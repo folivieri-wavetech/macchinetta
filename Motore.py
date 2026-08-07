@@ -48,27 +48,33 @@ def invia_notifica(titolo, messaggio, tags="rotating_light"):
     topic = config.get("NTFY_TOPIC")
     if topic:
         try:
+            orario = datetime.datetime.now().strftime("%H:%M:%S")
+            messaggio_con_orario = f"[{orario}] {messaggio}"
             headers = {
                 "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
                 "Tags": tags
             }
-            requests.post(f"https://ntfy.sh/{topic}", data=messaggio.encode('utf-8'), headers=headers, timeout=5)
+            requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
         except Exception as e:
             print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
-    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
-    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
-    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP", "valore_punto": 1},
-    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
-    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
-    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
-    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1}
+    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD"},
+    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD"},
+    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY"},
+    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP"},
+    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD"},
+    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD"},
+    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF"},
+    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY"},
+    "Ethereum": {"epic": "CS.D.ETHUSD.CFD.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "USD"},
+    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR"},
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR"}
 }
+
+# --- STATO GLOBALE ---
+falsi_allarmi_tracker = {}
 
 def print_log(strumento, messaggio):
     ora = datetime.datetime.now().strftime("%H:%M:%S")
@@ -162,7 +168,7 @@ def formatta_pnl(pnl):
     if pnl == 0:
         return ""
     segno = "+" if pnl > 0 else ""
-    return f" [Parziale: {segno}{pnl:.2f} €]"
+    return f" [Parziale: {segno}{int(round(pnl))} €]"
 
 # --- NUOVA REGISTRAZIONE STATISTICHE CHIRURGICA ---
 def registra_operazione(nome_strumento, fase_label, pnl_eur):
@@ -551,7 +557,25 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
             falso_allarme_ord = len([o for o in ord_agg if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == target_size]) > 0
     
     if falso_allarme_pos or falso_allarme_ord:
-        print_log(nome_strumento, f"✅ Falso allarme IG. Ordine o Posizione {etichetta} rilevata dopo l'attesa. Nessun rimpiazzo.")
+        ora = time.time()
+        tracker = falsi_allarmi_tracker.get(nome_strumento, {"count": 0, "last_time": 0})
+        
+        # Reset se è passato più di 1 minuto dall'ultimo falso allarme
+        if ora - tracker["last_time"] > 60:
+            tracker["count"] = 0
+            
+        tracker["count"] += 1
+        tracker["last_time"] = ora
+        falsi_allarmi_tracker[nome_strumento] = tracker
+        
+        if tracker["count"] >= 5:
+            testo_alert = f"Attenzione, mancato posizionamento su [{nome_strumento}] Ordine {etichetta}. Procedi con il Recovery."
+            print_log(nome_strumento, "🛑 Troppi falsi allarmi consecutivi (5). Genero Alert sulla Dashboard (Rimango in Automatico).")
+            aggiorna_memoria(nome_strumento, {"alert_falso_allarme": testo_alert})
+            tracker["count"] = 0
+            return True
+
+        print_log(nome_strumento, f"✅ Falso allarme IG. Ordine o Posizione {etichetta} rilevata dopo l'attesa. Nessun rimpiazzo. (Tentativo {tracker['count']}/5)")
         return True
         
     print_log(nome_strumento, f"⚠️ {etichetta} effettivamente mancante. Procedo con il rimpiazzo...")

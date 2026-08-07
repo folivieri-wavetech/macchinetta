@@ -554,7 +554,17 @@ else:
                 has_subrows = len(posizioni) > 1
                 master_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and not has_subrows) else ""
                 
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'><td><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td><td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td><u>{formatta_numero(avg_entry, dec)}</u></td><td><u>{formatta_numero(prezzo_attuale, dec) if prezzo_attuale else '-'}</u></td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span style='color: #0ea5e9; font-weight: bold;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                is_first_of_instrument = True
+                if i > 0:
+                    prev_nome = items_pos[i-1][0][0]
+                    if prev_nome == nome:
+                        is_first_of_instrument = False
+                        
+                prezzo_str = f"<u>{formatta_numero(prezzo_attuale, dec)}</u>" if prezzo_attuale else "<u>-</u>"
+                if not is_first_of_instrument:
+                    prezzo_str = ""
+
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'><td><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td><td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td><u>{formatta_numero(avg_entry, dec)}</u></td><td>{prezzo_str}</td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span style='color: #0ea5e9; font-weight: bold;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     for idx, p in enumerate(posizioni):
@@ -583,7 +593,7 @@ else:
                         is_last_subrow = (idx == len(posizioni) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td>{data_str}</td><td class='{size_class}'>{sign}{sz:g}</td><td>{formatta_numero(lvl, dec)}</td><td>{formatta_numero(prezzo_attuale, dec) if prezzo_attuale else '-'}</td><td>{s_str}</td><td>{l_str}</td><td><span style='color: #0ea5e9; font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td>{data_str}</td><td class='{size_class}'>{sign}{sz:g}</td><td>{formatta_numero(lvl, dec)}</td><td></td><td>{s_str}</td><td>{l_str}</td><td><span style='color: #0ea5e9; font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
             html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td style='font-weight: bold;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
@@ -634,7 +644,11 @@ else:
                         
                 row_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if is_last_of_instrument else ""
                 
-                html_ord += f"<tr class='ig-row' style='{row_style}'><td><span class='ig-dot'></span><span style='color: #FFD700; font-weight: bold;'>{nome}</span></td><td class='{size_class}'>{sign}{sz:g}</td><td>{formatta_numero(lvl, dec)}</td><td>{formatta_numero(prezzo_attuale, dec) if prezzo_attuale else '-'}</td><td>{s_str}</td><td>{l_str}</td><td><span style='color: #0ea5e9; font-weight: bold;'>{ruolo_ord}</span></td></tr>\n"
+                prezzo_str = formatta_numero(prezzo_attuale, dec) if prezzo_attuale else '-'
+                if i > 0 and ord_data_sorted[i-1]['marketData']['epic'] == epic:
+                    prezzo_str = ""
+                
+                html_ord += f"<tr class='ig-row' style='{row_style}'><td><span class='ig-dot'></span><span style='color: #FFD700; font-weight: bold;'>{nome}</span></td><td class='{size_class}'>{sign}{sz:g}</td><td>{formatta_numero(lvl, dec)}</td><td>{prezzo_str}</td><td>{s_str}</td><td>{l_str}</td><td><span style='color: #0ea5e9; font-weight: bold;'>{ruolo_ord}</span></td></tr>\n"
                 
             html_ord += "</tbody></table>"
             
@@ -831,6 +845,14 @@ else:
 
                     if msg_weekend: st.error(f"🛑 {msg_weekend}")
                     if msg_manuale: st.error(msg_manuale)
+                    
+                    alert_falso = dati_salvati.get("alert_falso_allarme")
+                    if alert_falso:
+                        st.error(f"🛑 **{alert_falso}**")
+                        if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}"):
+                            memoria_attuale[nome] = {**dati_salvati, "alert_falso_allarme": ""}
+                            salva_memoria(conto_selezionato, memoria_attuale)
+                            st.rerun()
                     
                     c_in1, c_in2 = st.columns(2)
                     with c_in1: tp = st.number_input("TP", value=int(tp_val), step=5, format="%d", key=f"{conto_selezionato}_{nome}_tp")
