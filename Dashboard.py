@@ -731,7 +731,7 @@ else:
                                 spia = " 🟢" if (prezzo < f3_base + (dati.get("tp", 50)/4)*mult if f3_dir == "BUY" else prezzo > f3_base - (dati.get("tp", 50)/4)*mult) else " 🔴"
                     
                     if not is_attivo and stato == "IN_ATTESA":
-                        stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #abb2bf; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>{'🟢 Ciclo Concluso (Spenta)' if storico else '⚪ Spenta / In Attesa'}</span>"
+                        stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #abb2bf; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>{'⚪ Ciclo Concluso (Spenta)' if storico else '⚪ Spenta / In Attesa'}</span>"
                     elif not is_attivo:
                         stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>🔴 SPENTA ({stato_display})</span>"
                     elif stato == "FASE_2_STANDBY":
@@ -739,15 +739,38 @@ else:
                     else:
                         stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
                     
+                    has_anomalia = bool(dati.get("alert_falso_allarme") or dati.get("errore_avvio") or dati.get("errore_ripristino") or dati.get("msg_manuale"))
+                    
+                    if has_anomalia:
+                        bg_color = "#FFC107" # Giallo
+                        text_color = "black"
+                    elif is_attivo:
+                        bg_color = "#198754" # Verde
+                        text_color = "white"
+                    else:
+                        bg_color = "#E97451" # Salmone
+                        text_color = "white"
+                        
+                    marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
+                    css_marker = f"""<style>
+                    div[data-testid="stHorizontalBlock"]:has(.{marker_class}) {{
+                        margin-bottom: -15px !important;
+                    }}
+                    div[data-testid="stColumn"]:has(.{marker_class}) div[data-testid="stButton"] > button {{
+                        background-color: {bg_color} !important; border-color: {bg_color} !important; color: {text_color} !important;
+                    }}
+                    </style>"""
+                    
                     c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
                     with c1:
+                        st.markdown(f"<span class='{marker_class}'></span>{css_marker}", unsafe_allow_html=True)
                         if st.button(nome, key=f"wip_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
                             mostra_diario_wip(nome, storico)
                     
-                    c2.markdown(f"<div style='height: 32px; display: flex; align-items: center; margin-top: -15px;'>{stato_visivo}</div>", unsafe_allow_html=True)
-                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; margin-top: -15px;'>{prezzo}</div>", unsafe_allow_html=True)
+                    c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
+                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px;'>{prezzo}</div>", unsafe_allow_html=True)
                     ultimo_evento = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
-                    c4.markdown(f"<div style='margin-top: -15px; font-size: 0.85rem; color: white; font-style: italic; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
+                    c4.markdown(f"<div style='font-size: 0.85rem; color: white; font-style: italic; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
                     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
                     
         renderizza_sintesi()
