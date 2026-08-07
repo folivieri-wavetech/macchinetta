@@ -1,0 +1,25 @@
+# Credenziali e Token privati
+.env
+token_ig.json
+
+# File di stato e log locali
+*.log
+console_live.log
+stato_sistema.json
+memoria_parametri.json
+storico_operazioni.csv
+
+# File binari e build
+*.exe
+build/
+dist/
+
+# Backup e file temporanei office
+BACKUP/
+~$*.docx
+~$*.xlsx
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
