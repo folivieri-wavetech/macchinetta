@@ -222,7 +222,7 @@ def aggiorna_memoria(nome_strumento, aggiornamenti, log_wip=None):
             time.sleep(0.5)
     print_log(nome_strumento, "⚠️ Errore salvataggio Diario: File bloccato.")
 
-def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezzi_live=None, distanze_minime=None):
+def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None):
     dati = {
         "saldo": str(saldo),
         "disponibile": str(disponibile),
@@ -232,7 +232,8 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
         "durata_sessione": calcola_durata_sessione(),
         "ultimo_aggiornamento": datetime.datetime.now().strftime("%H:%M:%S"),
         "prezzi_live": prezzi_live or {},
-        "distanze_minime": distanze_minime or {}
+        "distanze_minime": distanze_minime or {},
+        "prezzi_bid_ask": prezzi_bid_ask or {}
     }
     with open("stato_sistema.json", "w") as f:
         json.dump(dati, f, indent=4)
@@ -322,7 +323,7 @@ def ottieni_dati_mercati_batch(h):
             
     return risultato
 
-def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None):
+def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=None):
     try:
         h_conti = h.copy()
         h_conti["Version"] = "1"
@@ -336,7 +337,7 @@ def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None):
             marg = il_mio_conto['balance'].get('deposit', 0)
             dd = il_mio_conto['balance'].get('profitLoss', 0)
             
-            scrivi_stato_sistema(bal, disp, marg, dd, "Sistema Online", prezzi_live, dist_min)
+            scrivi_stato_sistema(bal, disp, marg, dd, "Sistema Online", prezzi_live, dist_min, prezzi_bid_ask)
     except Exception:
         pass
 
@@ -534,7 +535,7 @@ def pulisci_mercato(epic, headers_auth, nome_strumento, solo_pendenti=False, man
                 time.sleep(1.5) 
 
 # --- FUNZIONE CENTRALIZZATA DI SICUREZZA API ---
-def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target_dir, etichetta, pos_attese=0):
+def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target_dir, etichetta, pos_attese=0, no_stop=False):
     print_log(nome_strumento, f"⏳ Ordine {etichetta} non rilevato. Pausa di 6s per assestamento server IG...")
     time.sleep(6.0)
     
@@ -542,6 +543,8 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
     falso_allarme_pos = False
     if resp_pos_check and resp_pos_check.status_code == 200:
         pos_agg = [p for p in resp_pos_check.json().get('positions', []) if p['market']['epic'] == epic]
+        if no_stop:
+            pos_agg = [p for p in pos_agg if p['position'].get('stopLevel') is None]
         if target_dir:
             falso_allarme_pos = len([p for p in pos_agg if float(p['position']['size']) == target_size and p['position']['direction'] == target_dir]) > pos_attese
         else:
@@ -551,6 +554,8 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
     falso_allarme_ord = False
     if resp_ord_check and resp_ord_check.status_code == 200:
         ord_agg = [o for o in resp_ord_check.json().get('workingOrders', []) if o['marketData']['epic'] == epic]
+        if no_stop:
+            ord_agg = [o for o in ord_agg if o['workingOrderData'].get('stopLevel') is None]
         if target_dir:
             falso_allarme_ord = len([o for o in ord_agg if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == target_size and o['workingOrderData']['direction'] == target_dir]) > 0
         else:
@@ -678,13 +683,15 @@ def esegui_motore():
             
             prezzi_live = {}
             distanze_minime = {}
+            prezzi_bid_ask = {}
             
             for n, v in dati_mercati.items():
                 prezzi_live[n] = round(float((v["bid"]+v["ask"])/2), CONFIG_STRUMENTI[n]["decimali"])
                 distanze_minime[n] = v["min_dist"]
+                prezzi_bid_ask[n] = {"bid": v["bid"], "ask": v["ask"]}
             
             if ora_attuale - ultimo_controllo_saldo >= 15:
-                ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime)
+                ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
                 ultimo_controllo_saldo = ora_attuale
 
             resp_pos_global = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
@@ -1076,49 +1083,49 @@ def esegui_motore():
                                 chiudi_parziale(nome, m_attiva['position']['dealId'], epic, "BUY" if m_attiva['position']['direction'] == "SELL" else "SELL", m_attiva['position']['size'], valuta, h, etichetta="[ASSICURAZIONE]")
                                 time.sleep(3.0) 
                             
-                            print_log(nome, "➡️ Inserisco Ordine [TICKET]...")
+                            print_log(nome, "➡️ Inserisco Ordine [TICKET1]...")
                             pulisci_mercato(epic, h, nome, solo_pendenti=True)
                             time.sleep(3.0) 
                             
-                            ticket_dir = "BUY" if dir_core == "LONG" else "SELL"
+                            ticket1_dir = "BUY" if dir_core == "LONG" else "SELL"
                             
                             if dir_core == "LONG":
-                                ticket_base = float(core_short[0]['position']['level'])
+                                ticket1_base = float(core_short[0]['position']['level'])
                             else:
-                                ticket_base = float(core_long[0]['position']['level'])
+                                ticket1_base = float(core_long[0]['position']['level'])
                             
                             opp_val = round(param.get("opp") * mult, dec)
-                            lim_lvl = round(ticket_base + opp_val, dec) if ticket_dir == "BUY" else round(ticket_base - opp_val, dec)
-                            stop_lvl = round(ticket_base - opp_val, dec) if ticket_dir == "BUY" else round(ticket_base + opp_val, dec)
+                            lim_lvl = round(ticket1_base + opp_val, dec) if ticket1_dir == "BUY" else round(ticket1_base - opp_val, dec)
+                            stop_lvl = round(ticket1_base - opp_val, dec) if ticket1_dir == "BUY" else round(ticket1_base + opp_val, dec)
                             
-                            successo_ticket = invia_ordine_mercato(nome, epic, valuta, ticket_dir, s_ass, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET]")
+                            successo_ticket1 = invia_ordine_mercato(nome, epic, valuta, ticket1_dir, s_ass, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET1]")
                             time.sleep(3.0) 
                             
-                            real_ticket_lvl = ticket_base
+                            real_ticket1_lvl = ticket1_base
                             new_deal_id = None
                             
-                            if successo_ticket:
+                            if successo_ticket1:
                                 resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
                                 if resp_ticket and resp_ticket.status_code == 200:
-                                    pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == ticket_dir and float(p['position']['size']) == s_ass]
+                                    pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == ticket1_dir and float(p['position']['size']) == s_ass]
                                     if pos_t:
-                                        real_ticket_lvl = float(pos_t[0]['position']['level'])
+                                        real_ticket1_lvl = float(pos_t[0]['position']['level'])
                                         new_deal_id = pos_t[0]['position']['dealId']
                                         
-                                        invia_notifica(f"🎫 ENTRY FASE 2: {nome}", f"[{nome}] Ticket {ticket_dir} entrato a mercato a {formatta_numero(real_ticket_lvl, dec)}.", "ticket")
+                                        invia_notifica(f"🎫 ENTRY FASE 2: {nome}", f"[{nome}] Ticket {ticket1_dir} entrato a mercato a {formatta_numero(real_ticket1_lvl, dec)}.", "ticket")
                                         aggiorna_memoria(nome, {
-                                            "stato": "FASE_2_TICKET", 
-                                            "ticket_dir": ticket_dir, 
-                                            "ticket_base": ticket_base, 
-                                            "ticket_entry": real_ticket_lvl,
-                                            "ticket_deal_id": new_deal_id
-                                        }, log_wip=f"✅ [ASSICURAZIONE] chiusa{pnl_str}. ➡️ Entrata in Fase 2 - [TICKET] {ticket_dir} eseguito a {formatta_numero(real_ticket_lvl, dec)}.")
+                                            "stato": "FASE_2_TICKET1", 
+                                            "ticket1_dir": ticket1_dir, 
+                                            "ticket1_base": ticket1_base, 
+                                            "ticket1_entry": real_ticket1_lvl,
+                                            "ticket1_deal_id": new_deal_id
+                                        }, log_wip=f"✅ [ASSICURAZIONE] chiusa{pnl_str}. ➡️ Entrata in Fase 2 - [TICKET1] {ticket1_dir} eseguito a {formatta_numero(real_ticket1_lvl, dec)}.")
                                         continue
                                     else:
-                                        print_log(nome, "⚠️ Ordine [TICKET] non trovato su IG nonostante la conferma.")
+                                        print_log(nome, "⚠️ Ordine [TICKET1] non trovato su IG nonostante la conferma.")
                                         continue
                             else:
-                                print_log(nome, "⚠️ [TICKET] Impossibile aprire. Riprovo al prossimo giro.")
+                                print_log(nome, "⚠️ [TICKET1] Impossibile aprire. Riprovo al prossimo giro.")
                                 continue
 
                         if not micro_gia_a_mercato and not pendenti_micro and is_micro_closing:
@@ -1224,21 +1231,21 @@ def esegui_motore():
                                 pulisci_mercato(epic, h, nome, solo_pendenti=True)
                                 aggiorna_memoria(nome, {"attivo": False, "modalita_manuale": True, "stato": "MANUALE", "msg_manuale": "❌ IG ha rifiutato i SAT1 OCO dopo l'attesa. Il Motore passa in Manuale."})
 
-                    elif stato == "FASE_2_TICKET":
+                    elif stato == "FASE_2_TICKET1":
                         s_mezzo = max(1.0, s_core / 2)
                         dir_core = param.get("direzione")
                         core_ig_dir = "BUY" if dir_core == "LONG" else "SELL"
-                        ticket_dir = param.get("ticket_dir")
-                        ticket_base = param.get("ticket_base")
+                        ticket1_dir = param.get("ticket1_dir")
+                        ticket1_base = param.get("ticket1_base")
                         opp_val = round(param.get("opp") * mult, dec)
                         
                         primary_core = [p for p in posizioni if float(p['position']['size']) == s_core and p['position']['direction'] == core_ig_dir]
                         if not primary_core:
                             continue 
 
-                        ticket_attivo = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket_dir]
+                        ticket1_attivo = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket1_dir]
                         
-                        if ticket_attivo:
+                        if ticket1_attivo:
                             continue
                         
                         if not bid or not ask:
@@ -1247,21 +1254,21 @@ def esegui_motore():
                         prezzo_attuale = round((bid + ask) / 2, dec)
                         
                         vittoria = False
-                        if ticket_dir == "BUY" and prezzo_attuale > ticket_base:
+                        if ticket1_dir == "BUY" and prezzo_attuale > ticket1_base:
                             vittoria = True
-                        elif ticket_dir == "SELL" and prezzo_attuale < ticket_base:
+                        elif ticket1_dir == "SELL" and prezzo_attuale < ticket1_base:
                             vittoria = True
                         
                         if vittoria:
-                            print_log(nome, "➡️ Profitto incassato. FLIP del [TICKET] a mercato...")
+                            print_log(nome, "➡️ Profitto incassato. FLIP del [TICKET1] a mercato...")
                             
-                            nuova_ticket_dir = "SELL" if ticket_dir == "BUY" else "BUY"
-                            nuova_ticket_base = round(ticket_base + opp_val, dec) if ticket_dir == "BUY" else round(ticket_base - opp_val, dec)
+                            nuova_ticket_dir = "SELL" if ticket1_dir == "BUY" else "BUY"
+                            nuova_ticket_base = round(ticket1_base + opp_val, dec) if ticket1_dir == "BUY" else round(ticket1_base - opp_val, dec)
                             
                             lim_lvl = round(nuova_ticket_base - opp_val, dec) if nuova_ticket_dir == "SELL" else round(nuova_ticket_base + opp_val, dec)
                             stop_lvl = round(nuova_ticket_base + opp_val, dec) if nuova_ticket_dir == "SELL" else round(nuova_ticket_base - opp_val, dec)
                             
-                            succ_tick = invia_ordine_mercato(nome, epic, valuta, nuova_ticket_dir, s_mezzo, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET]")
+                            succ_tick = invia_ordine_mercato(nome, epic, valuta, nuova_ticket_dir, s_mezzo, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET1]")
                             time.sleep(3.0)
                             
                             if succ_tick:
@@ -1270,36 +1277,41 @@ def esegui_motore():
                                 rate = get_eur_rate(valuta, prezzi_live)
                                 pnl_eur = pnl_valuta * rate
                                 
-                                registra_operazione(nome, "Ping-Pong TICKET (Fase 2)", pnl_eur)
+                                registra_operazione(nome, "Ping-Pong TICKET1 (Fase 2)", pnl_eur)
                                 
                                 resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
-                                real_ticket_lvl = nuova_ticket_base
+                                real_ticket1_lvl = nuova_ticket_base
                                 new_deal_id = None
                                 if resp_ticket and resp_ticket.status_code == 200:
                                     pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == nuova_ticket_dir and float(p['position']['size']) == s_mezzo]
                                     if pos_t:
-                                        real_ticket_lvl = float(pos_t[0]['position']['level'])
+                                        real_ticket1_lvl = float(pos_t[0]['position']['level'])
                                         new_deal_id = pos_t[0]['position']['dealId']
                                 
-                                invia_notifica(f"🎫 PING-PONG TICKET: {nome}", f"[{nome}] Ticket a target a {formatta_numero(prezzo_attuale, dec)}! Rigirato {nuova_ticket_dir} a {formatta_numero(real_ticket_lvl, dec)}.{formatta_pnl(pnl_eur)}", "ticket")
+                                invia_notifica(f"🎫 PING-PONG TICKET1: {nome}", f"[{nome}] Ticket a target a {formatta_numero(prezzo_attuale, dec)}! Rigirato {nuova_ticket_dir} a {formatta_numero(real_ticket1_lvl, dec)}.{formatta_pnl(pnl_eur)}", "ticket")
                                         
                                 aggiorna_memoria(nome, {
-                                    "stato": "FASE_2_TICKET",
-                                    "ticket_dir": nuova_ticket_dir,
-                                    "ticket_base": nuova_ticket_base,
-                                    "ticket_entry": real_ticket_lvl,
-                                    "ticket_deal_id": new_deal_id
-                                }, log_wip=f"✅ [TICKET] a target a {formatta_numero(prezzo_attuale, dec)}! Ping-Pong: Rigirato {nuova_ticket_dir} a {formatta_numero(real_ticket_lvl, dec)}.{formatta_pnl(pnl_eur)}")
+                                    "stato": "FASE_2_TICKET1",
+                                    "ticket1_dir": nuova_ticket_dir,
+                                    "ticket1_base": nuova_ticket_base,
+                                    "ticket1_entry": real_ticket1_lvl,
+                                    "ticket1_deal_id": new_deal_id
+                                }, log_wip=f"✅ [TICKET1] a target a {formatta_numero(prezzo_attuale, dec)}! Ping-Pong: Rigirato {nuova_ticket_dir} a {formatta_numero(real_ticket1_lvl, dec)}.{formatta_pnl(pnl_eur)}")
                             else:
                                 print_log(nome, "⚠️ IG ha rifiutato il FLIP del Ticket.")
                         else:
                             time.sleep(3.0)
                             resp_check = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
                             pos_check = [p for p in resp_check.json().get('positions', []) if p['market']['epic'] == epic]
-                            ticket_check = [p for p in pos_check if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket_dir]
+                            ticket1_check = [p for p in pos_check if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket1_dir]
                             
-                            if not ticket_check:
-                                # --- CALCOLO UTILE TEORICO LOSS TICKET ---
+                            if not ticket1_check:
+                                # --- CALCOLO UTILE TEORICO LOSS TICKET1 ---
+                                falso_allarme_t1 = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, ticket1_dir, "[TICKET1 (LOSS?)]")
+                                if falso_allarme_t1:
+                                    continue
+                                    
+                                # --- CALCOLO UTILE TEORICO LOSS TICKET1 ---
                                 valore_punto = c.get("valore_punto", 1)
                                 pnl_ticket_loss_valuta = - (param.get("opp") * s_mezzo * valore_punto)
                                 rate = get_eur_rate(valuta, prezzi_live)
@@ -1307,7 +1319,7 @@ def esegui_motore():
                                 pnl_str = formatta_pnl(pnl_ticket_loss_eur)
                                 # --- FINE CALCOLO ---
                                 
-                                registra_operazione(nome, "Stop Loss TICKET (Fase 2)", pnl_ticket_loss_eur)
+                                registra_operazione(nome, "Stop Loss TICKET1 (Fase 2)", pnl_ticket_loss_eur)
                                 
                                 core_long = [p for p in posizioni if p['position']['direction'] == "BUY" and float(p['position']['size']) == s_core]
                                 core_short = [p for p in posizioni if p['position']['direction'] == "SELL" and float(p['position']['size']) == s_core]
@@ -1322,7 +1334,25 @@ def esegui_motore():
                                     oco_str = ""
                                     
                                 invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Stop Ticket a {formatta_numero(prezzo_attuale, dec)}. Inseriti due ordini SAT1 OCO{oco_str}.{pnl_str}", "satellite")
-                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"❌ Stop [TICKET] colpito a {formatta_numero(prezzo_attuale, dec)}. Inserisco Ordini SAT1 (OCO){oco_str}.{pnl_str}")
+                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"❌ Stop [TICKET1] colpito a {formatta_numero(prezzo_attuale, dec)}. Inserisco Ordini SAT1 (OCO){oco_str}.{pnl_str}")
+                                log_ticket2 = ""
+                                if param.get("opp") == param.get("tp") / 4:
+                                    print_log(nome, "➡️ Condizione OPP == TP/4 verificata. Apertura [TICKET2] a mercato...")
+                                    ticket2_dir = ticket1_dir
+                                    lim_lvl_t2 = round(prezzo_attuale + (param.get("tp") / 4) * mult, dec) if ticket2_dir == "BUY" else round(prezzo_attuale - (param.get("tp") / 4) * mult, dec)
+                                    succ_t2 = invia_ordine_mercato(nome, epic, valuta, ticket2_dir, s_mezzo, h, dec, limit_lvl=lim_lvl_t2, stop_lvl=None, etichetta="[TICKET2]")
+                                    if succ_t2:
+                                        extra_mem = {
+                                            "ticket2_active": True,
+                                            "ticket2_entry": prezzo_attuale,
+                                            "ticket2_dir": ticket2_dir
+                                        }
+                                        log_ticket2 = f" ➕ [TICKET2] {ticket2_dir} a mercato ({formatta_numero(prezzo_attuale, dec)})."
+                                        invia_notifica(f"🎫 ENTRY TICKET2: {nome}", f"[{nome}] Ticket2 {ticket2_dir} aperto a mercato a {formatta_numero(prezzo_attuale, dec)}.", "ticket")
+                                # --- FINE LOGICA TICKET2 ---
+                                    
+                                invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Stop Ticket1 a {formatta_numero(prezzo_attuale, dec)}. Inseriti due ordini SAT1 OCO{oco_str}.{pnl_str}", "satellite")
+                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0, **extra_mem}, log_wip=f"❌ Stop [TICKET1] colpito a {formatta_numero(prezzo_attuale, dec)}. Inserisco Ordini SAT1 (OCO){oco_str}.{pnl_str}{log_ticket2}")
 
                     elif stato == "FASE_2_SATELLITI":
                         s_mezzo = max(1.0, s_core / 2)
@@ -1333,11 +1363,44 @@ def esegui_motore():
                         
                         core_ids = [p['position']['dealId'] for p in posizioni if float(p['position']['size']) == s_core]
                         sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
+                        # --- LOGICA PING PONG TICKET2 E FILTRO SAT1 ---
+                        is_ticket2 = lambda p: param.get("ticket2_active") and p['position']['direction'] == param.get("ticket2_dir") and p['position'].get('stopLevel') is None
+                        
+                        sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids and not is_ticket2(p)]
+                        
+                        if param.get("ticket2_active"):
+                            ticket2_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and is_ticket2(p)]
+                            ticket2_pendenti = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == param.get("ticket2_dir") and o['workingOrderData'].get('stopDistance') is None and o['workingOrderData'].get('stopLevel') is None]
+                            
+                            if not ticket2_attivi and not ticket2_pendenti:
+                                t2_dir = param.get("ticket2_dir")
+                                falso_allarme_t2 = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, t2_dir, "[ORDINE TICKET2]", no_stop=True)
+                                
+                                if not falso_allarme_t2:
+                                    t2_entry = param.get("ticket2_entry")
+                                    print_log(nome, f"🎯 [TICKET2] chiuso in profitto. Reinserisco ordine pendente a {formatta_numero(t2_entry, dec)}...")
+                                    lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
+                                    invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
+                                    invia_notifica(f"🎫 PING-PONG TICKET2: {nome}", f"[{nome}] Ticket2 ha preso profitto! Ordine pendente reinserito a {formatta_numero(t2_entry, dec)}.", "ticket")
+                                    time.sleep(2.0)
+                        # --- FINE LOGICA TICKET2 ---
                         
                         if sat1_attivi:
                             sat_pos = sat1_attivi[0]
                             sat_dir = sat_pos['position']['direction']
                             sat_price = float(sat_pos['position']['level'])
+                            
+                            # --- PULIZIA TICKET2 (Caso B e C) ---
+                            if param.get("ticket2_active"):
+                                print_log(nome, f"🚨 OCO entrato a mercato. Pulizia [TICKET2] in corso...")
+                                ticket2_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and is_ticket2(p)]
+                                if ticket2_attivi:
+                                    t2_deal_id = ticket2_attivi[0]['position']['dealId']
+                                    dir_chiusura_t2 = "SELL" if ticket2_attivi[0]['position']['direction'] == "BUY" else "BUY"
+                                    print_log(nome, f"📉 Chiusura a mercato del [TICKET2] (Loss)...")
+                                    chiudi_parziale(nome, t2_deal_id, epic, dir_chiusura_t2, s_mezzo, valuta, h, etichetta="[TICKET2 CLOSURE]")
+                                    time.sleep(1.0)
+                            # --- FINE PULIZIA ---
                             
                             pulisci_mercato(epic, h, nome, solo_pendenti=True)
                             

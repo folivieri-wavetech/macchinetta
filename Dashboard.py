@@ -143,6 +143,81 @@ def get_ig_headers(conto_selezionato):
     except:
         return None
 
+@st.dialog("Configurazione Avvio Sincrono Multiconto", width="large")
+def dialog_sync_start(conto_partenza, nome_strumento):
+    conti_disponibili = [d for d in os.listdir(".") if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
+    if len(conti_disponibili) < 2:
+        st.error("⚠️ Sono necessari almeno due conti (Demo o Reali) per utilizzare l'Avvio Sincrono Multiconto.")
+        return
+        
+    st.markdown(f"### ⚖️ Avvio Sincrono per {nome_strumento}")
+    st.write("Seleziona i conti su cui avviare le due gambe dell'operazione (una LONG e una SHORT).")
+    
+    mem_partenza = carica_memoria(conto_partenza)
+    dati_partenza = mem_partenza.get(nome_strumento, {})
+    
+    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash"]
+    def_tp = 100 if is_asset else 50
+    def_opp = 20 if is_asset else 10
+    def_dts = 10 if is_asset else 5
+    
+    tp_val = dati_partenza.get("tp", def_tp)
+    opp_val = dati_partenza.get("opp", def_opp)
+    dts_val = dati_partenza.get("dts", def_dts)
+    size_val = dati_partenza.get("size", 4)
+    
+    st.info(f"**Parametri di base (dal conto attuale):** TP = {tp_val} | OPP = {opp_val} | DTS = {dts_val} | Size = {size_val}")
+    
+    idx_long = conti_disponibili.index(conto_partenza) if conto_partenza in conti_disponibili else 0
+    idx_short = (idx_long + 1) % len(conti_disponibili) if len(conti_disponibili) > 1 else 0
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        conto_l = st.selectbox("🟢 Conto Lato LONG", conti_disponibili, index=idx_long, key=f"sync_l_{nome_strumento}")
+    with col2:
+        conto_s = st.selectbox("🔴 Conto Lato SHORT", conti_disponibili, index=idx_short, key=f"sync_s_{nome_strumento}")
+        
+    if conto_l == conto_s:
+        st.error("⚠️ Devi selezionare due conti differenti per l'Avvio Sincrono!")
+        if st.button("❌ ANNULLA", key=f"sync_annulla_err_{nome_strumento}"):
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+        return
+        
+    # Controllo Congruità Parametri
+    mem_l = carica_memoria(conto_l).get(nome_strumento, {})
+    mem_s = carica_memoria(conto_s).get(nome_strumento, {})
+    
+    p_l = (mem_l.get("tp", def_tp), mem_l.get("opp", def_opp), mem_l.get("dts", def_dts), mem_l.get("size", 4))
+    p_s = (mem_s.get("tp", def_tp), mem_s.get("opp", def_opp), mem_s.get("dts", def_dts), mem_s.get("size", 4))
+    
+    if p_l != p_s:
+        st.warning(f"⚠️ **Attenzione: i parametri salvati sui due conti non coincidono.**\n\n- **{conto_l} (LONG):** TP={p_l[0]}, OPP={p_l[1]}, DTS={p_l[2]}, Size={p_l[3]}\n- **{conto_s} (SHORT):** TP={p_s[0]}, OPP={p_s[1]}, DTS={p_s[2]}, Size={p_s[3]}\n\nAssicurati di salvarli identici nella Dashboard di entrambi i conti prima di avviare il Sincrono per mantenere un hedging perfetto.")
+        if st.button("❌ ANNULLA", key=f"sync_annulla_warn_{nome_strumento}"):
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+        return
+        
+    c_btn1, c_btn2 = st.columns(2)
+    with c_btn1:
+        if st.button("⚡ CONFERMA AVVIO SINCRONO", type="primary", use_container_width=True, key=f"sync_conf_{nome_strumento}"):
+            full_mem_l = carica_memoria(conto_l)
+            full_mem_s = carica_memoria(conto_s)
+            
+            full_mem_l[nome_strumento] = {"attivo": True, "direzione": "LONG", "tp": p_l[0], "opp": p_l[1], "dts": p_l[2], "size": p_l[3], "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+            salva_memoria(conto_l, full_mem_l)
+            
+            full_mem_s[nome_strumento] = {"attivo": True, "direzione": "SHORT", "tp": p_s[0], "opp": p_s[1], "dts": p_s[2], "size": p_s[3], "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+            salva_memoria(conto_s, full_mem_s)
+            
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+    with c_btn2:
+        if st.button("❌ ANNULLA", use_container_width=True, key=f"sync_annulla_{nome_strumento}"):
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+
+
 @st.dialog("Modifica SL/TP su IG", width="large")
 def dialog_sync(conto_selezionato, nome_strumento):
     st.markdown(f"### ⚙️ {nome_strumento} | Gestione Posizioni IG")
@@ -367,7 +442,7 @@ else:
 
     # TABS RIORDINATI (Portafoglio IG per primo)
     tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console = st.tabs([
-        "💼 Portafoglio IG", "📝 Sintesi", "🎛️ Operatività", "🛠️ Recovery", "📊 Statistiche", "💻 Console"
+        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console"
     ])
 
     with tab_portafoglio:
@@ -412,7 +487,7 @@ else:
                 elif abs(sz_pos - s_m) < 0.001:
                     if "FASE_1" in stato_sys: 
                         return "Micro" if has_limits else "Assicurazione"
-                    if "TICKET" in stato_sys: return "Ticket"
+                    if "TICKET1" in stato_sys: return "Ticket"
                     if "SATELLITE" in stato_sys: return "SAT1" if dir_pos == param_memoria.get("sat_dir", "") else "OverGain"
                     if "FASE_3" in stato_sys: return "Ultima"
                     return "SAT1" if "FASE_2" in stato_sys else ("Micro" if has_limits else "Assicurazione")
@@ -438,7 +513,7 @@ else:
                     return f"Core ({dir_label})"
                 elif abs(sz_pos - s_m) < 0.001:
                     if "FASE_1" in stato_sys: return "Micro"
-                    if "SATELLIT" in stato_sys or "STANDBY" in stato_sys or "TICKET" in stato_sys:
+                    if "SATELLIT" in stato_sys or "STANDBY" in stato_sys or "TICKET1" in stato_sys:
                         if "OG" in stato_sys or "OL" in stato_sys or "(OG-OL)" in stato_sys:
                             return "OverGain"
                         return "SAT1 OCO"
@@ -698,6 +773,8 @@ else:
                 st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                # Ordina portando in cima gli strumenti attivi (True -> 0, False -> 1) preservando l'ordine originale per i parimerito
+                tutti_strumenti.sort(key=lambda x: not memoria.get(x, {}).get("attivo", False))
                 
                 for nome in tutti_strumenti:
                     dati = memoria.get(nome, {})
@@ -717,19 +794,25 @@ else:
                             if dir_core and base is not None:
                                 stato_display = f"FASE_1 + Micro ({'SHORT' if dir_core == 'LONG' else 'LONG'})"
                                 spia = " 🟢" if (prezzo < base + (tp/4)*mult if dir_core == 'LONG' else prezzo > base - (tp/4)*mult) else " 🔴"
-                        elif stato == "FASE_2_TICKET":
-                            t_dir, t_entry = dati.get("ticket_dir"), dati.get("ticket_entry", dati.get("ticket_base")) 
+                        elif stato == "FASE_2_TICKET1":
+                            t_dir, t_entry = dati.get("ticket1_dir"), dati.get("ticket1_entry", dati.get("ticket1_base")) 
                             if t_dir and t_entry is not None:
                                 spia = " 🟢" if (prezzo > t_entry if t_dir == "BUY" else prezzo < t_entry) else " 🔴"
                         elif stato in ["FASE_2_SATELLITE_OG", "FASE_2_SATELLITE_OL"]:
                             s_dir, s_base = dati.get("sat_dir"), dati.get("sat_price")
                             if s_dir and s_base is not None:
-                                spia = " 🟢" if (prezzo > s_base if s_dir == "SELL" else prezzo < s_base) else " 🔴"
+                                spia = " 🟢" if (prezzo > s_base if s_dir == "BUY" else prezzo < s_base) else " 🔴"
                         elif stato == "FASE_3 + Ultima":
                             f3_dir, f3_base = dati.get("fase3_dir"), dati.get("fase3_current_base")
                             if f3_dir and f3_base is not None:
                                 spia = " 🟢" if (prezzo < f3_base + (dati.get("tp", 50)/4)*mult if f3_dir == "BUY" else prezzo > f3_base - (dati.get("tp", 50)/4)*mult) else " 🔴"
                     
+                    if dati.get("ticket2_active"):
+                        t2_dir, t2_entry = dati.get("ticket2_dir"), dati.get("ticket2_entry")
+                        if t2_dir and t2_entry is not None:
+                            spia_t2 = " 🟢" if (prezzo > t2_entry if t2_dir == "BUY" else prezzo < t2_entry) else " 🔴"
+                            stato_display += f" [+ TICKET2 {spia_t2}]"
+
                     if not is_attivo and stato == "IN_ATTESA":
                         stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #abb2bf; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>{'⚪ Ciclo Concluso (Spenta)' if storico else '⚪ Spenta / In Attesa'}</span>"
                     elif not is_attivo:
@@ -782,6 +865,7 @@ else:
             stato = leggi_stato_sistema(conto_selezionato)
             distanze_minime = stato.get("distanze_minime", {})
             prezzi_live = stato.get("prezzi_live", {})
+            prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
             col_titolo_main, col_btn_restart = st.columns([4, 1])
             with col_titolo_main:
@@ -840,7 +924,9 @@ else:
                     with col_titolo:
                         badge = "🟢 <b>[ Auto ]</b>" if not modalita_manuale else "🟠 <b>[ Manuale ]</b>"
                         st.markdown(f"<div style='font-size: 1.4rem; font-weight: bold; white-space: nowrap; margin-bottom: -5px;'><span style='color: #FFD700;'>{nome}</span> <span style='font-size: 0.85rem; padding-left: 4px; vertical-align: middle; color: #abb2bf;'>{badge}</span></div>", unsafe_allow_html=True)
-                        st.caption(tipo)
+                        prezzi_ba = prezzi_bid_ask.get(nome, {})
+                        bid_ask_str = f"Bid: <span style='color:#ff4b4b;'>{prezzi_ba.get('bid', '-')}</span> | Ask: <span style='color:#09ab3b;'>{prezzi_ba.get('ask', '-')}</span>" if prezzi_ba else "<span style='color: #666;'>In aggiornamento...</span>"
+                        st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
                         
                     with col_salva:
                         if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help="Conferma e salva TP, OPP, DTS e Size", width="stretch"):
@@ -910,6 +996,12 @@ else:
                                 memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
+                        if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True):
+                            st.session_state[f"sync_open_{nome}"] = True
+                            st.rerun()
+                            
+                        if st.session_state.get(f"sync_open_{nome}", False):
+                            dialog_sync_start(conto_selezionato, nome)
                     else:
                         c_stop, c_man, c_wk, c_sync = st.columns([1.7, 2.3, 2.3, 1.7], vertical_alignment="center")
                         with c_stop:
@@ -974,7 +1066,7 @@ else:
         if r_fase == "FASE 1": 
             opzioni = ["Ordine MICRO (Pendente)"]
         elif r_fase == "FASE 2": 
-            opzioni = ["Posizione TICKET (A Mercato)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
+            opzioni = ["Posizione TICKET1 (A Mercato)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
         else: 
             opzioni = ["Ordine ULTIMA (Pendente)"]
 
@@ -1012,14 +1104,14 @@ else:
                     stop = round(p_base + 2*tp4_val if m_dir == "SELL" else p_base - 2*tp4_val, dec)
                     cmd_data = {"azione": "PENDENTE", "dir": m_dir, "size": s_mezzo, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": stop, "etichetta": "[RECOVERY MICRO]"}
 
-            elif "TICKET" in r_anom:
+            elif "TICKET1" in r_anom:
                 t_dir = "BUY" if dir_core == "LONG" else "SELL"
                 st.info("Il Ticket (post-assicurazione) è una POSIZIONE A MERCATO. Cliccando il bottone, la macchina entrerà immediatamente al prezzo live e ricalcolerà Stop e Limit in base all'OPP.")
                 
-                t_base = dati.get("ticket_base") or prezzo_live
+                t_base = dati.get("ticket1_base") or prezzo_live
                 lim = round(t_base + opp_val if t_dir == "BUY" else t_base - opp_val, dec)
                 stop = round(t_base - opp_val if t_dir == "BUY" else t_base + opp_val, dec)
-                cmd_data = {"azione": "MERCATO", "dir": t_dir, "size": s_mezzo, "lim": lim, "stop": stop, "etichetta": "[RECOVERY TICKET]"}
+                cmd_data = {"azione": "MERCATO", "dir": t_dir, "size": s_mezzo, "lim": lim, "stop": stop, "etichetta": "[RECOVERY TICKET1]"}
 
             elif "SAT2" in r_anom:
                 s_dir = dati.get("sat_dir")
@@ -1136,7 +1228,7 @@ else:
                     def categorizza_fase(fase_str):
                         f = str(fase_str).upper()
                         if "1" in f or "MICRO" in f or "ASSICURAZIONE" in f: return "F1"
-                        if "2" in f or "TICKET" in f or "SAT" in f or "OVERGAIN" in f or "OVERLOSS" in f or "OG" in f or "OL" in f: return "F2"
+                        if "2" in f or "TICKET1" in f or "SAT" in f or "OVERGAIN" in f or "OVERLOSS" in f or "OG" in f or "OL" in f: return "F2"
                         if "3" in f or "ULTIMA" in f or "TAGLIO" in f or "VITTORIA" in f: return "F3"
                         return "Altro"
 
