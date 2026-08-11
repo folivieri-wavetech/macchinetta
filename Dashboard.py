@@ -107,7 +107,7 @@ def mostra_diario_wip(nome_strumento, storico):
         totale = 0.0
         html_str = "<div style='font-size: 0.85rem; line-height: 1.6;'>"
         for riga in storico:
-            match = re.search(r"\[Parziale:\s*([+-]?\d+\.\d+)\s*€\]", riga)
+            match = re.search(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", riga)
             if match:
                 totale += float(match.group(1))
             
@@ -448,8 +448,8 @@ else:
     with tab_portafoglio:
         @st.fragment(run_every=15)
         def renderizza_portafoglio():
-            st.markdown("<h1 style='color: #FFD700;'>💼 Portafoglio IG (Live)</h1>", unsafe_allow_html=True)
-            st.markdown("Visualizzazione speculare in sola lettura delle tue posizioni e ordini sui server IG.")
+            st.markdown("<h1 style='color: #FFD700; text-align: center;'>💼 Portafoglio IG (Live)</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>Visualizzazione speculare in sola lettura delle tue posizioni e ordini sui server IG.</p>", unsafe_allow_html=True)
             
             h = get_ig_headers(conto_selezionato)
             if not h:
@@ -487,7 +487,9 @@ else:
                 elif abs(sz_pos - s_m) < 0.001:
                     if "FASE_1" in stato_sys: 
                         return "Micro" if has_limits else "Assicurazione"
-                    if "TICKET1" in stato_sys: return "Ticket"
+                    if "TICKET1" in stato_sys: return "Ticket1"
+                    if param_memoria.get("ticket2_active") and dir_pos == param_memoria.get("ticket2_dir") and not pos_dict.get('stopLevel'):
+                        return "Ticket2"
                     if "SATELLITE" in stato_sys: return "SAT1" if dir_pos == param_memoria.get("sat_dir", "") else "OverGain"
                     if "FASE_3" in stato_sys: return "Ultima"
                     return "SAT1" if "FASE_2" in stato_sys else ("Micro" if has_limits else "Assicurazione")
@@ -500,7 +502,7 @@ else:
                 elif abs(sz_pos - s_c * 0.50) < 0.001: return f"Core ({dir_label}) (Taglio 2)"
                 return "Posizione Orfana"
 
-            def get_role_ord(nome_strum, dir_pos, sz_pos, param_memoria):
+            def get_role_ord(nome_strum, dir_pos, sz_pos, param_memoria, ord_dict):
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
                 stato_sys = param_memoria.get("stato", "")
@@ -513,6 +515,8 @@ else:
                     return f"Core ({dir_label})"
                 elif abs(sz_pos - s_m) < 0.001:
                     if "FASE_1" in stato_sys: return "Micro"
+                    if param_memoria.get("ticket2_active") and dir_pos == param_memoria.get("ticket2_dir") and not ord_dict.get('stopDistance') and not ord_dict.get('stopLevel'):
+                        return "Ticket2"
                     if "SATELLIT" in stato_sys or "STANDBY" in stato_sys or "TICKET1" in stato_sys:
                         if "OG" in stato_sys or "OL" in stato_sys or "(OG-OL)" in stato_sys:
                             return "OverGain"
@@ -537,7 +541,7 @@ else:
                 gruppi_pos[key].append(p)
             
             # Intestazioni centrate e bianche
-            html_pos = "<h4 style='margin-top: 20px; text-align: center;'>Posizioni Aperte</h4>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'>MERCATO</th><th style='text-align: center; color: white;'>SIZE</th><th style='text-align: center; color: white;'>APERTURA</th><th style='text-align: center; color: white;'>ULTIMO</th><th style='text-align: center; color: white;'>STOP</th><th style='text-align: center; color: white;'>LIMITE</th><th style='text-align: center; color: white;'>TIPO</th><th style='text-align: center; color: white;'>P/L (EUR)</th></tr></thead>\n<tbody>\n"
+            html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>APERTURA</u></th><th style='text-align: center; color: white;'><u>ULTIMO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th><th style='text-align: center; color: white;'><u>P/L (EUR)</u></th></tr></thead>\n<tbody>\n"
             
             totale_pnl_portafoglio = 0.0
             
@@ -639,7 +643,7 @@ else:
                 if not is_first_of_instrument:
                     prezzo_str = ""
 
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'><td><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td><td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td><u>{formatta_numero(avg_entry, dec)}</u></td><td>{prezzo_str}</td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span style='color: #0ea5e9; font-weight: bold;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'><td><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td><td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span class='{size_class}' style='font-weight: bold;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     for idx, p in enumerate(posizioni):
@@ -668,17 +672,17 @@ else:
                         is_last_subrow = (idx == len(posizioni) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td>{data_str}</td><td class='{size_class}'>{sign}{sz:g}</td><td>{formatta_numero(lvl, dec)}</td><td></td><td>{s_str}</td><td>{l_str}</td><td><span style='color: #0ea5e9; font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td>{data_str}</td><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
             html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td style='font-weight: bold;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
             
-            if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'>Posizioni Aperte</h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
+            if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
             st.markdown(html_pos, unsafe_allow_html=True)
             
             # --- ELABORAZIONE ORDINI PENDENTI ---
-            html_ord = "<h4 style='margin-top: 40px; text-align: center;'>Ordini di Apertura</h4>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'>MERCATO</th><th style='text-align: center; color: white;'>SIZE</th><th style='text-align: center; color: white;'>LIVELLO</th><th style='text-align: center; color: white;'>ULTIMO</th><th style='text-align: center; color: white;'>STOP</th><th style='text-align: center; color: white;'>LIMITE</th><th style='text-align: center; color: white;'>TIPO</th></tr></thead>\n<tbody>\n"
+            html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th></tr></thead>\n<tbody>\n"
             
             # Ordino i pendenti per nome e poi per size
             ord_data_sorted = sorted(ord_data, key=lambda x: (
@@ -708,7 +712,7 @@ else:
                 l_str = "-"
                 if wo.get('limitDistance'): l_str = f"{int(float(wo['limitDistance']))}"
                 
-                ruolo_ord = get_role_ord(nome, dir, sz, memoria_attuale.get(nome, {}))
+                ruolo_ord = get_role_ord(nome, dir, sz, memoria_attuale.get(nome, {}), wo)
                 
                 is_last_of_instrument = True
                 if i < len(ord_data_sorted) - 1:
@@ -719,15 +723,11 @@ else:
                         
                 row_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if is_last_of_instrument else ""
                 
-                prezzo_str = formatta_numero(prezzo_attuale, dec) if prezzo_attuale else '-'
-                if i > 0 and ord_data_sorted[i-1]['marketData']['epic'] == epic:
-                    prezzo_str = ""
-                
-                html_ord += f"<tr class='ig-row' style='{row_style}'><td><span class='ig-dot'></span><span style='color: #FFD700; font-weight: bold;'>{nome}</span></td><td class='{size_class}'>{sign}{sz:g}</td><td>{formatta_numero(lvl, dec)}</td><td>{prezzo_str}</td><td>{s_str}</td><td>{l_str}</td><td><span style='color: #0ea5e9; font-weight: bold;'>{ruolo_ord}</span></td></tr>\n"
+                html_ord += f"<tr class='ig-row' style='{row_style}'><td><span class='ig-dot'></span><span style='color: #FFD700; font-weight: bold;'>{nome}</span></td><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: bold;'>{ruolo_ord}</span></td></tr>\n"
                 
             html_ord += "</tbody></table>"
             
-            if not ord_data: html_ord = "<h4 style='margin-top: 40px; text-align: center;'>Ordini di Apertura</h4><p style='color: #888; font-style: italic; text-align: center;'>Nessun ordine pendente al momento.</p>"
+            if not ord_data: html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessun ordine pendente al momento.</p>"
 
             st.markdown(html_ord, unsafe_allow_html=True)
             
@@ -1066,7 +1066,7 @@ else:
         if r_fase == "FASE 1": 
             opzioni = ["Ordine MICRO (Pendente)"]
         elif r_fase == "FASE 2": 
-            opzioni = ["Posizione TICKET1 (A Mercato)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
+            opzioni = ["Posizione TICKET1 (A Mercato)", "Ordine TICKET2 (Pendente)", "Ordini SAT1 OCO (Entrambi)", "Ordine SAT1 OCO (Solo BUY)", "Ordine SAT1 OCO (Solo SELL)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
         else: 
             opzioni = ["Ordine ULTIMA (Pendente)"]
 
@@ -1091,6 +1091,19 @@ else:
             opp_val = round(dati.get("opp", 20) * mult, dec)
             dir_core = dati.get("direzione")
             
+            # --- TENTATIVO DI RECUPERO DATI SAT1 DA LIVE ---
+            s_dir = dati.get("sat_dir")
+            s_price = dati.get("sat_price")
+            if not s_dir or not s_price:
+                pos_live = stato.get("posizioni", [])
+                t_epic = c.get("epic")
+                core_ids = [p['position']['dealId'] for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_core]
+                sat1_live = [p for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
+                if sat1_live:
+                    if not s_dir: s_dir = sat1_live[0]['position']['direction']
+                    if not s_price: s_price = float(sat1_live[0]['position']['level'])
+            # -----------------------------------------------
+            
             cmd_data = None
             
             if "MICRO" in r_anom:
@@ -1113,20 +1126,60 @@ else:
                 stop = round(t_base - opp_val if t_dir == "BUY" else t_base + opp_val, dec)
                 cmd_data = {"azione": "MERCATO", "dir": t_dir, "size": s_mezzo, "lim": lim, "stop": stop, "etichetta": "[RECOVERY TICKET1]"}
 
+            elif "TICKET2" in r_anom:
+                t2_dir = dati.get("ticket2_dir")
+                t2_entry = dati.get("ticket2_entry")
+                if not t2_dir or not t2_entry:
+                    st.error("Dati TICKET2 non trovati in memoria. Verifica che il Ticket2 sia stato attivato dal Motore.")
+                else:
+                    st.info("Il Ticket2 (Ping-Pong) è un ORDINE PENDENTE LIMIT. Sarà reinserito al livello originale.")
+                    lim_lvl_t2 = round(t2_entry + tp4_val if t2_dir == "BUY" else t2_entry - tp4_val, dec)
+                    cmd_data = {"azione": "PENDENTE", "dir": t2_dir, "size": s_mezzo, "livello": t2_entry, "tipo": "LIMIT", "lim": lim_lvl_t2, "stop": None, "etichetta": "[RECOVERY TICKET2]"}
+
+            elif "SAT1 OCO" in r_anom:
+                p_base = dati.get("prezzo_base")
+                if not p_base:
+                    st.error("Prezzo base Core mancante in memoria. Impossibile calcolare i Satelliti OCO.")
+                else:
+                    tp2_val = round((dati.get("tp", 50) / 2) * mult, dec)
+                    if dir_core == "LONG":
+                        lvl_l = round(p_base + tp2_val, dec)
+                        lvl_s = round((p_base - opp_val) - tp2_val, dec)
+                    else:
+                        lvl_l = round((p_base + opp_val) + tp2_val, dec)
+                        lvl_s = round(p_base - tp2_val, dec)
+                        
+                    lim_l = round(lvl_l + tp2_val, dec)
+                    stop_l = round(lvl_l - tp2_val, dec)
+                    lim_s = round(lvl_s - tp2_val, dec)
+                    stop_s = round(lvl_s + tp2_val, dec)
+                    
+                    if "Solo BUY" in r_anom:
+                        st.info("Verrà reinserito SOLO l'ordine SAT1 OCO lato BUY.")
+                        cmd_data = {"azione": "PENDENTE", "dir": "BUY", "size": s_mezzo, "livello": lvl_l, "tipo": "STOP", "lim": lim_l, "stop": stop_l, "etichetta": "[RECOVERY SAT1 OCO BUY]"}
+                    elif "Solo SELL" in r_anom:
+                        st.info("Verrà reinserito SOLO l'ordine SAT1 OCO lato SELL.")
+                        cmd_data = {"azione": "PENDENTE", "dir": "SELL", "size": s_mezzo, "livello": lvl_s, "tipo": "STOP", "lim": lim_s, "stop": stop_s, "etichetta": "[RECOVERY SAT1 OCO SELL]"}
+                    else:
+                        st.info("Verranno ricalcolati e inseriti ENTRAMBI gli ordini SAT1 OCO (Buy e Sell).")
+                        cmd_data = {
+                            "azione": "SAT1_OCO", "size": s_mezzo, 
+                            "lvl_l": lvl_l, "lim_l": lim_l, "stop_l": stop_l,
+                            "lvl_s": lvl_s, "lim_s": lim_s, "stop_s": stop_s,
+                            "etichetta": "[RECOVERY SAT1 OCO]"
+                        }
+
             elif "SAT2" in r_anom:
-                s_dir = dati.get("sat_dir")
                 if not s_dir:
-                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria.")
+                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
                 else:
                     i_dir = "SELL" if s_dir == "BUY" else "BUY"
                     st.info("SAT2 è una POSIZIONE A MERCATO. Cliccando il bottone, la macchina entrerà immediatamente al prezzo live calcolando 1/4 della size Core.")
                     cmd_data = {"azione": "MERCATO", "dir": i_dir, "size": s_quarto, "lim": None, "stop": None, "etichetta": "[RECOVERY SAT2]"}
 
             elif "OVERGAIN" in r_anom:
-                s_dir = dati.get("sat_dir")
-                s_price = dati.get("sat_price")
                 if not s_dir or not s_price:
-                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria.")
+                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
                 else:
                     i_dir = "SELL" if s_dir == "BUY" else "BUY"
                     lvl = round(s_price + tp4_val if i_dir == "SELL" else s_price - tp4_val, dec)
@@ -1134,10 +1187,8 @@ else:
                     cmd_data = {"azione": "PENDENTE", "dir": i_dir, "size": s_mezzo, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": None, "etichetta": "[RECOVERY OVERGAIN]"}
 
             elif "OVERLOSS" in r_anom:
-                s_dir = dati.get("sat_dir")
-                s_price = dati.get("sat_price")
                 if not s_dir or not s_price:
-                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria.")
+                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
                 else:
                     i_dir = "SELL" if s_dir == "BUY" else "BUY"
                     lvl = round(s_price - tp4_val if i_dir == "SELL" else s_price + tp4_val, dec)
@@ -1199,9 +1250,14 @@ else:
                             st.success(f"🟢 **Condizioni nei parametri.** Il livello {formatta_numero(cmd_data['livello'], dec)} è piazzabile in sicurezza senza incorrere in rifiuti di IG.")
                             if st.button(f"🚀 Invia Ordine a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, type="primary"):
                                 piazza_restore(conto_selezionato, r_nome, cmd_data)
-                    
+                    elif cmd_data["azione"] == "SAT1_OCO":
+                        st.markdown(f"**Ordini da Inviare:** `BUY` a {formatta_numero(cmd_data['lvl_l'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; `SELL` a {formatta_numero(cmd_data['lvl_s'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}`")
+                        st.success("🟢 **Ordini Simultanei Pronti.** I livelli teorici sono stati calcolati in base alla strategia in corso.")
+                        if st.button("🚀 Invia Entrambi gli Ordini (OCO SAT1)", use_container_width=True, type="primary"):
+                            piazza_restore(conto_selezionato, r_nome, cmd_data)
+
                     else: # MERCATO (Es. Ticket o SAT2)
-                        st.markdown(f"**Direzione:** `{cmd_data['dir']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Azione Reale:** `INGRESSO A MERCATO`")
+                        st.markdown(f"**Direzione:** `{cmd_data.get('dir', 'N/D')}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Azione Reale:** `INGRESSO A MERCATO`")
                         if st.button(f"🚀 Entra a MERCATO adesso (Prezzo Live: {prezzo_live})", use_container_width=True, type="primary"):
                             piazza_restore(conto_selezionato, r_nome, cmd_data)
 
@@ -1209,11 +1265,82 @@ else:
         st.title("📊 Analisi Operazioni & Profitti (EUR)")
         path_storico = os.path.join(conto_selezionato, FILE_STORICO)
         if os.path.exists(path_storico):
+            # Cerca prima data
+            prima_data_db = None
+            try:
+                df_temp = pd.read_csv(path_storico)
+                if not df_temp.empty:
+                    df_temp['Data_Op'] = pd.to_datetime(df_temp['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
+                    prima_data_db = df_temp['Data_Op'].min()
+            except:
+                pass
+                
+            if prima_data_db:
+                st.markdown(f"<div style='font-size: 0.9rem; color: #888; margin-bottom: 15px;'>ℹ️ <b>Prima data disponibile nel database attuale:</b> {prima_data_db.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
+                
+            pref_file = os.path.join(conto_selezionato, "preferenze_ui.json")
+            prefs = {}
+            if os.path.exists(pref_file):
+                try:
+                    with open(pref_file, "r") as f: prefs = json.load(f)
+                except: pass
+                
+            saved_inizio_str = prefs.get("data_inizio", (datetime.today() - timedelta(days=30)).strftime("%Y-%m-%d"))
+            saved_fine_str = prefs.get("data_fine", datetime.today().strftime("%Y-%m-%d"))
+            try:
+                def_inizio = datetime.strptime(saved_inizio_str, "%Y-%m-%d").date()
+                def_fine = datetime.strptime(saved_fine_str, "%Y-%m-%d").date()
+            except:
+                def_inizio = (datetime.today() - timedelta(days=30)).date()
+                def_fine = datetime.today().date()
+
             c_data1, c_data2 = st.columns(2)
             with c_data1:
-                data_inizio = st.date_input("📅 Da Data:", datetime.today() - timedelta(days=30))
+                data_inizio = st.date_input("📅 Data iniziale:", def_inizio, key="date_inizio")
             with c_data2:
-                data_fine = st.date_input("📅 A Data:", datetime.today())
+                data_fine = st.date_input("📅 Data finale:", def_fine, key="date_fine")
+                
+            if data_inizio != def_inizio or data_fine != def_fine:
+                prefs["data_inizio"] = data_inizio.strftime("%Y-%m-%d")
+                prefs["data_fine"] = data_fine.strftime("%Y-%m-%d")
+                with open(pref_file, "w") as f: json.dump(prefs, f, indent=4)
+                
+            st.write("")
+            with st.expander("🗄️ Archiviazione Storico"):
+                st.markdown("Usa questo strumento per alleggerire la Dashboard spostando i dati vecchi in un file di archivio (`storico_archiviato.csv`), rimuovendoli dalla vista principale ma senza perderli definitivamente.")
+                prima_data_str = prima_data_db.strftime('%d/%m/%Y') if prima_data_db else "inizio"
+                max_date = datetime.today().date() - timedelta(days=1)
+                
+                data_archiviazione = st.date_input(f"Archivia tutte le operazioni dal giorno {prima_data_str} al giorno (incluso):", value=max_date, max_value=max_date, format="DD/MM/YYYY", key="archivia_date")
+                if st.button("🗄️ Archivia Ora", type="primary"):
+                    try:
+                        df_arch = pd.read_csv(path_storico)
+                        df_arch['Data_Op'] = pd.to_datetime(df_arch['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
+                        mask_arch = df_arch['Data_Op'] <= data_archiviazione
+                        
+                        df_to_archive = df_arch.loc[mask_arch].copy()
+                        df_to_keep = df_arch.loc[~mask_arch].copy()
+                        
+                        if not df_to_archive.empty:
+                            df_to_archive = df_to_archive.drop(columns=['Data_Op'])
+                            df_to_keep = df_to_keep.drop(columns=['Data_Op'])
+                            
+                            path_archivio = os.path.join(conto_selezionato, "storico_archiviato.csv")
+                            if os.path.exists(path_archivio):
+                                df_to_archive.to_csv(path_archivio, mode='a', header=False, index=False)
+                            else:
+                                df_to_archive.to_csv(path_archivio, index=False)
+                                
+                            df_to_keep.to_csv(path_storico, index=False)
+                            st.success(f"✅ Archiviate {len(df_to_archive)} operazioni! Il database principale ora contiene {len(df_to_keep)} operazioni.")
+                            time.sleep(1.5)
+                            st.rerun()
+                        else:
+                            st.info("Non ci sono operazioni precedenti a questa data da archiviare.")
+                    except Exception as e:
+                        st.error(f"Errore durante l'archiviazione: {e}")
+            st.write("")
+            
             try:
                 df = pd.read_csv(path_storico)
                 df['Data_Operazione'] = pd.to_datetime(df['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
@@ -1298,7 +1425,8 @@ else:
                     html_t2 += "</tbody></table>"
                     
                     st.markdown(html_t2, unsafe_allow_html=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+
                     
                 else:
                     st.info("Nessuna operazione registrata nel periodo selezionato.")

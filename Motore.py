@@ -774,14 +774,19 @@ def esegui_motore():
                         cmd = param["comando_restore"]
                         print_log(nome, f"🛠️ Ricevuto comando RECOVERY: {cmd.get('etichetta', '')}")
                         
-                        if cmd.get("azione") == "MERCATO":
+                        if cmd["azione"] == "MERCATO":
                             succ = invia_ordine_mercato(nome, epic, valuta, cmd["dir"], cmd["size"], h, dec, limit_lvl=cmd.get("lim"), stop_lvl=cmd.get("stop"), etichetta=cmd.get("etichetta", "[RECOVERY]"))
+                        elif cmd["azione"] == "SAT1_OCO":
+                            succ1 = invia_ordine_pendente(nome, epic, valuta, "BUY", cmd["size"], cmd["lvl_l"], "STOP", cmd["lim_l"], cmd["stop_l"], h, dec, etichetta="[ORDINE SAT1 OCO BUY]")
+                            time.sleep(3.0)
+                            succ2 = invia_ordine_pendente(nome, epic, valuta, "SELL", cmd["size"], cmd["lvl_s"], "STOP", cmd["lim_s"], cmd["stop_s"], h, dec, etichetta="[ORDINE SAT1 OCO SELL]")
+                            succ = succ1 or succ2
                         else:
                             succ = invia_ordine_pendente(nome, epic, valuta, cmd["dir"], cmd["size"], cmd["livello"], cmd["tipo"], cmd.get("lim"), cmd.get("stop"), h, dec, etichetta=cmd.get("etichetta", "[RECOVERY]"))
                             
                         if succ:
                             invia_notifica(f"🛠️ RECOVERY ESEGUITO: {nome}", f"[{nome}] Il sistema ha eseguito il recovery per {cmd.get('etichetta', '')}.", "wrench")
-                            aggiorna_memoria(nome, {"comando_restore": None}, log_wip=f"🛠️ Eseguito comando RECOVERY manuale: {cmd.get('etichetta', '')}.")
+                            aggiorna_memoria(nome, {"comando_restore": None, "alert_falso_allarme": ""}, log_wip=f"🛠️ Eseguito comando RECOVERY manuale: {cmd.get('etichetta', '')}.")
                         else:
                             invia_notifica(f"⚠️ RECOVERY FALLITO: {nome}", f"[{nome}] IG ha rifiutato l'ordine di Recovery.", "warning")
                             aggiorna_memoria(nome, {"comando_restore": None}, log_wip=f"⚠️ Fallito inserimento RECOVERY manuale: {cmd.get('etichetta', '')}.")
@@ -1307,7 +1312,8 @@ def esegui_motore():
                             
                             if not ticket1_check:
                                 # --- CALCOLO UTILE TEORICO LOSS TICKET1 ---
-                                falso_allarme_t1 = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, ticket1_dir, "[TICKET1 (LOSS?)]")
+                                att_t1 = len([p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket1_dir])
+                                falso_allarme_t1 = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, ticket1_dir, "[TICKET1 (LOSS?)]", pos_attese=att_t1)
                                 if falso_allarme_t1:
                                     continue
                                     
@@ -1333,9 +1339,9 @@ def esegui_motore():
                                 else:
                                     oco_str = ""
                                     
-                                invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Stop Ticket a {formatta_numero(prezzo_attuale, dec)}. Inseriti due ordini SAT1 OCO{oco_str}.{pnl_str}", "satellite")
+                                invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Stop Ticket1 a {formatta_numero(prezzo_attuale, dec)}. Inseriti due ordini SAT1 OCO{oco_str}.{pnl_str}", "satellite")
                                 aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"❌ Stop [TICKET1] colpito a {formatta_numero(prezzo_attuale, dec)}. Inserisco Ordini SAT1 (OCO){oco_str}.{pnl_str}")
-                                log_ticket2 = ""
+
                                 if param.get("opp") == param.get("tp") / 4:
                                     print_log(nome, "➡️ Condizione OPP == TP/4 verificata. Apertura [TICKET2] a mercato...")
                                     ticket2_dir = ticket1_dir
@@ -1347,12 +1353,9 @@ def esegui_motore():
                                             "ticket2_entry": prezzo_attuale,
                                             "ticket2_dir": ticket2_dir
                                         }
-                                        log_ticket2 = f" ➕ [TICKET2] {ticket2_dir} a mercato ({formatta_numero(prezzo_attuale, dec)})."
                                         invia_notifica(f"🎫 ENTRY TICKET2: {nome}", f"[{nome}] Ticket2 {ticket2_dir} aperto a mercato a {formatta_numero(prezzo_attuale, dec)}.", "ticket")
+                                        aggiorna_memoria(nome, extra_mem, log_wip=f"➕ [TICKET2] {ticket2_dir} a mercato ({formatta_numero(prezzo_attuale, dec)}).")
                                 # --- FINE LOGICA TICKET2 ---
-                                    
-                                invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Stop Ticket1 a {formatta_numero(prezzo_attuale, dec)}. Inseriti due ordini SAT1 OCO{oco_str}.{pnl_str}", "satellite")
-                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0, **extra_mem}, log_wip=f"❌ Stop [TICKET1] colpito a {formatta_numero(prezzo_attuale, dec)}. Inserisco Ordini SAT1 (OCO){oco_str}.{pnl_str}{log_ticket2}")
 
                     elif stato == "FASE_2_SATELLITI":
                         s_mezzo = max(1.0, s_core / 2)
@@ -1454,9 +1457,11 @@ def esegui_motore():
                                 falso_allarme_s = False
                                 
                                 if not pend_sat_l:
-                                    falso_allarme_l = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, 'BUY', "[ORDINE SAT1 OCO BUY]")
+                                    att_l = len([p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['direction'] == 'BUY'])
+                                    falso_allarme_l = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, 'BUY', "[ORDINE SAT1 OCO BUY]", pos_attese=att_l)
                                 if not pend_sat_s:
-                                    falso_allarme_s = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, 'SELL', "[ORDINE SAT1 OCO SELL]")
+                                    att_s = len([p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['direction'] == 'SELL'])
+                                    falso_allarme_s = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, 'SELL', "[ORDINE SAT1 OCO SELL]", pos_attese=att_s)
                                     
                                 if falso_allarme_l or falso_allarme_s:
                                     continue
