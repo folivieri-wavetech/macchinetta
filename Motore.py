@@ -603,14 +603,14 @@ def esegui_fase_1(nome, dir, size, tp, opp, dts, bid, ask, mult, dec, epic, val,
         
         if pend_core_ok and pend_micro_ok:
             print_log(nome, "✅ Griglia accettata da IG. Procedo con l'entrata a mercato...")
-            invia_ordine_mercato(nome, epic, val, "BUY", s_core, h, dec, etichetta="[ORDINE CORE]")
+            succ_core = invia_ordine_mercato(nome, epic, val, "BUY", s_core, h, dec, etichetta="[ORDINE CORE]")
             time.sleep(3.0) 
-            invia_ordine_mercato(nome, epic, val, "SELL", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
-            return True
+            succ_ass = invia_ordine_mercato(nome, epic, val, "SELL", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
+            return succ_core, succ_ass
         else:
             print_log(nome, "❌ Griglia RIFIUTATA da IG. Rollback di sicurezza. Non entro a mercato.")
             pulisci_mercato(epic, h, nome, solo_pendenti=True)
-            return False
+            return False, False
             
     else:
         pend_core_ok = invia_ordine_pendente(nome, epic, val, "BUY", s_core, round(base + opp_val, dec), "STOP", None, None, h, dec, etichetta="[ORDINE CORE]")
@@ -619,14 +619,14 @@ def esegui_fase_1(nome, dir, size, tp, opp, dts, bid, ask, mult, dec, epic, val,
         
         if pend_core_ok and pend_micro_ok:
             print_log(nome, "✅ Griglia accettata da IG. Procedo con l'entrata a mercato...")
-            invia_ordine_mercato(nome, epic, val, "SELL", s_core, h, dec, etichetta="[ORDINE CORE]")
+            succ_core = invia_ordine_mercato(nome, epic, val, "SELL", s_core, h, dec, etichetta="[ORDINE CORE]")
             time.sleep(3.0)
-            invia_ordine_mercato(nome, epic, val, "BUY", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
-            return True
+            succ_ass = invia_ordine_mercato(nome, epic, val, "BUY", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
+            return succ_core, succ_ass
         else:
             print_log(nome, "❌ Griglia RIFIUTATA da IG. Rollback di sicurezza. Non entro a mercato.")
             pulisci_mercato(epic, h, nome, solo_pendenti=True)
-            return False
+            return False, False
 
 def esegui_motore():
     try:
@@ -756,7 +756,7 @@ def esegui_motore():
                             pnl_str = formatta_pnl(pnl)
                             registra_operazione(nome, "Chiusura Manuale / Reset", pnl)
                         pulisci_mercato(epic, h, nome)
-                        aggiorna_memoria(nome, {"comando_reset": False, "stato": "IN_ATTESA", "prezzo_base": None, "pausa_mercato": False, "attivo": False, "allarme_distanza": False, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "comando_riattiva_fase2": False, "comando_restore": None}, log_wip=f"🧹 RESET FORZATO completato. Posizioni chiuse.{pnl_str}")
+                        aggiorna_memoria(nome, {"comando_reset": False, "stato": "IN_ATTESA", "prezzo_base": None, "pausa_mercato": False, "attivo": False, "allarme_distanza": False, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "comando_riattiva_fase2": False, "comando_restore": None, "ticket2_active": False}, log_wip=f"🧹 RESET FORZATO completato. Posizioni chiuse.{pnl_str}")
                         continue
 
                     if param.get("comando_manuale", False):
@@ -871,7 +871,7 @@ def esegui_motore():
                             registra_operazione(nome, "Stop Generale (Kill Switch)", pnl)
                         pulisci_mercato(epic, h, nome)
                         invia_notifica(f"🛑 KILL SWITCH: {nome}", f"[{nome}] Tasto STOP premuto. Strumento chiuso, atteso Riavvio manuale Fase 1.{pnl_str}", "octagonal_sign")
-                        aggiorna_memoria(nome, {"kill_switch": False, "attivo": False, "stato": "IN_ATTESA", "sospeso_weekend": False, "allarme_distanza": False, "errore_avvio": False, "errore_ripristino": False}, log_wip=f"🛑 Tutte le posizioni chiuse da Tasto STOP.{pnl_str}")
+                        aggiorna_memoria(nome, {"kill_switch": False, "attivo": False, "stato": "IN_ATTESA", "sospeso_weekend": False, "allarme_distanza": False, "errore_avvio": False, "errore_ripristino": False, "ticket2_active": False}, log_wip=f"🛑 Tutte le posizioni chiuse da Tasto STOP.{pnl_str}")
                         continue
 
                     if param.get("comando_weekend", False):
@@ -928,7 +928,7 @@ def esegui_motore():
                     if not param.get("attivo", False):
                         if "IN_ATTESA" not in param.get("stato", "IN_ATTESA"):
                             pulisci_mercato(epic, h, nome)
-                            aggiorna_memoria(nome, {"stato": "IN_ATTESA", "pausa_mercato": False, "tentativi_sat": 0, "allarme_distanza": False})
+                            aggiorna_memoria(nome, {"stato": "IN_ATTESA", "pausa_mercato": False, "tentativi_sat": 0, "allarme_distanza": False, "ticket2_active": False})
                         continue
                     
                     if not stato_mercato:
@@ -956,15 +956,18 @@ def esegui_motore():
                             dir_core = param.get("direzione")
                             prezzo_base = round(float(ask if dir_core == "LONG" else bid), dec)
                             
-                            successo = esegui_fase_1(nome, dir_core, s_core, param.get("tp"), param.get("opp"), param.get("dts"), bid, ask, mult, dec, epic, valuta, h)
+                            dir_contro = "SELL" if dir_core == "LONG" else "BUY"
+                            s_ass = max(1.0, s_core / 2)
+                            succ_core, succ_ass = esegui_fase_1(nome, dir_core, s_core, param.get("tp"), param.get("opp"), param.get("dts"), bid, ask, mult, dec, epic, valuta, h)
                             
-                            if successo:
+                            if succ_core and succ_ass:
                                 is_flip = len(param.get("storico_wip", [])) > 0
                                 prefix = "🔄 FLIP FASE_1" if is_flip else "🚀 AVVIO FASE 1"
                                 invia_notifica(f"{prefix}: {nome}", f"[{nome}]: {dir_core} a {formatta_numero(prezzo_base, dec)} (Size: {s_core})", "rocket")
                                 aggiorna_memoria(nome, {"stato": "FASE_1", "prezzo_base": prezzo_base, "errore_avvio": False, "errore_ripristino": False}, log_wip=f"{prefix} ({dir_core}) a {formatta_numero(prezzo_base, dec)}")
                             else:
-                                aggiorna_memoria(nome, {"attivo": False, "stato": "IN_ATTESA", "errore_avvio": True, "errore_ripristino": False}, log_wip=f"🛑 Avvio Abortito: IG ha rifiutato la griglia di sicurezza.")
+                                pulisci_mercato(epic, h, nome)
+                                aggiorna_memoria(nome, {"attivo": False, "stato": "IN_ATTESA", "errore_avvio": True, "errore_ripristino": False, "ticket2_active": False}, log_wip=f"🛑 Avvio Abortito: fallita immissione ordini a mercato (Core/Ass).")
                     
                     elif stato.startswith("FASE_1"): 
                         dir_core = param.get("direzione")
@@ -1147,13 +1150,11 @@ def esegui_motore():
                             lvl_ingresso_micro_long = round(p_base_orig + tp4, dec)
                             lvl_ingresso_micro_short = round(p_base_orig - tp4, dec)
 
-                            # --- CALCOLO UTILE TEORICO MICRO ---
                             valore_punto = c.get("valore_punto", 1)
                             pnl_micro_valuta = (param.get("tp") / 4) * s_ass * valore_punto
                             rate = get_eur_rate(valuta, prezzi_live)
                             pnl_micro_eur = pnl_micro_valuta * rate
                             pnl_str = formatta_pnl(pnl_micro_eur)
-                            # --- FINE CALCOLO ---
 
                             if dir_core == "LONG":
                                 if prezzo_attuale < lvl_ingresso_micro_long: 
@@ -1170,7 +1171,7 @@ def esegui_motore():
                                     time.sleep(3.0) 
                                     registra_operazione(nome, "Stop Loss MICRO / FLIP (Fase 1)", pnl)
                                     invia_notifica(f"🔄 TARGET FASE 1: {nome}", f"[{nome}] Micro SHORT a target a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni e FLIP.{formatta_pnl(pnl)}", "arrows_counterclockwise")
-                                    aggiorna_memoria(nome, {"direzione": "SHORT", "stato": "IN_ATTESA"}, log_wip=f"🎯 Stop [MICRO SHORT] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{formatta_pnl(pnl)}")
+                                    aggiorna_memoria(nome, {"direzione": "SHORT", "stato": "IN_ATTESA", "ticket2_active": False}, log_wip=f"🎯 Stop [MICRO SHORT] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{formatta_pnl(pnl)}")
                             else:
                                 if prezzo_attuale > lvl_ingresso_micro_short: 
                                     print_log(nome, "🔄 Profitto parziale. Inserisco Ordine [MICRO]...")
@@ -1186,7 +1187,7 @@ def esegui_motore():
                                     time.sleep(3.0) 
                                     registra_operazione(nome, "Stop Loss MICRO / FLIP (Fase 1)", pnl)
                                     invia_notifica(f"🔄 TARGET FASE 1: {nome}", f"[{nome}] Micro LONG a target a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni e FLIP.{formatta_pnl(pnl)}", "arrows_counterclockwise")
-                                    aggiorna_memoria(nome, {"direzione": "LONG", "stato": "IN_ATTESA"}, log_wip=f"🎯 Stop [MICRO LONG] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{formatta_pnl(pnl)}")
+                                    aggiorna_memoria(nome, {"direzione": "LONG", "stato": "IN_ATTESA", "ticket2_active": False}, log_wip=f"🎯 Stop [MICRO LONG] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{formatta_pnl(pnl)}")
 
                     elif stato == "FASE_2_STANDBY":
                         if not bid or not ask:
@@ -1311,19 +1312,16 @@ def esegui_motore():
                             ticket1_check = [p for p in pos_check if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket1_dir]
                             
                             if not ticket1_check:
-                                # --- CALCOLO UTILE TEORICO LOSS TICKET1 ---
                                 att_t1 = len([p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket1_dir])
                                 falso_allarme_t1 = verifica_falso_allarme_ig(nome, epic, h, s_mezzo, ticket1_dir, "[TICKET1 (LOSS?)]", pos_attese=att_t1)
                                 if falso_allarme_t1:
                                     continue
                                     
-                                # --- CALCOLO UTILE TEORICO LOSS TICKET1 ---
                                 valore_punto = c.get("valore_punto", 1)
                                 pnl_ticket_loss_valuta = - (param.get("opp") * s_mezzo * valore_punto)
                                 rate = get_eur_rate(valuta, prezzi_live)
                                 pnl_ticket_loss_eur = pnl_ticket_loss_valuta * rate
                                 pnl_str = formatta_pnl(pnl_ticket_loss_eur)
-                                # --- FINE CALCOLO ---
                                 
                                 registra_operazione(nome, "Stop Loss TICKET1 (Fase 2)", pnl_ticket_loss_eur)
                                 
@@ -1355,7 +1353,6 @@ def esegui_motore():
                                         }
                                         invia_notifica(f"🎫 ENTRY TICKET2: {nome}", f"[{nome}] Ticket2 {ticket2_dir} aperto a mercato a {formatta_numero(prezzo_attuale, dec)}.", "ticket")
                                         aggiorna_memoria(nome, extra_mem, log_wip=f"➕ [TICKET2] {ticket2_dir} a mercato ({formatta_numero(prezzo_attuale, dec)}).")
-                                # --- FINE LOGICA TICKET2 ---
 
                     elif stato == "FASE_2_SATELLITI":
                         s_mezzo = max(1.0, s_core / 2)
@@ -1366,14 +1363,13 @@ def esegui_motore():
                         
                         core_ids = [p['position']['dealId'] for p in posizioni if float(p['position']['size']) == s_core]
                         sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
-                        # --- LOGICA PING PONG TICKET2 E FILTRO SAT1 ---
                         is_ticket2 = lambda p: param.get("ticket2_active") and p['position']['direction'] == param.get("ticket2_dir") and p['position'].get('stopLevel') is None
                         
                         sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids and not is_ticket2(p)]
                         
                         if param.get("ticket2_active"):
                             ticket2_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and is_ticket2(p)]
-                            ticket2_pendenti = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == param.get("ticket2_dir") and o['workingOrderData'].get('stopDistance') is None and o['workingOrderData'].get('stopLevel') is None]
+                            ticket2_pendenti = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == param.get("ticket2_dir") and o['workingOrderData'].get('stopLevel') is None]
                             
                             if not ticket2_attivi and not ticket2_pendenti:
                                 t2_dir = param.get("ticket2_dir")
@@ -1386,14 +1382,12 @@ def esegui_motore():
                                     invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
                                     invia_notifica(f"🎫 PING-PONG TICKET2: {nome}", f"[{nome}] Ticket2 ha preso profitto! Ordine pendente reinserito a {formatta_numero(t2_entry, dec)}.", "ticket")
                                     time.sleep(2.0)
-                        # --- FINE LOGICA TICKET2 ---
                         
                         if sat1_attivi:
                             sat_pos = sat1_attivi[0]
                             sat_dir = sat_pos['position']['direction']
                             sat_price = float(sat_pos['position']['level'])
                             
-                            # --- PULIZIA TICKET2 (Caso B e C) ---
                             if param.get("ticket2_active"):
                                 print_log(nome, f"🚨 OCO entrato a mercato. Pulizia [TICKET2] in corso...")
                                 ticket2_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and is_ticket2(p)]
@@ -1403,13 +1397,11 @@ def esegui_motore():
                                     print_log(nome, f"📉 Chiusura a mercato del [TICKET2] (Loss)...")
                                     chiudi_parziale(nome, t2_deal_id, epic, dir_chiusura_t2, s_mezzo, valuta, h, etichetta="[TICKET2 CLOSURE]")
                                     time.sleep(1.0)
-                            # --- FINE PULIZIA ---
                             
                             pulisci_mercato(epic, h, nome, solo_pendenti=True)
                             
                             sat2_dir = "SELL" if sat_dir == "BUY" else "BUY"
                             s_quarto = max(0.1, s_core / 4)
-                            tp4_val = round((param.get("tp") / 4) * mult, dec)
                             
                             print_log(nome, f"➡️ Inserisco [SAT2] a mercato...")
                             succ_sat2 = invia_ordine_mercato(nome, epic, valuta, sat2_dir, s_quarto, h, dec, etichetta=f"[SAT2]")
@@ -1431,7 +1423,11 @@ def esegui_motore():
                                         }, log_wip=f"🛑 Spegnimento emergenza: [SAT2] fantasma evitato. Passaggio a MANUALE.")
                                         continue
                             else:
-                                print_log(nome, f"⚠️ Impossibile inserire [SAT2].")
+                                print_log(nome, f"⚠️ Impossibile inserire [SAT2]. Passaggio a MANUALE.")
+                                pulisci_mercato(epic, h, nome)
+                                invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento inserimento [SAT2] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
+                                aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione [SAT2] a mercato dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [SAT2]. Macchina in MANUALE.")
+                                continue
                             
                             print_log(nome, "➡️ Inserisco Ordine [OVERGAIN] e [OVERLOSS]...")
                             if sat2_dir == "SELL":
@@ -1446,7 +1442,7 @@ def esegui_motore():
                                 time.sleep(3.0)
                                 
                             invia_notifica(f"🎯 SAT1 INNESCATO: {nome}", f"[{nome}] Entrata a mercato in {sat_dir} a {formatta_numero(sat_price, dec)}. Piazzati SAT2, OG e OL.", "dart")
-                            aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI_(OG-OL)", "sat_dir": sat_dir, "sat_price": sat_price, "tentativi_sat": 0}, log_wip=f"⚡ [SAT1 {sat_dir}] innescato a mercato a {formatta_numero(sat_price, dec)}.")
+                            aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITE_(OG-OL)", "sat_dir": sat_dir, "sat_price": sat_price, "tentativi_sat": 0, "ticket2_active": False}, log_wip=f"⚡ [SAT1 {sat_dir}] innescato a mercato a {formatta_numero(sat_price, dec)}.")
 
                         else:
                             pend_sat_l = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == 'BUY']
@@ -1631,7 +1627,13 @@ def esegui_motore():
                         
                         lim_core = round(f3_base + tp2_val, dec) if sat_dir == "BUY" else round(f3_base - tp2_val, dec)
                         stop_core = round(f3_base - dts_val, dec) if sat_dir == "BUY" else round(f3_base + dts_val, dec)
-                        invia_ordine_mercato(nome, epic, valuta, sat_dir, s_core, h, dec, limit_lvl=lim_core, stop_lvl=stop_core, etichetta="[ORDINE FASE 3]")
+                        succ_f3 = invia_ordine_mercato(nome, epic, valuta, sat_dir, s_core, h, dec, limit_lvl=lim_core, stop_lvl=stop_core, etichetta="[ORDINE FASE 3]")
+                        if not succ_f3:
+                            pulisci_mercato(epic, h, nome)
+                            invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento immissione [ORDINE FASE 3] a mercato (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
+                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione [ORDINE FASE 3] a mercato dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [ORDINE FASE 3]. Macchina in MANUALE.")
+                            continue
+                            
                         time.sleep(3.0) 
                         
                         lvl_last = round(f3_base + tp4_val, dec) if sat_dir == "BUY" else round(f3_base - tp4_val, dec)
@@ -1689,7 +1691,7 @@ def esegui_motore():
                                 
                                 pulisci_mercato(epic, h, nome)
                                 invia_notifica(f"🏁 FASE 3 CONCLUSA: {nome}", f"[{nome}] Ciclo terminato (Stop Loss colpito a {formatta_numero(prezzo_attuale, dec)}). In attesa di riavvio manuale.{formatta_pnl(pnl_tot)}", "checkered_flag")
-                                aggiorna_memoria(nome, {"stato": "IN_ATTESA", "tentativi_sat": 0, "attivo": False}, log_wip=f"♻️ Sconfitta in Fase 3 (SL colpito) a {formatta_numero(prezzo_attuale, dec)}. Macchinetta SPENTA.{formatta_pnl(pnl_tot)}")
+                                aggiorna_memoria(nome, {"stato": "IN_ATTESA", "tentativi_sat": 0, "attivo": False, "ticket2_active": False}, log_wip=f"♻️ Sconfitta in Fase 3 (SL colpito) a {formatta_numero(prezzo_attuale, dec)}. Macchinetta SPENTA.{formatta_pnl(pnl_tot)}")
                             else:
                                 if pendenti:
                                     pulisci_mercato(epic, h, nome, solo_pendenti=True)
@@ -1705,12 +1707,20 @@ def esegui_motore():
                                     c = core_contro_pos[0]
                                     if step == 1:
                                         s_cut_effettivo = s_core * 0.35 
-                                        chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
+                                        succ_cut = chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
+                                        if not succ_cut:
+                                            invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento [TAGLIO CORE STEP {step}] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
+                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallito [TAGLIO CORE STEP {step}] dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [TAGLIO CORE STEP {step}]. Macchina in MANUALE.")
+                                            continue
                                         time.sleep(3.0) 
                                         new_step = 2
                                     elif step == 2:
                                         s_cut_effettivo = float(c['position']['size']) 
-                                        chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
+                                        succ_cut = chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
+                                        if not succ_cut:
+                                            invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento [TAGLIO CORE STEP {step}] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
+                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallito [TAGLIO CORE STEP {step}] dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [TAGLIO CORE STEP {step}]. Macchina in MANUALE.")
+                                            continue
                                         time.sleep(3.0) 
                                         new_step = 3
                                         
@@ -1722,7 +1732,7 @@ def esegui_motore():
                                     registra_operazione(nome, "Vittoria 100% (Fine Fase 3)", pnl)
                                     pulisci_mercato(epic, h, nome)
                                     invia_notifica(f"🏁 FASE 3 CONCLUSA: {nome}", f"[{nome}] Ciclo completato con successo al 100% a {formatta_numero(prezzo_attuale, dec)}. In attesa di riavvio manuale.{formatta_pnl(pnl)}", "checkered_flag")
-                                    aggiorna_memoria(nome, {"stato": "IN_ATTESA", "tentativi_sat": 0, "attivo": False}, log_wip=f"🏆 FASE 3 COMPLETATA AL 100% a {formatta_numero(prezzo_attuale, dec)}! Ciclo concluso. Macchinetta SPENTA.{formatta_pnl(pnl)}")
+                                    aggiorna_memoria(nome, {"stato": "IN_ATTESA", "tentativi_sat": 0, "attivo": False, "ticket2_active": False}, log_wip=f"🏆 FASE 3 COMPLETATA AL 100% a {formatta_numero(prezzo_attuale, dec)}! Ciclo concluso. Macchinetta SPENTA.{formatta_pnl(pnl)}")
                                 else:
                                     registra_operazione(nome, f"Taglio Core {35 if new_step==2 else 15}% (Fase 3)", pnl)
                                     
