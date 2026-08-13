@@ -1,0 +1,63 @@
+======================================================
+     STRATEGIA PORTAFOGLIO SINCRONO (MACCHINETTA)
+======================================================
+- Capitale per singolo conto: 15.000 € (Totale 30.000 €)
+- Strategia di avvio: Sincrono puro (Conto A tutto LONG, Conto B tutto SHORT)
+- Regola di Risk Parity: Size equiparate per mantenere lo stesso peso (PnL)
+- Margine Libero Minimo Desiderato: ~20% (Circa 3.000 €)
+
+======================================================
+     ANALISI DEGLI SCENARI DI CARICO (STRESS TEST)
+======================================================
+
+SQUADRA TITOLARE DEFINITIVA (5 STRUMENTI - INGRESSO SCALATO)
+------------------------------------------------------
+[START INIZIALE - Conto a 15.000 €]
+1. Spot Gold     -> Size 4 
+2. US 500 Cash   -> Size 4 
+3. USD/CHF       -> Size 4 
+4. CAD/JPY       -> Size 6 
+
+[FASE DI SCALING - All'arrotondamento del conto a 16.000 €]
+5. EUR/GBP       -> Size 4
+
+
+--- SCENARIO 1: VELOCITÀ DI CROCIERA PRUDENTE (1.75x) ---
+Rappresenta una situazione realistica in cui i mercati sono mossi e tutti gli strumenti sono mediamente esposti in Fase 2 (es. Ticket 1 e 2 presi).
+
+1. Spot Gold ➡️ Cumulativo: 1.540 € (Libero: 89%)
+2. US 500 Cash ➡️ Cumulativo: 4.340 € (Libero: 71%)
+3. USD/CHF ➡️ Cumulativo: 6.370 € (Libero: 57%)
+4. CAD/JPY ➡️ Cumulativo: 8.575 € (Libero: 42%)
+5. EUR/GBP ➡️ Cumulativo: 10.920 € (Libero: 27%)  <-- Limite di sicurezza ottimale
+6. GBP/USD ➡️ Cumulativo: 13.720 € (Libero: 8,5%) <-- PERICOLO
+7. USD/JPY ➡️ Cumulativo: 16.765 € (Margin Call)
+8. USD/CAD ➡️ Cumulativo: 19.915 €
+
+VERDETTO 1.75x: Il "Golden Ratio" è 5 Strumenti. Ti lascia un ampio 27% di margine libero per respirare.
+
+--- SCENARIO 2: VELOCITÀ DI CROCIERA FORZATA (2.0x) ---
+Rappresenta una situazione di forte stress in cui la maggior parte degli strumenti si trova vicinissima ai Satelliti.
+
+1. Spot Gold ➡️ Cumulativo: 1.760 € (Libero: 88%)
+2. US 500 Cash ➡️ Cumulativo: 4.960 € (Libero: 67%)
+3. USD/CHF ➡️ Cumulativo: 7.280 € (Libero: 51%)
+4. CAD/JPY ➡️ Cumulativo: 9.800 € (Libero: 34%)  <-- Limite di sicurezza ottimale
+5. EUR/GBP ➡️ Cumulativo: 12.480 € (Libero: 16,8%) <-- Scende sotto il 20%
+6. GBP/USD ➡️ Cumulativo: 15.680 € (Margin Call)
+7. USD/JPY ➡️ Cumulativo: 19.160 €
+8. USD/CAD ➡️ Cumulativo: 22.760 €
+
+VERDETTO 2.0x: In condizioni di stress grave, per restare sopra il 20% di margine libero devi fermarti a 4 Strumenti. Il 5° strumento (EUR/GBP) spinge il margine libero al 16,8%.
+
+--- SCENARIO 3: APOCALISSE SIMULTANEA (2.5x) ---
+Rappresenta il peggiore dei casi assoluto: tutti gli strumenti agganciano i Satelliti nello stesso secondo.
+
+1. Spot Gold ➡️ Cumulativo: 2.200 € (Libero: 85%)
+2. US 500 Cash ➡️ Cumulativo: 6.200 € (Libero: 58%)
+3. USD/CHF ➡️ Cumulativo: 9.100 € (Libero: 39%)
+4. CAD/JPY ➡️ Cumulativo: 12.250 € (Libero: 18,3%) <-- Limite di sopportazione estrema
+5. EUR/GBP ➡️ Cumulativo: 15.600 € (Margin Call)
+
+VERDETTO 2.5x: Per sopravvivere a un evento apocalittico senza margin call (accettando un 18,3% residuo), il numero massimo assoluto di strumenti è 4.
+======================================================

@@ -18,16 +18,16 @@ CREDENTIALS = {"Marco": "Bolzano&1971"}
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
-    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
-    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
-    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP", "valore_punto": 1},
-    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
-    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
-    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
-    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1}
+    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 310},
+    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "margine_unitario": 310},
+    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 210},
+    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP", "valore_punto": 1, "margine_unitario": 335},
+    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 400},
+    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 300},
+    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1, "margine_unitario": 290},
+    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290},
+    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220},
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400}
 }
 
 st.set_page_config(page_title="Macchinetta IG", layout="wide")
@@ -495,6 +495,16 @@ else:
                     return "SAT1" if "FASE_2" in stato_sys else ("Micro" if has_limits else "Assicurazione")
                 elif abs(sz_pos - s_q) < 0.001: 
                     if "SATELLIT" in stato_sys:
+                        if "OL" in stato_sys:
+                            sat_price = float(param_memoria.get("sat_price", 0))
+                            tp = float(param_memoria.get("tp", 0))
+                            c = CONFIG_STRUMENTI.get(nome_strum, {})
+                            mult = c.get("moltiplicatore", 1)
+                            if sat_price > 0 and tp > 0:
+                                pos_level = float(pos_dict.get('level', 0))
+                                distance_pts = abs(pos_level - sat_price) / mult
+                                if distance_pts > (tp / 8):
+                                    return "OverLoss"
                         return "SAT2"
                     return "Posizione (1/4)"
                 elif abs(sz_pos - s_c * 0.15) < 0.001: return "Ultima"
@@ -517,7 +527,8 @@ else:
                     if "FASE_1" in stato_sys: return "Micro"
                     if param_memoria.get("ticket2_active") and dir_pos == param_memoria.get("ticket2_dir") and not ord_dict.get('stopDistance') and not ord_dict.get('stopLevel'):
                         return "Ticket2"
-                    if "SATELLIT" in stato_sys or "STANDBY" in stato_sys or "TICKET1" in stato_sys:
+                    if "TICKET1" in stato_sys: return "Ticket1"
+                    if "SATELLIT" in stato_sys or "STANDBY" in stato_sys:
                         if "OG" in stato_sys or "OL" in stato_sys or "(OG-OL)" in stato_sys:
                             return "OverGain"
                         return "SAT1 OCO"
@@ -961,6 +972,10 @@ else:
                     elif errore_ripristino: st.error("🛑 **RIPRISTINO BLOCCATO:** 4 tentativi falliti. Passaggio in **MANUALE**.")
                     elif is_distanza_pericolosa: st.error(f"⚠️ **ATTENZIONE:** Stop Minimo IG: **{min_richiesto_ig} pt**. Impostato: **{min_impostato} pt**.")
                     else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
+                    
+                    margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
+                    if margine_u != "N/D":
+                        st.caption(f"🛡️ Margine (Size=1): **{margine_u}€**")
 
                     if msg_weekend: st.error(f"🛑 {msg_weekend}")
                     if msg_manuale: st.error(msg_manuale)
