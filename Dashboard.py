@@ -433,9 +433,9 @@ else:
             st.markdown("---")
             st.markdown(f"**Stato Sistema:** {badge_motore_side}")
             st.markdown("---")
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa;'>Capitale Totale</div><div style='font-size: 1.2rem; font-weight: bold;'>{val_capitale} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.2rem; font-weight: bold;'>{val_margine} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Residuo</div><div style='font-size: 1.2rem; font-weight: bold;'>{val_residuo} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa;'>Capitale Totale</div><div style='font-size: 1.2rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.2rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Residuo</div><div style='font-size: 1.2rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Drawdown (P/L)</div><div style='font-size: 1.2rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
         
         renderizza_sidebar_stats()
@@ -893,11 +893,21 @@ else:
             with col_head2:
                 with st.container(border=True):
                     c_bal1, c_bal2 = st.columns(2)
-                    c_bal1.metric("CAPITALE TOTALE", f"{formatta_eur(stato.get('saldo', '0'))} EUR")
-                    c_bal2.metric("CAPITALE DISPONIBILE", f"{formatta_eur(stato.get('disponibile', '0'))} EUR")
+                    c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
+                    c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+                    
                     c_bal3, c_bal4 = st.columns(2)
-                    c_bal3.metric("MARGINE UTILIZZATO", f"{formatta_eur(stato.get('margine', '0'))} EUR")
-                    c_bal4.metric("DRAWDOWN (P/L)", f"{formatta_eur(stato.get('drawdown', '0'))} EUR")
+                    c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
+                    
+                    try:
+                        dd_num_op = float(stato.get('drawdown', '0'))
+                        dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
+                    except:
+                        dd_col_op = "white"
+                        
+                    c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
                     st.caption(stato.get('messaggio', ''))
 
             st.markdown("---")
@@ -1355,7 +1365,7 @@ else:
                     def categorizza_fase(fase_str):
                         f = str(fase_str).upper()
                         if "1" in f or "MICRO" in f or "ASSICURAZIONE" in f: return "F1"
-                        if "2" in f or "TICKET1" in f or "SAT" in f or "OVERGAIN" in f or "OVERLOSS" in f or "OG" in f or "OL" in f: return "F2"
+                        if "2" in f or "TICKET1" in f or "TICKET2" in f or "SAT" in f or "OVERGAIN" in f or "OVERLOSS" in f or "OG" in f or "OL" in f: return "F2"
                         if "3" in f or "ULTIMA" in f or "TAGLIO" in f or "VITTORIA" in f: return "F3"
                         return "Altro"
 

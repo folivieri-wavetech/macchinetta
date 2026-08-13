@@ -1360,6 +1360,7 @@ def esegui_motore():
                         prezzo_base = param.get("prezzo_base") 
                         opp_val = round(param.get("opp") * mult, dec)
                         tp2_val = round((param.get("tp") / 2) * mult, dec)
+                        tp4_val = round((param.get("tp") / 4) * mult, dec)
                         
                         core_ids = [p['position']['dealId'] for p in posizioni if float(p['position']['size']) == s_core]
                         sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
@@ -1380,7 +1381,15 @@ def esegui_motore():
                                     print_log(nome, f"🎯 [TICKET2] chiuso in profitto. Reinserisco ordine pendente a {formatta_numero(t2_entry, dec)}...")
                                     lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
                                     invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
-                                    invia_notifica(f"🎫 PING-PONG TICKET2: {nome}", f"[{nome}] Ticket2 ha preso profitto! Ordine pendente reinserito a {formatta_numero(t2_entry, dec)}.", "ticket")
+                                    
+                                    valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
+                                    rate = get_eur_rate(valuta, prezzi_live)
+                                    pnl_t2_win_eur = (param.get("tp") / 4) * s_mezzo * valore_punto * rate
+                                    pnl_str = formatta_pnl(pnl_t2_win_eur)
+                                    registra_operazione(nome, "Take Profit TICKET2", pnl_t2_win_eur)
+                                    
+                                    invia_notifica(f"🎫 PING-PONG TICKET2: {nome}", f"[{nome}] Ticket2 ha preso profitto! Ordine pendente reinserito a {formatta_numero(t2_entry, dec)}.{pnl_str}", "ticket")
+                                    aggiorna_memoria(nome, {}, log_wip=f"🎯 [TICKET2] chiuso in profitto a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str}")
                                     time.sleep(2.0)
                         
                         if sat1_attivi:
@@ -1393,9 +1402,19 @@ def esegui_motore():
                                 ticket2_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and is_ticket2(p)]
                                 if ticket2_attivi:
                                     t2_deal_id = ticket2_attivi[0]['position']['dealId']
+                                    t2_entry = float(ticket2_attivi[0]['position']['level'])
                                     dir_chiusura_t2 = "SELL" if ticket2_attivi[0]['position']['direction'] == "BUY" else "BUY"
+                                    
+                                    valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
+                                    rate = get_eur_rate(valuta, prezzi_live)
+                                    pts = (sat_price - t2_entry)/mult if ticket2_attivi[0]['position']['direction'] == 'BUY' else (t2_entry - sat_price)/mult
+                                    pnl_t2_loss_eur = pts * s_mezzo * valore_punto * rate
+                                    pnl_str = formatta_pnl(pnl_t2_loss_eur)
+                                    
                                     print_log(nome, f"📉 Chiusura a mercato del [TICKET2] (Loss)...")
                                     chiudi_parziale(nome, t2_deal_id, epic, dir_chiusura_t2, s_mezzo, valuta, h, etichetta="[TICKET2 CLOSURE]")
+                                    registra_operazione(nome, "Stop Loss TICKET2", pnl_t2_loss_eur)
+                                    aggiorna_memoria(nome, {}, log_wip=f"📉 [TICKET2] chiuso a mercato (Loss) a {formatta_numero(sat_price, dec)}.{pnl_str}")
                                     time.sleep(1.0)
                             
                             pulisci_mercato(epic, h, nome, solo_pendenti=True)
@@ -1403,9 +1422,14 @@ def esegui_motore():
                             sat2_dir = "SELL" if sat_dir == "BUY" else "BUY"
                             s_quarto = max(0.1, s_core / 4)
                             
-                            print_log(nome, f"➡️ Inserisco [SAT2] a mercato...")
-                            succ_sat2 = invia_ordine_mercato(nome, epic, valuta, sat2_dir, s_quarto, h, dec, etichetta=f"[SAT2]")
-                            time.sleep(3.0) 
+                            sat2_gia_presente = [p for p in posizioni if float(p['position']['size']) == s_quarto and p['position']['direction'] == sat2_dir]
+                            if not sat2_gia_presente:
+                                print_log(nome, f"➡️ Inserisco [SAT2] a mercato...")
+                                succ_sat2 = invia_ordine_mercato(nome, epic, valuta, sat2_dir, s_quarto, h, dec, etichetta=f"[SAT2]")
+                                time.sleep(3.0) 
+                            else:
+                                print_log(nome, f"✅ [SAT2] già presente a mercato. Salto inserimento.")
+                                succ_sat2 = True
                             
                             if succ_sat2:
                                 resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
