@@ -315,7 +315,7 @@ st.markdown("""
         .ig-table th:first-child { text-align: left; padding-left: 15px; color: #888; }
         
         /* Master Row in Grassetto e sottolineato */
-        .ig-row { border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: bold; }
+        .ig-row { border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: normal; }
         .ig-master-row td { text-decoration: underline; text-underline-offset: 3px; }
         .ig-master-row span.ig-dot { text-decoration: none; display: inline-block; }
         
@@ -332,7 +332,7 @@ st.markdown("""
 
         .size-buy { color: #3b82f6; }
         .size-sell { color: #ef4444; }
-        .ig-row .size-buy, .ig-row .size-sell { font-weight: bold; }
+        .ig-row .size-buy, .ig-row .size-sell { font-weight: normal; text-align: center !important; }
         
         /* Modifica per far ereditare correttamente il colore della size nei subrows */
         .ig-subrow td.size-buy { color: #3b82f6 !important; font-weight: normal !important; }
@@ -556,10 +556,16 @@ else:
             
             totale_pnl_portafoglio = 0.0
             
-            # Ordinamento Master Rows: Nome alfabetico, poi size totale (assoluto) decrescente
-            # Garantisce che la Core (-4) venga stampata sempre PRIMA della Assicurazione (+2)
+            # Pre-calcolo strutture per Rowspan
+            master_rows = []
             def get_group_total_size(posizioni):
                 return sum(float(p['position']['size']) for p in posizioni)
+                
+            pos_row_counts = {}
+            for k, posizioni in gruppi_pos.items():
+                nome_r = k[0]
+                count = 1 + (len(posizioni) if len(posizioni) > 1 else 0)
+                pos_row_counts[nome_r] = pos_row_counts.get(nome_r, 0) + count
                 
             items_pos = sorted(gruppi_pos.items(), key=lambda item: (item[0][0], -abs(get_group_total_size(item[1]))))
             
@@ -654,7 +660,13 @@ else:
                 if not is_first_of_instrument:
                     prezzo_str = ""
 
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'><td><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td><td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span class='{size_class}' style='font-weight: bold;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                if is_first_of_instrument:
+                    r_span = pos_row_counts.get(nome, 1)
+                    td_mercato = f"<td rowspan='{r_span}' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td>"
+                else:
+                    td_mercato = ""
+
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span class='{size_class}' style='font-weight: normal;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     for idx, p in enumerate(posizioni):
@@ -683,10 +695,10 @@ else:
                         is_last_subrow = (idx == len(posizioni) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td>{data_str}</td><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
-            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td style='font-weight: bold;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
+            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
@@ -700,6 +712,13 @@ else:
                 epic_to_name.get(x['marketData']['epic'], x['marketData']['epic']),
                 -float(x['workingOrderData'].get('orderSize', x['workingOrderData'].get('size', 0)))
             ))
+            
+            # Calcolo rowspan per ordini pendenti
+            ord_counts = {}
+            for o in ord_data_sorted:
+                epic = o['marketData']['epic']
+                n = epic_to_name.get(epic, epic)
+                ord_counts[n] = ord_counts.get(n, 0) + 1
             
             for i, o in enumerate(ord_data_sorted):
                 epic = o['marketData']['epic']
@@ -734,7 +753,15 @@ else:
                         
                 row_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if is_last_of_instrument else ""
                 
-                html_ord += f"<tr class='ig-row' style='{row_style}'><td><span class='ig-dot'></span><span style='color: #FFD700; font-weight: bold;'>{nome}</span></td><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: bold;'>{ruolo_ord}</span></td></tr>\n"
+                is_first_of_instrument_ord = (i == 0 or epic_to_name.get(ord_data_sorted[i-1]['marketData']['epic'], ord_data_sorted[i-1]['marketData']['epic']) != nome)
+                
+                if is_first_of_instrument_ord:
+                    r_span = ord_counts.get(nome, 1)
+                    td_mercato_ord = f"<td rowspan='{r_span}' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><span style='color: #FFD700; font-weight: normal;'>{nome}</span></td>"
+                else:
+                    td_mercato_ord = ""
+                
+                html_ord += f"<tr class='ig-row' style='{row_style}'>{td_mercato_ord}<td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_ord}</span></td></tr>\n"
                 
             html_ord += "</tbody></table>"
             
@@ -764,11 +791,36 @@ else:
                 color_dd = "#ff4b4b" if float(stato_sys.get('drawdown', '0')) < 0 else ("#09ab3b" if float(stato_sys.get('drawdown', '0')) > 0 else "inherit")
             except: color_dd = "inherit"
 
+            ultima_operazione_testo = ""
+            path_storico = os.path.join(conto_selezionato, "storico_operazioni.csv")
+            try:
+                if os.path.exists(path_storico):
+                    with open(path_storico, "r", encoding="utf-8") as f:
+                        last_line = None
+                        for riga in f:
+                            if riga.strip(): last_line = riga
+                        if last_line and not last_line.startswith("Data,"):
+                            parti = last_line.strip().split(",")
+                            if len(parti) >= 4:
+                                dt, strum, fase, pnl = parti[0], parti[1], parti[2], float(parti[3])
+                                try:
+                                    dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                                    dt_fmt = dt_obj.strftime("%d/%m %H:%M")
+                                except:
+                                    dt_fmt = dt
+                                segno = "+" if pnl > 0 else ""
+                                col_pnl = "#09ab3b" if pnl > 0 else "#ff4b4b"
+                                ultima_operazione_testo = f"<div style='font-size: 1rem; color: #FFD700; margin-top: 5px; font-weight: 500;'>⏱️ Ultima Op: <b>{strum}</b> - {fase} ({dt_fmt}) | <span style='color:{col_pnl}; font-weight:bold;'>{segno}{pnl:.2f} €</span></div>"
+            except Exception:
+                pass
+
             st.markdown(f"""
             <div style='display: flex; justify-content: space-between; align-items: flex-end; margin-top: -15px; margin-bottom: 20px;'>
-                <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Strumenti</h3>
+                <div>
+                    <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Strumenti</h3>
+                    {ultima_operazione_testo}
+                </div>
                 <div style='font-size: 1.05rem; font-weight: 500; display: flex; gap: 20px; align-items: center;'>
-                    <span style='background-color: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);'><b>Stato Sistema:</b> {badge_motore}</span>
                     <span><span style='color: #888;'>Saldo:</span> {saldo_val} €</span>
                     <span><span style='color: #888;'>P/L:</span> <span style='color: {color_dd};'>{dd_val} €</span></span>
                 </div>
@@ -970,7 +1022,7 @@ else:
                     
                     if errore_avvio: st.error("🛑 **AVVIO BLOCCATO:** IG ha rifiutato la griglia.")
                     elif errore_ripristino: st.error("🛑 **RIPRISTINO BLOCCATO:** 4 tentativi falliti. Passaggio in **MANUALE**.")
-                    elif is_distanza_pericolosa: st.error(f"⚠️ **ATTENZIONE:** Stop Minimo IG: **{min_richiesto_ig} pt**. Impostato: **{min_impostato} pt**.")
+                    elif is_distanza_pericolosa: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 15px;'>⚠️ <b>ATTENZIONE:</b> Stop Minimo IG: <b>{min_richiesto_ig} pt</b>. Impostato: <b>{min_impostato} pt</b>.</div>", unsafe_allow_html=True)
                     else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
                     
                     margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
@@ -1409,7 +1461,7 @@ else:
                             bold_class = "text-bold" if is_bold else ""
                             return f"<td class='{color_class} {bold_class}'>€ {val:.2f}</td>"
                             
-                        td_pl = format_td(row['P/L Tot.'], is_bold=True)
+                        td_pl = format_td(row['P/L Tot.'], is_bold=False)
                         td_f1 = format_td(row['F1'])
                         td_f2 = format_td(row['F2'])
                         td_f3 = format_td(row['F3'])
@@ -1439,7 +1491,7 @@ else:
                         loss = row['Perdenti']
                         wr = (win / tot_op * 100) if tot_op > 0 else 0
                         
-                        pnl_class = "text-green text-bold" if pnl > 0 else ("text-red text-bold" if pnl < 0 else "text-bold")
+                        pnl_class = "text-green" if pnl > 0 else ("text-red" if pnl < 0 else "")
                         pnl_str = f"€ {pnl:.2f}" if abs(pnl) >= 0.001 else "€ 0.00"
                         
                         win_class = "text-green" if win > 0 else ""
@@ -1473,6 +1525,22 @@ else:
             except FileNotFoundError:
                 logs = f"> In attesa di connessione col Motore per {conto_selezionato}..."
                 
-            st.code(logs, language="bash")
+            logs_escaped = logs.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+            st.markdown(f"""
+                <div style='
+                    background-color: #1E1E1E; 
+                    color: #D4D4D4; 
+                    font-family: "Courier New", Courier, monospace; 
+                    font-size: 0.82rem; 
+                    padding: 10px; 
+                    border-radius: 5px; 
+                    max-height: 500px; 
+                    overflow-y: auto;
+                    line-height: 1.4;
+                    white-space: nowrap;
+                '>
+                    {logs_escaped}
+                </div>
+            """, unsafe_allow_html=True)
             
         renderizza_console()

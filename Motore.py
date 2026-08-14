@@ -7,7 +7,18 @@ import datetime
 import sys
 import socket
 import hashlib
+import winsound
 from dotenv import dotenv_values
+
+# --- EFFETTI SONORI ---
+def suona_drumroll():
+    try:
+        ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+        FILE_AUDIO = os.path.join(ROOT_DIR, "drumroll.wav")
+        if os.path.exists(FILE_AUDIO):
+            winsound.PlaySound(FILE_AUDIO, winsound.SND_FILENAME | winsound.SND_ASYNC)
+    except Exception:
+        pass
 
 # --- GESTIONE MULTI-CONTO ---
 if len(sys.argv) < 2:
@@ -60,17 +71,17 @@ def invia_notifica(titolo, messaggio, tags="rotating_light"):
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
-    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD"},
-    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD"},
-    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY"},
-    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP"},
-    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD"},
-    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD"},
-    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF"},
-    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY"},
-    "Ethereum": {"epic": "CS.D.ETHUSD.CFD.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "USD"},
-    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR"},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR"}
+    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
+    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
+    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
+    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP", "valore_punto": 1},
+    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
+    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
+    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
+    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
+    "Ethereum": {"epic": "CS.D.ETHUSD.CFD.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "USD", "valore_punto": 1},
+    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1},
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1}
 }
 
 # --- STATO GLOBALE ---
@@ -176,6 +187,8 @@ def registra_operazione(nome_strumento, fase_label, pnl_eur):
         # Se l'operazione non sposta soldi, ignorala per le statistiche (evita spam e calcoli fasulli)
         if abs(pnl_eur) < 0.01: 
             return
+            
+        suona_drumroll()
         
         FILE_STORICO = "storico_operazioni.csv"
         file_esiste = os.path.exists(FILE_STORICO)
@@ -408,7 +421,9 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                         time.sleep(20)
                         continue
                 print_log(nome_strumento, f"✅ {etichetta} eseguito con successo.")
+                suona_drumroll()
                 return True
+
             else:
                 if r.status_code == 403 and "exceeded-api-key" in r.text:
                     print_log(nome_strumento, f"⏳ Rate Limit API (403). Pausa 30s...")
@@ -555,7 +570,7 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
     if resp_ord_check and resp_ord_check.status_code == 200:
         ord_agg = [o for o in resp_ord_check.json().get('workingOrders', []) if o['marketData']['epic'] == epic]
         if no_stop:
-            ord_agg = [o for o in ord_agg if o['workingOrderData'].get('stopLevel') is None]
+            ord_agg = [o for o in ord_agg if o['workingOrderData'].get('orderType') == 'LIMIT']
         if target_dir:
             falso_allarme_ord = len([o for o in ord_agg if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == target_size and o['workingOrderData']['direction'] == target_dir]) > 0
         else:
@@ -678,6 +693,7 @@ def esegui_motore():
                         "Version": "1", 
                         "Accept": "application/json"
                     }
+                    invia_notifica(f"🔄 TOKEN RINNOVATO: {NOME_CONTO}", f"Il token di sessione IG per il conto {NOME_CONTO} è stato rinnovato o rigenerato con successo.", "arrows_counterclockwise")
 
             dati_mercati = ottieni_dati_mercati_batch(h)
             
@@ -1071,6 +1087,7 @@ def esegui_motore():
                                         pr_str = f" a {formatta_numero(pos_micro_vera[0]['position']['level'], dec)}"
                                     msg_log = f"⚡ [MICRO {dir_micro_str}] innescata a mercato{pr_str}"
                                     invia_notifica(f"🔬 MICRO IN POSIZIONE: {nome}", f"[{nome}] Ordine Micro {dir_micro_str} entrato a mercato{pr_str}.", "microscope")
+                                    suona_drumroll()
                                 else:
                                     msg_log = f"🔄 Ritorno in {nuovo_stato}"
                                         
@@ -1166,12 +1183,29 @@ def esegui_motore():
                                     aggiorna_memoria(nome, {}, log_wip=f"✅ [MICRO SHORT] a target a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ordine.{pnl_str}")
                                 else: 
                                     print_log(nome, "🎯 Target Fase 1 raggiunto. Chiusura posizioni *** FLIP")
-                                    pnl = calcola_pnl_chiusura(posizioni, prezzo_attuale, nome, prezzi_live)
+                                    
+                                    c_pos = [p for p in posizioni if float(p['position']['size']) == s_core]
+                                    pnl_c = calcola_pnl_chiusura(c_pos, prezzo_attuale, nome, prezzi_live)
+                                    
+                                    a_pos = [p for p in posizioni if float(p['position']['size']) == s_ass and abs(float(p['position']['level']) - p_base_orig) < (tp4/2)]
+                                    pnl_a = calcola_pnl_chiusura(a_pos, prezzo_attuale, nome, prezzi_live)
+                                    
+                                    m_pos = [p for p in posizioni if float(p['position']['size']) == s_ass and abs(float(p['position']['level']) - p_base_orig) >= (tp4/2)]
+                                    if m_pos:
+                                        pnl_m = calcola_pnl_chiusura(m_pos, prezzo_attuale, nome, prezzi_live)
+                                    else:
+                                        pts = (lvl_ingresso_micro_long - prezzo_attuale) / mult
+                                        pnl_m = pts * s_ass * c.get("valore_punto", 1) * rate
+                                        
+                                    pnl = pnl_c + pnl_a + pnl_m
+                                    pnl_str_base = formatta_pnl(pnl)
+                                    dettaglio_pnl = f"{pnl_str_base} (Core: {pnl_c:+.2f}€ | Ass: {pnl_a:+.2f}€ | Micro: {pnl_m:+.2f}€)"
+                                    
                                     pulisci_mercato(epic, h, nome)
                                     time.sleep(3.0) 
                                     registra_operazione(nome, "Stop Loss MICRO / FLIP (Fase 1)", pnl)
-                                    invia_notifica(f"🔄 TARGET FASE 1: {nome}", f"[{nome}] Micro SHORT a target a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni e FLIP.{formatta_pnl(pnl)}", "arrows_counterclockwise")
-                                    aggiorna_memoria(nome, {"direzione": "SHORT", "stato": "IN_ATTESA", "ticket2_active": False}, log_wip=f"🎯 Stop [MICRO SHORT] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{formatta_pnl(pnl)}")
+                                    invia_notifica(f"🔄 TARGET FASE 1: {nome}", f"[{nome}] Micro SHORT a target a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni e FLIP.{dettaglio_pnl}", "arrows_counterclockwise")
+                                    aggiorna_memoria(nome, {"direzione": "SHORT", "stato": "IN_ATTESA", "ticket2_active": False}, log_wip=f"🎯 Stop [MICRO SHORT] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{dettaglio_pnl}")
                             else:
                                 if prezzo_attuale > lvl_ingresso_micro_short: 
                                     print_log(nome, "🔄 Profitto parziale. Inserisco Ordine [MICRO]...")
@@ -1182,12 +1216,29 @@ def esegui_motore():
                                     aggiorna_memoria(nome, {}, log_wip=f"✅ [MICRO LONG] a target a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ordine.{pnl_str}")
                                 else: 
                                     print_log(nome, "🎯 Target Fase 1 raggiunto. Chiusura posizioni *** FLIP")
-                                    pnl = calcola_pnl_chiusura(posizioni, prezzo_attuale, nome, prezzi_live)
+                                    
+                                    c_pos = [p for p in posizioni if float(p['position']['size']) == s_core]
+                                    pnl_c = calcola_pnl_chiusura(c_pos, prezzo_attuale, nome, prezzi_live)
+                                    
+                                    a_pos = [p for p in posizioni if float(p['position']['size']) == s_ass and abs(float(p['position']['level']) - p_base_orig) < (tp4/2)]
+                                    pnl_a = calcola_pnl_chiusura(a_pos, prezzo_attuale, nome, prezzi_live)
+                                    
+                                    m_pos = [p for p in posizioni if float(p['position']['size']) == s_ass and abs(float(p['position']['level']) - p_base_orig) >= (tp4/2)]
+                                    if m_pos:
+                                        pnl_m = calcola_pnl_chiusura(m_pos, prezzo_attuale, nome, prezzi_live)
+                                    else:
+                                        pts = (prezzo_attuale - lvl_ingresso_micro_short) / mult
+                                        pnl_m = pts * s_ass * c.get("valore_punto", 1) * rate
+                                        
+                                    pnl = pnl_c + pnl_a + pnl_m
+                                    pnl_str_base = formatta_pnl(pnl)
+                                    dettaglio_pnl = f"{pnl_str_base} (Core: {pnl_c:+.2f}€ | Ass: {pnl_a:+.2f}€ | Micro: {pnl_m:+.2f}€)"
+                                    
                                     pulisci_mercato(epic, h, nome)
                                     time.sleep(3.0) 
                                     registra_operazione(nome, "Stop Loss MICRO / FLIP (Fase 1)", pnl)
-                                    invia_notifica(f"🔄 TARGET FASE 1: {nome}", f"[{nome}] Micro LONG a target a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni e FLIP.{formatta_pnl(pnl)}", "arrows_counterclockwise")
-                                    aggiorna_memoria(nome, {"direzione": "LONG", "stato": "IN_ATTESA", "ticket2_active": False}, log_wip=f"🎯 Stop [MICRO LONG] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{formatta_pnl(pnl)}")
+                                    invia_notifica(f"🔄 TARGET FASE 1: {nome}", f"[{nome}] Micro LONG a target a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni e FLIP.{dettaglio_pnl}", "arrows_counterclockwise")
+                                    aggiorna_memoria(nome, {"direzione": "LONG", "stato": "IN_ATTESA", "ticket2_active": False}, log_wip=f"🎯 Stop [MICRO LONG] colpito a {formatta_numero(prezzo_attuale, dec)}. Chiusura posizioni *** FLIP.{dettaglio_pnl}")
 
                     elif stato == "FASE_2_STANDBY":
                         if not bid or not ask:
@@ -1370,7 +1421,7 @@ def esegui_motore():
                         
                         if param.get("ticket2_active"):
                             ticket2_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and is_ticket2(p)]
-                            ticket2_pendenti = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == param.get("ticket2_dir") and o['workingOrderData'].get('stopLevel') is None]
+                            ticket2_pendenti = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == param.get("ticket2_dir") and o['workingOrderData'].get('orderType') == 'LIMIT']
                             
                             if not ticket2_attivi and not ticket2_pendenti:
                                 t2_dir = param.get("ticket2_dir")
@@ -1466,6 +1517,7 @@ def esegui_motore():
                                 time.sleep(3.0)
                                 
                             invia_notifica(f"🎯 SAT1 INNESCATO: {nome}", f"[{nome}] Entrata a mercato in {sat_dir} a {formatta_numero(sat_price, dec)}. Piazzati SAT2, OG e OL.", "dart")
+                            suona_drumroll()
                             aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITE_(OG-OL)", "sat_dir": sat_dir, "sat_price": sat_price, "tentativi_sat": 0, "ticket2_active": False}, log_wip=f"⚡ [SAT1 {sat_dir}] innescato a mercato a {formatta_numero(sat_price, dec)}.")
 
                         else:
@@ -1551,6 +1603,18 @@ def esegui_motore():
                                     invia_notifica(f"🛡️ OVERLOSS INNESCATO: {nome}", f"[{nome}] {msg_log}", "shield")
                                 else:
                                     msg_log = f"🔄 Passaggio a: {nuovo_stato}{pr_str}"
+                                    vecchio_stato = param.get("stato")
+                                    valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
+                                    rate = get_eur_rate(valuta, prezzi_live)
+                                    
+                                    if vecchio_stato == "FASE_2_SATELLITE_OG":
+                                        pnl = (param.get("tp") / 4) * s_mezzo * valore_punto * rate
+                                        registra_operazione(nome, "Take Profit OVERGAIN", pnl)
+                                        msg_log += f"{formatta_pnl(pnl)}"
+                                    elif vecchio_stato == "FASE_2_SATELLITE_OL":
+                                        pnl = -(param.get("tp") / 4) * s_quarto * valore_punto * rate
+                                        registra_operazione(nome, "Stop Loss OVERLOSS", pnl)
+                                        msg_log += f"{formatta_pnl(pnl)}"
                                     
                                 aggiorna_memoria(nome, {"stato": nuovo_stato}, log_wip=msg_log)
                             else:
@@ -1687,7 +1751,16 @@ def esegui_motore():
                                 invia_notifica(f"🔪 ULTIMA IN POSIZIONE: {nome}", f"[{nome}] Ordine Ultima entrato a mercato{pr_str}.", "dagger")
                                 aggiorna_memoria(nome, {"stato": nuovo_stato}, log_wip=msg_log)
                             else:
-                                aggiorna_memoria(nome, {"stato": nuovo_stato})
+                                if is_ultima_closing:
+                                    valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
+                                    rate = get_eur_rate(valuta, prezzi_live)
+                                    pnl = (param.get("tp") / 4) * s_last * valore_punto * rate
+                                    registra_operazione(nome, "Take Profit ULTIMA", pnl)
+                                    msg_log = f"💰 [ULTIMA] chiusa in profitto.{formatta_pnl(pnl)}"
+                                    invia_notifica(f"🔪 ULTIMA A TARGET: {nome}", f"[{nome}] {msg_log}", "moneybag")
+                                    aggiorna_memoria(nome, {"stato": nuovo_stato}, log_wip=msg_log)
+                                else:
+                                    aggiorna_memoria(nome, {"stato": nuovo_stato})
 
                         if not core_trend:
                             if not bid or not ask:

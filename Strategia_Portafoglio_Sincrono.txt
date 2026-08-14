@@ -7,57 +7,36 @@
 - Margine Libero Minimo Desiderato: ~20% (Circa 3.000 €)
 
 ======================================================
-     ANALISI DEGLI SCENARI DI CARICO (STRESS TEST)
+     ANALISI DEL CARICO MASSIMO: START FASE 1 (3.0x)
 ======================================================
+Il momento di massimo sforzo assoluto per il Margine non è durante le fasi di difesa, ma all'istante di avvio simultaneo (START). 
+Ogni strumento impegna infatti un lordo di 3 volte la sua size core:
+- Posizione Core (1x) + Posizione Assicurazione (0.5x)
+- Pendente Core (1x) + Pendente Micro (0.5x) = Totale 3.0x
 
-SQUADRA TITOLARE DEFINITIVA (5 STRUMENTI - INGRESSO SCALATO)
+Di seguito il calcolo del margine assorbito a 3.0x (margine teorico lordo) per mantenere il ~20% di sicurezza (almeno 3.000 € liberi su 15.000 €).
+
+[SQUADRA TITOLARE DEFINITIVA - START SIMULTANEO]
+1. Spot Gold (Size 4)    ➡️ +2.640 € | Cumulativo: 2.640 € (Margine libero: 82,4%)
+2. US 500 Cash (Size 4)  ➡️ +4.800 € | Cumulativo: 7.440 € (Margine libero: 50,4%)
+3. USD/CHF (Size 4)      ➡️ +3.480 € | Cumulativo: 10.920 € (Margine libero: 27,2%)  <-- LIMITE SICUREZZA OLTRE IL 20%
 ------------------------------------------------------
-[START INIZIALE - Conto a 15.000 €]
-1. Spot Gold     -> Size 4 
-2. US 500 Cash   -> Size 4 
-3. USD/CHF       -> Size 4 
-4. CAD/JPY       -> Size 6 
+4. CAD/JPY (Size 6)      ➡️ +3.780 € | Cumulativo: 14.700 € (Margine libero: 2,0%)   <-- PERICOLO ESTREMO
+5. EUR/GBP (Size 4)      ➡️ +4.020 € | Cumulativo: 18.720 € (MARGIN CALL)
 
-[FASE DI SCALING - All'arrotondamento del conto a 16.000 €]
-5. EUR/GBP       -> Size 4
+[STRUMENTI SUCCESSIVI IN PANCHINA]
+6. GBP/USD (Size 4)      ➡️ +4.800 € | Cumulativo: 23.520 €
+7. USD/JPY (Size 6)      ➡️ +5.220 € | Cumulativo: 28.740 €
+8. USD/CAD (Size 6)      ➡️ +5.400 € | Cumulativo: 34.140 €
 
-
---- SCENARIO 1: VELOCITÀ DI CROCIERA PRUDENTE (1.75x) ---
-Rappresenta una situazione realistica in cui i mercati sono mossi e tutti gli strumenti sono mediamente esposti in Fase 2 (es. Ticket 1 e 2 presi).
-
-1. Spot Gold ➡️ Cumulativo: 1.540 € (Margine libero: 89%)
-2. US 500 Cash ➡️ Cumulativo: 4.340 € (Margine libero: 71%)
-3. USD/CHF ➡️ Cumulativo: 6.370 € (Margine libero: 57%)
-4. CAD/JPY ➡️ Cumulativo: 8.575 € (Margine libero: 42%)
-5. EUR/GBP ➡️ Cumulativo: 10.920 € (Margine libero: 27%)  <-- Limite di sicurezza ottimale
-6. GBP/USD ➡️ Cumulativo: 13.720 € (Margine libero: 8,5%) <-- PERICOLO
-7. USD/JPY ➡️ Cumulativo: 16.765 € (Margin Call)
-8. USD/CAD ➡️ Cumulativo: 19.915 €
-
-VERDETTO 1.75x: Il "Golden Ratio" è 5 Strumenti. Ti lascia un ampio 27% di margine libero per respirare.
-
---- SCENARIO 2: VELOCITÀ DI CROCIERA FORZATA (2.0x) ---
-Rappresenta una situazione di forte stress in cui la maggior parte degli strumenti si trova vicinissima ai Satelliti.
-
-1. Spot Gold ➡️ Cumulativo: 1.760 € (Margine libero: 88%)
-2. US 500 Cash ➡️ Cumulativo: 4.960 € (Margine libero: 67%)
-3. USD/CHF ➡️ Cumulativo: 7.280 € (Margine libero: 51%)
-4. CAD/JPY ➡️ Cumulativo: 9.800 € (Margine libero: 34%)  <-- Limite di sicurezza ottimale
-5. EUR/GBP ➡️ Cumulativo: 12.480 € (Margine libero: 16,8%) <-- Scende sotto il 20%
-6. GBP/USD ➡️ Cumulativo: 15.680 € (Margin Call)
-7. USD/JPY ➡️ Cumulativo: 19.160 €
-8. USD/CAD ➡️ Cumulativo: 22.760 €
-
-VERDETTO 2.0x: In condizioni di stress grave, per restare sopra il 20% di margine libero devi fermarti a 4 Strumenti. Il 5° strumento (EUR/GBP) spinge il margine libero al 16,8%.
-
---- SCENARIO 3: APOCALISSE SIMULTANEA (2.5x) ---
-Rappresenta il peggiore dei casi assoluto: tutti gli strumenti agganciano i Satelliti nello stesso secondo.
-
-1. Spot Gold ➡️ Cumulativo: 2.200 € (Margine libero: 85%)
-2. US 500 Cash ➡️ Cumulativo: 6.200 € (Margine libero: 58%)
-3. USD/CHF ➡️ Cumulativo: 9.100 € (Margine libero: 39%)
-4. CAD/JPY ➡️ Cumulativo: 12.250 € (Margine libero: 18,3%) <-- Limite di sopportazione estrema
-5. EUR/GBP ➡️ Cumulativo: 15.600 € (Margin Call)
-
-VERDETTO 2.5x: Per sopravvivere a un evento apocalittico senza margin call (accettando un 18,3% residuo), il numero massimo assoluto di strumenti è 4.
 ======================================================
+                      VERDETTO E SOLUZIONI
+======================================================
+Essendo la **Size 4 il limite minimo tecnico** insindacabile, l'opzione di tagliare le size è ufficialmente scartata.
+
+Con un capitale di 15.000 €, il limite matematico per non esplodere alla partenza e mantenere un buffer vitale (27,2%) è **accendere esattamente 3 Strumenti in sincrono** (Gold, US500, USD/CHF). 
+
+Il 4° e 5° strumento (CAD/JPY e EUR/GBP) non possono in alcun modo far parte della "formazione titolare di accensione". Per poterli tradare hai solo due strade obbligate:
+
+1. **Il Modulo a Staffetta (Scaglionato):** Tieni CAD/JPY e EUR/GBP "in panchina". Li accendi manualmente solo quando uno dei primi 3 strumenti si chiude definitivamente o accumula abbastanza "cicli vinti" da aver ingrassato il capitale e abbassato drasticamente il margine in uso.
+2. **Iniezione di Liquidità:** Se vuoi vedere tutti e 5 i motori ruggire simultaneamente fin dal primo secondo (Fase 1 START), 15.000 € non bastano. Hai bisogno di portare la cassa del conto a quota **23.500 €** per reggere il colpo iniziale mantenendo un ~20% di respiro.
