@@ -1,0 +1,463 @@
+--- DIARIO SIMULAZIONE SIM_FIORDOK ---
+
+[*] Avvio simulazione per SIM_FIORDOK...
+[SISTEMA] --- MOTORE AVVIATO PER CONTO: SIM_FIORDOK ---
+[SISTEMA] ✅ Connesso a IG con successo!
+[Spot Gold] 🚀 [PRE-FLIGHT CHECK] Avvio test griglia FASE 1 in direzione LONG
+[Spot Gold] ✅ [ORDINE CORE] inserito con successo.
+[Spot Gold] ✅ [ORDINE MICRO] inserito con successo.
+[Spot Gold] ✅ Griglia accettata da IG. Procedo con l'entrata a mercato...
+[Spot Gold] ✅ [ORDINE CORE] eseguito con successo.
+[Spot Gold] ✅ [ORDINE ASSICURAZIONE] eseguito con successo.
+📈 [MERCATO] Il prezzo sale a 5004.9
+📈 [MERCATO] Il prezzo sale a 5010.1
+📈 [MERCATO] Il prezzo sale a 5013.4
+📈 [MERCATO] Il prezzo sale a 5016.9
+📈 [MERCATO] Il prezzo sale a 5020.9
+📈 [MERCATO] Il prezzo sale a 5025.1
+⚡ [SIMULATORE] Ordine Pendente LIMIT SELL innescato a 5025.1
+📈 [MERCATO] Il prezzo sale a 5029.5
+📈 [MERCATO] Il prezzo sale a 5034.2
+📈 [MERCATO] Il prezzo sale a 5039.0
+📈 [MERCATO] Il prezzo sale a 5043.9
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5043.9 (PnL: -114.65€)
+[Spot Gold] 🎯 Target Fase 1 raggiunto. Chiusura posizioni *** FLIP
+📈 [MERCATO] Il prezzo sale a 5048.9
+[Spot Gold] 🚀 [PRE-FLIGHT CHECK] Avvio test griglia FASE 1 in direzione SHORT
+[Spot Gold] ✅ [ORDINE CORE] inserito con successo.
+[Spot Gold] ✅ [ORDINE MICRO] inserito con successo.
+[Spot Gold] ✅ Griglia accettata da IG. Procedo con l'entrata a mercato...
+[Spot Gold] ✅ [ORDINE CORE] eseguito con successo.
+[Spot Gold] ✅ [ORDINE ASSICURAZIONE] eseguito con successo.
+📈 [MERCATO] Il prezzo sale a 5053.9
+📈 [MERCATO] Il prezzo sale a 5058.9
+📈 [MERCATO] Il prezzo sale a 5063.7
+📈 [MERCATO] Il prezzo sale a 5068.5
+📈 [MERCATO] Il prezzo sale a 5073.0
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5073.0
+[Spot Gold] ➡️ Inserisco Ordine [TICKET1]...
+[Spot Gold] ✅ [TICKET1] eseguito con successo.
+📈 [MERCATO] Il prezzo sale a 5077.3
+📈 [MERCATO] Il prezzo sale a 5081.4
+📈 [MERCATO] Il prezzo sale a 5085.1
+📈 [MERCATO] Il prezzo sale a 5088.5
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5091.5 (PnL: -92.30€)
+[Spot Gold] ➡️ Condizione OPP == TP/4 verificata. Apertura [TICKET2] a mercato...
+[Spot Gold] ✅ [TICKET2] eseguito con successo.
+📈 [MERCATO] Il prezzo sale a 5094.1
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5097.9
+📉 [MERCATO] Il prezzo scende a 5093.6
+📉 [MERCATO] Il prezzo scende a 5087.9
+📉 [MERCATO] Il prezzo scende a 5084.5
+📉 [MERCATO] Il prezzo scende a 5080.7
+📉 [MERCATO] Il prezzo scende a 5076.6
+📉 [MERCATO] Il prezzo scende a 5072.3
+📉 [MERCATO] Il prezzo scende a 5067.7
+✅ [SIMULATORE] Eseguito Take Profit (Limit) su SELL a 5067.7 (PnL: +118.95€)
+[Spot Gold] 🎯 [TICKET2] chiuso in profitto. Reinserisco ordine pendente a 5091.7...
+[Spot Gold] ✅ [ORDINE TICKET2] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5062.9
+📉 [MERCATO] Il prezzo scende a 5058.1
+📉 [MERCATO] Il prezzo scende a 5053.1
+📉 [MERCATO] Il prezzo scende a 5048.1
+📉 [MERCATO] Il prezzo scende a 5043.1
+📉 [MERCATO] Il prezzo scende a 5038.2
+📉 [MERCATO] Il prezzo scende a 5033.4
+📉 [MERCATO] Il prezzo scende a 5028.8
+📉 [MERCATO] Il prezzo scende a 5024.3
+📉 [MERCATO] Il prezzo scende a 5020.2
+📉 [MERCATO] Il prezzo scende a 5016.3
+📉 [MERCATO] Il prezzo scende a 5012.8
+📉 [MERCATO] Il prezzo scende a 5009.6
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5006.9
+[Spot Gold] 🚨 OCO entrato a mercato. Pulizia [TICKET2] in corso...
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5004.6
+📉 [MERCATO] Il prezzo scende a 5001.3
+📈 [MERCATO] Il prezzo sale a 5005.3
+📈 [MERCATO] Il prezzo sale a 5010.6
+📈 [MERCATO] Il prezzo sale a 5013.9
+📈 [MERCATO] Il prezzo sale a 5017.6
+📈 [MERCATO] Il prezzo sale a 5021.6
+📈 [MERCATO] Il prezzo sale a 5025.8
+📈 [MERCATO] Il prezzo sale a 5030.3
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5030.3
+📈 [MERCATO] Il prezzo sale a 5035.0
+📈 [MERCATO] Il prezzo sale a 5039.8
+📈 [MERCATO] Il prezzo sale a 5044.8
+📈 [MERCATO] Il prezzo sale a 5049.8
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5049.8 (PnL: -204.30€)
+📈 [MERCATO] Il prezzo sale a 5054.8
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5059.7
+📈 [MERCATO] Il prezzo sale a 5064.6
+📈 [MERCATO] Il prezzo sale a 5069.2
+📈 [MERCATO] Il prezzo sale a 5073.8
+📈 [MERCATO] Il prezzo sale a 5078.0
+📈 [MERCATO] Il prezzo sale a 5082.0
+📈 [MERCATO] Il prezzo sale a 5085.7
+📈 [MERCATO] Il prezzo sale a 5089.0
+📈 [MERCATO] Il prezzo sale a 5094.4
+📈 [MERCATO] Il prezzo sale a 5098.1
+📉 [MERCATO] Il prezzo scende a 5093.2
+📉 [MERCATO] Il prezzo scende a 5087.4
+📉 [MERCATO] Il prezzo scende a 5083.9
+📉 [MERCATO] Il prezzo scende a 5080.1
+📉 [MERCATO] Il prezzo scende a 5075.9
+📉 [MERCATO] Il prezzo scende a 5071.5
+📉 [MERCATO] Il prezzo scende a 5066.9
+📉 [MERCATO] Il prezzo scende a 5062.1
+📉 [MERCATO] Il prezzo scende a 5057.2
+📉 [MERCATO] Il prezzo scende a 5052.2
+📉 [MERCATO] Il prezzo scende a 5047.2
+📉 [MERCATO] Il prezzo scende a 5042.3
+📉 [MERCATO] Il prezzo scende a 5037.4
+📉 [MERCATO] Il prezzo scende a 5032.6
+📉 [MERCATO] Il prezzo scende a 5028.0
+📉 [MERCATO] Il prezzo scende a 5023.6
+📉 [MERCATO] Il prezzo scende a 5019.5
+📉 [MERCATO] Il prezzo scende a 5015.7
+📉 [MERCATO] Il prezzo scende a 5012.2
+📉 [MERCATO] Il prezzo scende a 5009.1
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5006.5
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5004.2
+📉 [MERCATO] Il prezzo scende a 5001.1
+📈 [MERCATO] Il prezzo sale a 5005.7
+📈 [MERCATO] Il prezzo sale a 5011.2
+📈 [MERCATO] Il prezzo sale a 5014.5
+📈 [MERCATO] Il prezzo sale a 5018.2
+📈 [MERCATO] Il prezzo sale a 5022.2
+📈 [MERCATO] Il prezzo sale a 5026.5
+📈 [MERCATO] Il prezzo sale a 5031.1
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5031.1
+📈 [MERCATO] Il prezzo sale a 5035.8
+📈 [MERCATO] Il prezzo sale a 5040.6
+📈 [MERCATO] Il prezzo sale a 5045.6
+📈 [MERCATO] Il prezzo sale a 5050.6
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5050.6 (PnL: -208.50€)
+📈 [MERCATO] Il prezzo sale a 5055.6
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5060.5
+📈 [MERCATO] Il prezzo sale a 5065.4
+📈 [MERCATO] Il prezzo sale a 5070.0
+📈 [MERCATO] Il prezzo sale a 5074.5
+📈 [MERCATO] Il prezzo sale a 5078.7
+📈 [MERCATO] Il prezzo sale a 5082.7
+📈 [MERCATO] Il prezzo sale a 5086.3
+📈 [MERCATO] Il prezzo sale a 5089.5
+📈 [MERCATO] Il prezzo sale a 5094.8
+📈 [MERCATO] Il prezzo sale a 5098.3
+📉 [MERCATO] Il prezzo scende a 5095.2
+📉 [MERCATO] Il prezzo scende a 5090.0
+📉 [MERCATO] Il prezzo scende a 5086.8
+📉 [MERCATO] Il prezzo scende a 5083.3
+📉 [MERCATO] Il prezzo scende a 5079.4
+📉 [MERCATO] Il prezzo scende a 5075.2
+📉 [MERCATO] Il prezzo scende a 5070.8
+📉 [MERCATO] Il prezzo scende a 5066.1
+📉 [MERCATO] Il prezzo scende a 5061.3
+📉 [MERCATO] Il prezzo scende a 5056.4
+📉 [MERCATO] Il prezzo scende a 5051.4
+📉 [MERCATO] Il prezzo scende a 5046.4
+📉 [MERCATO] Il prezzo scende a 5041.4
+📉 [MERCATO] Il prezzo scende a 5036.6
+📉 [MERCATO] Il prezzo scende a 5031.8
+📉 [MERCATO] Il prezzo scende a 5027.2
+📉 [MERCATO] Il prezzo scende a 5022.9
+📉 [MERCATO] Il prezzo scende a 5018.9
+📉 [MERCATO] Il prezzo scende a 5015.1
+📉 [MERCATO] Il prezzo scende a 5011.7
+📉 [MERCATO] Il prezzo scende a 5008.7
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5008.7
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5003.9
+📉 [MERCATO] Il prezzo scende a 5000.2
+📈 [MERCATO] Il prezzo sale a 5003.9
+📈 [MERCATO] Il prezzo sale a 5008.7
+📈 [MERCATO] Il prezzo sale a 5011.7
+📈 [MERCATO] Il prezzo sale a 5015.1
+📈 [MERCATO] Il prezzo sale a 5018.9
+📈 [MERCATO] Il prezzo sale a 5022.9
+📈 [MERCATO] Il prezzo sale a 5027.3
+📈 [MERCATO] Il prezzo sale a 5031.9
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5031.9
+📈 [MERCATO] Il prezzo sale a 5036.6
+📈 [MERCATO] Il prezzo sale a 5041.5
+📈 [MERCATO] Il prezzo sale a 5046.4
+📈 [MERCATO] Il prezzo sale a 5051.4
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5051.4 (PnL: -212.70€)
+📈 [MERCATO] Il prezzo sale a 5056.4
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5061.3
+📈 [MERCATO] Il prezzo sale a 5066.1
+📈 [MERCATO] Il prezzo sale a 5070.8
+📈 [MERCATO] Il prezzo sale a 5075.2
+📈 [MERCATO] Il prezzo sale a 5079.4
+📈 [MERCATO] Il prezzo sale a 5083.3
+📈 [MERCATO] Il prezzo sale a 5086.9
+📈 [MERCATO] Il prezzo sale a 5090.1
+📈 [MERCATO] Il prezzo sale a 5095.2
+📈 [MERCATO] Il prezzo sale a 5098.5
+📉 [MERCATO] Il prezzo scende a 5094.8
+📉 [MERCATO] Il prezzo scende a 5089.5
+📉 [MERCATO] Il prezzo scende a 5086.2
+📉 [MERCATO] Il prezzo scende a 5082.6
+📉 [MERCATO] Il prezzo scende a 5078.7
+📉 [MERCATO] Il prezzo scende a 5074.5
+📉 [MERCATO] Il prezzo scende a 5070.0
+📉 [MERCATO] Il prezzo scende a 5065.3
+📉 [MERCATO] Il prezzo scende a 5060.5
+📉 [MERCATO] Il prezzo scende a 5055.6
+📉 [MERCATO] Il prezzo scende a 5050.6
+📉 [MERCATO] Il prezzo scende a 5045.6
+📉 [MERCATO] Il prezzo scende a 5040.6
+📉 [MERCATO] Il prezzo scende a 5035.8
+📉 [MERCATO] Il prezzo scende a 5031.0
+📉 [MERCATO] Il prezzo scende a 5026.5
+📉 [MERCATO] Il prezzo scende a 5022.2
+📉 [MERCATO] Il prezzo scende a 5018.2
+📉 [MERCATO] Il prezzo scende a 5014.5
+📉 [MERCATO] Il prezzo scende a 5011.1
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5008.2
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5005.6
+📉 [MERCATO] Il prezzo scende a 5001.9
+📈 [MERCATO] Il prezzo sale a 5006.5
+📈 [MERCATO] Il prezzo sale a 5012.3
+📈 [MERCATO] Il prezzo sale a 5015.7
+📈 [MERCATO] Il prezzo sale a 5019.6
+📈 [MERCATO] Il prezzo sale a 5023.7
+📈 [MERCATO] Il prezzo sale a 5028.0
+📈 [MERCATO] Il prezzo sale a 5032.6
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5032.6
+📈 [MERCATO] Il prezzo sale a 5037.4
+📈 [MERCATO] Il prezzo sale a 5042.3
+📈 [MERCATO] Il prezzo sale a 5047.3
+📈 [MERCATO] Il prezzo sale a 5052.3
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5052.3 (PnL: -216.90€)
+📈 [MERCATO] Il prezzo sale a 5057.3
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5062.2
+📈 [MERCATO] Il prezzo sale a 5066.9
+📈 [MERCATO] Il prezzo sale a 5071.6
+📈 [MERCATO] Il prezzo sale a 5075.9
+📈 [MERCATO] Il prezzo sale a 5080.1
+📈 [MERCATO] Il prezzo sale a 5083.9
+📈 [MERCATO] Il prezzo sale a 5087.4
+📈 [MERCATO] Il prezzo sale a 5090.5
+📈 [MERCATO] Il prezzo sale a 5095.5
+📈 [MERCATO] Il prezzo sale a 5098.7
+📉 [MERCATO] Il prezzo scende a 5094.4
+📉 [MERCATO] Il prezzo scende a 5089.0
+📉 [MERCATO] Il prezzo scende a 5085.7
+📉 [MERCATO] Il prezzo scende a 5082.0
+📉 [MERCATO] Il prezzo scende a 5078.0
+📉 [MERCATO] Il prezzo scende a 5073.7
+📉 [MERCATO] Il prezzo scende a 5069.2
+📉 [MERCATO] Il prezzo scende a 5064.5
+📉 [MERCATO] Il prezzo scende a 5059.7
+📉 [MERCATO] Il prezzo scende a 5054.7
+📉 [MERCATO] Il prezzo scende a 5049.7
+📉 [MERCATO] Il prezzo scende a 5044.7
+📉 [MERCATO] Il prezzo scende a 5039.8
+📉 [MERCATO] Il prezzo scende a 5034.9
+📉 [MERCATO] Il prezzo scende a 5030.3
+📉 [MERCATO] Il prezzo scende a 5025.8
+📉 [MERCATO] Il prezzo scende a 5021.5
+📉 [MERCATO] Il prezzo scende a 5017.6
+📉 [MERCATO] Il prezzo scende a 5013.9
+📉 [MERCATO] Il prezzo scende a 5010.6
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5007.7
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5005.3
+📉 [MERCATO] Il prezzo scende a 5001.7
+📈 [MERCATO] Il prezzo sale a 5006.9
+📈 [MERCATO] Il prezzo sale a 5012.8
+📈 [MERCATO] Il prezzo sale a 5016.4
+📈 [MERCATO] Il prezzo sale a 5020.2
+📈 [MERCATO] Il prezzo sale a 5024.4
+📈 [MERCATO] Il prezzo sale a 5028.8
+📈 [MERCATO] Il prezzo sale a 5033.4
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5033.4
+📈 [MERCATO] Il prezzo sale a 5038.2
+📈 [MERCATO] Il prezzo sale a 5043.1
+📈 [MERCATO] Il prezzo sale a 5048.1
+📈 [MERCATO] Il prezzo sale a 5053.1
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5053.1 (PnL: -221.10€)
+📈 [MERCATO] Il prezzo sale a 5058.1
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5063.0
+📈 [MERCATO] Il prezzo sale a 5067.7
+📈 [MERCATO] Il prezzo sale a 5072.3
+📈 [MERCATO] Il prezzo sale a 5076.7
+📈 [MERCATO] Il prezzo sale a 5080.8
+📈 [MERCATO] Il prezzo sale a 5084.5
+📈 [MERCATO] Il prezzo sale a 5088.0
+📈 [MERCATO] Il prezzo sale a 5091.0
+📈 [MERCATO] Il prezzo sale a 5095.9
+📈 [MERCATO] Il prezzo sale a 5098.9
+📉 [MERCATO] Il prezzo scende a 5094.0
+📉 [MERCATO] Il prezzo scende a 5088.5
+📉 [MERCATO] Il prezzo scende a 5085.1
+📉 [MERCATO] Il prezzo scende a 5081.4
+📉 [MERCATO] Il prezzo scende a 5077.3
+📉 [MERCATO] Il prezzo scende a 5073.0
+📉 [MERCATO] Il prezzo scende a 5068.4
+📉 [MERCATO] Il prezzo scende a 5063.7
+📉 [MERCATO] Il prezzo scende a 5058.8
+📉 [MERCATO] Il prezzo scende a 5053.9
+📉 [MERCATO] Il prezzo scende a 5048.9
+📉 [MERCATO] Il prezzo scende a 5043.9
+📉 [MERCATO] Il prezzo scende a 5039.0
+📉 [MERCATO] Il prezzo scende a 5034.1
+📉 [MERCATO] Il prezzo scende a 5029.5
+📉 [MERCATO] Il prezzo scende a 5025.0
+📉 [MERCATO] Il prezzo scende a 5020.8
+📉 [MERCATO] Il prezzo scende a 5016.9
+📉 [MERCATO] Il prezzo scende a 5013.3
+📉 [MERCATO] Il prezzo scende a 5010.1
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5007.3
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5004.9
+📉 [MERCATO] Il prezzo scende a 5001.5
+📈 [MERCATO] Il prezzo sale a 5004.9
+📈 [MERCATO] Il prezzo sale a 5010.2
+📈 [MERCATO] Il prezzo sale a 5013.4
+📈 [MERCATO] Il prezzo sale a 5017.0
+📈 [MERCATO] Il prezzo sale a 5020.9
+📈 [MERCATO] Il prezzo sale a 5025.1
+📈 [MERCATO] Il prezzo sale a 5029.6
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5029.6
+📈 [MERCATO] Il prezzo sale a 5034.2
+📈 [MERCATO] Il prezzo sale a 5039.1
+📈 [MERCATO] Il prezzo sale a 5044.0
+📈 [MERCATO] Il prezzo sale a 5049.0
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5049.0 (PnL: -200.30€)
+📈 [MERCATO] Il prezzo sale a 5054.0
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5058.9
+📈 [MERCATO] Il prezzo sale a 5063.8
+📈 [MERCATO] Il prezzo sale a 5068.5
+📈 [MERCATO] Il prezzo sale a 5073.1
+📈 [MERCATO] Il prezzo sale a 5077.4
+📈 [MERCATO] Il prezzo sale a 5081.4
+📈 [MERCATO] Il prezzo sale a 5085.1
+📈 [MERCATO] Il prezzo sale a 5088.5
+📈 [MERCATO] Il prezzo sale a 5094.1
+📈 [MERCATO] Il prezzo sale a 5097.9
+📉 [MERCATO] Il prezzo scende a 5093.6
+📉 [MERCATO] Il prezzo scende a 5087.9
+📉 [MERCATO] Il prezzo scende a 5084.5
+📉 [MERCATO] Il prezzo scende a 5080.7
+📉 [MERCATO] Il prezzo scende a 5076.6
+📉 [MERCATO] Il prezzo scende a 5072.2
+📉 [MERCATO] Il prezzo scende a 5067.6
+📉 [MERCATO] Il prezzo scende a 5062.9
+📉 [MERCATO] Il prezzo scende a 5058.0
+📉 [MERCATO] Il prezzo scende a 5053.0
+📉 [MERCATO] Il prezzo scende a 5048.0
+📉 [MERCATO] Il prezzo scende a 5043.1
+📉 [MERCATO] Il prezzo scende a 5038.1
+📉 [MERCATO] Il prezzo scende a 5033.4
+📉 [MERCATO] Il prezzo scende a 5028.7
+📉 [MERCATO] Il prezzo scende a 5024.3
+📉 [MERCATO] Il prezzo scende a 5020.1
+📉 [MERCATO] Il prezzo scende a 5016.3
+📉 [MERCATO] Il prezzo scende a 5012.8
+📉 [MERCATO] Il prezzo scende a 5009.6
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5006.9
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5004.5
+📉 [MERCATO] Il prezzo scende a 5001.3
+📈 [MERCATO] Il prezzo sale a 5005.3
+📈 [MERCATO] Il prezzo sale a 5010.7
+📈 [MERCATO] Il prezzo sale a 5014.0
+📈 [MERCATO] Il prezzo sale a 5017.6
+📈 [MERCATO] Il prezzo sale a 5021.6
+📈 [MERCATO] Il prezzo sale a 5025.8
+📈 [MERCATO] Il prezzo sale a 5030.3
+⚡ [SIMULATORE] Ordine Pendente STOP BUY innescato a 5030.3
+📈 [MERCATO] Il prezzo sale a 5035.0
+📈 [MERCATO] Il prezzo sale a 5039.9
+📈 [MERCATO] Il prezzo sale a 5044.8
+📈 [MERCATO] Il prezzo sale a 5049.8
+❌ [SIMULATORE] Colpito Stop Loss su SELL a 5049.8 (PnL: -204.50€)
+📈 [MERCATO] Il prezzo sale a 5054.8
+[Spot Gold] ✅ [ORDINE SAT1 OCO BUY] inserito con successo.
+[Spot Gold] ✅ [ORDINE SAT1 OCO SELL] inserito con successo.
+📈 [MERCATO] Il prezzo sale a 5059.7
+📈 [MERCATO] Il prezzo sale a 5064.6
+📈 [MERCATO] Il prezzo sale a 5069.3
+📈 [MERCATO] Il prezzo sale a 5073.8
+📈 [MERCATO] Il prezzo sale a 5078.1
+📈 [MERCATO] Il prezzo sale a 5082.1
+📈 [MERCATO] Il prezzo sale a 5085.7
+📈 [MERCATO] Il prezzo sale a 5089.0
+📈 [MERCATO] Il prezzo sale a 5094.5
+📈 [MERCATO] Il prezzo sale a 5098.1
+📉 [MERCATO] Il prezzo scende a 5093.2
+📉 [MERCATO] Il prezzo scende a 5087.4
+📉 [MERCATO] Il prezzo scende a 5083.9
+📉 [MERCATO] Il prezzo scende a 5080.0
+📉 [MERCATO] Il prezzo scende a 5075.9
+📉 [MERCATO] Il prezzo scende a 5071.5
+📉 [MERCATO] Il prezzo scende a 5066.9
+📉 [MERCATO] Il prezzo scende a 5062.1
+📉 [MERCATO] Il prezzo scende a 5057.2
+📉 [MERCATO] Il prezzo scende a 5052.2
+📉 [MERCATO] Il prezzo scende a 5047.2
+📉 [MERCATO] Il prezzo scende a 5042.2
+📉 [MERCATO] Il prezzo scende a 5037.3
+📉 [MERCATO] Il prezzo scende a 5032.6
+📉 [MERCATO] Il prezzo scende a 5028.0
+📉 [MERCATO] Il prezzo scende a 5023.6
+📉 [MERCATO] Il prezzo scende a 5019.5
+📉 [MERCATO] Il prezzo scende a 5015.7
+📉 [MERCATO] Il prezzo scende a 5012.2
+📉 [MERCATO] Il prezzo scende a 5009.1
+⚡ [SIMULATORE] Ordine Pendente STOP SELL innescato a 5006.4
+[Spot Gold] ➡️ Inserisco [SAT2] a mercato...
+[Spot Gold] ✅ [SAT2] eseguito con successo.
+[Spot Gold] ➡️ Inserisco Ordine [OVERGAIN] a 4988.9 e [OVERLOSS] a 5028.9...
+[Spot Gold] ✅ [ORDINE OVERGAIN] inserito con successo.
+[Spot Gold] ✅ [ORDINE OVERLOSS] inserito con successo.
+📉 [MERCATO] Il prezzo scende a 5004.2
+
+🛑 Motore per SIM_FIORDOK fermato manualmente (CTRL+C).

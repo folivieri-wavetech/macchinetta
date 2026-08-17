@@ -7,6 +7,8 @@ import requests
 import re
 from datetime import datetime, timedelta, timezone
 from dotenv import dotenv_values
+import plotly.graph_objects as go
+import numpy as np
 
 # --- CONFIGURAZIONI CENTRALI ---
 FILE_MEMORIA = "memoria_parametri.json"
@@ -321,12 +323,11 @@ st.markdown("""
         
         .ig-row:hover { background-color: rgba(255,255,255,0.02); }
         .ig-row td { padding: 10px 8px; text-align: center; }
-        .ig-row td:first-child { text-align: left; padding-left: 15px; }
+        .col-mercato { text-align: left !important; padding-left: 15px !important; }
         
         /* Sub Row NON in Grassetto e con P/L colorato preservato */
         .ig-subrow { background-color: rgba(0,0,0,0.2); font-weight: normal !important; }
         .ig-subrow td { color: #aaa; font-size: 0.8rem; border-bottom: none; padding: 6px 8px; font-weight: normal !important; text-decoration: none !important; }
-        .ig-subrow td:first-child { padding-left: 35px; text-align: left; }
         .ig-subrow td.pnl-pos { color: #3b82f6 !important; font-weight: bold !important; }
         .ig-subrow td.pnl-neg { color: #ef4444 !important; font-weight: bold !important; }
 
@@ -441,8 +442,8 @@ else:
         renderizza_sidebar_stats()
 
     # TABS RIORDINATI (Portafoglio IG per primo)
-    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console = st.tabs([
-        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console"
+    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici, tab_simulatore = st.tabs([
+        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici", "🔬 Simulatore"
     ])
 
     with tab_portafoglio:
@@ -621,17 +622,17 @@ else:
                 sign = "+" if dir == "BUY" else "-"
                 size_class = "size-buy" if dir == "BUY" else "size-sell"
                 
-                stop_str = "-"
+                stop_str = ""
                 if len(stops) > 1: stop_str = "<span class='ig-multiplo'>Multiplo</span>"
                 elif len(stops) == 1:
                     val = list(stops)[0]
-                    stop_str = formatta_numero(val, dec) if val != "NONE" else "-"
+                    stop_str = formatta_numero(val, dec) if val != "NONE" else ""
                 
-                lim_str = "-"
+                lim_str = ""
                 if len(limits) > 1: lim_str = "<span class='ig-multiplo'>Multiplo</span>"
                 elif len(limits) == 1:
                     val = list(limits)[0]
-                    lim_str = formatta_numero(val, dec) if val != "NONE" else "-"
+                    lim_str = formatta_numero(val, dec) if val != "NONE" else ""
                 
                 pnl_class = "pnl-pos" if tot_pnl_eur >= 0 else "pnl-neg"
                 pnl_str = f"{tot_pnl_eur:.2f} €"
@@ -662,11 +663,11 @@ else:
 
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
-                    td_mercato = f"<td rowspan='{r_span}' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td>"
+                    td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td>"
                 else:
                     td_mercato = ""
 
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td><u>{stop_str}</u></td><td><u>{lim_str}</u></td><td><span class='{size_class}' style='font-weight: normal;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td><td><span class='{size_class}' style='font-weight: normal;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     for idx, p in enumerate(posizioni):
@@ -676,11 +677,11 @@ else:
                         dt_utc = datetime.strptime(p['position']['createdDateUTC'], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
                         data_str = dt_utc.astimezone().strftime("%d/%m/%y %H:%M")
                         
-                        s_str = "-"
+                        s_str = ""
                         if p['position'].get('stopLevel'): s_str = formatta_numero(p['position']['stopLevel'], dec)
                         elif p['position'].get('stopDistance'): s_str = "Stop" 
                         
-                        l_str = "-"
+                        l_str = ""
                         if p['position'].get('limitLevel'): l_str = formatta_numero(p['position']['limitLevel'], dec)
                         elif p['position'].get('limitDistance'): l_str = "Limite"
                         
@@ -698,7 +699,7 @@ else:
                         html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
-            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
+            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
@@ -736,10 +737,10 @@ else:
                 sign = "+" if dir == "BUY" else "-"
                 size_class = "size-buy" if dir == "BUY" else "size-sell"
                 
-                s_str = "-"
+                s_str = ""
                 if wo.get('stopDistance'): s_str = f"{int(float(wo['stopDistance']))}"
                 
-                l_str = "-"
+                l_str = ""
                 if wo.get('limitDistance'): l_str = f"{int(float(wo['limitDistance']))}"
                 
                 ruolo_ord = get_role_ord(nome, dir, sz, memoria_attuale.get(nome, {}), wo)
@@ -757,7 +758,7 @@ else:
                 
                 if is_first_of_instrument_ord:
                     r_span = ord_counts.get(nome, 1)
-                    td_mercato_ord = f"<td rowspan='{r_span}' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><span style='color: #FFD700; font-weight: normal;'>{nome}</span></td>"
+                    td_mercato_ord = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><span style='color: #FFD700; font-weight: normal;'>{nome}</span></td>"
                 else:
                     td_mercato_ord = ""
                 
@@ -914,9 +915,9 @@ else:
                             mostra_diario_wip(nome, storico)
                     
                     c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
-                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px;'>{prezzo}</div>", unsafe_allow_html=True)
+                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; width: 95px; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
                     ultimo_evento = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
-                    c4.markdown(f"<div style='font-size: 0.85rem; color: white; font-style: italic; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
+                    c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
                     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
                     
         renderizza_sintesi()
@@ -1048,7 +1049,13 @@ else:
                     with c_in3: dts = st.number_input("DTS", value=int(dts_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_dts")
                     with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
                     
-                    if modalita_manuale:
+                    if is_sospeso_wk:
+                        st.warning("🌴 **MACCHINA IN SOSPENSIONE WEEKEND.** Le funzioni generali sono bloccate per proteggere la memoria. Clicca Riprendi per sbloccare la console e piazzare i Satelliti.")
+                        if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                            memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                            salva_memoria(conto_selezionato, memoria_attuale)
+                            st.rerun()
+                    elif modalita_manuale:
                         st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
                         col_m1, col_m2 = st.columns(2, vertical_alignment="center")
                         with col_m1:
@@ -1095,9 +1102,9 @@ else:
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
                         with c_wk:
-                            if "FASE_2" in stato_corrente or is_sospeso_wk:
-                                if st.button("▶️ RIPRENDI" if is_sospeso_wk else "🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True if is_sospeso_wk else False, "comando_weekend": False if is_sospeso_wk else True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                            if "FASE_2" in stato_corrente:
+                                if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                         with c_sync:
@@ -1186,7 +1193,9 @@ else:
             if "MICRO" in r_anom:
                 p_base = dati.get("prezzo_base")
                 if not p_base:
-                    st.error("Prezzo base Core mancante in memoria. Impossibile calcolare la Micro.")
+                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare la Micro:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_micro_{conto_selezionato}_{nome}")
+                if not p_base or p_base <= 0:
+                    st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
                 else:
                     m_dir = "SELL" if dir_core == "LONG" else "BUY"
                     lvl = round(p_base + tp4_val if m_dir == "SELL" else p_base - tp4_val, dec)
@@ -1216,7 +1225,9 @@ else:
             elif "SAT1 OCO" in r_anom:
                 p_base = dati.get("prezzo_base")
                 if not p_base:
-                    st.error("Prezzo base Core mancante in memoria. Impossibile calcolare i Satelliti OCO.")
+                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare i Satelliti OCO:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_sat1_{conto_selezionato}_{nome}")
+                if not p_base or p_base <= 0:
+                    st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
                 else:
                     tp2_val = round((dati.get("tp", 50) / 2) * mult, dec)
                     if dir_core == "LONG":
@@ -1544,3 +1555,307 @@ else:
             """, unsafe_allow_html=True)
             
         renderizza_console()
+
+    with tab_grafici:
+        st.markdown("<h2 style='text-align: center; color: #FFD700;'>📊 Grafici Interattivi (IG Live)</h2>", unsafe_allow_html=True)
+        
+        c1, c2, c3 = st.columns([2,2,1])
+        with c1:
+            grafico_strum = st.selectbox("Seleziona Strumento", options=list(CONFIG_STRUMENTI.keys()), key="grafico_strum")
+        with c2:
+            res_options = {"5 Minuti": "MINUTE_5", "15 Minuti": "MINUTE_15", "1 Ora": "HOUR", "4 Ore": "HOUR_4", "Daily": "DAY", "Weekly": "WEEK"}
+            grafico_res_label = st.selectbox("Timeframe", options=list(res_options.keys()), index=2, key="grafico_res")
+            grafico_res = res_options[grafico_res_label]
+        with c3:
+            st.write("")
+            st.write("")
+            btn_aggiorna = st.button("🔄 Aggiorna Grafico", use_container_width=True)
+            
+        if btn_aggiorna:
+            with st.spinner("Aggiornamento storico da IG (modalità cache)..."):
+                epic = CONFIG_STRUMENTI[grafico_strum]["epic"]
+                h_api = get_ig_headers(conto_selezionato)
+                if h_api:
+                    # Logica Cache Intelligente per evitare limiti API
+                    import os
+                    cache_file = f"cache_candele_{epic}_{grafico_res}.csv"
+                    max_fetch = 600
+                    df_cache = None
+                    
+                    if os.path.exists(cache_file):
+                        try:
+                            df_cache = pd.read_csv(cache_file, parse_dates=['Time'])
+                            if not df_cache.empty:
+                                last_time = df_cache['Time'].iloc[-1]
+                                gap_minutes = (pd.Timestamp.utcnow().tz_localize(None) - last_time).total_seconds() / 60
+                                res_to_min = {"MINUTE_5": 5, "MINUTE_15": 15, "HOUR": 60, "HOUR_4": 240, "DAY": 1440, "WEEK": 10080}
+                                # Calcoliamo le candele mancanti + un buffer enorme di 50 candele per gestire fusi orari
+                                candles_needed = int(abs(gap_minutes) / res_to_min.get(grafico_res, 60)) + 50
+                                if candles_needed < 600:
+                                    max_fetch = max(10, candles_needed)
+                        except Exception:
+                            pass
+
+                    # Usiamo la versione 2 e il path corretto
+                    h_api["Version"] = "2"
+                    base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto_selezionato.upper() else "https://demo-api.ig.com/gateway/deal"
+                    url = f"{base_url}/prices/{epic}/{grafico_res}/{max_fetch}"
+                    
+                    resp = requests.get(url, headers=h_api)
+                    if resp.status_code == 200:
+                        data = resp.json().get("prices", [])
+                        if data:
+                            df_new = pd.DataFrame([{
+                                'Time': p['snapshotTime'],
+                                'Open': p['openPrice']['bid'],
+                                'High': p['highPrice']['bid'],
+                                'Low': p['lowPrice']['bid'],
+                                'Close': p['closePrice']['bid']
+                            } for p in data])
+                            
+                            df_new['Time'] = pd.to_datetime(df_new['Time'])
+                            
+                            # Merge con la cache
+                            if df_cache is not None and not df_cache.empty:
+                                df = pd.concat([df_cache, df_new]).drop_duplicates(subset=['Time'], keep='last').sort_values('Time').tail(600)
+                            else:
+                                df = df_new
+                                
+                            # Salva cache aggiornata per i click successivi
+                            df.to_csv(cache_file, index=False)
+                            
+                            # Calcolo Donchian Midlines
+                            df['Donchian_55'] = (df['High'].rolling(55).max() + df['Low'].rolling(55).min()) / 2
+                            df['Donchian_21'] = (df['High'].rolling(21).max() + df['Low'].rolling(21).min()) / 2
+                            
+                            # Calcolo HMA 377
+                            def WMA(s, period):
+                                weights = np.arange(1, period + 1)
+                                return s.rolling(period).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+                            
+                            if len(df) >= 377:
+                                half_len = int(377 / 2)
+                                sqrt_len = int(np.sqrt(377))
+                                wmaf = WMA(df['Close'], half_len)
+                                wmas = WMA(df['Close'], 377)
+                                diff = 2 * wmaf - wmas
+                                df['HMA_377'] = WMA(diff, sqrt_len)
+                            else:
+                                df['HMA_377'] = np.nan
+                                
+                            # Punti Pivot (Daily e Weekly)
+                            df['Date'] = df['Time'].dt.date
+                            df['YearWeek'] = df['Time'].dt.isocalendar().year.astype(str) + '-' + df['Time'].dt.isocalendar().week.astype(str)
+                            
+                            daily_agg = df.groupby('Date').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
+                            daily_agg['Pivot_Daily'] = (daily_agg['High'] + daily_agg['Low'] + daily_agg['Close']) / 3
+                            daily_agg['Pivot_Daily'] = daily_agg['Pivot_Daily'].shift(1)
+                            
+                            weekly_agg = df.groupby('YearWeek').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
+                            weekly_agg['Pivot_Weekly'] = (weekly_agg['High'] + weekly_agg['Low'] + weekly_agg['Close']) / 3
+                            weekly_agg['Pivot_Weekly'] = weekly_agg['Pivot_Weekly'].shift(1)
+                            
+                            df = df.merge(daily_agg[['Pivot_Daily']], on='Date', how='left')
+                            df = df.merge(weekly_agg[['Pivot_Weekly']], on='YearWeek', how='left')
+                            
+                            # Costruzione Plotly Figure
+                            fig = go.Figure()
+                            
+                            # Candele
+                            fig.add_trace(go.Candlestick(
+                                x=df['Time'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
+                                name='Prezzo', 
+                                increasing_line_color='white', increasing_fillcolor='#7CFC00', 
+                                decreasing_line_color='white', decreasing_fillcolor='#FA8072'
+                            ))
+                            
+                            # Estrazione ultimi valori per la legenda
+                            val_d55 = round(df['Donchian_55'].iloc[-1], 5) if pd.notna(df['Donchian_55'].iloc[-1]) else "-"
+                            val_d21 = round(df['Donchian_21'].iloc[-1], 5) if pd.notna(df['Donchian_21'].iloc[-1]) else "-"
+                            val_hma = round(df['HMA_377'].iloc[-1], 5) if pd.notna(df['HMA_377'].iloc[-1]) else "-"
+                            val_pd = round(df['Pivot_Daily'].iloc[-1], 5) if pd.notna(df['Pivot_Daily'].iloc[-1]) else "-"
+                            val_pw = round(df['Pivot_Weekly'].iloc[-1], 5) if pd.notna(df['Pivot_Weekly'].iloc[-1]) else "-"
+                            
+                            # Kijun (Gialla, tratto-punto, spessa)
+                            fig.add_trace(go.Scatter(x=df['Time'], y=df['Donchian_55'], mode='lines', name=f'<span style="color:yellow;">Kijun<br><b>{val_d55}</b></span>', line=dict(color='yellow', dash='dashdot', width=2.5)))
+                            
+                            # Tenkan (Azzurro/Blu chiaro, tratto-punto, spessa)
+                            fig.add_trace(go.Scatter(x=df['Time'], y=df['Donchian_21'], mode='lines', name=f'<span style="color:#00BFFF;">Tenkan<br><b>{val_d21}</b></span>', line=dict(color='#00BFFF', dash='dashdot', width=2.5)))
+                            
+                            # HMA 377 (Grigio Chiaro, tratto-punto, spessa)
+                            if df['HMA_377'].notna().any():
+                                fig.add_trace(go.Scatter(x=df['Time'], y=df['HMA_377'], mode='lines', name=f'<span style="color:lightgray;">HMA 377<br><b>{val_hma}</b></span>', line=dict(color='lightgray', dash='dashdot', width=2.5)))
+                            
+                            # Pivot (Solo l'ultimo per non sporcare il grafico storico)
+                            fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', name=f'<span style="color:#4CAF50;">Pivot Daily<br><b>{val_pd}</b></span>', line=dict(color='#4CAF50', width=2)))
+                            fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', name=f'<span style="color:orange;">Pivot Weekly<br><b>{val_pw}</b></span>', line=dict(color='orange', width=2)))
+                            
+                            last_date = df['Date'].iloc[-1]
+                            group_daily = df[df['Date'] == last_date]
+                            if group_daily['Pivot_Daily'].notna().any():
+                                fig.add_trace(go.Scatter(x=group_daily['Time'], y=group_daily['Pivot_Daily'], mode='lines', showlegend=False, line=dict(color='#4CAF50', width=2)))
+                                
+                            last_week = df['YearWeek'].iloc[-1]
+                            group_weekly = df[df['YearWeek'] == last_week]
+                            if group_weekly['Pivot_Weekly'].notna().any():
+                                fig.add_trace(go.Scatter(x=group_weekly['Time'], y=group_weekly['Pivot_Weekly'], mode='lines', showlegend=False, line=dict(color='orange', width=2)))
+                            
+                            # Zoom Iniziale asse X e Y (ultime 100 candele per tutti i timeframe)
+                            visible = 100
+                            
+                            if visible < len(df):
+                                x_start = df['Time'].iloc[-visible]
+                                x_end = df['Time'].iloc[-1]
+                                xaxis_dict = dict(rangeslider=dict(visible=False), range=[x_start, x_end], rangebreaks=[dict(bounds=["sat", "mon"])])
+                                
+                                # Calcolo min/max per centrare asse Y sulle candele visibili
+                                df_vis = df.tail(visible)
+                                cols_to_check = ['High', 'Low', 'Donchian_55', 'Donchian_21', 'HMA_377', 'Pivot_Daily', 'Pivot_Weekly']
+                                min_y = df_vis[cols_to_check].min().min()
+                                max_y = df_vis[cols_to_check].max().max()
+                                padding = (max_y - min_y) * 0.05
+                                yaxis_dict = dict(side='right', range=[min_y - padding, max_y + padding])
+                            else:
+                                xaxis_dict = dict(rangeslider=dict(visible=False), rangebreaks=[dict(bounds=["sat", "mon"])])
+                                yaxis_dict = dict(side='right')
+                            
+                            fig.update_layout(
+                                title=f'{grafico_strum} - {grafico_res_label}',
+                                template='plotly_dark',
+                                dragmode='pan',
+                                yaxis=yaxis_dict,
+                                xaxis=xaxis_dict,
+                                height=750,
+                                margin=dict(l=20, r=20, t=100, b=20),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0)
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
+                        else:
+                            st.warning("Nessun dato restituito dall'API per questo timeframe.")
+                    else:
+                        st.error(f"Errore API IG: {resp.text}")
+                else:
+                    st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
+
+    # --- TAB SIMULATORE ---
+    with tab_simulatore:
+        st.markdown("<h2 style='text-align: center; color: #00FFCC;'>🔬 Simulatore Avanzato (Moviola Hedge Sincrono)</h2>", unsafe_allow_html=True)
+        st.markdown("Simula l'esecuzione del **Motore.py originale** senza alterarne il codice, tramite una staffetta sequenziale che riproduce fedelmente una partenza multiconto parallela.", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        sm1, sm2 = st.columns(2)
+        # --- Ristrutturazione Simulatore ---
+        
+        # 1. Generatore Base Dati
+        st.markdown("<h3 style='color: #FFD700;'>1. Generatore Base Dati</h3>", unsafe_allow_html=True)
+        
+        g1, g2, g3 = st.columns(3)
+        with g1:
+            gen_strum = st.selectbox("Strumento", list(CONFIG_STRUMENTI.keys()), key="gen_strum")
+        with g2:
+            gen_scen = st.selectbox("Scenario Mercato", ["LATERALE", "TREND_UP", "TREND_DOWN", "CRASH", "RANDOM"], key="gen_scen")
+        with g3:
+            gen_ticks = st.number_input("Durata (Tick totali)", min_value=50, max_value=50000, value=250, step=50, key="gen_ticks")
+            
+        g4, g5, g6 = st.columns(3)
+        with g4:
+            gen_base_price = st.number_input("Prezzo di Partenza", value=2400.0, step=1.0, format="%.2f", key="gen_base_price")
+        with g5:
+            gen_tick_size = st.number_input("Volatilità (Ampiezza Tick)", value=1.0, step=0.1, format="%.2f", key="gen_tick_size")
+        with g6:
+            gen_size = st.number_input("Size Suggerita", min_value=4, value=10, step=1, key="gen_size")
+            
+        import Simulatore_Avanzato
+        import os
+        
+        if st.button("🛠️ Crea Base Dati", use_container_width=True):
+            with st.spinner(f"Generazione file dati per {gen_strum} in corso..."):
+                f_path = Simulatore_Avanzato.genera_base_dati(gen_strum, gen_scen, gen_base_price, gen_tick_size, gen_ticks, gen_size)
+                st.success(f"Base dati generata e salvata: `{os.path.basename(f_path)}`")
+                
+        st.markdown("---")
+        
+        # 2. Esecutore Simulazione
+        st.markdown("<h3 style='color: #00FFCC;'>2. Esecutore Simulazione</h3>", unsafe_allow_html=True)
+        
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            eseg_strum = st.selectbox("Seleziona Strumento", list(CONFIG_STRUMENTI.keys()), key="eseg_strum")
+        with e2:
+            eseg_dir = st.selectbox("Direzione", ["LONG", "SHORT"], index=0, key="eseg_dir")
+        with e3:
+            strum_pulito = Simulatore_Avanzato.pulisci_nome_strumento(eseg_strum)
+            dir_path = os.path.join(os.getcwd(), "Simulatore", strum_pulito)
+            file_list = []
+            if os.path.exists(dir_path):
+                file_list = [f for f in os.listdir(dir_path) if f.endswith(".csv")]
+            
+            eseg_file = st.selectbox("Seleziona Base Dati", file_list if file_list else ["Nessun file trovato"], key="eseg_file")
+            
+        st.markdown("**Parametri Griglia (Applicati a runtime)**")
+        e4, e5, e6, e7 = st.columns(4)
+        with e4:
+            sim_tp = st.number_input("Take Profit (TP)", value=80, step=5, key="eseg_tp")
+        with e5:
+            sim_opp = st.number_input("Opposto (OPP)", value=20, step=5, key="eseg_opp")
+        with e6:
+            sim_dts = st.number_input("Distanza Sicurezza (DTS)", value=10, step=5, key="eseg_dts")
+        with e7:
+            sim_size = st.number_input("Size Contratti", min_value=4, value=10, step=1, key="eseg_size")
+            
+        btn_disabled = (eseg_file == "Nessun file trovato")
+        
+        if st.button("▶️ Avvia Simulazione", use_container_width=True, disabled=btn_disabled):
+            with st.spinner(f"Elaborazione strategia su {eseg_file} in corso..."):
+                try:
+                    f_path_full = os.path.join(dir_path, eseg_file)
+                    
+                    # Esecuzione del Motore simulato (Forzato a Singolo)
+                    ris = Simulatore_Avanzato.esegui_hedge_sincrono(
+                        f_path_full, eseg_strum,
+                        sim_tp, sim_opp, sim_dts, sim_size,
+                        "Singolo", eseg_dir
+                    )
+                    
+                    if not ris:
+                        st.error("Errore durante la simulazione. Controlla il terminale.")
+                        st.stop()
+                        
+                    st.success("Simulazione completata con successo!")
+                    
+                    st.markdown(f"### 📖 Diario di Bordo della Simulazione (WS) - {eseg_strum}")
+                    
+                    def renderizza_storico(conto_key):
+                        storico = ris["risultati"].get(conto_key, {}).get("log_ws", [])
+                        if storico:
+                            html_str = "<div style='font-size: 0.85rem; line-height: 1.6; margin-bottom: 20px;'>"
+                            for riga in storico:
+                                import re
+                                riga_colorata = re.sub(r"(\[EVENTO\]:.*)", r"<span style='color: #00FFFF;'>\1</span>", riga)
+                                
+                                def colora_parziale(match):
+                                    val = float(match.group(1))
+                                    colore = "#00FF00" if val >= 0 else "#FF4500"
+                                    return f"<span style='color: {colore};'>[Parziale: {val:+.2f} €]</span>"
+                                    
+                                riga_colorata = re.sub(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", colora_parziale, riga_colorata)
+                                riga_colorata = re.sub(r"(\[Totale:.*?\])", r"<span style='color: #FFD700;'><b>\1</b></span>", riga_colorata)
+                                html_str += f"&bull; {riga_colorata}<br>"
+                                
+                            html_str += "</div>"
+                            st.markdown(html_str, unsafe_allow_html=True)
+                            return True
+                        return False
+                        
+                    trovato_f = renderizza_storico("SIM_FIORDOK")
+                        
+                    if not trovato_f:
+                        st.warning("Nessun evento registrato durante questa simulazione.")
+                    
+                except Exception as e:
+                    st.error(f"Errore durante la simulazione: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+
