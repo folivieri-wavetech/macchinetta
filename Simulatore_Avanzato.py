@@ -11,15 +11,22 @@ def genera_prezzi(scenario, strumento_base_price=2400.0, tick_size=1.0, tic_tota
     prices = []
     price = strumento_base_price
     prices.append(round(price, 2))
+    momentum = 0.0
+    
     for step in range(1, tic_totali):
         if scenario == "LATERALE":
-            variazione = np.sin(step / 10.0) * tick_size * 5
-            price += variazione
+            # Processo di Mean Reversion (Ritorno verso la media) + Rumore di mercato
+            distanza_media = strumento_base_price - price
+            forza_ritorno = 0.05 * distanza_media
+            rumore = np.random.normal(0, tick_size * 3)
+            price += forza_ritorno + rumore
         elif scenario == "TREND_UP":
-            variazione = abs(np.random.normal(0, tick_size * 3)) - (tick_size * 0.5)
+            momentum = 0.8 * momentum + np.random.normal(0, tick_size)
+            variazione = abs(np.random.normal(0, tick_size * 2)) + (tick_size * 0.2) + momentum * 0.3
             price += variazione
         elif scenario == "TREND_DOWN":
-            variazione = -abs(np.random.normal(0, tick_size * 3)) + (tick_size * 0.5)
+            momentum = 0.8 * momentum + np.random.normal(0, tick_size)
+            variazione = -abs(np.random.normal(0, tick_size * 2)) - (tick_size * 0.2) + momentum * 0.3
             price += variazione
         elif scenario == "CRASH":
             if 50 < step < 60:
@@ -27,8 +34,9 @@ def genera_prezzi(scenario, strumento_base_price=2400.0, tick_size=1.0, tic_tota
             else:
                 price += np.random.normal(0, tick_size)
         elif scenario == "RANDOM":
-            variazione = np.random.normal(0, tick_size * 4)
-            price += variazione
+            # Micro-trend locali autoregressivi (Swings realistici) e colpi di volatilità
+            momentum = 0.85 * momentum + np.random.normal(0, tick_size * 1.5)
+            price += momentum + np.random.normal(0, tick_size * 1.5)
             
         prices.append(round(price, 2))
     return prices
@@ -48,7 +56,16 @@ def genera_base_dati(strumento, scenario, partenza, tick_size, tic_totali, size)
     return file_path
 
 class SimulatoreMatematico:
-    def __init__(self, tp, opp, dts, size, direzione_base):
+    def __init__(self, tp, opp, dts, size, direzione_base, mult=1.0, valore_punto=1.0, valuta="EUR"):
+        self.mult = float(mult)
+        self.valore_punto = float(valore_punto)
+        self.valuta = valuta
+        self.mock_rates = {
+            "EUR": 1.0, "USD": 0.92, "JPY": 0.0061, "GBP": 1.17, 
+            "CAD": 0.68, "CHF": 1.03, "NZD": 0.56, "AUD": 0.60
+        }
+        self.rate = self.mock_rates.get(self.valuta, 1.0)
+        
         self.tp = float(tp)
         self.opp = float(opp)
         self.dts = float(dts)
@@ -85,6 +102,31 @@ class SimulatoreMatematico:
         self.fase3_step = 0
         self.fase3_dir = None
         self.fase3_base = 0.0
+        self.fase3_perc = None
+        self.fase3_pnl = 0.0
+        
+        self.max_pnl_reached = 0.0
+        self.max_drawdown = 0.0
+        
+        self.stats = {
+            "Micro": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "Flip": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "Ticket1": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "Ticket2": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "OverGain": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "OverLoss": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "Ultima": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0},
+            "Assicurazione": {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0}
+        }
+
+    def registra_stat(self, nome, pnl):
+        if nome in self.stats:
+            self.stats[nome]["pnl"] += pnl
+            self.stats[nome]["totale"] += 1
+            if pnl > 0:
+                self.stats[nome]["profit"] += 1
+            elif pnl < 0:
+                self.stats[nome]["loss"] += 1
 
     def wlog(self, msg):
         msg = msg.replace("BUY", "LONG").replace("SELL", "SHORT")
@@ -92,6 +134,52 @@ class SimulatoreMatematico:
 
     def wstep(self, prezzo):
         self.log_ws.append(f"[STEP {self.tick_corrente}] prezzo raggiunto: {prezzo:.2f}")
+
+    def genera_riepilogo(self):
+        riepilogo = []
+        riepilogo.append("-----------------------------------------------------------")
+        riepilogo.append("📊 RIEPILOGO GENERALE:")
+        tot_subtrading = 0.0
+        tot_profit = 0
+        tot_loss = 0
+        for key in ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]:
+            st = self.stats[key]
+            val = st['pnl']
+            tot_subtrading += val
+            tot_profit += st['profit']
+            tot_loss += st['loss']
+            if val > 0:
+                color = "#2ECC71" # Verde Smeraldo
+            elif val < 0:
+                color = "#FA8072" # Rosso Salmone
+            else:
+                color = "#A9A9A9" # Grigio scuro
+            riga = f"{key} [{val:+.2f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
+            riepilogo.append(f"<span style='color: {color};'>{riga}</span>")
+            
+        riga_totale = f"Totale Sottotrading [{tot_subtrading:+.2f} €] - Profit: {tot_profit} - Loss: {tot_loss}"
+        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
+        
+        st_ass = self.stats["Assicurazione"]
+        riga_ass = f"Assicurazione [{st_ass['pnl']:+.2f} €]"
+        riepilogo.append(f"<span style='color: #FFD700;'>{riga_ass}</span>")
+        
+        val_f3 = self.fase3_pnl
+        if val_f3 > 0:
+            color_f3 = "#2ECC71"
+        elif val_f3 < 0:
+            color_f3 = "#FA8072"
+        else:
+            color_f3 = "#A9A9A9"
+            
+        if self.fase3_perc:
+            riga_f3 = f"FASE3 [{val_f3:+.2f} €] [{self.fase3_perc}]"
+        else:
+            riga_f3 = f"FASE3 [{val_f3:+.2f} €] [Mai Avviata]"
+            
+        riepilogo.append(f"<span style='color: {color_f3};'>{riga_f3}</span>")
+        
+        return riepilogo
 
     def aggiungi_posizione(self, nome, dir, size, entry, tp=None, sl=None):
         pos_id = f"POS_{self.id_counter}"
@@ -116,11 +204,18 @@ class SimulatoreMatematico:
         pos = self.posizioni.pop(pos_id, None)
         if pos:
             if pos["dir"] == "BUY":
-                pnl = (prezzo_chiusura - pos["entry"]) * pos["size"]
+                pts = (prezzo_chiusura - pos["entry"]) * self.mult
             else:
-                pnl = (pos["entry"] - prezzo_chiusura) * pos["size"]
+                pts = (pos["entry"] - prezzo_chiusura) * self.mult
             
-            pnl = round(pnl, 2)
+            pnl_valuta = pts * pos["size"] * self.valore_punto
+            pnl = pnl_valuta * self.rate
+            
+            if self.valuta != "EUR":
+                pnl = float(int(pnl))
+            else:
+                pnl = round(pnl, 2)
+                
             self.pnl_realizzato += pnl
             self.operazioni.append({
                 "tick": self.tick_corrente, "prezzo": prezzo_chiusura, "tipo": f"CHIUSURA {pos['dir']} {pos['nome']} ({motivo})", "size": pos["size"], "pnl": pnl
@@ -232,7 +327,8 @@ class SimulatoreMatematico:
                 
                 if self.stato == "FASE_1":
                     if "ORDINE MICRO" in pend["nome"]:
-                        self.wlog(f"Posizione MICRO ({pend['dir']}) [{pend['size']}] a {lvl:.2f}")
+                        segno = "+" if pend['dir'] == "BUY" else "-"
+                        self.wlog(f"Posizione MICRO ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
                         self.aggiungi_posizione("MICRO", pend["dir"], pend["size"], lvl, tp=pend["tp"], sl=pend["sl"])
                         
                     elif "ORDINE CORE" in pend["nome"]:
@@ -241,8 +337,11 @@ class SimulatoreMatematico:
                         for pid in list(self.posizioni.keys()):
                             if "Assicurazione" in self.posizioni[pid]["nome"]:
                                 pnl_ass, _ = self.chiudi_posizione(pid, lvl, "Take Profit")
+                                self.registra_stat("Assicurazione", pnl_ass)
                         
-                        self.wlog(f"Core Reverse innescato a <u><b>{lvl:.2f}</b></u>. Chiusura Assicurazione. [Parziale: {pnl_ass:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
+                        dir_str = "LONG" if pend["dir"] in ["BUY", "LONG"] else "SHORT"
+                        segno = "+" if dir_str == "LONG" else "-"
+                        self.wlog(f"Core [{dir_str}] [{segno}{pend['size']}] a <u><b>{lvl:.2f}</b></u>. Chiusura Assicurazione. [Parziale: {pnl_ass:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
                         
                         # Aggiungi la nuova posizione Core Reverse
                         self.aggiungi_posizione(f"Core Reverse", pend["dir"], pend["size"], lvl)
@@ -257,7 +356,8 @@ class SimulatoreMatematico:
                         t1_sl = lvl - self.opp if t1_dir == "BUY" else lvl + self.opp
                         
                         self.aggiungi_posizione("TICKET1", t1_dir, self.s_mezzo, lvl, tp=t1_tp, sl=t1_sl)
-                        self.wlog(f"Entrata in Fase 2 - TICKET1 {t1_dir} [{self.s_mezzo}] a {lvl:.2f}")
+                        segno = "+" if t1_dir == "BUY" else "-"
+                        self.wlog(f"Entrata in Fase 2 - TICKET1 {t1_dir} [{segno}{self.s_mezzo}] a {lvl:.2f}")
                         
                 elif self.stato == "FASE_2_SATELLITI":
                     if "SAT1" in pend["nome"]:
@@ -270,12 +370,14 @@ class SimulatoreMatematico:
                                 self.wlog(f"TICKET2 chiuso a mercato (Loss) a {lvl:.2f}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
 
                         nome_pulito = pend['nome'].replace("ORDINE ", "")
-                        self.wlog(f"Posizione {nome_pulito} [{pend['size']}] a {lvl:.2f}")
+                        segno = "+" if pend['dir'] == "BUY" else "-"
+                        self.wlog(f"Posizione {nome_pulito} [{segno}{pend['size']}] a {lvl:.2f}")
                         
                         self.aggiungi_posizione("SAT1", pend["dir"], pend["size"], lvl, tp=pend["tp"], sl=pend["sl"])
                         sat2_dir = "SELL" if pend["dir"] == "BUY" else "BUY"
                         self.aggiungi_posizione("SAT2", sat2_dir, self.s_quarto, lvl)
-                        self.wlog(f"Posizione SAT2 {sat2_dir} [{self.s_quarto}] a {lvl:.2f}")
+                        segno = "+" if sat2_dir == "BUY" else "-"
+                        self.wlog(f"Posizione SAT2 {sat2_dir} [{segno}{self.s_quarto}] a {lvl:.2f}")
                         self.sat_price = lvl
                         self.sat2_dir = sat2_dir
                         
@@ -291,28 +393,34 @@ class SimulatoreMatematico:
                         self.aggiungi_pendente("OVERLOSS", sat2_dir, self.s_quarto, lvl_ol, "STOP", sl=lvl)
                         
                     elif pend["nome"] == "OVERGAIN":
-                        self.wlog(f"Posizione OVERGAIN ({pend['dir']}) [{pend['size']}] a {lvl:.2f}")
+                        segno = "+" if pend['dir'] == "BUY" else "-"
+                        self.wlog(f"Posizione OVERGAIN ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
                         self.aggiungi_posizione("OVERGAIN", pend["dir"], pend["size"], lvl, tp=pend["tp"])
                         
                     elif pend["nome"] == "OVERLOSS":
-                        self.wlog(f"Posizione OVERLOSS ({pend['dir']}) [{pend['size']}] a {lvl:.2f}")
+                        segno = "+" if pend['dir'] == "BUY" else "-"
+                        self.wlog(f"Posizione OVERLOSS ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
                         self.aggiungi_posizione("OVERLOSS", pend["dir"], pend["size"], lvl, sl=pend["sl"])
                             
                     elif "TICKET2" in pend["nome"]:
-                        self.wlog(f"Posizione TICKET2 ({pend['dir']}) [{pend['size']}] a {lvl:.2f}")
+                        segno = "+" if pend['dir'] == "BUY" else "-"
+                        self.wlog(f"Posizione TICKET2 ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
                         self.aggiungi_posizione("TICKET2", pend["dir"], pend["size"], lvl, tp=pend["tp"])
                         
                 elif self.stato == "FASE_3":
                     if pend["nome"] == "ULTIMA":
-                        self.wlog(f"Posizione ULTIMA ({pend['dir']}) [{pend['size']}] a {lvl:.2f}")
+                        segno = "+" if pend['dir'] == "BUY" else "-"
+                        self.wlog(f"Posizione ULTIMA ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
                         self.aggiungi_posizione("ULTIMA", pend["dir"], pend["size"], lvl, tp=pend["tp"])
                         
             elif tipo in ["TP", "SL"]:
                 if obj_id not in self.posizioni: continue
+                pos_dir_pre_chiusura = self.posizioni[obj_id]["dir"]
                 pnl, pos_nome = self.chiudi_posizione(obj_id, lvl, "Take Profit" if tipo == "TP" else "Stop Loss")
                 
                 if pos_nome == "MICRO":
                     if tipo == "TP":
+                        self.registra_stat("Micro", pnl)
                         self.wlog(f"MICRO a target a {lvl:.2f}. Reinserisco ordine. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
                         # Re-inserisci MICRO pendente
                         micro_pend_dir = "SELL" if self.dir_base == "BUY" else "BUY"
@@ -331,10 +439,12 @@ class SimulatoreMatematico:
                             elif "Assicurazione" in nome_pos:
                                 a_pnl, _ = self.chiudi_posizione(pid, lvl, "FLIP")
                                 pnl_ass += a_pnl
+                                self.registra_stat("Assicurazione", a_pnl)
                             else:
                                 self.chiudi_posizione(pid, lvl, "FLIP")
                         
                         pnl_tot = pnl_core + pnl_ass + pnl_micro
+                        self.registra_stat("Flip", pnl_tot)
                         self.wlog(f"Stop MICRO colpito a {lvl:.2f}. Chiusura posizioni *** FLIP. [Parziale: {pnl_tot:+.2f} €] (Core: {pnl_core:+.2f}€ | Ass: {pnl_ass:+.2f}€ | Micro: {pnl_micro:+.2f}€) [Totale: {self.pnl_realizzato:+.2f} €]")
                         self.svuota_pendenti()
                         self.dir_base = self.dir_contro
@@ -343,7 +453,8 @@ class SimulatoreMatematico:
 
                 elif pos_nome == "TICKET1":
                     if tipo == "TP":
-                        t1_dir = "SELL" if self.posizioni.get(obj_id, {}).get("dir", self.dir_base) == "BUY" else "BUY"
+                        self.registra_stat("Ticket1", pnl)
+                        t1_dir = "SELL" if pos_dir_pre_chiusura == "BUY" else "BUY"
                         dir_str = "SHORT" if t1_dir == "SELL" else "LONG"
                         self.wlog(f"TICKET1 a target a {lvl:.2f}! Ping-Pong: Rigirato in {dir_str}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
                         t1_tp = lvl + self.opp if t1_dir == "BUY" else lvl - self.opp
@@ -365,6 +476,7 @@ class SimulatoreMatematico:
                         sat_long_lvl = lvl_long + tp2_val
                         sat_short_lvl = lvl_short - tp2_val
                         
+                        self.registra_stat("Ticket1", pnl)
                         self.wlog(f"Stop TICKET1 colpito a {lvl:.2f}. Inserisco Ordini SAT1 (OCO) a {sat_short_lvl:.2f} e {sat_long_lvl:.2f}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
                         self.stato = "FASE_2_SATELLITI"
                         tp2_val = self.tp / 2.0
@@ -373,7 +485,8 @@ class SimulatoreMatematico:
                         
                         if abs(self.opp - self.tp/4.0) < 1e-4:
                             t2_dir = self.posizioni.get(obj_id, {}).get("dir", self.dir_base)
-                            self.wlog(f"Posizione TICKET2 ({t2_dir}) [{self.s_mezzo}] a {lvl:.2f}")
+                            segno = "+" if t2_dir == "BUY" else "-"
+                            self.wlog(f"Posizione TICKET2 ({t2_dir}) [{segno}{self.s_mezzo}] a {lvl:.2f}")
                             tp4 = self.tp / 4.0
                             t2_tp = lvl + tp4 if t2_dir == "BUY" else lvl - tp4
                             self.aggiungi_posizione("TICKET2", t2_dir, self.s_mezzo, lvl, tp=t2_tp)
@@ -479,15 +592,22 @@ class SimulatoreMatematico:
                                 entry_tossica = self.posizioni[per_ct]["entry"]
                                 self.posizioni[per_ct]["size"] -= self.s_mezzo
                                 if self.posizioni[per_ct]["dir"] == "BUY":
-                                    pnl_c_tossica = (lvl - entry_tossica) * self.s_mezzo
+                                    pts = (lvl - entry_tossica) * self.mult
                                 else:
-                                    pnl_c_tossica = (entry_tossica - lvl) * self.s_mezzo
-                                pnl_c_tossica = round(pnl_c_tossica, 2)
+                                    pts = (entry_tossica - lvl) * self.mult
+                                
+                                pnl_valuta = pts * self.s_mezzo * self.valore_punto
+                                pnl_c_tossica = pnl_valuta * self.rate
+                                if self.valuta != "EUR":
+                                    pnl_c_tossica = float(int(pnl_c_tossica))
+                                else:
+                                    pnl_c_tossica = round(pnl_c_tossica, 2)
+                                
                                 self.pnl_realizzato += pnl_c_tossica
                                 self.operazioni.append({"tick": self.tick_corrente, "prezzo": lvl, "tipo": "Chiusura Parziale Core Tossica (50%)", "size": self.s_mezzo, "pnl": pnl_c_tossica})
                                 
                             pnl_tot_f3 = pnl_tot + pnl_c_vincente + pnl_c_tossica
-                            self.wlog(f"TP Core [{sat_dir}] raggiunto a {lvl:.2f}. Avvio FASE 3. [Parziale: {pnl_tot_f3:+.2f} €] (Good: {pnl_c_vincente:+.2f}€ | 1/2 Bad: {pnl_c_tossica:+.2f}€){dettagli_ibride} [Totale: {self.pnl_realizzato:+.2f} €]")
+                            self.fase3_pnl = pnl_tot_f3
                             
                             self.stato = "FASE_3"
                             self.fase3_step = 1
@@ -502,16 +622,18 @@ class SimulatoreMatematico:
                             dir_contro = "SELL" if sat_dir == "BUY" else "BUY"
                             lvl_last = lvl + (self.tp / 4.0) if sat_dir == "BUY" else lvl - (self.tp / 4.0)
                             self.aggiungi_pendente("ULTIMA", dir_contro, self.s_mezzo, lvl_last, "LIMIT", tp=lvl)
-                            self.wlog(f"Entrata in Fase 3 a {lvl:.2f}. Inserita nuova core [{sat_dir} + {self.s_core}] e Ordine ULTIMA a [{lvl_last:.2f}].")
+                            
+                            segno = "+" if sat_dir in ["BUY", "LONG"] else "-"
+                            segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
+                            self.wlog(f"TP Core [{sat_dir}] raggiunto a {lvl:.2f}. Avvio FASE 3. Taglio effettuato 50%. [Parziale: {pnl_tot_f3:+.2f} €] (Good: {pnl_c_vincente:+.2f}€ | 1/2 Bad: {pnl_c_tossica:+.2f}€){dettagli_ibride} [Totale: {self.pnl_realizzato:+.2f} €] Inserita nuova Core [{sat_dir}] [{segno}{self.s_core}] e Ordine ULTIMA ({dir_contro}) [{segno_u}{self.s_mezzo}] a {lvl_last:.2f}")
                             
                         else:
-                            if pos_nome not in ["Fase3_Core", "ULTIMA"]:
-                                self.wlog(f"{tipo} colpito su {pos_nome}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
-                            
                             if pos_nome == "TICKET2" and tipo == "TP":
-                                self.wlog(f"TICKET2 ha preso profitto! Re-inserisco Ordine a {self.ticket2_entry:.2f}")
+                                self.registra_stat("Ticket2", pnl)
+                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €] Re-inserisco Ordine ({self.ticket2_dir}) a {self.ticket2_entry:.2f}")
                                 self.aggiungi_pendente("TICKET2 PEND", self.ticket2_dir, self.s_mezzo, self.ticket2_entry, "LIMIT", tp=self.ticket2_tp_lvl)
                             elif pos_nome == "OVERGAIN" and tipo == "TP":
+                                self.registra_stat("OverGain", pnl)
                                 self.pendenti = {k: v for k, v in self.pendenti.items() if "OVERLOSS" not in v["nome"] and "OVERGAIN" not in v["nome"]}
                                 tp4 = self.tp / 4.0
                                 if self.sat2_dir == "SELL":
@@ -520,10 +642,11 @@ class SimulatoreMatematico:
                                 else:
                                     l_og = self.sat_price - tp4
                                     l_ol = self.sat_price + tp4
-                                self.wlog(f"OVERGAIN ha preso profitto! Reinserisco OG e OL a {l_og:.2f} e {l_ol:.2f}")
+                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €] Reinserisco OG e OL ({self.sat2_dir}) a {l_og:.2f} e {l_ol:.2f}")
                                 self.aggiungi_pendente("OVERGAIN", self.sat2_dir, self.s_mezzo, l_og, "LIMIT", tp=self.sat_price)
                                 self.aggiungi_pendente("OVERLOSS", self.sat2_dir, self.s_quarto, l_ol, "STOP", sl=self.sat_price)
                             elif pos_nome == "OVERLOSS" and tipo == "SL":
+                                self.registra_stat("OverLoss", pnl)
                                 self.pendenti = {k: v for k, v in self.pendenti.items() if "OVERLOSS" not in v["nome"] and "OVERGAIN" not in v["nome"]}
                                 tp4 = self.tp / 4.0
                                 if self.sat2_dir == "SELL":
@@ -532,22 +655,39 @@ class SimulatoreMatematico:
                                 else:
                                     l_og = self.sat_price - tp4
                                     l_ol = self.sat_price + tp4
-                                self.wlog(f"OVERLOSS colpito! Reinserisco OG e OL a {l_og:.2f} e {l_ol:.2f}")
+                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €] Reinserisco OG e OL ({self.sat2_dir}) a {l_og:.2f} e {l_ol:.2f}")
                                 self.aggiungi_pendente("OVERGAIN", self.sat2_dir, self.s_mezzo, l_og, "LIMIT", tp=self.sat_price)
                                 self.aggiungi_pendente("OVERLOSS", self.sat2_dir, self.s_quarto, l_ol, "STOP", sl=self.sat_price)
-                                
                             elif pos_nome == "ULTIMA" and tipo == "TP":
                                 # SCENARIO A: ULTIMA prende profitto (Mungitura)
+                                self.registra_stat("Ultima", pnl)
                                 dir_contro = "SELL" if self.fase3_dir == "BUY" else "BUY"
                                 s_last = self.s_core * 0.5 if self.fase3_step == 1 else (self.s_core * 0.15 if self.fase3_step == 2 else 0)
                                 lvl_last = self.fase3_base + (self.tp / 4.0) if self.fase3_dir == "BUY" else self.fase3_base - (self.tp / 4.0)
                                 
-                                self.wlog(f"[ULTIMA] chiusa in profitto! [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]. Reinserisco ordine ULTIMA a {lvl_last:.2f}")
+                                self.wlog(f"[ULTIMA] chiusa in profitto! [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]. Reinserisco ordine ULTIMA ({dir_contro}) a {lvl_last:.2f}")
                                 self.aggiungi_pendente("ULTIMA", dir_contro, s_last, lvl_last, "LIMIT", tp=self.fase3_base)
                                 
                             elif pos_nome == "Fase3_Core" and tipo == "SL":
                                 # SCENARIO C: Sconfitta Fase 3
-                                self.wlog(f"Sconfitta in Fase 3 (SL colpito). Ciclo terminato in perdita. Macchinetta SPENTA. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
+                                self.svuota_pendenti()
+                                pnl_f3_core = pnl
+                                pnl_ultima = 0.0
+                                pnl_bad_core = 0.0
+                                
+                                for pid, pos in list(self.posizioni.items()):
+                                    if pos["nome"] == "ULTIMA":
+                                        p, _ = self.chiudi_posizione(pid, lvl, "Chiusura ULTIMA per Uscita C")
+                                        pnl_ultima = p
+                                        self.registra_stat("Ultima", p)
+                                    elif "Core" in pos["nome"]:
+                                        p, _ = self.chiudi_posizione(pid, lvl, "Chiusura Bad Core per Uscita C")
+                                        pnl_bad_core = p
+                                        
+                                pnl_tot_step = pnl_f3_core + pnl_ultima + pnl_bad_core
+                                self.fase3_perc = "50%" if self.fase3_step == 1 else "85%"
+                                self.fase3_pnl += pnl_tot_step
+                                self.wlog(f"USCITA FASE 3. Ciclo terminato. Macchinetta Spenta. [Parziale: {pnl_tot_step:+.2f} €] (Nuova Core: {pnl_f3_core:+.2f}€ | Bad Core: {pnl_bad_core:+.2f}€ | ULTIMA: {pnl_ultima:+.2f}€) [Totale: {self.pnl_realizzato:+.2f} €]")
                                 self.attivo = False
                                 
                             elif pos_nome == "Fase3_Core" and tipo == "TP":
@@ -560,6 +700,7 @@ class SimulatoreMatematico:
                                     if pos["nome"] == "ULTIMA":
                                         p, _ = self.chiudi_posizione(pid, lvl, "Chiusura ULTIMA in perdita")
                                         pnl_ultima = p
+                                        self.registra_stat("Ultima", p)
                                         
                                 core_tossica = [p for p in self.posizioni.values() if "Core" in p['nome']]
                                 pnl_taglio = 0.0
@@ -573,10 +714,17 @@ class SimulatoreMatematico:
                                     self.posizioni[per_ct]["size"] = round(self.posizioni[per_ct]["size"], 2)
                                     
                                     if self.posizioni[per_ct]["dir"] == "BUY":
-                                        pnl_taglio = (lvl - entry_tossica) * s_cut_effettivo
+                                        pts = (lvl - entry_tossica) * self.mult
                                     else:
-                                        pnl_taglio = (entry_tossica - lvl) * s_cut_effettivo
-                                    pnl_taglio = round(pnl_taglio, 2)
+                                        pts = (entry_tossica - lvl) * self.mult
+                                        
+                                    pnl_valuta = pts * s_cut_effettivo * self.valore_punto
+                                    pnl_taglio = pnl_valuta * self.rate
+                                    if self.valuta != "EUR":
+                                        pnl_taglio = float(int(pnl_taglio))
+                                    else:
+                                        pnl_taglio = round(pnl_taglio, 2)
+                                        
                                     self.pnl_realizzato += pnl_taglio
                                     self.operazioni.append({"tick": self.tick_corrente, "prezzo": lvl, "tipo": f"Taglio Core Tossica ({s_cut_effettivo})", "size": s_cut_effettivo, "pnl": pnl_taglio})
                                     
@@ -584,14 +732,15 @@ class SimulatoreMatematico:
                                         self.chiudi_posizione(per_ct, lvl, "Pulizia Core")
                                 
                                 tot_step = pnl + pnl_ultima + pnl_taglio
+                                self.fase3_pnl += tot_step
                                 
                                 if self.fase3_step == 2:
+                                    self.fase3_perc = "100%"
                                     self.wlog(f"Fase 3 completata al {lvl:.2f}. Macchinetta SPENTA. [Parziale: {tot_step:+.2f} €] (Core: {pnl:+.2f}€ | ULTIMA: {pnl_ultima:+.2f}€ | Taglio: {pnl_taglio:+.2f}€) [Totale: {self.pnl_realizzato:+.2f} €]")
                                     self.attivo = False
                                 else:
                                     self.fase3_step = 2
                                     self.fase3_base = lvl
-                                    self.wlog(f"Taglio 35% effettuato. [Parziale: {tot_step:+.2f} €] (Core: {pnl:+.2f}€ | ULTIMA: {pnl_ultima:+.2f}€ | Taglio: {pnl_taglio:+.2f}€) [Totale: {self.pnl_realizzato:+.2f} €]")
                                     
                                     lim_core = lvl + (self.tp / 2.0) if self.fase3_dir == "BUY" else lvl - (self.tp / 2.0)
                                     stop_core = lvl - self.dts if self.fase3_dir == "BUY" else lvl + self.dts
@@ -599,14 +748,27 @@ class SimulatoreMatematico:
                                     
                                     dir_contro = "SELL" if self.fase3_dir == "BUY" else "BUY"
                                     lvl_last = lvl + (self.tp / 4.0) if self.fase3_dir == "BUY" else lvl - (self.tp / 4.0)
-                                    self.aggiungi_pendente("ULTIMA", dir_contro, self.s_core * 0.15, lvl_last, "LIMIT", tp=lvl)
+                                    s_ultima = self.s_core * 0.15
+                                    self.aggiungi_pendente("ULTIMA", dir_contro, s_ultima, lvl_last, "LIMIT", tp=lvl)
                                     
                                     dir_str = "LONG" if self.fase3_dir == "BUY" else "SHORT"
-                                    self.wlog(f"Reinserisco Core [{dir_str}] a {lvl:.2f} e Ordine ULTIMA (15%) a {lvl_last:.2f}")
+                                    segno = "+" if self.fase3_dir in ["BUY", "LONG"] else "-"
+                                    segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
+                                    self.wlog(f"Taglio 35% effettuato. [Parziale: {tot_step:+.2f} €] (Core: {pnl:+.2f}€ | ULTIMA: {pnl_ultima:+.2f}€ | Taglio: {pnl_taglio:+.2f}€) [Totale: {self.pnl_realizzato:+.2f} €] Reinserisco Core [{dir_str}] [{segno}{self.s_core}] a {lvl:.2f} e Ordine ULTIMA ({dir_contro}) [{segno_u}{s_ultima}] a {lvl_last:.2f}")
+                            else:
+                                if pos_nome not in ["Fase3_Core", "ULTIMA"]:
+                                    self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} €] [Totale: {self.pnl_realizzato:+.2f} €]")
+
+        if self.pnl_realizzato > self.max_pnl_reached:
+            self.max_pnl_reached = self.pnl_realizzato
+            
+        current_drawdown = self.max_pnl_reached - self.pnl_realizzato
+        if current_drawdown > self.max_drawdown:
+            self.max_drawdown = current_drawdown
 
         self.pnl_storico.append({"tick": self.tick_corrente, "totale": self.pnl_realizzato})
 
-def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=50, size=1.0, modalita="Multiconto", direzione="LONG"):
+def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=50, size=1.0, modalita="Multiconto", direzione="LONG", mult=1.0, valore_punto=1.0, valuta="EUR"):
     try:
         df = pd.read_csv(file_path)
         prezzi = df["Price"].tolist()
@@ -620,8 +782,8 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
     }
     
     if modalita == "Multiconto":
-        sim_f = SimulatoreMatematico(tp, opp, dts, size, "LONG")
-        sim_d = SimulatoreMatematico(tp, opp, dts, size, "SHORT")
+        sim_f = SimulatoreMatematico(tp, opp, dts, size, "LONG", mult, valore_punto, valuta)
+        sim_d = SimulatoreMatematico(tp, opp, dts, size, "SHORT", mult, valore_punto, valuta)
         
         for idx, prezzo in enumerate(prezzi):
             if not sim_f.attivo and not sim_d.attivo:
@@ -633,14 +795,16 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
             
         ultimo_step = idx
         start_str_f = f"Start: {prezzi[0]:.2f} +{size} LONG"
-        sim_f.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[-1]:.2f} | {strumento} | {start_str_f}")
+        sim_f.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.2f} | {strumento} | {start_str_f}")
         sim_f.log_ws.append("-----------------------------------------------------------")
         sim_f.log_ws.append(f"[Totale: {sim_f.pnl_realizzato:+.2f} €]")
+        sim_f.log_ws.extend(sim_f.genera_riepilogo())
         
         start_str_d = f"Start: {prezzi[0]:.2f} -{size} SHORT"
-        sim_d.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[-1]:.2f} | {strumento} | {start_str_d}")
+        sim_d.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.2f} | {strumento} | {start_str_d}")
         sim_d.log_ws.append("-----------------------------------------------------------")
         sim_d.log_ws.append(f"[Totale: {sim_d.pnl_realizzato:+.2f} €]")
+        sim_d.log_ws.extend(sim_d.genera_riepilogo())
             
         risultati["SIM_FIORDOK"]["pnl"] = sim_f.pnl_storico
         risultati["SIM_FIORDOK"]["operazioni"] = sim_f.operazioni
@@ -650,7 +814,7 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
         risultati["SIM_DANY"]["operazioni"] = sim_d.operazioni
         risultati["SIM_DANY"]["log_ws"] = sim_d.log_ws
     else:
-        sim = SimulatoreMatematico(tp, opp, dts, size, direzione)
+        sim = SimulatoreMatematico(tp, opp, dts, size, direzione, mult, valore_punto, valuta)
         for idx, prezzo in enumerate(prezzi):
             if not sim.attivo:
                 break
@@ -659,9 +823,10 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
         ultimo_step = idx
         segno_start = "+" if direzione in ["BUY", "LONG"] else "-"
         start_str = f"Start: {prezzi[0]:.2f} {segno_start}{size} {direzione}"
-        sim.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[-1]:.2f} | {strumento} | {start_str}")
+        sim.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.2f} | {strumento} | {start_str}")
         sim.log_ws.append("-----------------------------------------------------------")
         sim.log_ws.append(f"[Totale: {sim.pnl_realizzato:+.2f} €]")
+        sim.log_ws.extend(sim.genera_riepilogo())
             
         risultati["SIM_FIORDOK"]["pnl"] = sim.pnl_storico
         risultati["SIM_FIORDOK"]["operazioni"] = sim.operazioni
@@ -673,3 +838,83 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
         "modalita": modalita,
         "direzione": direzione
     }
+
+def esegui_ottimizzazione_griglia(file_paths, tp_range, dts_range, size=10.0, mult=1.0, valore_punto=1.0, valuta="EUR"):
+    import numpy as np
+    
+    tp_values = np.arange(tp_range['min'], tp_range['max'] + tp_range['step'], tp_range['step']).tolist()
+    dts_values = np.arange(dts_range['min'], dts_range['max'] + dts_range['step'], dts_range['step']).tolist()
+    
+    risultati_ottimizzazione = []
+    
+    for tp in tp_values:
+        for dts in dts_values:
+            opp = tp / 4.0
+            
+            pnl_long_totale = 0.0
+            pnl_short_totale = 0.0
+            max_dd_long_avg = 0.0
+            max_dd_short_avg = 0.0
+            win_count = 0
+            loss_count = 0
+            
+            for file_path in file_paths:
+                try:
+                    df = pd.read_csv(file_path)
+                    prezzi = df["Price"].tolist()
+                except Exception as e:
+                    print(f"Errore caricamento CSV {file_path}: {e}")
+                    continue
+                
+                sim_f = SimulatoreMatematico(tp, opp, dts, size, "LONG", mult, valore_punto, valuta)
+                sim_d = SimulatoreMatematico(tp, opp, dts, size, "SHORT", mult, valore_punto, valuta)
+                
+                # Disabilita i log_ws per massimizzare le performance ed evitare overflow memoria
+                sim_f.log_ws = []
+                sim_d.log_ws = []
+                sim_f.wlog = lambda msg: None
+                sim_f.wstep = lambda msg: None
+                sim_d.wlog = lambda msg: None
+                sim_d.wstep = lambda msg: None
+                
+                for idx, prezzo in enumerate(prezzi):
+                    if not sim_f.attivo and not sim_d.attivo:
+                        break
+                    if sim_f.attivo:
+                        sim_f.elabora_tick(idx, prezzo)
+                    if sim_d.attivo:
+                        sim_d.elabora_tick(idx, prezzo)
+                        
+                pnl_long_totale += sim_f.pnl_realizzato
+                pnl_short_totale += sim_d.pnl_realizzato
+                max_dd_long_avg += sim_f.max_drawdown
+                max_dd_short_avg += sim_d.max_drawdown
+                
+                if (sim_f.pnl_realizzato + sim_d.pnl_realizzato) >= 0:
+                    win_count += 1
+                else:
+                    loss_count += 1
+                    
+            n_files = len(file_paths)
+            if n_files > 0:
+                pnl_long_medio = pnl_long_totale / n_files
+                pnl_short_medio = pnl_short_totale / n_files
+                pnl_totale_medio = pnl_long_medio + pnl_short_medio
+                max_dd_long_avg /= n_files
+                max_dd_short_avg /= n_files
+                
+                win_rate = (win_count / n_files) * 100
+                
+                risultati_ottimizzazione.append({
+                    "TP": tp,
+                    "OPP": opp,
+                    "DTS": dts,
+                    "PNL Long": round(pnl_long_medio, 2),
+                    "PNL Short": round(pnl_short_medio, 2),
+                    "PNL Totale": round(pnl_totale_medio, 2),
+                    "Max Drawdown": round(max_dd_long_avg + max_dd_short_avg, 2),
+                    "Win Rate %": round(win_rate, 2)
+                })
+                
+    df_risultati = pd.DataFrame(risultati_ottimizzazione)
+    return df_risultati

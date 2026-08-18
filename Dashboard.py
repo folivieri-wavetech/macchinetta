@@ -11,11 +11,11 @@ import plotly.graph_objects as go
 import numpy as np
 
 # --- CONFIGURAZIONI CENTRALI ---
-FILE_MEMORIA = "memoria_parametri.json"
-FILE_TOKEN = "token_ig.json"
+FILE_MEMORIA = os.path.join("Sistema", "memoria_parametri.json")
+FILE_TOKEN = os.path.join("Sistema", "token_ig.json")
 FILE_STORICO = "storico_operazioni.csv"
-CONSOLE_LOG_FILE = "console_live.log"
-STATO_SISTEMA = "stato_sistema.json"
+CONSOLE_LOG_FILE = os.path.join("Logs_e_Cache", "console_live.log")
+STATO_SISTEMA = os.path.join("Sistema", "stato_sistema.json")
 CREDENTIALS = {"Marco": "Bolzano&1971"} 
 
 # --- VOCABOLARIO ---
@@ -442,8 +442,8 @@ else:
         renderizza_sidebar_stats()
 
     # TABS RIORDINATI (Portafoglio IG per primo)
-    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici, tab_simulatore = st.tabs([
-        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici", "🔬 Simulatore"
+    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici, tab_simulatore, tab_ottimizzazione = st.tabs([
+        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici", "🔬 Simulatore", "🧪 Ottimizzazione"
     ])
 
     with tab_portafoglio:
@@ -1193,7 +1193,7 @@ else:
             if "MICRO" in r_anom:
                 p_base = dati.get("prezzo_base")
                 if not p_base:
-                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare la Micro:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_micro_{conto_selezionato}_{nome}")
+                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare la Micro:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_micro_{conto_selezionato}_{r_nome}")
                 if not p_base or p_base <= 0:
                     st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
                 else:
@@ -1225,7 +1225,7 @@ else:
             elif "SAT1 OCO" in r_anom:
                 p_base = dati.get("prezzo_base")
                 if not p_base:
-                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare i Satelliti OCO:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_sat1_{conto_selezionato}_{nome}")
+                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare i Satelliti OCO:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_sat1_{conto_selezionato}_{r_nome}")
                 if not p_base or p_base <= 0:
                     st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
                 else:
@@ -1578,7 +1578,7 @@ else:
                 if h_api:
                     # Logica Cache Intelligente per evitare limiti API
                     import os
-                    cache_file = f"cache_candele_{epic}_{grafico_res}.csv"
+                    cache_file = os.path.join("Logs_e_Cache", f"cache_candele_{epic}_{grafico_res}.csv")
                     max_fetch = 600
                     df_cache = None
                     
@@ -1859,3 +1859,234 @@ else:
                     import traceback
                     st.code(traceback.format_exc())
 
+
+    # --- TAB OTTIMIZZAZIONE GLOBALE ---
+    with tab_ottimizzazione:
+        st.title("🧪 Ottimizzazione Massiva (Monte Carlo)")
+        st.markdown("Cerca i parametri migliori simulando migliaia di scenari (Laterali e Randomici).")
+        
+        import glob
+        cartella_salvataggi = os.path.join("Simulatore", "ottimizzazioni_salvate")
+        if not os.path.exists(cartella_salvataggi):
+            os.makedirs(cartella_salvataggi)
+            
+        def renderizza_risultati_ottimizzazione(df_full, modo_dati):
+            # Raggruppamento Globale e Medie
+            df_global = df_full.groupby(["TP", "OPP", "DTS"]).mean().reset_index()
+            n_files = 10 if modo_dati == "Generazione Batch (LATERALE + RANDOM)" else 1
+            if "N_Simulazioni" not in df_full.columns:
+                df_global["N_Simulazioni"] = df_full.groupby(["TP", "OPP", "DTS"]).size().reset_index(drop=True) * n_files
+            else:
+                df_global["N_Simulazioni"] = df_full.groupby(["TP", "OPP", "DTS"]).size().reset_index(drop=True) * n_files
+            
+            # Calcolo Score RoMD e Win
+            df_global["Score RoMD"] = df_global["PNL Totale"] / df_global["Max Drawdown"].replace(0, 1)
+            df_global["Score Win"] = df_global["PNL Totale"] * (df_global["Win Rate %"] / 100.0)
+            
+            # Ordinamento per Score RoMD
+            df_global = df_global.sort_values(by="Score RoMD", ascending=False).reset_index(drop=True)
+            
+            # Formattazione per visualizzazione
+            col_display = ["TP", "OPP", "DTS", "PNL Long", "PNL Short", "PNL Totale", "Max Drawdown", "Win Rate %", "Score RoMD", "Score Win", "N_Simulazioni"]
+            df_display = df_global[col_display].copy()
+            
+            st.markdown("### 🏆 Classifica Globale Parametri Migliori (Ordinata per Score RoMD)")
+            st.dataframe(df_display.style.background_gradient(subset=["Score RoMD", "PNL Totale"], cmap="RdYlGn").format({
+                "PNL Long": "{:.2f} €", "PNL Short": "{:.2f} €", "PNL Totale": "{:.2f} €", 
+                "Max Drawdown": "{:.2f} €", "Score RoMD": "{:.2f}", "Score Win": "{:.2f}"
+            }), use_container_width=True)
+            
+            st.markdown("### 🗺️ Mappa di Calore Globale (Robustezza Score RoMD)")
+            try:
+                import plotly.express as px
+                pivot_df = df_global.pivot_table(values="Score RoMD", index="DTS", columns="TP", aggfunc="mean")
+                fig = px.imshow(pivot_df, text_auto=".2f", color_continuous_scale="RdYlGn", aspect="auto", origin='lower')
+                fig.update_layout(title="Score RoMD Globale per Combinazione (TP vs DTS)", xaxis_title="Take Profit (TP)", yaxis_title="Distanza Sicurezza (DTS)")
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Impossibile renderizzare la Heatmap: {e}")
+
+        # --- CARICAMENTO SALVATAGGI ---
+        st.markdown("### 📂 Carica Tabella Ottimizzazioni Salvate")
+        file_salvati = [f for f in os.listdir(cartella_salvataggi) if f.endswith(".csv")]
+        if file_salvati:
+            col_sel, col_btn = st.columns([3, 1])
+            with col_sel:
+                file_selezionato = st.selectbox("Seleziona un file salvato", ["-- Nessuno --"] + file_salvati, key="sel_file_ott_salvato")
+            with col_btn:
+                st.write("") # padding
+                st.write("")
+                btn_carica = st.button("Mostra Classifica", use_container_width=True)
+                
+            if btn_carica and file_selezionato != "-- Nessuno --":
+                st.markdown("---")
+                try:
+                    percorso_load = os.path.join(cartella_salvataggi, file_selezionato)
+                    df_loaded = pd.read_csv(percorso_load)
+                    st.success(f"Risultati caricati da {file_selezionato}")
+                    renderizza_risultati_ottimizzazione(df_loaded, "Generazione Batch (LATERALE + RANDOM)")
+                except Exception as e:
+                    st.error(f"Errore caricamento: {e}")
+                st.markdown("---")
+        else:
+            st.info("Nessun salvataggio presente.")
+            
+        st.markdown("---")
+        
+        st.markdown("### 0. Seleziona Strumento da Ottimizzare")
+        
+        r_nome_ott = st.selectbox("Seleziona lo Strumento per agganciare le quotazioni Live e i moltiplicatori reali:", tutti_strumenti, key="ott_r_nome")
+        
+        # Recupero config base per lo strumento selezionato
+        c_ott = CONFIG_STRUMENTI.get(r_nome_ott, {})
+        def_tick = c_ott.get("tick_size", 1.0)
+        def_mult = c_ott.get("moltiplicatore_dts", 1.0)
+        
+        # Gestione prezzo live se disponibile, altrimenti default
+        prezzo_live_ott = prezzi_live.get(r_nome_ott, 0.0)
+        if prezzo_live_ott > 0:
+            def_part = float(prezzo_live_ott)
+            lbl_partenza = f"Prezzo di Partenza (AGGANCIATO LIVE a {r_nome_ott})"
+        else:
+            def_part = 2400.0 if "Gold" in r_nome_ott or "Cash" in r_nome_ott else (1.1000 if "USD" in r_nome_ott else 160.0)
+            lbl_partenza = "Prezzo di Partenza (Prezzo di default - Live non trovato)"
+            
+        # Default per le griglie
+        if "USD" in r_nome_ott and "Gold" not in r_nome_ott and "Cash" not in r_nome_ott:
+            # Forex Major
+            def_tp_min, def_tp_max, def_tp_step = 20.0, 60.0, 20.0
+            def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
+        elif "JPY" in r_nome_ott:
+            # Forex JPY
+            def_tp_min, def_tp_max, def_tp_step = 20.0, 60.0, 20.0
+            def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
+        else:
+            # Oro / Indici
+            def_tp_min, def_tp_max, def_tp_step = 40.0, 100.0, 20.0
+            def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
+            
+        fmt = "%.4f" if def_tick < 0.01 else "%.2f"
+        
+        ott_modo_dati = st.radio("Modalità Dati", ["Generazione Batch (LATERALE + RANDOM)", "File Singolo Esistente"], key="ott_modo")
+        
+        import pandas as pd
+        file_paths_ott = []
+        ott_partenza = def_part
+        ott_tick_size = def_tick
+        ott_tic_tot = 10000
+        
+        st.markdown("### 1. Dati di Partenza")
+        if ott_modo_dati == "File Singolo Esistente":
+            file_upload_ott = st.file_uploader("Carica Storico CSV", type=['csv'], key="ott_up")
+            if file_upload_ott is not None:
+                tmp_path = "temp_ottimizzazione.csv"
+                with open(tmp_path, "wb") as f: f.write(file_upload_ott.getbuffer())
+                file_paths_ott.append(tmp_path)
+        else:
+            c_g1, c_g2, c_g3 = st.columns(3)
+            with c_g1: ott_partenza = st.number_input(lbl_partenza, value=def_part, step=def_tick*10, format=fmt, key="ott_part")
+            with c_g2: ott_tick_size = st.number_input("Tick Size (Auto-Configurato)", value=def_tick, step=def_tick, format=fmt, key="ott_tick")
+            ott_tic_tot = st.number_input("Numero di Tick per file", value=10000, step=1000, key="ott_tic_tot")
+            
+        st.markdown("### 2. Configura la Griglia dei Parametri")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown("#### TP (Take Profit)")
+            tp_min = st.number_input("TP Minimo", value=def_tp_min, step=def_tp_step, format=fmt, key="ott_tp_min")
+            tp_max = st.number_input("TP Massimo", value=def_tp_max, step=def_tp_step, format=fmt, key="ott_tp_max")
+            tp_step = st.number_input("TP Step", value=def_tp_step, step=def_tp_step, format=fmt, key="ott_tp_step")
+        with c2:
+            st.markdown("#### DTS (Distanza Sicurezza)")
+            dts_min = st.number_input("DTS Minimo", value=def_dts_min, step=def_dts_step, format=fmt, key="ott_dts_min")
+            dts_max = st.number_input("DTS Massimo", value=def_dts_max, step=def_dts_step, format=fmt, key="ott_dts_max")
+            dts_step = st.number_input("DTS Step", value=def_dts_step, step=def_dts_step, format=fmt, key="ott_dts_step")
+        with c3:
+            st.markdown("#### Variabili Fisse")
+            ott_size = st.number_input("Size Iniziale", value=10.0, step=1.0, key="ott_size")
+            ott_val_punto = st.number_input("Valore Punto (EUR)", value=1.0, step=0.5, key="ott_val")
+            
+        st.markdown("#### Automazione")
+        ott_target_sim = st.number_input("Target Simulazioni (File totali)", min_value=10, max_value=10000, value=50, step=10, key="ott_target_sim")
+        
+        if st.button(f"🚀 Avvia Ottimizzazione per {r_nome_ott}", type="primary", use_container_width=True):
+            import numpy as np
+            import shutil
+            tp_list = np.arange(tp_min, tp_max + tp_step, tp_step).tolist()
+            dts_list = np.arange(dts_min, dts_max + dts_step, dts_step).tolist()
+            tp_range = {"min": tp_min, "max": tp_max, "step": tp_step}
+            dts_range = {"min": dts_min, "max": dts_max, "step": dts_step}
+            storico_file = "ottimizzazione_storico_globale.csv"
+            
+            # Resetto sempre lo storico prima di un nuovo calcolo
+            if os.path.exists(storico_file):
+                os.remove(storico_file)
+            
+            if ott_modo_dati == "Generazione Batch (LATERALE + RANDOM)":
+                iterazioni = max(1, int(ott_target_sim / 10))
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                import time
+                for it in range(iterazioni):
+                    status_text.markdown(f"**Elaborazione in corso... Batch {it+1}/{iterazioni} ({(it+1)*10} file totali)**")
+                    
+                    file_paths_ott = []
+                    for i in range(5):
+                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "LATERALE", ott_partenza, ott_tick_size, ott_tic_tot, ott_size)
+                        file_paths_ott.append(p)
+                    for i in range(5):
+                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "RANDOM", ott_partenza, ott_tick_size, ott_tic_tot, ott_size)
+                        file_paths_ott.append(p)
+                        
+                    df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto)
+                    
+                    if not df_res.empty:
+                        if os.path.exists(storico_file):
+                            df_storico = pd.read_csv(storico_file)
+                            df_full = pd.concat([df_storico, df_res], ignore_index=True)
+                        else:
+                            df_full = df_res.copy()
+                        df_full.to_csv(storico_file, index=False)
+                        
+                    for p in file_paths_ott:
+                        if os.path.exists(p):
+                            os.remove(p)
+                            
+                    progress_bar.progress((it + 1) / iterazioni)
+                
+                tot_sim_effettive = iterazioni * 10
+                status_text.success(f"✅ Ottimizzazione completata! ({tot_sim_effettive} file elaborati)")
+                
+            else:
+                tot_sim_effettive = 1
+                if not file_paths_ott:
+                    st.error("Nessun dataset selezionato.")
+                else:
+                    with st.spinner("Ottimizzazione file singolo in corso..."):
+                        df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto)
+                        if not df_res.empty:
+                            if os.path.exists(storico_file):
+                                df_storico = pd.read_csv(storico_file)
+                                df_full = pd.concat([df_storico, df_res], ignore_index=True)
+                            else:
+                                df_full = df_res.copy()
+                            df_full.to_csv(storico_file, index=False)
+                            st.success("✅ Ottimizzazione file singolo completata!")
+                            
+            if os.path.exists(storico_file):
+                df_full = pd.read_csv(storico_file)
+                
+                # Logica di salvataggio automatico e pulizia
+                nome_pulito = r_nome_ott.replace(" ", "_").replace("/", "")
+                file_finale = f"Ott.{nome_pulito}_{tot_sim_effettive}test.csv"
+                path_finale = os.path.join(cartella_salvataggi, file_finale)
+                
+                shutil.copy(storico_file, path_finale)
+                os.remove(storico_file)
+                
+                st.success(f"💾 Risultati salvati automaticamente in: `{file_finale}`")
+                
+                # Mostra subito i risultati
+                renderizza_risultati_ottimizzazione(df_full, ott_modo_dati)
+            else:
+                st.warning("Nessun risultato ottenuto (griglia vuota o nessun test eseguito).")
