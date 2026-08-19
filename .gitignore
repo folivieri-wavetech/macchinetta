@@ -23,3 +23,6 @@ BACKUP/
 __pycache__/
 *.pyc
 *.pyo
+
+#deploy
+local.yaml
