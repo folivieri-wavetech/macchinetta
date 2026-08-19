@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: macchinetta-dashboard
+  namespace: macchinetta
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: macchinetta.wavetech.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: macchinetta-dashboard
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - macchinetta.wavetech.it
+      secretName: macchinetta-dashboard-tls

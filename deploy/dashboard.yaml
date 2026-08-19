@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: macchinetta-dashboard
+  namespace: macchinetta
+  labels:
+    app: macchinetta
+    component: dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: macchinetta
+      component: dashboard
+  template:
+    metadata:
+      labels:
+        app: macchinetta
+        component: dashboard
+    spec:
+      initContainers:
+        - name: init
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          command: ["sh", "/etc/macchinetta/seed.sh"]
+          volumeMounts:
+            - name: seed
+              mountPath: /etc/macchinetta/seed.sh
+              subPath: seed.sh
+            - name: data
+              mountPath: /data
+      containers:
+        - name: dashboard
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          command: ["streamlit", "run", "/data/Dashboard.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+          workingDir: /data
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          ports:
+            - containerPort: 8501
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: seed
+          configMap:
+            name: macchinetta-init
+            defaultMode: 0755
+        - name: data
+          persistentVolumeClaim:
+            claimName: macchinetta-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: macchinetta-dashboard
+  namespace: macchinetta
+spec:
+  selector:
+    app: macchinetta
+    component: dashboard
+  ports:
+    - port: 80
+      targetPort: 8501
+      name: http

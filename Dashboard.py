@@ -17,7 +17,7 @@ FILE_TOKEN = "token_ig.json"
 FILE_STORICO = "storico_operazioni.csv"
 CONSOLE_LOG_FILE = "console_live.log"
 STATO_SISTEMA = "stato_sistema.json"
-CREDENTIALS = {"Marco": "Bolzano&1971"} 
+CREDENTIALS = {os.getenv("DASHBOARD_USER", "Marco"): os.getenv("DASHBOARD_PASSWORD", "Bolzano&1971")} 
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
@@ -816,7 +816,7 @@ else:
             except Exception:
                 pass
 
-            st.markdown(f"""
+            st.html(f"""
             <div style='display: flex; justify-content: space-between; align-items: flex-end; margin-top: -15px; margin-bottom: 20px;'>
                 <div>
                     <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Strumenti</h3>
@@ -827,7 +827,7 @@ else:
                     <span><span style='color: #888;'>P/L:</span> <span style='color: {color_dd};'>{dd_val} €</span></span>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
             
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])

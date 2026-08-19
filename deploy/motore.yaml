@@ -1,0 +1,194 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: macchinetta-motore-bongiolo
+  namespace: macchinetta
+  labels:
+    app: macchinetta
+    component: motore
+    account: bongiolo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: macchinetta
+      component: motore
+      account: bongiolo
+  template:
+    metadata:
+      labels:
+        app: macchinetta
+        component: motore
+        account: bongiolo
+    spec:
+      initContainers:
+        - name: init
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          command: ["sh", "/etc/macchinetta/seed.sh"]
+          volumeMounts:
+            - name: seed
+              mountPath: /etc/macchinetta/seed.sh
+              subPath: seed.sh
+            - name: data
+              mountPath: /data
+      containers:
+        - name: motore
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          command: ["python", "/data/Motore.py", "BONGIOLO_DEMO"]
+          workingDir: /data
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: seed
+          configMap:
+            name: macchinetta-init
+            defaultMode: 0755
+        - name: data
+          persistentVolumeClaim:
+            claimName: macchinetta-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: macchinetta-motore-dany
+  namespace: macchinetta
+  labels:
+    app: macchinetta
+    component: motore
+    account: dany
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: macchinetta
+      component: motore
+      account: dany
+  template:
+    metadata:
+      labels:
+        app: macchinetta
+        component: motore
+        account: dany
+    spec:
+      initContainers:
+        - name: init
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          command: ["sh", "/etc/macchinetta/seed.sh"]
+          volumeMounts:
+            - name: seed
+              mountPath: /etc/macchinetta/seed.sh
+              subPath: seed.sh
+            - name: data
+              mountPath: /data
+      containers:
+        - name: motore
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          command: ["python", "/data/Motore.py", "DANY_DEMO"]
+          workingDir: /data
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: seed
+          configMap:
+            name: macchinetta-init
+            defaultMode: 0755
+        - name: data
+          persistentVolumeClaim:
+            claimName: macchinetta-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: macchinetta-motore-fiordok
+  namespace: macchinetta
+  labels:
+    app: macchinetta
+    component: motore
+    account: fiordok
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: macchinetta
+      component: motore
+      account: fiordok
+  template:
+    metadata:
+      labels:
+        app: macchinetta
+        component: motore
+        account: fiordok
+    spec:
+      initContainers:
+        - name: init
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          command: ["sh", "/etc/macchinetta/seed.sh"]
+          volumeMounts:
+            - name: seed
+              mountPath: /etc/macchinetta/seed.sh
+              subPath: seed.sh
+            - name: data
+              mountPath: /data
+      containers:
+        - name: motore
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: Always
+          command: ["python", "/data/Motore.py", "FIORDOK_DEMO"]
+          workingDir: /data
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: seed
+          configMap:
+            name: macchinetta-init
+            defaultMode: 0755
+        - name: data
+          persistentVolumeClaim:
+            claimName: macchinetta-data

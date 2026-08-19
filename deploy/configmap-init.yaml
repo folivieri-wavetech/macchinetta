@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: macchinetta-init
+  namespace: macchinetta
+data:
+  seed.sh: |
+    #!/bin/sh
+    set -e
+
+    # Se la PVC e' vuota, copia il progetto contenuto nell'immagine
+    if [ ! -f /data/Dashboard.py ]; then
+      cp -a /app/. /data/
+    fi
+
+    # Iniezione credenziali IG per ogni conto (da Kubernetes Secret)
+    for c in BONGIOLO DANY FIORDOK; do
+      eval "env_content=\$${c}_DEMO_ENV"
+      if [ -n "$env_content" ]; then
+        mkdir -p "/data/${c}_DEMO"
+        printf '%s\n' "$env_content" > "/data/${c}_DEMO/.env"
+      fi
+    done

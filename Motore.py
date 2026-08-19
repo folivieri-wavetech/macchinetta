@@ -7,7 +7,10 @@ import datetime
 import sys
 import socket
 import hashlib
-import winsound
+try:
+    import winsound
+except ImportError:
+    winsound = None
 from dotenv import dotenv_values
 import io
 
@@ -20,6 +23,8 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- EFFETTI SONORI ---
 def suona_drumroll():
     try:
+        if winsound is None:
+            return
         ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
         FILE_AUDIO = os.path.join(ROOT_DIR, "Sistema", "DRUMROLL.WAV")
         if os.path.exists(FILE_AUDIO):
