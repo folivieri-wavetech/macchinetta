@@ -1,0 +1,62 @@
+{
+    "Spot Gold": {
+        "tp_min": 40.0,
+        "tp_max": 200.0,
+        "tp_step": 20.0,
+        "dts_min": 10.0,
+        "dts_max": 40.0,
+        "dts_step": 5.0,
+        "size": 16.0,
+        "val_punto": 1.0,
+        "target_sim": 1000,
+        "tic_tot": 5000
+    },
+    "US 500 Cash": {
+        "tp_min": 40.0,
+        "tp_max": 300.0,
+        "tp_step": 20.0,
+        "dts_min": 10.0,
+        "dts_max": 40.0,
+        "dts_step": 10.0,
+        "size": 10.0,
+        "val_punto": 1.0,
+        "target_sim": 1000,
+        "tic_tot": 5000
+    },
+    "USD/JPY": {
+        "tp_min": 60.0,
+        "tp_max": 120.0,
+        "tp_step": 20.0,
+        "dts_min": 10.0,
+        "dts_max": 30.0,
+        "dts_step": 10.0,
+        "size": 10.0,
+        "val_punto": 1.0,
+        "target_sim": 1000,
+        "tic_tot": 10000
+    },
+    "GBP/USD": {
+        "tp_min": 60.0,
+        "tp_max": 120.0,
+        "tp_step": 20.0,
+        "dts_min": 10.0,
+        "dts_max": 30.0,
+        "dts_step": 10.0,
+        "size": 10.0,
+        "val_punto": 1.0,
+        "target_sim": 1000,
+        "tic_tot": 10000
+    },
+    "USD/CHF": {
+        "tp_min": 40.0,
+        "tp_max": 200.0,
+        "tp_step": 20.0,
+        "dts_min": 10.0,
+        "dts_max": 40.0,
+        "dts_step": 10.0,
+        "size": 10.0,
+        "val_punto": 1.0,
+        "target_sim": 1000,
+        "tic_tot": 10000
+    }
+}

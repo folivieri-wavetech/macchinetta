@@ -1,0 +1,339 @@
+--- Simulatore_Avanzato.py
++++ Simulatore_Avanzato_Old.py
+@@ -1,2 +1,2 @@
+-import os
++﻿import os
+ import pandas as pd
+@@ -9,6 +9,6 @@
+ 
+-def genera_prezzi(scenario, strumento_base_price=2400.0, tick_size=1.0, tic_totali=500, decimali=5):
++def genera_prezzi(scenario, strumento_base_price=2400.0, tick_size=1.0, tic_totali=500):
+     prices = []
+     price = strumento_base_price
+-    prices.append(round(price, decimali))
++    prices.append(round(price, 2))
+     momentum = 0.0
+@@ -36,3 +36,3 @@
+         elif scenario == "RANDOM":
+-            # Micro-trend locali autoregressivi (Swings realistici) e colpi di volatilità
++            # Micro-trend locali autoregressivi (Swings realistici) e colpi di volatilit├á
+             momentum = 0.85 * momentum + np.random.normal(0, tick_size * 1.5)
+@@ -40,6 +40,6 @@
+             
+-        prices.append(round(price, decimali))
++        prices.append(round(price, 2))
+     return prices
+ 
+-def genera_base_dati(strumento, scenario, partenza, tick_size, tic_totali, size, decimali=5):
++def genera_base_dati(strumento, scenario, partenza, tick_size, tic_totali, size):
+     strum_pulito = pulisci_nome_strumento(strumento)
+@@ -58,5 +58,4 @@
+ class SimulatoreMatematico:
+-    def __init__(self, tp, opp, dts, size, direzione_base, mult=1.0, valore_punto=1.0, valuta="EUR", molt_strum=1.0):
++    def __init__(self, tp, opp, dts, size, direzione_base, mult=1.0, valore_punto=1.0, valuta="EUR"):
+         self.mult = float(mult)
+-        self.dec = 2 if molt_strum == 1.0 else (3 if molt_strum == 0.01 else 5)
+         self.valore_punto = float(valore_punto)
+@@ -69,5 +68,5 @@
+         
+-        self.tp = float(tp) * molt_strum
+-        self.opp = float(opp) * molt_strum
+-        self.dts = float(dts) * molt_strum
++        self.tp = float(tp)
++        self.opp = float(opp)
++        self.dts = float(dts)
+         self.size = float(size)
+@@ -136,3 +135,3 @@
+     def wstep(self, prezzo):
+-        self.log_ws.append(f"[STEP {self.tick_corrente}] prezzo raggiunto: {prezzo:.{self.dec}f}")
++        self.log_ws.append(f"[STEP {self.tick_corrente}] prezzo raggiunto: {prezzo:.2f}")
+ 
+@@ -141,3 +140,3 @@
+         riepilogo.append("-----------------------------------------------------------")
+-        riepilogo.append("📊 RIEPILOGO GENERALE:")
++        riepilogo.append("­ƒôè RIEPILOGO GENERALE:")
+         tot_subtrading = 0.0
+@@ -157,6 +156,6 @@
+                 color = "#A9A9A9" # Grigio scuro
+-            riga = f"{key} [{val:+.{self.dec}f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
++            riga = f"{key} [{val:+.2f} Ôé¼] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
+             riepilogo.append(f"<span style='color: {color};'>{riga}</span>")
+             
+-        riga_totale = f"Totale Sottotrading [{tot_subtrading:+.{self.dec}f} €] - Profit: {tot_profit} - Loss: {tot_loss}"
++        riga_totale = f"Totale Sottotrading [{tot_subtrading:+.2f} Ôé¼] - Profit: {tot_profit} - Loss: {tot_loss}"
+         riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
+@@ -164,3 +163,3 @@
+         st_ass = self.stats["Assicurazione"]
+-        riga_ass = f"Assicurazione [{st_ass['pnl']:+.0f} €]"
++        riga_ass = f"Assicurazione [{st_ass['pnl']:+.2f} Ôé¼]"
+         riepilogo.append(f"<span style='color: #FFD700;'>{riga_ass}</span>")
+@@ -176,5 +175,5 @@
+         if self.fase3_perc:
+-            riga_f3 = f"FASE3 [{val_f3:+.{self.dec}f} €] [{self.fase3_perc}]"
++            riga_f3 = f"FASE3 [{val_f3:+.2f} Ôé¼] [{self.fase3_perc}]"
+         else:
+-            riga_f3 = f"FASE3 [{val_f3:+.{self.dec}f} €] [Mai Avviata]"
++            riga_f3 = f"FASE3 [{val_f3:+.2f} Ôé¼] [Mai Avviata]"
+             
+@@ -233,3 +232,3 @@
+         segno = "+" if self.dir_base in ["BUY", "LONG"] else "-"
+-        self.wlog(f"Core [{self.dir_base}] [{segno}{self.s_core}] a <u><b>{self.prezzo_base:.{self.dec}f}</b></u>")
++        self.wlog(f"Core [{self.dir_base}] [{segno}{self.s_core}] a <u><b>{self.prezzo_base:.2f}</b></u>")
+         
+@@ -297,5 +296,28 @@
+                         pnl, _ = self.chiudi_posizione(pid, lvl, "Inizio Fase 3")
+-                        self.wlog(f"Chiudo {nome_pos} a mercato. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"Chiudo {nome_pos} a mercato. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                 self.stato = "FASE_3"
+                 self.wlog("FASE 3: Il Core e' l'unica posizione rimasta.")
++                
++            elif tipo == "SAT1_SL_HIT":
++                self.wlog("Stop SAT1 colpito (Falso innesco). Si torna a FASE 1")
++                self.svuota_pendenti()
++                for pid in list(self.posizioni.keys()):
++                    nome_pos = self.posizioni[pid]["nome"]
++                    if "Core" not in nome_pos and "Assicurazione" not in nome_pos:
++                        pnl, _ = self.chiudi_posizione(pid, lvl, "Falso Innesco SAT1")
++                        self.wlog(f"Chiudo {nome_pos} a mercato. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
++                        
++                self.ticket2_active = False
++                tp4 = self.tp / 4.0
++                if self.dir_base == "BUY":
++                    lvl_core_rev = self.prezzo_base - self.opp
++                    lvl_micro = self.prezzo_base + tp4
++                    self.aggiungi_pendente("ORDINE MICRO (SAT1)", "SELL", self.s_mezzo, lvl_micro, "LIMIT", tp=self.prezzo_base, sl=self.prezzo_base + 2*tp4)
++                    self.aggiungi_pendente("ORDINE CORE", "SELL", self.s_core, lvl_core_rev, "STOP")
++                else:
++                    lvl_core_rev = self.prezzo_base + self.opp
++                    lvl_micro = self.prezzo_base - tp4
++                    self.aggiungi_pendente("ORDINE MICRO (SAT1)", "BUY", self.s_mezzo, lvl_micro, "LIMIT", tp=self.prezzo_base, sl=self.prezzo_base - 2*tp4)
++                    self.aggiungi_pendente("ORDINE CORE", "BUY", self.s_core, lvl_core_rev, "STOP")
++                self.stato = "FASE_1"
+                 
+@@ -308,3 +330,3 @@
+                         segno = "+" if pend['dir'] == "BUY" else "-"
+-                        self.wlog(f"Posizione MICRO ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione MICRO ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
+                         self.aggiungi_posizione("MICRO", pend["dir"], pend["size"], lvl, tp=pend["tp"], sl=pend["sl"])
+@@ -321,3 +343,3 @@
+                         segno = "+" if dir_str == "LONG" else "-"
+-                        self.wlog(f"Core [{dir_str}] [{segno}{pend['size']}] a <u><b>{lvl:.{self.dec}f}</b></u>. Chiusura Assicurazione. [Parziale: {pnl_ass:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"Core [{dir_str}] [{segno}{pend['size']}] a <u><b>{lvl:.2f}</b></u>. Chiusura Assicurazione. [Parziale: {pnl_ass:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                         
+@@ -337,3 +359,3 @@
+                         segno = "+" if t1_dir == "BUY" else "-"
+-                        self.wlog(f"Entrata in Fase 2 - TICKET1 {t1_dir} [{segno}{self.s_mezzo}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Entrata in Fase 2 - TICKET1 {t1_dir} [{segno}{self.s_mezzo}] a {lvl:.2f}")
+                         
+@@ -346,5 +368,4 @@
+                                 pnl, _ = self.chiudi_posizione(pid, lvl, "Loss OCO")
+-                                self.registra_stat("Ticket2", pnl)
+                                 self.ticket2_active = False
+-                                self.wlog(f"TICKET2 chiuso a mercato (Loss) a {lvl:.{self.dec}f}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                                self.wlog(f"TICKET2 chiuso a mercato (Loss) a {lvl:.2f}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+ 
+@@ -352,3 +373,3 @@
+                         segno = "+" if pend['dir'] == "BUY" else "-"
+-                        self.wlog(f"Posizione {nome_pulito} [{segno}{pend['size']}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione {nome_pulito} [{segno}{pend['size']}] a {lvl:.2f}")
+                         
+@@ -358,3 +379,3 @@
+                         segno = "+" if sat2_dir == "BUY" else "-"
+-                        self.wlog(f"Posizione SAT2 {sat2_dir} [{segno}{self.s_quarto}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione SAT2 {sat2_dir} [{segno}{self.s_quarto}] a {lvl:.2f}")
+                         self.sat_price = lvl
+@@ -375,3 +396,3 @@
+                         segno = "+" if pend['dir'] == "BUY" else "-"
+-                        self.wlog(f"Posizione OVERGAIN ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione OVERGAIN ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
+                         self.aggiungi_posizione("OVERGAIN", pend["dir"], pend["size"], lvl, tp=pend["tp"])
+@@ -380,3 +401,3 @@
+                         segno = "+" if pend['dir'] == "BUY" else "-"
+-                        self.wlog(f"Posizione OVERLOSS ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione OVERLOSS ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
+                         self.aggiungi_posizione("OVERLOSS", pend["dir"], pend["size"], lvl, sl=pend["sl"])
+@@ -385,3 +406,3 @@
+                         segno = "+" if pend['dir'] == "BUY" else "-"
+-                        self.wlog(f"Posizione TICKET2 ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione TICKET2 ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
+                         self.aggiungi_posizione("TICKET2", pend["dir"], pend["size"], lvl, tp=pend["tp"])
+@@ -391,3 +412,3 @@
+                         segno = "+" if pend['dir'] == "BUY" else "-"
+-                        self.wlog(f"Posizione ULTIMA ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.{self.dec}f}")
++                        self.wlog(f"Posizione ULTIMA ({pend['dir']}) [{segno}{pend['size']}] a {lvl:.2f}")
+                         self.aggiungi_posizione("ULTIMA", pend["dir"], pend["size"], lvl, tp=pend["tp"])
+@@ -402,3 +423,3 @@
+                         self.registra_stat("Micro", pnl)
+-                        self.wlog(f"MICRO a target a {lvl:.{self.dec}f}. Reinserisco ordine. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"MICRO a target a {lvl:.2f}. Reinserisco ordine. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                         # Re-inserisci MICRO pendente
+@@ -426,3 +447,3 @@
+                         self.registra_stat("Flip", pnl_tot)
+-                        self.wlog(f"Stop MICRO colpito a {lvl:.{self.dec}f}. Chiusura posizioni *** FLIP. [Parziale: {pnl_tot:+.0f} €] (Core: {pnl_core:+.0f}€ | Ass: {pnl_ass:+.0f}€ | Micro: {pnl_micro:+.0f}€) [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"Stop MICRO colpito a {lvl:.2f}. Chiusura posizioni *** FLIP. [Parziale: {pnl_tot:+.2f} Ôé¼] (Core: {pnl_core:+.2f}Ôé¼ | Ass: {pnl_ass:+.2f}Ôé¼ | Micro: {pnl_micro:+.2f}Ôé¼) [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                         self.svuota_pendenti()
+@@ -437,3 +458,3 @@
+                         dir_str = "SHORT" if t1_dir == "SELL" else "LONG"
+-                        self.wlog(f"TICKET1 a target a {lvl:.{self.dec}f}! Ping-Pong: Rigirato in {dir_str}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"TICKET1 a target a {lvl:.2f}! Ping-Pong: Rigirato in {dir_str}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                         t1_tp = lvl + self.opp if t1_dir == "BUY" else lvl - self.opp
+@@ -449,3 +470,3 @@
+                         else:
+-                            # Fallback in caso di anomalie (non dovrebbe mai accadere se FASE 1 è completa)
++                            # Fallback in caso di anomalie (non dovrebbe mai accadere se FASE 1 ├¿ completa)
+                             lvl_long = lvl + (self.tp / 4.0)
+@@ -458,3 +479,3 @@
+                         self.registra_stat("Ticket1", pnl)
+-                        self.wlog(f"Stop TICKET1 colpito a {lvl:.{self.dec}f}. Inserisco Ordini SAT1 (OCO) a {sat_short_lvl:.{self.dec}f} e {sat_long_lvl:.{self.dec}f}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"Stop TICKET1 colpito a {lvl:.2f}. Inserisco Ordini SAT1 (OCO) a {sat_short_lvl:.2f} e {sat_long_lvl:.2f}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                         self.stato = "FASE_2_SATELLITI"
+@@ -467,3 +488,3 @@
+                             segno = "+" if t2_dir == "BUY" else "-"
+-                            self.wlog(f"Posizione TICKET2 ({t2_dir}) [{segno}{self.s_mezzo}] a {lvl:.{self.dec}f}")
++                            self.wlog(f"Posizione TICKET2 ({t2_dir}) [{segno}{self.s_mezzo}] a {lvl:.2f}")
+                             tp4 = self.tp / 4.0
+@@ -493,8 +514,7 @@
+                         pnl_tot = pnl_sat1 + pnl_sat2 + pnl_og + pnl_ol
+-                        self.fase3_pnl += pnl_tot
+-                        
+-                        dett_pnl = [f"SAT1: {pnl_sat1:+.0f}€"]
+-                        if pnl_sat2 != 0: dett_pnl.append(f"SAT2: {pnl_sat2:+.0f}€")
+-                        if pnl_og != 0: dett_pnl.append(f"OG: {pnl_og:+.0f}€")
+-                        if pnl_ol != 0: dett_pnl.append(f"OL: {pnl_ol:+.0f}€")
++                        
++                        dett_pnl = [f"SAT1: {pnl_sat1:+.2f}Ôé¼"]
++                        if pnl_sat2 != 0: dett_pnl.append(f"SAT2: {pnl_sat2:+.2f}Ôé¼")
++                        if pnl_og != 0: dett_pnl.append(f"OG: {pnl_og:+.2f}Ôé¼")
++                        if pnl_ol != 0: dett_pnl.append(f"OL: {pnl_ol:+.2f}Ôé¼")
+                         dettagli = " (" + " | ".join(dett_pnl) + ")"
+@@ -515,3 +535,3 @@
+                         
+-                        self.wlog(f"Stop SAT1 colpito a {lvl:.{self.dec}f}. Reinserisco ENTRAMBI gli Ordini SAT1 (OCO) a {sat_short_lvl:.{self.dec}f} e {sat_long_lvl:.{self.dec}f}. [Parziale: {pnl_tot:+.0f} €] {dettagli} [Totale: {self.pnl_realizzato:+.0f} €]")
++                        self.wlog(f"Stop SAT1 colpito a {lvl:.2f}. Reinserisco ENTRAMBI gli Ordini SAT1 (OCO) a {sat_short_lvl:.2f} e {sat_long_lvl:.2f}. [Parziale: {pnl_tot:+.2f} Ôé¼] {dettagli} [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                         
+@@ -540,9 +560,8 @@
+                             pnl_tot = pnl_sat1 + pnl_sat2 + pnl_og + pnl_ol + pnl_t2
+-                            self.fase3_pnl += pnl_tot
+-                            
+-                            dett_pnl = [f"SAT1: {pnl_sat1:+.0f}€"]
+-                            if pnl_sat2 != 0: dett_pnl.append(f"SAT2: {pnl_sat2:+.0f}€")
+-                            if pnl_og != 0: dett_pnl.append(f"OG: {pnl_og:+.0f}€")
+-                            if pnl_ol != 0: dett_pnl.append(f"OL: {pnl_ol:+.0f}€")
+-                            if pnl_t2 != 0: dett_pnl.append(f"T2: {pnl_t2:+.0f}€")
++                            
++                            dett_pnl = [f"SAT1: {pnl_sat1:+.2f}Ôé¼"]
++                            if pnl_sat2 != 0: dett_pnl.append(f"SAT2: {pnl_sat2:+.2f}Ôé¼")
++                            if pnl_og != 0: dett_pnl.append(f"OG: {pnl_og:+.2f}Ôé¼")
++                            if pnl_ol != 0: dett_pnl.append(f"OL: {pnl_ol:+.2f}Ôé¼")
++                            if pnl_t2 != 0: dett_pnl.append(f"T2: {pnl_t2:+.2f}Ôé¼")
+                             dettagli_ibride = " (" + " | ".join(dett_pnl) + ")"
+@@ -550,5 +569,5 @@
+                             sat_dir = self.posizioni[obj_id]["dir"] if obj_id in self.posizioni else ("BUY" if "BUY" in pos_nome else "SELL")
+-                            # Se non abbiamo sat_dir esatto dall'oggetto chiuso (già rimosso), lo deduciamo
+-                            # Ma obj_id non è in self.posizioni perché l'abbiamo già chiuso.
+-                            # Usiamo self.sat_price. In realtà SAT1 dir era self.sat2_dir opposto.
++                            # Se non abbiamo sat_dir esatto dall'oggetto chiuso (gi├á rimosso), lo deduciamo
++                            # Ma obj_id non ├¿ in self.posizioni perch├® l'abbiamo gi├á chiuso.
++                            # Usiamo self.sat_price. In realt├á SAT1 dir era self.sat2_dir opposto.
+                             sat_dir = "BUY" if self.sat2_dir == "SELL" else "SELL"
+@@ -608,3 +627,3 @@
+                             segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
+-                            self.wlog(f"TP Core [{sat_dir}] raggiunto a {lvl:.{self.dec}f}. Avvio FASE 3. Taglio effettuato 50%. [Parziale: {pnl_tot_f3:+.0f} €] (Good: {pnl_c_vincente:+.0f}€ | 1/2 Bad: {pnl_c_tossica:+.0f}€){dettagli_ibride} [Totale: {self.pnl_realizzato:+.0f} €] Inserita nuova Core [{sat_dir}] [{segno}{self.s_core}] e Ordine ULTIMA ({dir_contro}) [{segno_u}{self.s_mezzo}] a {lvl_last:.{self.dec}f}")
++                            self.wlog(f"TP Core [{sat_dir}] raggiunto a {lvl:.2f}. Avvio FASE 3. Taglio effettuato 50%. [Parziale: {pnl_tot_f3:+.2f} Ôé¼] (Good: {pnl_c_vincente:+.2f}Ôé¼ | 1/2 Bad: {pnl_c_tossica:+.2f}Ôé¼){dettagli_ibride} [Totale: {self.pnl_realizzato:+.2f} Ôé¼] Inserita nuova Core [{sat_dir}] [{segno}{self.s_core}] e Ordine ULTIMA ({dir_contro}) [{segno_u}{self.s_mezzo}] a {lvl_last:.2f}")
+                             
+@@ -613,3 +632,3 @@
+                                 self.registra_stat("Ticket2", pnl)
+-                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.{self.dec}f}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €] Re-inserisco Ordine ({self.ticket2_dir}) a {self.ticket2_entry:.{self.dec}f}")
++                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼] Re-inserisco Ordine ({self.ticket2_dir}) a {self.ticket2_entry:.2f}")
+                                 self.aggiungi_pendente("TICKET2 PEND", self.ticket2_dir, self.s_mezzo, self.ticket2_entry, "LIMIT", tp=self.ticket2_tp_lvl)
+@@ -625,3 +644,3 @@
+                                     l_ol = self.sat_price + tp4
+-                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.{self.dec}f}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €] Reinserisco OG e OL ({self.sat2_dir}) a {l_og:.{self.dec}f} e {l_ol:.{self.dec}f}")
++                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼] Reinserisco OG e OL ({self.sat2_dir}) a {l_og:.2f} e {l_ol:.2f}")
+                                 self.aggiungi_pendente("OVERGAIN", self.sat2_dir, self.s_mezzo, l_og, "LIMIT", tp=self.sat_price)
+@@ -638,3 +657,3 @@
+                                     l_ol = self.sat_price + tp4
+-                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.{self.dec}f}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €] Reinserisco OG e OL ({self.sat2_dir}) a {l_og:.{self.dec}f} e {l_ol:.{self.dec}f}")
++                                self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼] Reinserisco OG e OL ({self.sat2_dir}) a {l_og:.2f} e {l_ol:.2f}")
+                                 self.aggiungi_pendente("OVERGAIN", self.sat2_dir, self.s_mezzo, l_og, "LIMIT", tp=self.sat_price)
+@@ -648,3 +667,3 @@
+                                 
+-                                self.wlog(f"[ULTIMA] chiusa in profitto! [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]. Reinserisco ordine ULTIMA ({dir_contro}) a {lvl_last:.{self.dec}f}")
++                                self.wlog(f"[ULTIMA] chiusa in profitto! [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]. Reinserisco ordine ULTIMA ({dir_contro}) a {lvl_last:.2f}")
+                                 self.aggiungi_pendente("ULTIMA", dir_contro, s_last, lvl_last, "LIMIT", tp=self.fase3_base)
+@@ -670,3 +689,3 @@
+                                 self.fase3_pnl += pnl_tot_step
+-                                self.wlog(f"USCITA FASE 3. Ciclo terminato. Macchinetta Spenta. [Parziale: {pnl_tot_step:+.0f} €] (Nuova Core: {pnl_f3_core:+.0f}€ | Bad Core: {pnl_bad_core:+.0f}€ | ULTIMA: {pnl_ultima:+.0f}€) [Totale: {self.pnl_realizzato:+.0f} €]")
++                                self.wlog(f"USCITA FASE 3. Ciclo terminato. Macchinetta Spenta. [Parziale: {pnl_tot_step:+.2f} Ôé¼] (Nuova Core: {pnl_f3_core:+.2f}Ôé¼ | Bad Core: {pnl_bad_core:+.2f}Ôé¼ | ULTIMA: {pnl_ultima:+.2f}Ôé¼) [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                                 self.attivo = False
+@@ -677,3 +696,3 @@
+                                 
+-                                # Dobbiamo chiudere la posizione ULTIMA che attualmente è in perdita
++                                # Dobbiamo chiudere la posizione ULTIMA che attualmente ├¿ in perdita
+                                 pnl_ultima = 0.0
+@@ -719,3 +738,3 @@
+                                     self.fase3_perc = "100%"
+-                                    self.wlog(f"Fase 3 completata al {lvl:.{self.dec}f}. Macchinetta SPENTA. [Parziale: {tot_step:+.0f} €] (Core: {pnl:+.0f}€ | ULTIMA: {pnl_ultima:+.0f}€ | Taglio: {pnl_taglio:+.0f}€) [Totale: {self.pnl_realizzato:+.0f} €]")
++                                    self.wlog(f"Fase 3 completata al {lvl:.2f}. Macchinetta SPENTA. [Parziale: {tot_step:+.2f} Ôé¼] (Core: {pnl:+.2f}Ôé¼ | ULTIMA: {pnl_ultima:+.2f}Ôé¼ | Taglio: {pnl_taglio:+.2f}Ôé¼) [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+                                     self.attivo = False
+@@ -737,6 +756,6 @@
+                                     segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
+-                                    self.wlog(f"Taglio 35% effettuato. [Parziale: {tot_step:+.0f} €] (Core: {pnl:+.0f}€ | ULTIMA: {pnl_ultima:+.0f}€ | Taglio: {pnl_taglio:+.0f}€) [Totale: {self.pnl_realizzato:+.0f} €] Reinserisco Core [{dir_str}] [{segno}{self.s_core}] a {lvl:.{self.dec}f} e Ordine ULTIMA ({dir_contro}) [{segno_u}{s_ultima}] a {lvl_last:.{self.dec}f}")
++                                    self.wlog(f"Taglio 35% effettuato. [Parziale: {tot_step:+.2f} Ôé¼] (Core: {pnl:+.2f}Ôé¼ | ULTIMA: {pnl_ultima:+.2f}Ôé¼ | Taglio: {pnl_taglio:+.2f}Ôé¼) [Totale: {self.pnl_realizzato:+.2f} Ôé¼] Reinserisco Core [{dir_str}] [{segno}{self.s_core}] a {lvl:.2f} e Ordine ULTIMA ({dir_contro}) [{segno_u}{s_ultima}] a {lvl_last:.2f}")
+                             else:
+                                 if pos_nome not in ["Fase3_Core", "ULTIMA"]:
+-                                    self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.{self.dec}f}. [Parziale: {pnl:+.0f} €] [Totale: {self.pnl_realizzato:+.0f} €]")
++                                    self.wlog(f"{tipo} colpito su {pos_nome} a {lvl:.2f}. [Parziale: {pnl:+.2f} Ôé¼] [Totale: {self.pnl_realizzato:+.2f} Ôé¼]")
+ 
+@@ -751,4 +770,3 @@
+ 
+-def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=50, size=1.0, modalita="Multiconto", direzione="LONG", mult=1.0, valore_punto=1.0, valuta="EUR", molt_strum=1.0):
+-    dec = 2 if molt_strum == 1.0 else (3 if molt_strum == 0.01 else 5)
++def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=50, size=1.0, modalita="Multiconto", direzione="LONG", mult=1.0, valore_punto=1.0, valuta="EUR"):
+     try:
+@@ -766,4 +784,4 @@
+     if modalita == "Multiconto":
+-        sim_f = SimulatoreMatematico(tp, opp, dts, size, "LONG", mult, valore_punto, valuta, molt_strum=molt_strum)
+-        sim_d = SimulatoreMatematico(tp, opp, dts, size, "SHORT", mult, valore_punto, valuta, molt_strum=molt_strum)
++        sim_f = SimulatoreMatematico(tp, opp, dts, size, "LONG", mult, valore_punto, valuta)
++        sim_d = SimulatoreMatematico(tp, opp, dts, size, "SHORT", mult, valore_punto, valuta)
+         
+@@ -778,12 +796,12 @@
+         ultimo_step = idx
+-        start_str_f = f"Start: {prezzi[0]:.{dec}f} +{size} LONG"
+-        sim_f.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.{dec}f} | {strumento} | {start_str_f}")
++        start_str_f = f"Start: {prezzi[0]:.2f} +{size} LONG"
++        sim_f.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.2f} | {strumento} | {start_str_f}")
+         sim_f.log_ws.append("-----------------------------------------------------------")
+-        sim_f.log_ws.append(f"[Totale: {sim_f.pnl_realizzato:+.0f} €]")
++        sim_f.log_ws.append(f"[Totale: {sim_f.pnl_realizzato:+.2f} Ôé¼]")
+         sim_f.log_ws.extend(sim_f.genera_riepilogo())
+         
+-        start_str_d = f"Start: {prezzi[0]:.{dec}f} -{size} SHORT"
+-        sim_d.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.{dec}f} | {strumento} | {start_str_d}")
++        start_str_d = f"Start: {prezzi[0]:.2f} -{size} SHORT"
++        sim_d.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.2f} | {strumento} | {start_str_d}")
+         sim_d.log_ws.append("-----------------------------------------------------------")
+-        sim_d.log_ws.append(f"[Totale: {sim_d.pnl_realizzato:+.0f} €]")
++        sim_d.log_ws.append(f"[Totale: {sim_d.pnl_realizzato:+.2f} Ôé¼]")
+         sim_d.log_ws.extend(sim_d.genera_riepilogo())
+@@ -798,3 +816,3 @@
+     else:
+-        sim = SimulatoreMatematico(tp, opp, dts, size, direzione, mult, valore_punto, valuta, molt_strum=molt_strum)
++        sim = SimulatoreMatematico(tp, opp, dts, size, direzione, mult, valore_punto, valuta)
+         for idx, prezzo in enumerate(prezzi):
+@@ -806,6 +824,6 @@
+         segno_start = "+" if direzione in ["BUY", "LONG"] else "-"
+-        start_str = f"Start: {prezzi[0]:.{dec}f} {segno_start}{size} {direzione}"
+-        sim.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.{dec}f} | {strumento} | {start_str}")
++        start_str = f"Start: {prezzi[0]:.2f} {segno_start}{size} {direzione}"
++        sim.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.2f} | {strumento} | {start_str}")
+         sim.log_ws.append("-----------------------------------------------------------")
+-        sim.log_ws.append(f"[Totale: {sim.pnl_realizzato:+.0f} €]")
++        sim.log_ws.append(f"[Totale: {sim.pnl_realizzato:+.2f} Ôé¼]")
+         sim.log_ws.extend(sim.genera_riepilogo())
+@@ -823,3 +841,3 @@
+ 
+-def esegui_ottimizzazione_griglia(file_paths, tp_range, dts_range, size=10.0, mult=1.0, valore_punto=1.0, valuta="EUR", molt_strum=1.0):
++def esegui_ottimizzazione_griglia(file_paths, tp_range, dts_range, size=10.0, mult=1.0, valore_punto=1.0, valuta="EUR"):
+     import numpy as np

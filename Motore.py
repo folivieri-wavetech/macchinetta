@@ -9,6 +9,13 @@ import socket
 import hashlib
 import winsound
 from dotenv import dotenv_values
+import io
+
+# Fix per console Windows cp1252 (permette la stampa delle emoji nelle finestre nere)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', line_buffering=True)
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # --- EFFETTI SONORI ---
 def suona_drumroll():
@@ -49,9 +56,9 @@ except socket.error:
     sys.exit()
 
 # --- CONFIGURAZIONI ---
-FILE_MEMORIA = os.path.join("Sistema", "memoria_parametri.json")
-FILE_TOKEN = os.path.join("Sistema", "token_ig.json")
-CONSOLE_LOG_FILE = os.path.join("Logs_e_Cache", "console_live.log")
+FILE_MEMORIA = "memoria_parametri.json"
+FILE_TOKEN = "token_ig.json"
+CONSOLE_LOG_FILE = "console_live.log"
 config = dotenv_values(".env")
 
 # --- GESTIONE NOTIFICHE PUSH (NTFY) ---
@@ -266,26 +273,34 @@ def stampa_riepilogo_statistiche(nome_strumento):
         tot_profit = 0
         tot_loss = 0
         
+        tot_subtrading = 0.0
+        tot_profit = 0
+        tot_loss = 0
+        for key in ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]:
+            st = stats[key]
+            tot_subtrading += st['pnl']
+            tot_profit += st['profit']
+            tot_loss += st['loss']
+            
+        tot_trades = tot_profit + tot_loss
+        perc_pos = (tot_profit / tot_trades * 100) if tot_trades > 0 else 0
+        riga_totale = f"Totale Sottotrading [{tot_subtrading:+.0f} €] - Profit: {tot_profit} - Loss: {tot_loss} [{perc_pos:.0f}%]"
+        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
+        
         for key in ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]:
             st = stats[key]
             val = st['pnl']
-            tot_subtrading += val
-            tot_profit += st['profit']
-            tot_loss += st['loss']
             if val > 0:
                 color = "#2ECC71" # Verde Smeraldo
             elif val < 0:
                 color = "#FA8072" # Rosso Salmone
             else:
                 color = "#A9A9A9" # Grigio scuro
-            riga = f"{key} [{val:+.2f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
+            riga = f"{key} [{val:+.0f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
             riepilogo.append(f"<span style='color: {color};'>{riga}</span>")
-            
-        riga_totale = f"Totale Sottotrading [{tot_subtrading:+.2f} €] - Profit: {tot_profit} - Loss: {tot_loss}"
-        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
         
         st_ass = stats.get("Assicurazione", {"pnl": 0.0})
-        riga_ass = f"Assicurazione [{st_ass['pnl']:+.2f} €]"
+        riga_ass = f"Assicurazione [{st_ass['pnl']:+.0f} €]"
         riepilogo.append(f"<span style='color: #FFD700;'>{riga_ass}</span>")
         
         st_f3 = stats.get("Fase3", {"pnl": 0.0})
@@ -297,7 +312,7 @@ def stampa_riepilogo_statistiche(nome_strumento):
         else:
             color_f3 = "#A9A9A9"
             
-        riga_f3 = f"FASE3 [{val_f3:+.2f} €]"
+        riga_f3 = f"FASE3 [{val_f3:+.0f} €]"
         riepilogo.append(f"<span style='color: {color_f3};'>{riga_f3}</span>")
         riepilogo.append("-----------------------------------------------------------")
         
@@ -366,7 +381,7 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
         "distanze_minime": distanze_minime or {},
         "prezzi_bid_ask": prezzi_bid_ask or {}
     }
-    with open(os.path.join("Sistema", "stato_sistema.json"), "w") as f:
+    with open("stato_sistema.json", "w") as f:
         json.dump(dati, f, indent=4)
 
 def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=6):
@@ -1054,9 +1069,10 @@ def esegui_motore():
                             invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, sat_long, "STOP", round(sat_long + tp2_val, dec), round(sat_long - tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO BUY]")
                             time.sleep(3.0) 
                             invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, sat_short, "STOP", round(sat_short - tp2_val, dec), round(sat_short + tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO SELL]")
-                            invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Ripresa da weekend. SAT1 OCO piazzati a mercato.", "satellite")
+                            oco_str = f" a {formatta_numero(sat_short, dec)} e {formatta_numero(sat_long, dec)}"
+                            invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Ripresa da weekend. SAT1 OCO piazzati{oco_str}.", "satellite")
                             aggiorna_memoria(nome, {"comando_riprendi": False, "sospeso_weekend": False, "msg_weekend": "", "stato": "FASE_2_SATELLITI", "tentativi_sat": 1}, log_wip=f"✅ [EVENTO]: Ripresa da Weekend completata a {formatta_numero(prezzo_attuale, dec)}. Nuovi OCO piazzati.")
-                            print_log(nome, "✅ Ripresa completata. SAT1 OCO piazzati.")
+                            print_log(nome, f"✅ Ripresa completata. SAT1 OCO piazzati{oco_str}.")
                         continue
 
                     if param.get("sospeso_weekend", False):
@@ -1301,8 +1317,8 @@ def esegui_motore():
                                     invia_ordine_pendente(nome, epic, valuta, "SELL", s_ass, lvl_ingresso_micro_long, "LIMIT", p_base_orig, round(p_base_orig + (2 * tp4), dec), h, dec, etichetta="[ORDINE MICRO]")
                                     time.sleep(3.0)
                                     registra_operazione(nome, "Take Profit MICRO (Fase 1)", pnl_micro_eur)
-                                    invia_notifica(f"💰 MICRO IN PROFITTO: {nome}", f"[{nome}] Micro SHORT chiusa in profitto a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ordine.{pnl_str}", "moneybag")
-                                    aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: MICRO a target a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ordine.{pnl_str}")
+                                    invia_notifica(f"💰 MICRO IN PROFITTO: {nome}", f"[{nome}] Micro SHORT chiusa in profitto a {formatta_numero(prezzo_attuale, dec)}. Reinserisco Ordine MICRO (SHORT) a {formatta_numero(lvl_ingresso_micro_long, dec)}.{pnl_str}", "moneybag")
+                                    aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: MICRO a target a {formatta_numero(prezzo_attuale, dec)}. Reinserisco Ordine MICRO (SHORT) a {formatta_numero(lvl_ingresso_micro_long, dec)}.{pnl_str}")
                                 else: 
                                     print_log(nome, "🎯 Target Fase 1 raggiunto. Chiusura posizioni *** FLIP")
                                     
@@ -1321,7 +1337,7 @@ def esegui_motore():
                                         
                                     pnl = pnl_c + pnl_a + pnl_m
                                     pnl_str_base = formatta_pnl(pnl)
-                                    dettaglio_pnl = f"{pnl_str_base} (Core: {pnl_c:+.2f}€ | Ass: {pnl_a:+.2f}€ | Micro: {pnl_m:+.2f}€)"
+                                    dettaglio_pnl = f"{pnl_str_base} (Core: {pnl_c:+.0f}€ | Ass: {pnl_a:+.0f}€ | Micro: {pnl_m:+.0f}€)"
                                     
                                     pulisci_mercato(epic, h, nome)
                                     time.sleep(3.0) 
@@ -1335,8 +1351,8 @@ def esegui_motore():
                                     invia_ordine_pendente(nome, epic, valuta, "BUY", s_ass, lvl_ingresso_micro_short, "LIMIT", p_base_orig, round(p_base_orig - (2 * tp4), dec), h, dec, etichetta="[ORDINE MICRO]")
                                     time.sleep(3.0)
                                     registra_operazione(nome, "Take Profit MICRO (Fase 1)", pnl_micro_eur)
-                                    invia_notifica(f"💰 MICRO IN PROFITTO: {nome}", f"[{nome}] Micro LONG chiusa in profitto a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ordine.{pnl_str}", "moneybag")
-                                    aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: MICRO a target a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ordine.{pnl_str}")
+                                    invia_notifica(f"💰 MICRO IN PROFITTO: {nome}", f"[{nome}] Micro LONG chiusa in profitto a {formatta_numero(prezzo_attuale, dec)}. Reinserisco Ordine MICRO (LONG) a {formatta_numero(lvl_ingresso_micro_short, dec)}.{pnl_str}", "moneybag")
+                                    aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: MICRO a target a {formatta_numero(prezzo_attuale, dec)}. Reinserisco Ordine MICRO (LONG) a {formatta_numero(lvl_ingresso_micro_short, dec)}.{pnl_str}")
                                 else: 
                                     print_log(nome, "🎯 Target Fase 1 raggiunto. Chiusura posizioni *** FLIP")
                                     
@@ -1355,7 +1371,7 @@ def esegui_motore():
                                         
                                     pnl = pnl_c + pnl_a + pnl_m
                                     pnl_str_base = formatta_pnl(pnl)
-                                    dettaglio_pnl = f"{pnl_str_base} (Core: {pnl_c:+.2f}€ | Ass: {pnl_a:+.2f}€ | Micro: {pnl_m:+.2f}€)"
+                                    dettaglio_pnl = f"{pnl_str_base} (Core: {pnl_c:+.0f}€ | Ass: {pnl_a:+.0f}€ | Micro: {pnl_m:+.0f}€)"
                                     
                                     pulisci_mercato(epic, h, nome)
                                     time.sleep(3.0) 
@@ -1538,8 +1554,7 @@ def esegui_motore():
                         tp4_val = round((param.get("tp") / 4) * mult, dec)
                         
                         core_ids = [p['position']['dealId'] for p in posizioni if float(p['position']['size']) == s_core]
-                        sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
-                        is_ticket2 = lambda p: param.get("ticket2_active") and p['position']['direction'] == param.get("ticket2_dir") and p['position'].get('stopLevel') is None
+                        is_ticket2 = lambda p: param.get("ticket2_active") and p['position']['direction'] == param.get("ticket2_dir") and p['position'].get('limitLevel') is not None
                         
                         sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids and not is_ticket2(p)]
                         
@@ -1553,19 +1568,35 @@ def esegui_motore():
                                 
                                 if not falso_allarme_t2:
                                     t2_entry = param.get("ticket2_entry")
-                                    print_log(nome, f"🎯 [TICKET2] chiuso in profitto. Reinserisco ordine pendente a {formatta_numero(t2_entry, dec)}...")
-                                    lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
-                                    invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
                                     
                                     valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
                                     rate = get_eur_rate(valuta, prezzi_live)
-                                    pnl_t2_win_eur = (param.get("tp") / 4) * s_mezzo * valore_punto * rate
-                                    pnl_str = formatta_pnl(pnl_t2_win_eur)
-                                    registra_operazione(nome, "Take Profit TICKET2", pnl_t2_win_eur)
                                     
-                                    invia_notifica(f"🎫 PING-PONG TICKET2: {nome}", f"[{nome}] Ticket2 ha preso profitto a {formatta_numero(lim_lvl_t2, dec)}. Ordine reinserito a {formatta_numero(t2_entry, dec)}.{pnl_str}", "ticket")
-                                    aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: TP colpito su TICKET2 a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Re-inserisco Ordine ({t2_dir}) a {formatta_numero(t2_entry, dec)}")
-                                    time.sleep(2.0)
+                                    # Capiamo se ha preso TP o SL guardando il prezzo attuale
+                                    hit_tp = False
+                                    if (t2_dir == "BUY" and prezzo_attuale > t2_entry) or (t2_dir == "SELL" and prezzo_attuale < t2_entry):
+                                        hit_tp = True
+                                        
+                                    if hit_tp:
+                                        print_log(nome, f"🎯 [TICKET2] chiuso in profitto. Reinserisco ordine pendente a {formatta_numero(t2_entry, dec)}...")
+                                        lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
+                                        invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
+                                        
+                                        pnl_t2_win_eur = (param.get("tp") / 4) * s_mezzo * valore_punto * rate
+                                        pnl_str = formatta_pnl(pnl_t2_win_eur)
+                                        registra_operazione(nome, "Take Profit TICKET2", pnl_t2_win_eur)
+                                        
+                                        invia_notifica(f"🎫 PING-PONG TICKET2: {nome}", f"[{nome}] Ticket2 ha preso profitto a {formatta_numero(lim_lvl_t2, dec)}. Ordine reinserito a {formatta_numero(t2_entry, dec)}.{pnl_str}", "ticket")
+                                        aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: TP colpito su TICKET2 a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Re-inserisco Ordine ({t2_dir}) a {formatta_numero(t2_entry, dec)}")
+                                        time.sleep(2.0)
+                                    else:
+                                        print_log(nome, f"📉 [TICKET2] chiuso in STOP LOSS.")
+                                        pnl_t2_loss_eur = -(param.get("tp") / 4) * s_mezzo * valore_punto * rate
+                                        pnl_str = formatta_pnl(pnl_t2_loss_eur)
+                                        registra_operazione(nome, "Stop Loss TICKET2", pnl_t2_loss_eur)
+                                        invia_notifica(f"📉 SL TICKET2: {nome}", f"[{nome}] Ticket2 ha colpito lo Stop Loss.{pnl_str}", "chart_with_downwards_trend")
+                                        aggiorna_memoria(nome, {"ticket2_active": False}, log_wip=f"✅ [EVENTO]: SL colpito su TICKET2.{pnl_str}")
+                                        time.sleep(2.0)
                         
                         if sat1_attivi:
                             sat_pos = sat1_attivi[0]
@@ -1646,15 +1677,17 @@ def esegui_motore():
                                 invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
                                 time.sleep(3.0)
                                 
-                            invia_notifica(f"🎯 SAT1 INNESCATO: {nome}", f"[{nome}] Entrata a mercato in {sat_dir} a {formatta_numero(sat_price, dec)}. Piazzati SAT2, OG e OL.", "dart")
-                            suona_drumroll()
-                            
                             lvl_og = round(sat_price + tp4_val, dec) if sat2_dir == "SELL" else round(sat_price - tp4_val, dec)
                             lvl_ol = round(sat_price - tp4_val, dec) if sat2_dir == "SELL" else round(sat_price + tp4_val, dec)
                             
+                            msg_dettagliato = f"✅ [EVENTO]: SAT1 innescato a mercato a {formatta_numero(sat_price, dec)}. ➕ [SAT2] {sat2_dir} eseguito a mercato. ⏳ Ordini pendenti piazzati: OG a {formatta_numero(lvl_og, dec)}, OL a {formatta_numero(lvl_ol, dec)}."
+                            
+                            invia_notifica(f"🎯 SAT1 INNESCATO: {nome}", f"[{nome}] {msg_dettagliato}", "dart")
+                            suona_drumroll()
+                            
                             aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITE_(OG-OL)", "sat_dir": sat_dir, "sat_price": sat_price, "tentativi_sat": 0, "ticket2_active": False}, 
-                                log_wip=f"✅ [EVENTO]: SAT1 innescato a mercato a {formatta_numero(sat_price, dec)}. ➕ [SAT2] {sat2_dir} eseguito a mercato. ⏳ Ordini pendenti piazzati: OG a {formatta_numero(lvl_og, dec)}, OL a {formatta_numero(lvl_ol, dec)}.")
-
+                                log_wip=msg_dettagliato)
+                            
                         else:
                             pend_sat_l = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == 'BUY']
                             pend_sat_s = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_mezzo and o['workingOrderData']['direction'] == 'SELL']
@@ -1775,12 +1808,28 @@ def esegui_motore():
                                 valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
                                 rate = get_eur_rate(valuta, prezzi_live)
                                 pnl_sat1_teorico = (param.get("tp") / 2) * s_mezzo * valore_punto * rate
-                                pnl_totale = pnl_rimaste + pnl_sat1_teorico
+                                pnl_sottotrading = pnl_rimaste + pnl_sat1_teorico
                                 
-                                registra_operazione(nome, f"TP Core [{sat_dir}] (Avvio Fase 3)", pnl_totale)
+                                dir_vincente = sat_dir
+                                dir_tossica = "SELL" if sat_dir == "BUY" else "BUY"
+                                core_vinc = [p for p in posizioni if p['position']['direction'] == dir_vincente and float(p['position']['size']) == s_core]
+                                core_toss = [p for p in posizioni if p['position']['direction'] == dir_tossica and float(p['position']['size']) == s_core]
+                                
+                                pnl_c_vincente = calcola_pnl_chiusura(core_vinc, prezzo_attuale, nome, prezzi_live) if core_vinc else 0.0
+                                pnl_c_tossica_full = calcola_pnl_chiusura(core_toss, prezzo_attuale, nome, prezzi_live) if core_toss else 0.0
+                                pnl_c_tossica = pnl_c_tossica_full / 2.0
+                                
+                                pnl_tot_f3 = pnl_sottotrading + pnl_c_vincente + pnl_c_tossica
+                                
+                                v_str = f"+{int(round(pnl_c_vincente))}" if pnl_c_vincente > 0 else str(int(round(pnl_c_vincente)))
+                                t_str = f"{int(round(pnl_c_tossica))}"
+                                sub_str = f"+{int(round(pnl_sottotrading))}" if pnl_sottotrading > 0 else str(int(round(pnl_sottotrading)))
+                                dett_macro = f" (Good: {v_str}€ | 1/2 Bad: {t_str}€ | Sotto: {sub_str}€)"
+                                
+                                registra_operazione(nome, f"TP Core [{sat_dir}] (Avvio Fase 3)", pnl_tot_f3)
                                 pulisci_mercato(epic, h, nome, mantieni_core_size=s_core)
                                 invia_notifica(f"🔥 INGRESSO FASE 3: {nome}", f"[{nome}] TP Core [{sat_dir}] raggiunto a {formatta_numero(prezzo_attuale, dec)}. Avvio manovra in direzione {sat_dir}.", "fire")
-                                aggiorna_memoria(nome, {"stato": "FASE_3_INIT", "fase3_dir": sat_dir, "fase3_base": sat_price, "temp_fase3_log": f"✅ [EVENTO]: TP Core [{sat_dir}] raggiunto a {formatta_numero(prezzo_attuale, dec)}. Avvio FASE 3. Taglio effettuato 50%.{formatta_pnl(pnl_totale)}"})
+                                aggiorna_memoria(nome, {"stato": "FASE_3_INIT", "fase3_dir": sat_dir, "fase3_base": sat_price, "temp_fase3_log": f"✅ [EVENTO]: TP Core [{sat_dir}] raggiunto a {formatta_numero(prezzo_attuale, dec)}. Avvio FASE 3. Taglio effettuato 50%.{formatta_pnl(pnl_tot_f3)}{dett_macro}"})
                             else:
                                 pos_ibride = [p for p in posizioni if float(p['position']['size']) != s_core]
                                 pnl_rimaste = calcola_pnl_chiusura(pos_ibride, prezzo_attuale, nome, prezzi_live)
@@ -1797,16 +1846,25 @@ def esegui_motore():
                                 p_og = sum(calcola_pnl_chiusura([p], prezzo_attuale, nome, prezzi_live) for p in pos_ibride if float(p['position']['size']) == s_mezzo and p['position']['direction'] == sat2_dir and abs(float(p['position']['level']) - sat_price) > 0.1)
                                 p_ol = sum(calcola_pnl_chiusura([p], prezzo_attuale, nome, prezzi_live) for p in pos_ibride if float(p['position']['size']) == s_quarto and p['position']['direction'] == sat2_dir and abs(float(p['position']['level']) - sat_price) > 0.1)
                                 
-                                dett_pnl.append(f"SAT1: {pnl_sat1_teorico:+.2f}€")
-                                if p_s2 != 0: dett_pnl.append(f"SAT2: {p_s2:+.2f}€")
-                                if p_og != 0: dett_pnl.append(f"OG: {p_og:+.2f}€")
-                                if p_ol != 0: dett_pnl.append(f"OL: {p_ol:+.2f}€")
+                                dett_pnl.append(f"SAT1: {pnl_sat1_teorico:+.0f}€")
+                                if p_s2 != 0: dett_pnl.append(f"SAT2: {p_s2:+.0f}€")
+                                if p_og != 0: dett_pnl.append(f"OG: {p_og:+.0f}€")
+                                if p_ol != 0: dett_pnl.append(f"OL: {p_ol:+.0f}€")
                                 dett_str = " (" + " | ".join(dett_pnl) + ")" if dett_pnl else ""
+                                
+                                core_long = [p for p in posizioni if p['position']['direction'] == "BUY" and float(p['position']['size']) == s_core]
+                                core_short = [p for p in posizioni if p['position']['direction'] == "SELL" and float(p['position']['size']) == s_core]
+                                lvl_long = float(core_long[0]['position']['level']) if core_long else param.get("prezzo_base")
+                                lvl_short = float(core_short[0]['position']['level']) if core_short else param.get("prezzo_base")
+                                tp2_val = round((param.get("tp") / 2) * mult, dec)
+                                sat_l_lvl = round(lvl_long + tp2_val, dec)
+                                sat_s_lvl = round(lvl_short - tp2_val, dec)
+                                oco_str = f" a {formatta_numero(sat_s_lvl, dec)} e {formatta_numero(sat_l_lvl, dec)}"
                                 
                                 registra_operazione(nome, "Falso Innesco SAT1 (Rientro)", pnl_totale)
                                 pulisci_mercato(epic, h, nome, mantieni_core_size=s_core)
-                                invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Falso innesco (rientro). Reinseriti ENTRAMBI gli ordini SAT1 OCO.", "satellite")
-                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"✅ [EVENTO]: Stop SAT1 colpito a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ENTRAMBI gli Ordini SAT1 (OCO).{formatta_pnl(pnl_totale)}{dett_str}")
+                                invia_notifica(f"🛰️ ORDINI OCO INSERITI: {nome}", f"[{nome}] Falso innesco (rientro). Reinseriti ENTRAMBI gli ordini SAT1 OCO{oco_str}.", "satellite")
+                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"✅ [EVENTO]: Stop SAT1 colpito a {formatta_numero(prezzo_attuale, dec)}. Reinserisco ENTRAMBI gli Ordini SAT1 (OCO){oco_str}.{formatta_pnl(pnl_totale)}{dett_str}")
                         
                         else:
                             if over_gain_attivo or over_loss_attivo:
@@ -1890,7 +1948,7 @@ def esegui_motore():
                                 pos_tossica_chiusa = {'position': {**core_contro_pos[0]['position'], 'size': s_mezzo}}
                                 pnl_c_tossica = calcola_pnl_chiusura([pos_tossica_chiusa], prezzo_attuale, nome, prezzi_live)
                             
-                            pnl_str = f"{pnl_str_base} (Good: {pnl_c_vincente:+.2f}€ | 1/2 Bad: {pnl_c_tossica:+.2f}€)"
+                            pnl_str = f"{pnl_str_base} (Good: {pnl_c_vincente:+.0f}€ | 1/2 Bad: {pnl_c_tossica:+.0f}€)"
                             registra_operazione(nome, "Entrata FASE 3 (Monetizzazione vecchie Core)", pnl)
                         
                         f3_base = round(float(ask if sat_dir == "BUY" else bid), dec)

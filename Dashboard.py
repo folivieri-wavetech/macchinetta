@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 import time
 import pandas as pd
 import requests
@@ -11,11 +12,11 @@ import plotly.graph_objects as go
 import numpy as np
 
 # --- CONFIGURAZIONI CENTRALI ---
-FILE_MEMORIA = os.path.join("Sistema", "memoria_parametri.json")
-FILE_TOKEN = os.path.join("Sistema", "token_ig.json")
+FILE_MEMORIA = "memoria_parametri.json"
+FILE_TOKEN = "token_ig.json"
 FILE_STORICO = "storico_operazioni.csv"
-CONSOLE_LOG_FILE = os.path.join("Logs_e_Cache", "console_live.log")
-STATO_SISTEMA = os.path.join("Sistema", "stato_sistema.json")
+CONSOLE_LOG_FILE = "console_live.log"
+STATO_SISTEMA = "stato_sistema.json"
 CREDENTIALS = {"Marco": "Bolzano&1971"} 
 
 # --- VOCABOLARIO ---
@@ -118,7 +119,7 @@ def mostra_diario_wip(nome_strumento, storico):
         
         segno = "+" if totale > 0 else ""
         html_str += "<br>========================<br>"
-        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.2f} €</span></div>"
+        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.0f} €</span></div>"
         
         st.markdown(html_str, unsafe_allow_html=True)
     else:
@@ -443,7 +444,7 @@ else:
 
     # TABS RIORDINATI (Portafoglio IG per primo)
     tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici, tab_simulatore, tab_ottimizzazione = st.tabs([
-        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici", "🔬 Simulatore", "🧪 Ottimizzazione"
+        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici", "🔬 Simulatore", "🧪 Backtest"
     ])
 
     with tab_portafoglio:
@@ -635,7 +636,7 @@ else:
                     lim_str = formatta_numero(val, dec) if val != "NONE" else ""
                 
                 pnl_class = "pnl-pos" if tot_pnl_eur >= 0 else "pnl-neg"
-                pnl_str = f"{tot_pnl_eur:.2f} €"
+                pnl_str = f"{tot_pnl_eur:.0f} €"
                 
                 if len(posizioni) > 1:
                     ruolo_master_str = ""
@@ -696,10 +697,10 @@ else:
                         is_last_subrow = (idx == len(posizioni) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.2f} €</td></tr>\n"
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
-            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.2f} €</td></tr>\n</tbody></table>"
+            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.0f} €</td></tr>\n</tbody></table>"
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
@@ -811,7 +812,7 @@ else:
                                     dt_fmt = dt
                                 segno = "+" if pnl > 0 else ""
                                 col_pnl = "#09ab3b" if pnl > 0 else "#ff4b4b"
-                                ultima_operazione_testo = f"<div style='font-size: 1rem; color: #FFD700; margin-top: 5px; font-weight: 500;'>⏱️ Ultima Op: <b>{strum}</b> - {fase} ({dt_fmt}) | <span style='color:{col_pnl}; font-weight:bold;'>{segno}{pnl:.2f} €</span></div>"
+                                ultima_operazione_testo = f"<div style='font-size: 1rem; color: #FFD700; margin-top: 5px; font-weight: 500;'>⏱️ Ultima Op: <b>{strum}</b> - {fase} ({dt_fmt}) | <span style='color:{col_pnl}; font-weight:bold;'>{segno}{pnl:.0f} €</span></div>"
             except Exception:
                 pass
 
@@ -1578,7 +1579,7 @@ else:
                 if h_api:
                     # Logica Cache Intelligente per evitare limiti API
                     import os
-                    cache_file = os.path.join("Logs_e_Cache", f"cache_candele_{epic}_{grafico_res}.csv")
+                    cache_file = os.path.join(ROOT_DIR, "Logs_e_Cache", f"cache_candele_{epic}_{grafico_res}.csv")
                     max_fetch = 600
                     df_cache = None
                     
@@ -1757,22 +1758,34 @@ else:
         with g2:
             gen_scen = st.selectbox("Scenario Mercato", ["LATERALE", "TREND_UP", "TREND_DOWN", "CRASH", "RANDOM"], key="gen_scen")
         with g3:
-            gen_ticks = st.number_input("Durata (Tick totali)", min_value=50, max_value=50000, value=250, step=50, key="gen_ticks")
+            _gen_ticks = st.text_input("Durata", value="250", key="gen_ticks")
+            gen_ticks = int(_gen_ticks) if _gen_ticks.isdigit() else 250
             
-        g4, g5, g6 = st.columns(3)
+        g4, g6 = st.columns(2)
         with g4:
-            gen_base_price = st.number_input("Prezzo di Partenza", value=2400.0, step=1.0, format="%.2f", key="gen_base_price")
-        with g5:
-            gen_tick_size = st.number_input("Volatilità (Ampiezza Tick)", value=1.0, step=0.1, format="%.2f", key="gen_tick_size")
+            _gen_base_price = st.text_input("Prezzo di Partenza", value="2400.0", key="gen_base_price")
+            try: gen_base_price = float(_gen_base_price.replace(',', '.'))
+            except: gen_base_price = 2400.0
         with g6:
-            gen_size = st.number_input("Size Suggerita", min_value=4, value=10, step=1, key="gen_size")
+            _gen_size = st.text_input("Size", value="10", key="gen_size")
+            gen_size = int(_gen_size) if _gen_size.isdigit() else 10
             
         import Simulatore_Avanzato
+        import importlib
+        importlib.reload(Simulatore_Avanzato)
         import os
         
         if st.button("🛠️ Crea Base Dati", use_container_width=True):
             with st.spinner(f"Generazione file dati per {gen_strum} in corso..."):
-                f_path = Simulatore_Avanzato.genera_base_dati(gen_strum, gen_scen, gen_base_price, gen_tick_size, gen_ticks, gen_size)
+                molt = CONFIG_STRUMENTI.get(gen_strum, {}).get("moltiplicatore", 1.0)
+                dec = CONFIG_STRUMENTI.get(gen_strum, {}).get("decimali", 5)
+                
+                if molt == 1.0:
+                    real_tick = 1.0
+                else:
+                    real_tick = 2.5 * molt
+                    
+                f_path = Simulatore_Avanzato.genera_base_dati(gen_strum, gen_scen, gen_base_price, real_tick, gen_ticks, gen_size, decimali=dec)
                 st.success(f"Base dati generata e salvata: `{os.path.basename(f_path)}`")
                 
         st.markdown("---")
@@ -1807,6 +1820,32 @@ else:
             
         btn_disabled = (eseg_file == "Nessun file trovato")
         
+        st.markdown("---")
+        import pandas as pd
+        if not btn_disabled:
+            try:
+                f_path_full = os.path.join(dir_path, eseg_file)
+                df_temp = pd.read_csv(f_path_full)
+                p_start = float(df_temp['Price'].iloc[0])
+            except:
+                p_start = 0.0
+        else:
+            p_start = 0.0
+            
+        molt = CONFIG_STRUMENTI.get(eseg_strum, {}).get("moltiplicatore", 1.0)
+        dec = CONFIG_STRUMENTI.get(eseg_strum, {}).get("decimali", 5)
+        v_punto = CONFIG_STRUMENTI.get(eseg_strum, {}).get("valore_punto", 1.0)
+        v_valuta = CONFIG_STRUMENTI.get(eseg_strum, {}).get("valuta", "EUR")
+        
+        real_tp = sim_tp * molt
+        
+        if eseg_dir == "LONG":
+            p_target = p_start + real_tp
+        else:
+            p_target = p_start - real_tp
+            
+        st.info(f"**Verifica Parametri:** {sim_tp} punti per **{eseg_strum}** partendo da **{p_start:.{dec}f}** -> Target a **{p_target:.{dec}f}** (Variazione di {real_tp:.{dec}f})")
+        
         if st.button("▶️ Avvia Simulazione", use_container_width=True, disabled=btn_disabled):
             with st.spinner(f"Elaborazione strategia su {eseg_file} in corso..."):
                 try:
@@ -1816,7 +1855,11 @@ else:
                     ris = Simulatore_Avanzato.esegui_hedge_sincrono(
                         f_path_full, eseg_strum,
                         sim_tp, sim_opp, sim_dts, sim_size,
-                        "Singolo", eseg_dir
+                        "Singolo", eseg_dir,
+                        mult=1.0,
+                        valore_punto=v_punto,
+                        valuta=v_valuta,
+                        molt_strum=molt
                     )
                     
                     if not ris:
@@ -1838,7 +1881,7 @@ else:
                                 def colora_parziale(match):
                                     val = float(match.group(1))
                                     colore = "#00FF00" if val >= 0 else "#FF4500"
-                                    return f"<span style='color: {colore};'>[Parziale: {val:+.2f} €]</span>"
+                                    return f"<span style='color: {colore};'>[Parziale: {val:+.0f} €]</span>"
                                     
                                 riga_colorata = re.sub(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", colora_parziale, riga_colorata)
                                 riga_colorata = re.sub(r"(\[Totale:.*?\])", r"<span style='color: #FFD700;'><b>\1</b></span>", riga_colorata)
@@ -1862,7 +1905,7 @@ else:
 
     # --- TAB OTTIMIZZAZIONE GLOBALE ---
     with tab_ottimizzazione:
-        st.title("🧪 Ottimizzazione Massiva (Monte Carlo)")
+        st.title("🧪 Backtest (Simulazione Monte Carlo)")
         st.markdown("Cerca i parametri migliori simulando migliaia di scenari (Laterali e Randomici).")
         
         import glob
@@ -1870,7 +1913,7 @@ else:
         if not os.path.exists(cartella_salvataggi):
             os.makedirs(cartella_salvataggi)
             
-        def renderizza_risultati_ottimizzazione(df_full, modo_dati):
+        def renderizza_risultati_ottimizzazione(df_full, modo_dati, nome_strumento=""):
             # Raggruppamento Globale e Medie
             df_global = df_full.groupby(["TP", "OPP", "DTS"]).mean().reset_index()
             n_files = 10 if modo_dati == "Generazione Batch (LATERALE + RANDOM)" else 1
@@ -1883,25 +1926,68 @@ else:
             df_global["Score RoMD"] = df_global["PNL Totale"] / df_global["Max Drawdown"].replace(0, 1)
             df_global["Score Win"] = df_global["PNL Totale"] * (df_global["Win Rate %"] / 100.0)
             
-            # Ordinamento per Score RoMD
-            df_global = df_global.sort_values(by="Score RoMD", ascending=False).reset_index(drop=True)
+            # Rinomino colonne per compattezza visiva
+            df_global = df_global.rename(columns={"Max Drawdown": "Max DD", "N_Simulazioni": "N. Test", "Score RoMD": "RoMD"})
+            
+            # Ordinamento per RoMD
+            df_global = df_global.sort_values(by="RoMD", ascending=False).reset_index(drop=True)
             
             # Formattazione per visualizzazione
-            col_display = ["TP", "OPP", "DTS", "PNL Long", "PNL Short", "PNL Totale", "Max Drawdown", "Win Rate %", "Score RoMD", "Score Win", "N_Simulazioni"]
+            col_display = ["TP", "OPP", "DTS", "PNL Long", "PNL Short", "PNL Totale", "Max DD", "Win Rate %", "RoMD", "Score Win", "N. Test"]
             df_display = df_global[col_display].copy()
             
-            st.markdown("### 🏆 Classifica Globale Parametri Migliori (Ordinata per Score RoMD)")
-            st.dataframe(df_display.style.background_gradient(subset=["Score RoMD", "PNL Totale"], cmap="RdYlGn").format({
-                "PNL Long": "{:.2f} €", "PNL Short": "{:.2f} €", "PNL Totale": "{:.2f} €", 
-                "Max Drawdown": "{:.2f} €", "Score RoMD": "{:.2f}", "Score Win": "{:.2f}"
-            }), use_container_width=True)
+            # Stile per colorare la colonna Max DD di rosso salmone
+            def colora_max_dd(val):
+                return 'color: #FA8072; font-weight: bold;'
             
-            st.markdown("### 🗺️ Mappa di Calore Globale (Robustezza Score RoMD)")
+            if nome_strumento:
+                st.markdown(f"### 🏆 Classifica Globale {nome_strumento} - Parametri Migliori (Ordinata per RoMD)")
+            else:
+                st.markdown("### 🏆 Classifica Globale Parametri Migliori (Ordinata per RoMD)")
+            
+            # Applico stili: gradiente, colore Max DD
+            styled_df = df_display.style.background_gradient(subset=["RoMD", "PNL Totale"], cmap="RdYlGn")\
+                .map(colora_max_dd, subset=["Max DD"])\
+                .format({
+                "PNL Long": "{:.0f} €", "PNL Short": "{:.0f} €", "PNL Totale": "{:.0f} €", 
+                "Max DD": "-{:.0f} €", "RoMD": "{:.2f}", "Score Win": "{:.2f}"
+            })
+            
+            st.dataframe(styled_df, use_container_width=True)
+            
+            if "Median_CSV" in df_global.columns:
+                st.markdown("### 💾 Scarica i CSV dei Top 5 Risultati")
+                st.markdown("Questi file rappresentano lo scenario 'Mediano' (più vicino alla media statistica) per le combinazioni migliori. Scaricali e usali nel **Simulatore** per analizzare il dettaglio chirurgico (Fase 3, Micro, Ticket, ecc).")
+                
+                top_5 = df_global.head(5)
+                cols = st.columns(min(5, len(top_5)))
+                numeri_romani = ["I", "II", "III", "IV", "V"]
+                
+                for i, row in top_5.iterrows():
+                    csv_path = row.get("Median_CSV", "")
+                    if pd.notna(csv_path) and os.path.exists(str(csv_path)):
+                        with open(csv_path, "rb") as f:
+                            csv_data = f.read()
+                        
+                        nome_strum_clean = nome_strumento.replace("/", "").replace(" ", "") if nome_strumento else "Generico"
+                        suffisso = numeri_romani[i] if i < 5 else str(i+1)
+                        file_name = f"Backtest.{nome_strum_clean}.{suffisso}.csv"
+                        
+                        with cols[i]:
+                            st.download_button(
+                                label=f"↓ {suffisso} (TP:{int(row['TP'])})",
+                                data=csv_data,
+                                file_name=file_name,
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                            
+            st.markdown("### 🗺️ Mappa di Calore Globale (Robustezza RoMD)")
             try:
                 import plotly.express as px
-                pivot_df = df_global.pivot_table(values="Score RoMD", index="DTS", columns="TP", aggfunc="mean")
+                pivot_df = df_global.pivot_table(values="RoMD", index="DTS", columns="TP", aggfunc="mean")
                 fig = px.imshow(pivot_df, text_auto=".2f", color_continuous_scale="RdYlGn", aspect="auto", origin='lower')
-                fig.update_layout(title="Score RoMD Globale per Combinazione (TP vs DTS)", xaxis_title="Take Profit (TP)", yaxis_title="Distanza Sicurezza (DTS)")
+                fig.update_layout(title="RoMD Globale per Combinazione (TP vs DTS)", xaxis_title="Take Profit (TP)", yaxis_title="Distanza Sicurezza (DTS)")
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.warning(f"Impossibile renderizzare la Heatmap: {e}")
@@ -1924,7 +2010,12 @@ else:
                     percorso_load = os.path.join(cartella_salvataggi, file_selezionato)
                     df_loaded = pd.read_csv(percorso_load)
                     st.success(f"Risultati caricati da {file_selezionato}")
-                    renderizza_risultati_ottimizzazione(df_loaded, "Generazione Batch (LATERALE + RANDOM)")
+                    
+                    import re
+                    match = re.search(r"Ott\.(.+?)_\d+test", file_selezionato)
+                    strum_name = match.group(1).replace("_", " ") if match else file_selezionato.replace(".csv", "")
+                    
+                    renderizza_risultati_ottimizzazione(df_loaded, "Generazione Batch (LATERALE + RANDOM)", strum_name)
                 except Exception as e:
                     st.error(f"Errore caricamento: {e}")
                 st.markdown("---")
@@ -1933,7 +2024,7 @@ else:
             
         st.markdown("---")
         
-        st.markdown("### 0. Seleziona Strumento da Ottimizzare")
+        st.markdown("### 1. Seleziona Strumento da Ottimizzare")
         
         r_nome_ott = st.selectbox("Seleziona lo Strumento per agganciare le quotazioni Live e i moltiplicatori reali:", tutti_strumenti, key="ott_r_nome")
         
@@ -1946,69 +2037,116 @@ else:
         prezzo_live_ott = prezzi_live.get(r_nome_ott, 0.0)
         if prezzo_live_ott > 0:
             def_part = float(prezzo_live_ott)
-            lbl_partenza = f"Prezzo di Partenza (AGGANCIATO LIVE a {r_nome_ott})"
+            lbl_partenza = f"Prezzo START (Live) su {r_nome_ott}"
         else:
             def_part = 2400.0 if "Gold" in r_nome_ott or "Cash" in r_nome_ott else (1.1000 if "USD" in r_nome_ott else 160.0)
-            lbl_partenza = "Prezzo di Partenza (Prezzo di default - Live non trovato)"
+            lbl_partenza = f"Prezzo START (Default) su {r_nome_ott}"
             
         # Default per le griglie
         if "USD" in r_nome_ott and "Gold" not in r_nome_ott and "Cash" not in r_nome_ott:
             # Forex Major
             def_tp_min, def_tp_max, def_tp_step = 20.0, 60.0, 20.0
             def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
+            def_tic_tot = 10000
         elif "JPY" in r_nome_ott:
             # Forex JPY
             def_tp_min, def_tp_max, def_tp_step = 20.0, 60.0, 20.0
             def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
+            def_tic_tot = 10000
         else:
             # Oro / Indici
             def_tp_min, def_tp_max, def_tp_step = 40.0, 100.0, 20.0
             def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
+            def_tic_tot = 5000
+            
+        def_size = 10.0
+        def_val_punto = 1.0
+        def_target_sim = 50
+        
+        # Caricamento memorie parametri
+        file_memoria_ott = os.path.join(cartella_salvataggi, "memoria_parametri_ott.json")
+        import json
+        if os.path.exists(file_memoria_ott):
+            try:
+                with open(file_memoria_ott, "r") as f:
+                    memoria_ott = json.load(f)
+                memoria_strumento = memoria_ott.get(r_nome_ott, {})
+                if memoria_strumento:
+                    def_tp_min = memoria_strumento.get("tp_min", def_tp_min)
+                    def_tp_max = memoria_strumento.get("tp_max", def_tp_max)
+                    def_tp_step = memoria_strumento.get("tp_step", def_tp_step)
+                    def_dts_min = memoria_strumento.get("dts_min", def_dts_min)
+                    def_dts_max = memoria_strumento.get("dts_max", def_dts_max)
+                    def_dts_step = memoria_strumento.get("dts_step", def_dts_step)
+                    def_size = memoria_strumento.get("size", def_size)
+                    def_val_punto = memoria_strumento.get("val_punto", def_val_punto)
+                    def_target_sim = memoria_strumento.get("target_sim", def_target_sim)
+                    def_tic_tot = memoria_strumento.get("tic_tot", def_tic_tot)
+            except Exception as e:
+                pass
             
         fmt = "%.4f" if def_tick < 0.01 else "%.2f"
         
-        ott_modo_dati = st.radio("Modalità Dati", ["Generazione Batch (LATERALE + RANDOM)", "File Singolo Esistente"], key="ott_modo")
+        safe_nome = r_nome_ott.replace(" ", "_").replace("/", "")
+        ott_modo_dati = st.radio("Modalità Dati", ["Generazione Batch (LATERALE + RANDOM)", "File Singolo Esistente"], key=f"ott_modo_{safe_nome}")
         
         import pandas as pd
         file_paths_ott = []
         ott_partenza = def_part
         ott_tick_size = def_tick
-        ott_tic_tot = 10000
+        ott_tic_tot = def_tic_tot
         
-        st.markdown("### 1. Dati di Partenza")
+        st.markdown("### 2. Dati di Partenza")
         if ott_modo_dati == "File Singolo Esistente":
-            file_upload_ott = st.file_uploader("Carica Storico CSV", type=['csv'], key="ott_up")
+            file_upload_ott = st.file_uploader("Carica Storico CSV", type=['csv'], key=f"ott_up_{safe_nome}")
             if file_upload_ott is not None:
                 tmp_path = "temp_ottimizzazione.csv"
                 with open(tmp_path, "wb") as f: f.write(file_upload_ott.getbuffer())
                 file_paths_ott.append(tmp_path)
         else:
-            c_g1, c_g2, c_g3 = st.columns(3)
-            with c_g1: ott_partenza = st.number_input(lbl_partenza, value=def_part, step=def_tick*10, format=fmt, key="ott_part")
-            with c_g2: ott_tick_size = st.number_input("Tick Size (Auto-Configurato)", value=def_tick, step=def_tick, format=fmt, key="ott_tick")
-            ott_tic_tot = st.number_input("Numero di Tick per file", value=10000, step=1000, key="ott_tic_tot")
+            c_g1, c_g2 = st.columns(2)
+            with c_g1: ott_partenza = st.number_input(lbl_partenza, value=def_part, step=def_tick*10, format=fmt, key=f"ott_part_{safe_nome}")
+            with c_g2: ott_tic_tot = st.number_input("Numero di Tick per file", value=def_tic_tot, step=1000, key=f"ott_tic_tot_{safe_nome}")
             
-        st.markdown("### 2. Configura la Griglia dei Parametri")
+        st.markdown("### 3. Configura la Griglia dei Parametri")
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown("#### TP (Take Profit)")
-            tp_min = st.number_input("TP Minimo", value=def_tp_min, step=def_tp_step, format=fmt, key="ott_tp_min")
-            tp_max = st.number_input("TP Massimo", value=def_tp_max, step=def_tp_step, format=fmt, key="ott_tp_max")
-            tp_step = st.number_input("TP Step", value=def_tp_step, step=def_tp_step, format=fmt, key="ott_tp_step")
+            tp_min = st.number_input("TP Minimo", value=def_tp_min, step=def_tp_step, format=fmt, key=f"ott_tp_min_{safe_nome}")
+            tp_max = st.number_input("TP Massimo", value=def_tp_max, step=def_tp_step, format=fmt, key=f"ott_tp_max_{safe_nome}")
+            tp_step = st.number_input("TP Step", value=def_tp_step, step=def_tp_step, format=fmt, key=f"ott_tp_step_{safe_nome}")
         with c2:
             st.markdown("#### DTS (Distanza Sicurezza)")
-            dts_min = st.number_input("DTS Minimo", value=def_dts_min, step=def_dts_step, format=fmt, key="ott_dts_min")
-            dts_max = st.number_input("DTS Massimo", value=def_dts_max, step=def_dts_step, format=fmt, key="ott_dts_max")
-            dts_step = st.number_input("DTS Step", value=def_dts_step, step=def_dts_step, format=fmt, key="ott_dts_step")
+            dts_min = st.number_input("DTS Minimo", value=def_dts_min, step=def_dts_step, format=fmt, key=f"ott_dts_min_{safe_nome}")
+            dts_max = st.number_input("DTS Massimo", value=def_dts_max, step=def_dts_step, format=fmt, key=f"ott_dts_max_{safe_nome}")
+            dts_step = st.number_input("DTS Step", value=def_dts_step, step=def_dts_step, format=fmt, key=f"ott_dts_step_{safe_nome}")
         with c3:
             st.markdown("#### Variabili Fisse")
-            ott_size = st.number_input("Size Iniziale", value=10.0, step=1.0, key="ott_size")
-            ott_val_punto = st.number_input("Valore Punto (EUR)", value=1.0, step=0.5, key="ott_val")
+            ott_size = st.number_input("Size Iniziale", value=def_size, step=1.0, key=f"ott_size_{safe_nome}")
+            ott_val_punto = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("valore_punto", 1.0)
             
         st.markdown("#### Automazione")
-        ott_target_sim = st.number_input("Target Simulazioni (File totali)", min_value=10, max_value=10000, value=50, step=10, key="ott_target_sim")
+        def_target_sim = min(def_target_sim, 1000) # Assicuriamoci che non superi il nuovo massimo
+        ott_target_sim = st.number_input("Target Simulazioni (File totali)", min_value=10, max_value=1000, value=def_target_sim, step=10, key=f"ott_target_sim_{safe_nome}")
         
-        if st.button(f"🚀 Avvia Ottimizzazione per {r_nome_ott}", type="primary", use_container_width=True):
+        if st.button(f"🚀 Avvia Backtest per {r_nome_ott}", type="primary", use_container_width=True):
+            # Salvataggio parametri in memoria
+            try:
+                memoria_ott = {}
+                if os.path.exists(file_memoria_ott):
+                    with open(file_memoria_ott, "r") as f:
+                        memoria_ott = json.load(f)
+                memoria_ott[r_nome_ott] = {
+                    "tp_min": float(tp_min), "tp_max": float(tp_max), "tp_step": float(tp_step),
+                    "dts_min": float(dts_min), "dts_max": float(dts_max), "dts_step": float(dts_step),
+                    "size": float(ott_size), "val_punto": float(ott_val_punto), "target_sim": int(ott_target_sim),
+                    "tic_tot": int(ott_tic_tot)
+                }
+                with open(file_memoria_ott, "w") as f:
+                    json.dump(memoria_ott, f, indent=4)
+            except Exception as e:
+                pass
+                
             import numpy as np
             import shutil
             tp_list = np.arange(tp_min, tp_max + tp_step, tp_step).tolist()
@@ -2031,14 +2169,22 @@ else:
                     status_text.markdown(f"**Elaborazione in corso... Batch {it+1}/{iterazioni} ({(it+1)*10} file totali)**")
                     
                     file_paths_ott = []
+                    molt_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("moltiplicatore", 1.0)
+                    dec_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("decimali", 5)
+                    v_valuta_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("valuta", "EUR")
+                    if molt_ott == 1.0:
+                        real_tick_ott = 1.0
+                    else:
+                        real_tick_ott = 5.0 * molt_ott
+                    
                     for i in range(5):
-                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "LATERALE", ott_partenza, ott_tick_size, ott_tic_tot, ott_size)
+                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "LATERALE", ott_partenza, real_tick_ott, ott_tic_tot, ott_size, decimali=dec_ott)
                         file_paths_ott.append(p)
                     for i in range(5):
-                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "RANDOM", ott_partenza, ott_tick_size, ott_tic_tot, ott_size)
+                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "RANDOM", ott_partenza, real_tick_ott, ott_tic_tot, ott_size, decimali=dec_ott)
                         file_paths_ott.append(p)
                         
-                    df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto)
+                    df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto, valuta=v_valuta_ott, molt_strum=molt_ott, save_median=(it==0))
                     
                     if not df_res.empty:
                         if os.path.exists(storico_file):
@@ -2051,19 +2197,26 @@ else:
                     for p in file_paths_ott:
                         if os.path.exists(p):
                             os.remove(p)
-                            
+                            try:
+                                parent_dir = os.path.dirname(p)
+                                if os.path.exists(parent_dir) and not os.listdir(parent_dir):
+                                    os.rmdir(parent_dir)
+                            except:
+                                pass
                     progress_bar.progress((it + 1) / iterazioni)
                 
                 tot_sim_effettive = iterazioni * 10
-                status_text.success(f"✅ Ottimizzazione completata! ({tot_sim_effettive} file elaborati)")
+                status_text.success(f"✅ Backtest completato! ({tot_sim_effettive} file elaborati)")
                 
             else:
                 tot_sim_effettive = 1
                 if not file_paths_ott:
                     st.error("Nessun dataset selezionato.")
                 else:
-                    with st.spinner("Ottimizzazione file singolo in corso..."):
-                        df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto)
+                    with st.spinner("Backtest file singolo in corso..."):
+                        molt_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("moltiplicatore", 1.0)
+                        v_valuta_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("valuta", "EUR")
+                        df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto, valuta=v_valuta_ott, molt_strum=molt_ott, save_median=True)
                         if not df_res.empty:
                             if os.path.exists(storico_file):
                                 df_storico = pd.read_csv(storico_file)
@@ -2071,15 +2224,23 @@ else:
                             else:
                                 df_full = df_res.copy()
                             df_full.to_csv(storico_file, index=False)
-                            st.success("✅ Ottimizzazione file singolo completata!")
+                            st.success("✅ Backtest file singolo completato!")
                             
             if os.path.exists(storico_file):
                 df_full = pd.read_csv(storico_file)
                 
                 # Logica di salvataggio automatico e pulizia
                 nome_pulito = r_nome_ott.replace(" ", "_").replace("/", "")
-                file_finale = f"Ott.{nome_pulito}_{tot_sim_effettive}test.csv"
+                base_file_name = f"Ott.{nome_pulito}_{tot_sim_effettive}test"
+                file_finale = f"{base_file_name}.csv"
                 path_finale = os.path.join(cartella_salvataggi, file_finale)
+                
+                # Gestione versionamento per non sovrascrivere file esistenti (v02, v03...)
+                counter = 2
+                while os.path.exists(path_finale):
+                    file_finale = f"{base_file_name}_v{counter:02d}.csv"
+                    path_finale = os.path.join(cartella_salvataggi, file_finale)
+                    counter += 1
                 
                 shutil.copy(storico_file, path_finale)
                 os.remove(storico_file)
@@ -2087,6 +2248,6 @@ else:
                 st.success(f"💾 Risultati salvati automaticamente in: `{file_finale}`")
                 
                 # Mostra subito i risultati
-                renderizza_risultati_ottimizzazione(df_full, ott_modo_dati)
+                renderizza_risultati_ottimizzazione(df_full, ott_modo_dati, r_nome_ott)
             else:
                 st.warning("Nessun risultato ottenuto (griglia vuota o nessun test eseguito).")
