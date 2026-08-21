@@ -570,19 +570,44 @@ else:
             file_list = []
             if os.path.exists(dir_path):
                 file_list = [f for f in os.listdir(dir_path) if f.endswith(".csv")]
+                # Metti in cima i file di Backtest
+                file_list.sort(key=lambda x: (not x.startswith("Backtest"), x))
             
             eseg_file = st.selectbox("Seleziona Base Dati", file_list if file_list else ["Nessun file trovato"], key="eseg_file")
             
+        # Rilevamento automatico parametri dal nome file o CSV
+        import re
+        def_sim_tp = 80
+        def_sim_opp = 20
+        def_sim_dts = 10
+        def_sim_size = 10
+        
+        if eseg_file and eseg_file != "Nessun file trovato":
+            m_params = re.search(r"TP(\d+(?:\.\d+)?)\.OPP(\d+(?:\.\d+)?)\.DTS(\d+(?:\.\d+)?)", eseg_file)
+            if m_params:
+                def_sim_tp = int(float(m_params.group(1))) if float(m_params.group(1)).is_integer() else float(m_params.group(1))
+                def_sim_opp = int(float(m_params.group(2))) if float(m_params.group(2)).is_integer() else float(m_params.group(2))
+                def_sim_dts = int(float(m_params.group(3))) if float(m_params.group(3)).is_integer() else float(m_params.group(3))
+            
+            try:
+                f_check_size = os.path.join(dir_path, eseg_file)
+                if os.path.exists(f_check_size):
+                    df_chk = pd.read_csv(f_check_size, nrows=1)
+                    if "Size" in df_chk.columns:
+                        def_sim_size = int(df_chk["Size"].iloc[0])
+            except:
+                pass
+                
         st.markdown("**Parametri Griglia (Applicati a runtime)**")
         e4, e5, e6, e7 = st.columns(4)
         with e4:
-            sim_tp = st.number_input("Take Profit (TP)", value=80, step=5, key="eseg_tp")
+            sim_tp = st.number_input("Take Profit (TP)", value=def_sim_tp, step=5, key=f"eseg_tp_{eseg_strum}_{eseg_file}")
         with e5:
-            sim_opp = st.number_input("Opposto (OPP)", value=20, step=5, key="eseg_opp")
+            sim_opp = st.number_input("Opposto (OPP)", value=def_sim_opp, step=5, key=f"eseg_opp_{eseg_strum}_{eseg_file}")
         with e6:
-            sim_dts = st.number_input("Distanza Sicurezza (DTS)", value=10, step=5, key="eseg_dts")
+            sim_dts = st.number_input("Distanza Sicurezza (DTS)", value=def_sim_dts, step=5, key=f"eseg_dts_{eseg_strum}_{eseg_file}")
         with e7:
-            sim_size = st.number_input("Size Contratti", min_value=4, value=10, step=1, key="eseg_size")
+            sim_size = st.number_input("Size Contratti", min_value=4, value=def_sim_size, step=1, key=f"eseg_size_{eseg_strum}_{eseg_file}")
             
         btn_disabled = (eseg_file == "Nessun file trovato")
         
@@ -733,31 +758,46 @@ else:
             st.dataframe(styled_df, use_container_width=True)
             
             if "Median_CSV" in df_global.columns:
-                st.markdown("### 💾 Scarica i CSV dei Top 5 Risultati")
-                st.markdown("Questi file rappresentano lo scenario 'Mediano' (più vicino alla media statistica) per le combinazioni migliori. Scaricali e usali nel **Simulatore** per analizzare il dettaglio chirurgico (Fase 3, Micro, Ticket, ecc).")
+                st.markdown("### 💾 Top 5 Scenari Mediani (Pronti nel Simulatore)")
+                
+                nome_strum_clean = Simulatore_Avanzato.pulisci_nome_strumento(nome_strumento) if nome_strumento else "Generico"
+                dest_dir = os.path.join(os.getcwd(), "Simulatore", nome_strum_clean)
+                os.makedirs(dest_dir, exist_ok=True)
                 
                 top_5 = df_global.head(5)
                 cols = st.columns(min(5, len(top_5)))
                 numeri_romani = ["I", "II", "III", "IV", "V"]
                 
+                salvati_in_cartella = 0
                 for i, row in top_5.iterrows():
                     csv_path = row.get("Median_CSV", "")
+                    suffisso = numeri_romani[i] if i < 5 else str(i+1)
+                    tp_val = int(row['TP']) if float(row['TP']).is_integer() else row['TP']
+                    opp_val = int(row['OPP']) if float(row['OPP']).is_integer() else row['OPP']
+                    dts_val = int(row['DTS']) if float(row['DTS']).is_integer() else row['DTS']
+                    
+                    file_name = f"Backtest.{nome_strum_clean}.{suffisso}.TP{tp_val}.OPP{opp_val}.DTS{dts_val}.csv"
+                    
                     if pd.notna(csv_path) and os.path.exists(str(csv_path)):
+                        import shutil
+                        dest_file_path = os.path.join(dest_dir, file_name)
+                        shutil.copy2(str(csv_path), dest_file_path)
+                        salvati_in_cartella += 1
+                        
                         with open(csv_path, "rb") as f:
                             csv_data = f.read()
                         
-                        nome_strum_clean = nome_strumento.replace("/", "").replace(" ", "") if nome_strumento else "Generico"
-                        suffisso = numeri_romani[i] if i < 5 else str(i+1)
-                        file_name = f"Backtest.{nome_strum_clean}.{suffisso}.csv"
-                        
                         with cols[i]:
                             st.download_button(
-                                label=f"↓ {suffisso} (TP:{int(row['TP'])})",
+                                label=f"↓ {suffisso} (TP:{tp_val} DTS:{dts_val})",
                                 data=csv_data,
                                 file_name=file_name,
                                 mime="text/csv",
                                 use_container_width=True
                             )
+                
+                if salvati_in_cartella > 0:
+                    st.info(f"✅ I Top {salvati_in_cartella} scenari sono stati **salvati automaticamente** nella cartella `Simulatore/{nome_strum_clean}/`. Li trovi già pronti nel menu a tendina del **Simulatore** con tutti i parametri preimpostati!")
                             
             st.markdown("### 🗺️ Mappa di Calore Globale (Robustezza RoMD)")
             try:
