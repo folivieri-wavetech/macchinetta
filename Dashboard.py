@@ -446,21 +446,26 @@ st.markdown("""
             justify-content: flex-start !important;
             align-items: center !important;
             text-align: left !important;
-            padding-left: 10px !important;
-            padding-right: 10px !important;
-            border-radius: 8px !important;
-            font-size: 0.84rem !important;
+            padding: 2px 8px !important;
+            border-radius: 6px !important;
+            font-size: 0.72rem !important;
             font-weight: 600 !important;
-            min-height: 34px !important;
-            height: 34px !important;
+            min-height: 28px !important;
+            height: 28px !important;
             margin-bottom: 2px !important;
+            white-space: nowrap !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
             display: flex !important;
             justify-content: flex-start !important;
+            align-items: center !important;
             text-align: left !important;
             width: 100% !important;
             margin: 0 !important;
+            font-size: 0.72rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
             box-shadow: 0 2px 8px rgba(25, 135, 84, 0.4) !important;
@@ -590,10 +595,15 @@ st.markdown("""
                 font-size: 0.82rem !important;
                 padding: 4px 8px !important;
             }
-            div[data-testid="stButton"] > button[kind="secondary"] {
-                min-height: 38px !important;
-                height: auto !important;
-                font-size: 0.82rem !important;
+            /* Bottoni Selezione Conto Sidebar */
+            section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
+                padding: 2px 6px !important;
+                font-size: 0.72rem !important;
+                min-height: 28px !important;
+                height: 28px !important;
+            }
+            section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
+                font-size: 0.72rem !important;
             }
 
             /* Barra dei Tab a scorrimento orizzontale */
