@@ -1401,7 +1401,7 @@ else:
         elif r_fase == "FASE 2": 
             opzioni = ["Posizione TICKET1 (A Mercato)", "Ordine TICKET2 (Pendente)", "Ordini SAT1 OCO (Entrambi)", "Ordine SAT1 OCO (Solo BUY)", "Ordine SAT1 OCO (Solo SELL)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
         else: 
-            opzioni = ["Ordine ULTIMA (Pendente)"]
+            opzioni = ["Ordine ULTIMA (Pendente)", "Posizione TAGLIO CORE (A Mercato)"]
 
         with col3:
             r_anom = st.selectbox("3. Seleziona Elemento Mancante", opzioni)
@@ -1544,6 +1544,18 @@ else:
                     lvl = round(f3_current_base + tp4_val if d_contro == "SELL" else f3_current_base - tp4_val, dec)
                     lim = f3_current_base
                     cmd_data = {"azione": "PENDENTE", "dir": d_contro, "size": s_last, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": None, "etichetta": "[RECOVERY ULTIMA]"}
+
+            elif "TAGLIO CORE" in r_anom:
+                f3_dir = dati.get("fase3_dir")
+                f3_step = dati.get("fase3_step", 1)
+                if not f3_dir:
+                    st.error("Dati Fase 3 mancanti in memoria.")
+                else:
+                    d_contro = "SELL" if f3_dir == "BUY" else "BUY"
+                    s_taglio = round(s_core * 0.35, 2) if f3_step == 1 else s_core # actually we should just try to close what is there, let's use 0.35 for step 1
+                    # Wait, s_taglio is handled correctly if we just provide the command
+                    st.info("Il Taglio Core è un ORDINE A MERCATO per chiudere parte (o tutta) la posizione. Il motore eseguirà la chiusura parziale.")
+                    cmd_data = {"azione": "MERCATO", "dir": d_contro, "size": s_taglio, "lim": None, "stop": None, "etichetta": f"[RECOVERY TAGLIO CORE STEP {f3_step}]"}
 
             if cmd_data:
                 with st.container(border=True):
@@ -1821,6 +1833,28 @@ else:
             btn_aggiorna = st.button("🔄 Aggiorna Grafico", use_container_width=True)
             
         if btn_aggiorna:
+            def fetch_and_calc_sr(epic, h_api, base_url, res, window=5):
+                try:
+                    url = f"{base_url}/prices/{epic}/{res}/150"
+                    resp = requests.get(url, headers=h_api)
+                    if resp.status_code == 200:
+                        data = resp.json().get("prices", [])
+                        if data:
+                            df_sr = pd.DataFrame([{
+                                'High': p['highPrice']['bid'],
+                                'Low': p['lowPrice']['bid']
+                            } for p in data])
+                            
+                            df_sr['Peak'] = df_sr['High'] == df_sr['High'].rolling(window, center=True).max()
+                            df_sr['Trough'] = df_sr['Low'] == df_sr['Low'].rolling(window, center=True).min()
+                            
+                            peaks = df_sr[df_sr['Peak']]['High'].tail(2).tolist()
+                            troughs = df_sr[df_sr['Trough']]['Low'].tail(2).tolist()
+                            return peaks, troughs
+                except Exception:
+                    pass
+                return [], []
+
             with st.spinner("Aggiornamento storico da IG (modalità cache)..."):
                 epic = CONFIG_STRUMENTI[grafico_strum]["epic"]
                 h_api = get_ig_headers(conto_selezionato)
@@ -1949,6 +1983,20 @@ else:
                             group_weekly = df[df['YearWeek'] == last_week]
                             if group_weekly['Pivot_Weekly'].notna().any():
                                 fig.add_trace(go.Scatter(x=group_weekly['Time'], y=group_weekly['Pivot_Weekly'], mode='lines', showlegend=False, line=dict(color='orange', width=2)))
+                            
+                            # Macro Supporti e Resistenze (ProRealTrend style)
+                            peaks_w, troughs_w = fetch_and_calc_sr(epic, h_api, base_url, "WEEK", 5)
+                            peaks_m, troughs_m = fetch_and_calc_sr(epic, h_api, base_url, "MONTH", 5)
+                            
+                            for p in peaks_w:
+                                fig.add_hline(y=p, line_dash="dot", line_color="salmon", opacity=0.8, annotation_text="Resistenza (W)", annotation_position="top left")
+                            for t in troughs_w:
+                                fig.add_hline(y=t, line_dash="dot", line_color="limegreen", opacity=0.8, annotation_text="Supporto (W)", annotation_position="bottom left")
+                            for p in peaks_m:
+                                fig.add_hline(y=p, line_dash="dash", line_color="salmon", opacity=1.0, line_width=2, annotation_text="Resistenza (M)", annotation_position="top right")
+                            for t in troughs_m:
+                                fig.add_hline(y=t, line_dash="dash", line_color="limegreen", opacity=1.0, line_width=2, annotation_text="Supporto (M)", annotation_position="bottom right")
+
                             
                             # Zoom Iniziale asse X e Y (ultime 100 candele per tutti i timeframe)
                             visible = 100
