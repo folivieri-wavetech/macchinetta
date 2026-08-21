@@ -24,5 +24,10 @@ __pycache__/
 *.pyc
 *.pyo
 
-#deploy
+# Deploy
 local.yaml
+
+# File temporanei Simulatore
+Simulatore/salvataggi/csv_mediani/
+temp_*.csv
+ottimizzazione_storico_globale.csv
