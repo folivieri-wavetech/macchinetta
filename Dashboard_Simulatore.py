@@ -478,9 +478,9 @@ else:
             for cr in conti_reali:
                 nome_cr_clean = cr.replace("_REALE", "")
                 st_cr = leggi_stato_sistema(cr)
-                disp_cr = formatta_eur(st_cr.get('disponibile', '0'))
+                cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                 is_sel = (cr == conto_selezionato)
-                label_cr = f"🔴 {nome_cr_clean}  {disp_cr} €"
+                label_cr = f"🔴 {nome_cr_clean}: :orange[{cap_cr} €]"
                 if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                     if not is_sel:
                         st.session_state.conto_selezionato = cr
@@ -492,9 +492,9 @@ else:
             for cd in conti_demo:
                 nome_cd_clean = cd.replace("_DEMO", "")
                 st_cd = leggi_stato_sistema(cd)
-                disp_cd = formatta_eur(st_cd.get('disponibile', '0'))
+                cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                 is_sel = (cd == conto_selezionato)
-                label_cd = f"🔵 {nome_cd_clean}  {disp_cd} €"
+                label_cd = f"🔵 {nome_cd_clean}: :orange[{cap_cd} €]"
                 if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                     if not is_sel:
                         st.session_state.conto_selezionato = cd
