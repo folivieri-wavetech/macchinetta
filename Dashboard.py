@@ -116,7 +116,7 @@ def piazza_restore(conto, nome, cmd_dict):
         time.sleep(2)
         st.rerun()
 
-@st.dialog("Diario di Bordo (WIP)", width="large")
+@st.dialog("Diario di Bordo (WIP)")
 def mostra_diario_wip(nome_strumento, storico, conto=None):
     st.markdown(f"### 📈 Cronologia: {nome_strumento}")
     st.markdown("---")
@@ -696,8 +696,8 @@ else:
         
         renderizza_sidebar_stats()
 
-    # TABS RIORDINATI (Portafoglio IG per primo)
-    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici"])
+    # TABS RIORDINATI
+    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_grafici, tab_console = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📊 Grafici", "💻 Console"])
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
@@ -1797,7 +1797,7 @@ else:
                 logs = f"> In attesa di connessione col Motore per {conto_selezionato}..."
                 
             logs_escaped = logs.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-            st.markdown(f"""
+            st.html(f"""
                 <div style='
                     background-color: #1E1E1E; 
                     color: #D4D4D4; 
