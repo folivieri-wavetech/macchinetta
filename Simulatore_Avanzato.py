@@ -153,7 +153,6 @@ class SimulatoreMatematico:
         tot_trades = tot_profit + tot_loss
         perc_pos = (tot_profit / tot_trades * 100) if tot_trades > 0 else 0
         riga_totale = f"Totale Sottotrading [{tot_subtrading:+.{self.dec}f} €] - Profit: {tot_profit} - Loss: {tot_loss} [{perc_pos:.0f}%]"
-        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
         
         for key in ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]:
             st = self.stats[key]
@@ -166,6 +165,8 @@ class SimulatoreMatematico:
                 color = "#A9A9A9" # Grigio scuro
             riga = f"{key} [{val:+.{self.dec}f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
             riepilogo.append(f"<span style='color: {color};'>{riga}</span>")
+            
+        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
         
         st_ass = self.stats["Assicurazione"]
         riga_ass = f"Assicurazione [{st_ass['pnl']:+.0f} €]"
@@ -785,14 +786,14 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
         start_str_f = f"Start: {prezzi[0]:.{dec}f} +{size} LONG"
         sim_f.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.{dec}f} | {strumento} | {start_str_f}")
         sim_f.log_ws.append("-----------------------------------------------------------")
-        sim_f.log_ws.append(f"[Totale: {sim_f.pnl_realizzato:+.0f} €]")
         sim_f.log_ws.extend(sim_f.genera_riepilogo())
+        sim_f.log_ws.insert(0, f"[Totale: {sim_f.pnl_realizzato:+.0f} €]")
         
         start_str_d = f"Start: {prezzi[0]:.{dec}f} -{size} SHORT"
         sim_d.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.{dec}f} | {strumento} | {start_str_d}")
         sim_d.log_ws.append("-----------------------------------------------------------")
-        sim_d.log_ws.append(f"[Totale: {sim_d.pnl_realizzato:+.0f} €]")
         sim_d.log_ws.extend(sim_d.genera_riepilogo())
+        sim_d.log_ws.insert(0, f"[Totale: {sim_d.pnl_realizzato:+.0f} €]")
             
         risultati["SIM_FIORDOK"]["pnl"] = sim_f.pnl_storico
         risultati["SIM_FIORDOK"]["operazioni"] = sim_f.operazioni
@@ -813,8 +814,8 @@ def esegui_hedge_sincrono(file_path, strumento="Spot Gold", tp=50, opp=25, dts=5
         start_str = f"Start: {prezzi[0]:.{dec}f} {segno_start}{size} {direzione}"
         sim.log_ws.append(f"[STEP {ultimo_step}] Fine dati simulati - Prezzo: {prezzi[ultimo_step]:.{dec}f} | {strumento} | {start_str}")
         sim.log_ws.append("-----------------------------------------------------------")
-        sim.log_ws.append(f"[Totale: {sim.pnl_realizzato:+.0f} €]")
         sim.log_ws.extend(sim.genera_riepilogo())
+        sim.log_ws.insert(0, f"[Totale: {sim.pnl_realizzato:+.0f} €]")
             
         risultati["SIM_FIORDOK"]["pnl"] = sim.pnl_storico
         risultati["SIM_FIORDOK"]["operazioni"] = sim.operazioni

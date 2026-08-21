@@ -300,7 +300,6 @@ def stampa_riepilogo_statistiche(nome_strumento):
         tot_trades = tot_profit + tot_loss
         perc_pos = (tot_profit / tot_trades * 100) if tot_trades > 0 else 0
         riga_totale = f"Totale Sottotrading [{tot_subtrading:+.0f} €] - Profit: {tot_profit} - Loss: {tot_loss} [{perc_pos:.0f}%]"
-        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
         
         for key in ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]:
             st = stats[key]
@@ -313,6 +312,8 @@ def stampa_riepilogo_statistiche(nome_strumento):
                 color = "#A9A9A9" # Grigio scuro
             riga = f"{key} [{val:+.0f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
             riepilogo.append(f"<span style='color: {color};'>{riga}</span>")
+            
+        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
         
         st_ass = stats.get("Assicurazione", {"pnl": 0.0})
         riga_ass = f"Assicurazione [{st_ass['pnl']:+.0f} €]"
