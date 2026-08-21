@@ -461,13 +461,41 @@ else:
         st.warning("⚠️ Nessun conto trovato. Crea una cartella (es. ROSSI_DEMO) e inserisci al suo interno il file .env per cominciare.")
         st.stop()
 
+    if "conto_selezionato" not in st.session_state or st.session_state.conto_selezionato not in conti_disponibili:
+        st.session_state.conto_selezionato = conti_disponibili[0]
+        
+    conto_selezionato = st.session_state.conto_selezionato
+    is_reale = "_REALE" in conto_selezionato.upper()
+
     with st.sidebar:
         st.markdown(f"### 👤 Utente: {st.session_state.user}")
-        conto_selezionato = st.selectbox("🔌 Seleziona Conto", conti_disponibili)
-        is_reale = "_REALE" in conto_selezionato.upper()
-        if is_reale: st.error(f"**CONTO:** 🔴 REALE")
-        else: st.info(f"**CONTO:** 🔵 DEMO")
-        if st.button("Logout"):
+        
+        conti_reali = [c for c in conti_disponibili if "_REALE" in c.upper()]
+        conti_demo = [c for c in conti_disponibili if "_REALE" not in c.upper()]
+        
+        if conti_reali:
+            st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
+            for cr in conti_reali:
+                nome_cr_clean = cr.replace("_REALE", "")
+                is_sel = (cr == conto_selezionato)
+                if st.button(f"🔴 {nome_cr_clean}", key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
+                    if not is_sel:
+                        st.session_state.conto_selezionato = cr
+                        st.rerun()
+            st.markdown("<div style='margin: 8px 0;'></div>", unsafe_allow_html=True)
+            
+        if conti_demo:
+            st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
+            for cd in conti_demo:
+                nome_cd_clean = cd.replace("_DEMO", "")
+                is_sel = (cd == conto_selezionato)
+                if st.button(f"🔵 {nome_cd_clean}", key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
+                    if not is_sel:
+                        st.session_state.conto_selezionato = cd
+                        st.rerun()
+                        
+        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+        if st.button("🚪 Logout", key="btn_logout_side", use_container_width=True):
             st.session_state.logged_in = False
             st.rerun()
             
@@ -798,6 +826,14 @@ else:
                 
                 if salvati_in_cartella > 0:
                     st.info(f"✅ I Top {salvati_in_cartella} scenari sono stati **salvati automaticamente** nella cartella `Simulatore/{nome_strum_clean}/`. Li trovi già pronti nel menu a tendina del **Simulatore** con tutti i parametri preimpostati!")
+                    # Pulizia automatica dei file intermedi temporanei
+                    mediani_dir = os.path.join(os.getcwd(), "Simulatore", "salvataggi", "csv_mediani")
+                    if os.path.exists(mediani_dir):
+                        try:
+                            import shutil
+                            shutil.rmtree(mediani_dir, ignore_errors=True)
+                        except Exception:
+                            pass
                             
             st.markdown("### 🗺️ Mappa di Calore Globale (Robustezza RoMD)")
             try:
