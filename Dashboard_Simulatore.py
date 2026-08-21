@@ -477,8 +477,11 @@ else:
             st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
             for cr in conti_reali:
                 nome_cr_clean = cr.replace("_REALE", "")
+                st_cr = leggi_stato_sistema(cr)
+                disp_cr = formatta_eur(st_cr.get('disponibile', '0'))
                 is_sel = (cr == conto_selezionato)
-                if st.button(f"🔴 {nome_cr_clean}", key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
+                label_cr = f"🔴 {nome_cr_clean}  {disp_cr} €"
+                if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                     if not is_sel:
                         st.session_state.conto_selezionato = cr
                         st.rerun()
@@ -488,8 +491,11 @@ else:
             st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
             for cd in conti_demo:
                 nome_cd_clean = cd.replace("_DEMO", "")
+                st_cd = leggi_stato_sistema(cd)
+                disp_cd = formatta_eur(st_cd.get('disponibile', '0'))
                 is_sel = (cd == conto_selezionato)
-                if st.button(f"🔵 {nome_cd_clean}", key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
+                label_cd = f"🔵 {nome_cd_clean}  {disp_cd} €"
+                if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                     if not is_sel:
                         st.session_state.conto_selezionato = cd
                         st.rerun()
