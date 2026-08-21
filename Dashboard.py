@@ -1834,6 +1834,22 @@ else:
             
         if btn_aggiorna:
             def fetch_and_calc_sr(epic, h_api, base_url, res, window=5):
+                import json
+                import os
+                import time
+                
+                cache_file = os.path.join(ROOT_DIR, "Logs_e_Cache", f"sr_cache_{epic}_{res}.json")
+                
+                # Check if valid cache exists (younger than 12 hours)
+                if os.path.exists(cache_file):
+                    if time.time() - os.path.getmtime(cache_file) < 43200: # 12 ore
+                        try:
+                            with open(cache_file, "r") as f:
+                                data = json.load(f)
+                                return data.get("peaks", []), data.get("troughs", [])
+                        except Exception:
+                            pass
+                
                 try:
                     url = f"{base_url}/prices/{epic}/{res}/150"
                     resp = requests.get(url, headers=h_api)
@@ -1850,7 +1866,15 @@ else:
                             
                             peaks = df_sr[df_sr['Peak']]['High'].tail(2).tolist()
                             troughs = df_sr[df_sr['Trough']]['Low'].tail(2).tolist()
+                            
+                            # Save to cache
+                            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                            with open(cache_file, "w") as f:
+                                json.dump({"peaks": peaks, "troughs": troughs}, f)
+                                
                             return peaks, troughs
+                    else:
+                        st.sidebar.error(f"Errore IG Storico ({res}): {resp.text}")
                 except Exception:
                     pass
                 return [], []
