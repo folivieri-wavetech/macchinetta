@@ -13,6 +13,8 @@ data:
       cp -a /app/. /data/
     fi
 
+    mkdir -p /data/Logs_e_Cache
+
     # Iniezione credenziali IG per ogni conto (da Kubernetes Secret)
     for c in BONGIOLO DANY FIORDOK; do
       eval "env_content=\$${c}_DEMO_ENV"

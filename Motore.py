@@ -4,6 +4,15 @@ import os
 import requests
 import traceback
 import datetime
+try:
+    from zoneinfo import ZoneInfo
+    TZ_ITALIA = ZoneInfo("Europe/Rome")
+except Exception:
+    TZ_ITALIA = datetime.timezone(datetime.timedelta(hours=2))
+
+def now_it():
+    return datetime.datetime.now(TZ_ITALIA)
+
 import sys
 import socket
 import hashlib
@@ -65,13 +74,14 @@ FILE_MEMORIA = "memoria_parametri.json"
 FILE_TOKEN = "token_ig.json"
 CONSOLE_LOG_FILE = "console_live.log"
 config = dotenv_values(".env")
+DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
 
 # --- GESTIONE NOTIFICHE PUSH (NTFY) ---
 def invia_notifica(titolo, messaggio, tags="rotating_light"):
     topic = config.get("NTFY_TOPIC")
     if topic:
         try:
-            orario = datetime.datetime.now().strftime("%H:%M:%S")
+            orario = now_it().strftime("%H:%M:%S")
             messaggio_con_orario = f"[{orario}] {messaggio}"
             headers = {
                 "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
@@ -100,7 +110,7 @@ CONFIG_STRUMENTI = {
 falsi_allarmi_tracker = {}
 
 def print_log(strumento, messaggio):
-    ora = datetime.datetime.now().strftime("%H:%M:%S")
+    ora = now_it().strftime("%H:%M:%S")
     riga = f"[{ora}] [{strumento}] {messaggio}"
     print(f"[{NOME_CONTO}] {riga}")
     
@@ -255,7 +265,7 @@ def registra_operazione(nome_strumento, fase_label, pnl_eur):
             if not file_esiste:
                 f.write("Data,Strumento,Fase,Profitto_EUR,DealID\n")
             
-            ora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ora = now_it().strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"{ora},{nome_strumento},{fase_label},{pnl_eur:.2f},LOCAL\n")
             
     except Exception as e:
@@ -346,7 +356,7 @@ def calcola_durata_sessione():
     if not os.path.exists(FILE_TOKEN):
         return "0h 00m"
     tempo_creazione = os.path.getmtime(FILE_TOKEN)
-    durata = datetime.datetime.now() - datetime.datetime.fromtimestamp(tempo_creazione)
+    durata = now_it() - datetime.datetime.fromtimestamp(tempo_creazione, TZ_ITALIA)
     ore = int(durata.total_seconds() // 3600)
     minuti = int((durata.total_seconds() % 3600) // 60)
     return f"{ore}h {minuti}m"
@@ -363,7 +373,7 @@ def aggiorna_memoria(nome_strumento, aggiornamenti, log_wip=None):
                     log_wip = log_wip.replace("BUY", "LONG").replace("SELL", "SHORT")
                     if "storico_wip" not in dati[nome_strumento]:
                         dati[nome_strumento]["storico_wip"] = []
-                    ora = datetime.datetime.now().strftime("%d/%m %H:%M:%S")
+                    ora = now_it().strftime("%d/%m %H:%M:%S")
                     dati[nome_strumento]["storico_wip"].append(f"[{ora}] {log_wip}")
                 
                 with open(FILE_MEMORIA, "w") as f:
@@ -381,7 +391,7 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
         "drawdown": str(drawdown),
         "messaggio": messaggio,
         "durata_sessione": calcola_durata_sessione(),
-        "ultimo_aggiornamento": datetime.datetime.now().strftime("%H:%M:%S"),
+        "ultimo_aggiornamento": now_it().strftime("%H:%M:%S"),
         "prezzi_live": prezzi_live or {},
         "distanze_minime": distanze_minime or {},
         "prezzi_bid_ask": prezzi_bid_ask or {}
@@ -785,11 +795,14 @@ def esegui_motore():
     try:
         print_log("SISTEMA", f"--- MOTORE AVVIATO PER CONTO: {NOME_CONTO} ---")
         
-        while not verifica_token_ig(): 
-            print_log("SISTEMA", "❌ Accesso fallito. Riprovo tra 30 secondi...")
-            time.sleep(30)
-            
-        print_log("SISTEMA", "✅ Connesso a IG con successo!")
+        if DEV_MODE:
+            print_log("SISTEMA", "🔧 [DEV MODE ATTIVA] - Connessione IG bypassata. Modalità offline.")
+        else:
+            while not verifica_token_ig(): 
+                print_log("SISTEMA", "❌ Accesso fallito. Riprovo tra 30 secondi...")
+                time.sleep(30)
+                
+            print_log("SISTEMA", "✅ Connesso a IG con successo!")
 
         if os.path.exists(FILE_TOKEN):
             with open(FILE_TOKEN, "r") as f:
@@ -806,7 +819,23 @@ def esegui_motore():
         
         ultimo_controllo_saldo = 0
 
+        import random
         while True:
+            if DEV_MODE:
+                mem = carica_memoria(NOME_CONTO)
+                for nome, dati in mem.items():
+                    if dati.get("attivo", False):
+                        if random.random() < 0.2:  # 20% probabilità ogni 10 secondi
+                            msgs = [
+                                "🎯 [EVENTO]: TICKET1 a target! Ping-Pong: Rigirato.",
+                                "🔄 [EVENTO]: Rientro nel canale riuscito. SAT1 OCO piazzati.",
+                                "🛑 [EVENTO]: SL colpito su TICKET2.",
+                                "✅ [EVENTO]: FASE 3 COMPLETATA AL 100%!"
+                            ]
+                            aggiorna_memoria(nome, {}, log_wip=f"🔧 [TEST DEV]: {random.choice(msgs)}")
+                time.sleep(10)
+                continue
+
             ora_attuale = time.time()
             
             richiede_rinnovo = False
@@ -1973,7 +2002,7 @@ def esegui_motore():
                         time.sleep(3.0) 
                         
                         lvl_last = round(f3_base + tp4_val, dec) if sat_dir == "BUY" else round(f3_base - tp4_val, dec)
-                        invia_ordine_pendente(nome, epic, valuta, dir_contro, s_mezzo, lvl_last, "LIMIT", round(f3_base, dec), None, h, dec, etichetta="[ORDINE TAGLIO FASE 3]")
+                        invia_ordine_pendente(nome, epic, valuta, dir_contro, s_mezzo, lvl_last, "LIMIT", round(f3_base, dec), None, h, dec, etichetta="[ORDINE ULTIMA FASE 3]")
                         
                         segno = "+" if sat_dir in ["BUY", "LONG"] else "-"
                         segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
@@ -2099,7 +2128,7 @@ def esegui_motore():
                                     new_s_last = s_core * 0.15
                                     lvl_last = round(prezzo_attuale + tp4_val, dec) if sat_dir == "BUY" else round(prezzo_attuale - tp4_val, dec)
                                     
-                                    invia_ordine_pendente(nome, epic, valuta, dir_contro, new_s_last, lvl_last, "LIMIT", round(prezzo_attuale, dec), None, h, dec, etichetta="[ORDINE TAGLIO FASE 3]")
+                                    invia_ordine_pendente(nome, epic, valuta, dir_contro, new_s_last, lvl_last, "LIMIT", round(prezzo_attuale, dec), None, h, dec, etichetta="[ORDINE ULTIMA FASE 3]")
                                     
                                     segno = "+" if sat_dir in ["BUY", "LONG"] else "-"
                                     segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
@@ -2110,12 +2139,12 @@ def esegui_motore():
                             if not last_pos:
                                 pend_ultima = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_last and o['workingOrderData']['direction'] == dir_contro]
                                 if not pend_ultima:
-                                    if verifica_falso_allarme_ig(nome, epic, h, s_last, dir_contro, "[ORDINE TAGLIO FASE 3]"):
+                                    if verifica_falso_allarme_ig(nome, epic, h, s_last, dir_contro, "[ORDINE ULTIMA FASE 3]"):
                                         continue
                                         
                                     tp4_val = round((param.get("tp") / 4) * mult, dec)
                                     lvl_last = round(f3_base + tp4_val, dec) if sat_dir == "BUY" else round(f3_base - tp4_val, dec)
-                                    invia_ordine_pendente(nome, epic, valuta, dir_contro, s_last, lvl_last, "LIMIT", round(f3_base, dec), None, h, dec, etichetta="[ORDINE TAGLIO FASE 3]")
+                                    invia_ordine_pendente(nome, epic, valuta, dir_contro, s_last, lvl_last, "LIMIT", round(f3_base, dec), None, h, dec, etichetta="[ORDINE ULTIMA FASE 3]")
                                     aggiorna_memoria(nome, {"stato": "FASE_3"})
 
             time.sleep(4)

@@ -7,6 +7,15 @@ import pandas as pd
 import requests
 import re
 from datetime import datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+    TZ_ITALIA = ZoneInfo("Europe/Rome")
+except Exception:
+    TZ_ITALIA = timezone(timedelta(hours=2))
+
+def now_it():
+    return datetime.now(TZ_ITALIA)
+
 from dotenv import dotenv_values
 import plotly.graph_objects as go
 import numpy as np
@@ -33,7 +42,12 @@ CONFIG_STRUMENTI = {
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400}
 }
 
+config = dotenv_values(".env")
+DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
+
 st.set_page_config(page_title="Macchinetta IG", layout="wide")
+if DEV_MODE:
+    st.error("⚠️ **MODALITÀ SVILUPPO (DEV_MODE) ATTIVA** - I motori stanno scrivendo messaggi fittizi. Le connessioni API a IG sono sospese.")
 
 # --- FUNZIONI HELPER MULTI-CONTO ---
 def get_accounts():
@@ -102,13 +116,13 @@ def piazza_restore(conto, nome, cmd_dict):
         time.sleep(2)
         st.rerun()
 
-@st.dialog("Diario di Bordo (WIP)")
-def mostra_diario_wip(nome_strumento, storico):
+@st.dialog("Diario di Bordo (WIP)", width="large")
+def mostra_diario_wip(nome_strumento, storico, conto=None):
     st.markdown(f"### 📈 Cronologia: {nome_strumento}")
     st.markdown("---")
     if storico:
         totale = 0.0
-        html_str = "<div style='font-size: 0.85rem; line-height: 1.6;'>"
+        html_str = "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
         for riga in storico:
             match = re.search(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", riga)
             if match:
@@ -118,15 +132,122 @@ def mostra_diario_wip(nome_strumento, storico):
             html_str += f"&bull; {riga_colorata}<br>"
         
         segno = "+" if totale > 0 else ""
-        html_str += "<br>========================<br>"
-        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.0f} €</span></div>"
+        html_str += "</div>"
+        html_str += "<div style='margin-top: 15px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
+        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.2f} €</span></div>"
         
         st.markdown(html_str, unsafe_allow_html=True)
     else:
         st.info("Nessun evento registrato in questo ciclo.")
+        
+    # --- TABELLINA RIASSUNTIVA STATISTICHE ---
+    if conto:
+        mem = carica_memoria(conto)
+        stats = mem.get(nome_strumento, {}).get("stats", {})
+        if stats:
+            st.markdown("<div style='margin-top: 15px; margin-bottom: 5px; font-weight: 700; color: #00FFCC; font-size: 0.95rem;'>📊 Riepilogo Statistiche Ciclo</div>", unsafe_allow_html=True)
+            
+            righe_tabella = []
+            fasi_sotto = ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]
+            tot_pnl_sub = 0.0
+            tot_trade_sub = 0
+            tot_prof_sub = 0
+            tot_loss_sub = 0
+            
+            for k in fasi_sotto:
+                s_data = stats.get(k, {"pnl": 0.0, "totale": 0, "profit": 0, "loss": 0})
+                pnl = s_data.get("pnl", 0.0)
+                tot = s_data.get("totale", 0)
+                prof = s_data.get("profit", 0)
+                loss = s_data.get("loss", 0)
+                tot_pnl_sub += pnl
+                tot_trade_sub += tot
+                tot_prof_sub += prof
+                tot_loss_sub += loss
+                
+                col_p = "#09ab3b" if pnl > 0 else ("#ff4b4b" if pnl < 0 else "#aaa")
+                seg = "+" if pnl > 0 else ""
+                righe_tabella.append(f"""
+                <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                    <td style='padding: 6px 10px; text-align: left;'><b>{k}</b></td>
+                    <td style='padding: 6px 10px; text-align: center;'>{tot}</td>
+                    <td style='padding: 6px 10px; text-align: center; color: #09ab3b;'>{prof}</td>
+                    <td style='padding: 6px 10px; text-align: center; color: #ff4b4b;'>{loss}</td>
+                    <td style='padding: 6px 10px; text-align: right; color: {col_p}; font-weight: bold;'>{seg}{pnl:.2f} €</td>
+                </tr>
+                """)
+            
+            # Assicurazione e Fase3
+            ass_data = stats.get("Assicurazione", {"pnl": 0.0})
+            ass_pnl = ass_data.get("pnl", 0.0)
+            col_ass = "#09ab3b" if ass_pnl > 0 else ("#ff4b4b" if ass_pnl < 0 else "#aaa")
+            seg_ass = "+" if ass_pnl > 0 else ""
+            righe_tabella.append(f"""
+            <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                <td style='padding: 6px 10px; text-align: left;'><b>Assicurazione</b></td>
+                <td style='padding: 6px 10px; text-align: center;'>-</td>
+                <td style='padding: 6px 10px; text-align: center;'>-</td>
+                <td style='padding: 6px 10px; text-align: center;'>-</td>
+                <td style='padding: 6px 10px; text-align: right; color: {col_ass}; font-weight: bold;'>{seg_ass}{ass_pnl:.2f} €</td>
+            </tr>
+            """)
+            
+            f3_data = stats.get("Fase3", {"pnl": 0.0})
+            f3_pnl = f3_data.get("pnl", 0.0)
+            col_f3 = "#09ab3b" if f3_pnl > 0 else ("#ff4b4b" if f3_pnl < 0 else "#aaa")
+            seg_f3 = "+" if f3_pnl > 0 else ""
+            righe_tabella.append(f"""
+            <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                <td style='padding: 6px 10px; text-align: left;'><b>Fase 3</b></td>
+                <td style='padding: 6px 10px; text-align: center;'>-</td>
+                <td style='padding: 6px 10px; text-align: center;'>-</td>
+                <td style='padding: 6px 10px; text-align: center;'>-</td>
+                <td style='padding: 6px 10px; text-align: right; color: {col_f3}; font-weight: bold;'>{seg_f3}{f3_pnl:.2f} €</td>
+            </tr>
+            """)
+            
+            # Totale Sottotrading & Totale Ciclo
+            col_sub = "#09ab3b" if tot_pnl_sub > 0 else ("#ff4b4b" if tot_pnl_sub < 0 else "#aaa")
+            seg_sub = "+" if tot_pnl_sub > 0 else ""
+            
+            tot_generale = tot_pnl_sub + ass_pnl + f3_pnl
+            col_gen = "#09ab3b" if tot_generale > 0 else ("#ff4b4b" if tot_generale < 0 else "#aaa")
+            seg_gen = "+" if tot_generale > 0 else ""
+            
+            tabella_html = f"""
+            <div class='table-responsive'>
+            <table style='width: 100%; border-collapse: collapse; font-size: 0.82rem; background-color: rgba(255,255,255,0.03); border-radius: 6px; overflow: hidden; margin-top: 5px;'>
+                <thead>
+                    <tr style='background-color: rgba(255,255,255,0.08); color: #888; text-transform: uppercase; font-size: 0.75rem;'>
+                        <th style='padding: 8px 10px; text-align: left;'>Fase / Modulo</th>
+                        <th style='padding: 8px 10px; text-align: center;'>Trade</th>
+                        <th style='padding: 8px 10px; text-align: center;'>Profit</th>
+                        <th style='padding: 8px 10px; text-align: center;'>Loss</th>
+                        <th style='padding: 8px 10px; text-align: right;'>PnL (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(righe_tabella)}
+                    <tr style='background-color: rgba(255,215,0,0.08); border-top: 1px solid rgba(255,215,0,0.3); font-weight: bold;'>
+                        <td style='padding: 8px 10px; text-align: left; color: #FFD700;'>Totale Sottotrading</td>
+                        <td style='padding: 8px 10px; text-align: center; color: #FFD700;'>{tot_trade_sub}</td>
+                        <td style='padding: 8px 10px; text-align: center; color: #09ab3b;'>{tot_prof_sub}</td>
+                        <td style='padding: 8px 10px; text-align: center; color: #ff4b4b;'>{tot_loss_sub}</td>
+                        <td style='padding: 8px 10px; text-align: right; color: {col_sub}; font-weight: bold;'>{seg_sub}{tot_pnl_sub:.2f} €</td>
+                    </tr>
+                    <tr style='background-color: rgba(0,255,204,0.08); border-top: 1px solid rgba(0,255,204,0.3); font-weight: bold;'>
+                        <td colspan='4' style='padding: 8px 10px; text-align: left; color: #00FFCC;'>TOTALE CICLO (Sub + Ass + F3)</td>
+                        <td style='padding: 8px 10px; text-align: right; color: {col_gen}; font-weight: bold; font-size: 0.9rem;'>{seg_gen}{tot_generale:.2f} €</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+            """
+            st.markdown(tabella_html, unsafe_allow_html=True)
     st.markdown("---")
 
 def get_ig_headers(conto_selezionato):
+    if DEV_MODE: return None
     token_path = os.path.join(conto_selezionato, FILE_TOKEN)
     env_path = os.path.join(conto_selezionato, ".env")
     if not os.path.exists(token_path):
@@ -308,10 +429,21 @@ st.markdown("""
         .sintesi-testo { display: flex; align-items: center; height: 32px; margin: 0px !important; padding: 0px !important; font-size: 0.95rem; }
         .sintesi-testo p { margin: 0px !important; }
         div[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
-        section[data-testid="stSidebar"] { min-width: 220px !important; max-width: 220px !important; }
+        @media (min-width: 769px) {
+            section[data-testid="stSidebar"] { min-width: 220px !important; max-width: 220px !important; }
+        }
         button[data-testid="stNumberInputStepUp"], button[data-testid="stNumberInputStepDown"] { display: flex !important; }
         div[data-testid="stNumberInputContainer"] { padding-left: 0.2rem !important; padding-right: 0.2rem !important; }
         
+        /* Contenitore per Scrolling Orizzontale Fluido (Tabelle e Pannelli) */
+        .table-responsive {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            margin-bottom: 20px !important;
+            display: block !important;
+        }
+
         /* CSS per Tabelle Portafoglio IG */
         .ig-table { width: 90%; max-width: 1400px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.85rem; color: #d1d4dc; margin-bottom: 20px; }
         .ig-table th { text-align: center; color: white; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
@@ -354,6 +486,114 @@ st.markdown("""
         .text-green { color: #4ade80 !important; }
         .text-red { color: #f87171 !important; }
         .text-bold { font-weight: bold !important; }
+
+        /* ========================================================= */
+        /* --- REGOLE RESPONSIVE PER TABLET (fino a 1024px) --- */
+        /* ========================================================= */
+        @media (max-width: 1024px) {
+            .ig-table { width: 100% !important; font-size: 0.82rem !important; }
+            .ig-table th, .ig-table td { padding: 7px 5px !important; }
+            .stat-table { font-size: 0.85rem !important; }
+            .stat-table th, .stat-table td { padding: 7px 5px !important; }
+            section[data-testid="stSidebar"] { min-width: 200px !important; max-width: 250px !important; }
+        }
+
+        /* ========================================================= */
+        /* --- REGOLE RESPONSIVE PER SMARTPHONE (fino a 768px) --- */
+        /* ========================================================= */
+        @media (max-width: 768px) {
+            /* Container generale e margini */
+            .main .block-container {
+                padding-top: 1.5rem !important;
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+                padding-bottom: 2rem !important;
+                max-width: 100% !important;
+            }
+
+            /* Tipografia mobile friendly */
+            h1 { font-size: 1.4rem !important; text-align: center !important; margin-bottom: 0.5rem !important; }
+            h2 { font-size: 1.2rem !important; }
+            h3 { font-size: 1.05rem !important; }
+            h4 { font-size: 0.95rem !important; }
+            
+            div[data-testid="stMetricValue"] { font-size: 1.15rem !important; }
+            div[data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+
+            /* Tabelle Touch Friendly con scorrimento */
+            .ig-table {
+                min-width: 580px !important;
+                width: 100% !important;
+                font-size: 0.75rem !important;
+                margin-bottom: 10px !important;
+            }
+            .ig-table th, .ig-table td {
+                padding: 5px 3px !important;
+                font-size: 0.72rem !important;
+            }
+            .stat-table {
+                min-width: 520px !important;
+                width: 100% !important;
+                font-size: 0.75rem !important;
+                margin-bottom: 15px !important;
+            }
+            .stat-table th, .stat-table td {
+                padding: 5px 3px !important;
+                font-size: 0.72rem !important;
+            }
+
+            /* Bottoni a misura di tocco */
+            div[data-testid="stButton"] > button {
+                padding: 4px 6px !important;
+                font-size: 0.82rem !important;
+                min-height: 38px !important;
+            }
+            div[data-testid="stButton"] > button[kind="primary"] {
+                min-height: 34px !important;
+                height: auto !important;
+                font-size: 0.82rem !important;
+                padding: 4px 8px !important;
+            }
+            div[data-testid="stButton"] > button[kind="secondary"] {
+                min-height: 38px !important;
+                height: auto !important;
+                font-size: 0.82rem !important;
+            }
+
+            /* Barra dei Tab a scorrimento orizzontale */
+            div[data-baseweb="tab-list"] {
+                display: flex !important;
+                overflow-x: auto !important;
+                white-space: nowrap !important;
+                -webkit-overflow-scrolling: touch !important;
+                scrollbar-width: thin !important;
+                padding-bottom: 4px !important;
+            }
+            div[data-baseweb="tab"] {
+                flex-shrink: 0 !important;
+                padding: 8px 12px !important;
+                font-size: 0.85rem !important;
+            }
+
+            /* Sidebar mobile fluida */
+            section[data-testid="stSidebar"] {
+                min-width: 250px !important;
+                max-width: 85vw !important;
+            }
+
+            /* Righe Sintesi */
+            .sintesi-testo {
+                font-size: 0.82rem !important;
+                height: auto !important;
+            }
+
+            /* Modal/Dialogo WIP */
+            div[data-testid="stModal"] > div {
+                width: 95vw !important;
+                max-width: 95vw !important;
+                padding: 10px !important;
+            }
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -421,6 +661,19 @@ else:
                 motore_attivo_side = True
             badge_motore_side = "🟢 Connesso" if motore_attivo_side else "🔴 Offline"
 
+            durata_str = "--"
+            path_token = os.path.join(conto_selezionato, FILE_TOKEN)
+            if motore_attivo_side and os.path.exists(path_token):
+                try:
+                    durata_sec = time.time() - os.path.getmtime(path_token)
+                    ore = int(durata_sec // 3600)
+                    minuti = int((durata_sec % 3600) // 60)
+                    durata_str = f"{ore}h {minuti}m"
+                except Exception:
+                    durata_str = stato_side.get("durata_sessione", "--")
+            elif motore_attivo_side:
+                durata_str = stato_side.get("durata_sessione", "--")
+
             val_capitale = formatta_eur(stato_side.get('saldo', '0'))
             val_margine = formatta_eur(stato_side.get('margine', '0'))
             val_residuo = formatta_eur(stato_side.get('disponibile', '0'))
@@ -434,6 +687,8 @@ else:
 
             st.markdown("---")
             st.markdown(f"**Stato Sistema:** {badge_motore_side}")
+            if motore_attivo_side:
+                st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: -8px; margin-bottom: 8px;'>⏱️ Sessione: <b style='color: #4ade80;'>{durata_str}</b></div>", unsafe_allow_html=True)
             st.markdown("---")
             st.markdown(f"<div style='font-size: 0.9rem; color: #aaa;'>Capitale Totale</div><div style='font-size: 1.2rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.2rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
@@ -443,9 +698,7 @@ else:
         renderizza_sidebar_stats()
 
     # TABS RIORDINATI (Portafoglio IG per primo)
-    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici, tab_simulatore, tab_ottimizzazione = st.tabs([
-        "💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici", "🔬 Simulatore", "🧪 Backtest"
-    ])
+    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_console, tab_grafici = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "💻 Console", "📊 Grafici"])
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
@@ -554,7 +807,7 @@ else:
                 gruppi_pos[key].append(p)
             
             # Intestazioni centrate e bianche
-            html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>APERTURA</u></th><th style='text-align: center; color: white;'><u>ULTIMO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th><th style='text-align: center; color: white;'><u>P/L (EUR)</u></th></tr></thead>\n<tbody>\n"
+            html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>APERTURA</u></th><th style='text-align: center; color: white;'><u>ULTIMO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th><th style='text-align: center; color: white;'><u>P/L (EUR)</u></th></tr></thead>\n<tbody>\n"
             
             totale_pnl_portafoglio = 0.0
             
@@ -700,14 +953,14 @@ else:
                         html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
-            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.0f} €</td></tr>\n</tbody></table>"
+            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.0f} €</td></tr>\n</tbody></table></div>"
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
             st.markdown(html_pos, unsafe_allow_html=True)
             
             # --- ELABORAZIONE ORDINI PENDENTI ---
-            html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th></tr></thead>\n<tbody>\n"
+            html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th></tr></thead>\n<tbody>\n"
             
             # Ordino i pendenti per nome e poi per size
             ord_data_sorted = sorted(ord_data, key=lambda x: (
@@ -765,7 +1018,7 @@ else:
                 
                 html_ord += f"<tr class='ig-row' style='{row_style}'>{td_mercato_ord}<td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_ord}</span></td></tr>\n"
                 
-            html_ord += "</tbody></table>"
+            html_ord += "</tbody></table></div>"
             
             if not ord_data: html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessun ordine pendente al momento.</p>"
 
@@ -838,10 +1091,13 @@ else:
                 st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-                # Ordina portando in cima gli strumenti attivi (True -> 0, False -> 1) preservando l'ordine originale per i parimerito
-                tutti_strumenti.sort(key=lambda x: not memoria.get(x, {}).get("attivo", False))
+                # Mostra ESCLUSIVAMENTE gli strumenti attivi
+                strumenti_attivi = [x for x in tutti_strumenti if memoria.get(x, {}).get("attivo", False)]
                 
-                for nome in tutti_strumenti:
+                if not strumenti_attivi:
+                    st.info("ℹ️ Nessuno strumento attivo al momento.")
+                
+                for nome in strumenti_attivi:
                     dati = memoria.get(nome, {})
                     stato = dati.get("stato", "IN_ATTESA")
                     is_attivo = dati.get("attivo", False)
@@ -878,25 +1134,17 @@ else:
                             spia_t2 = " 🟢" if (prezzo > t2_entry if t2_dir == "BUY" else prezzo < t2_entry) else " 🔴"
                             stato_display += f" [+ TICKET2 {spia_t2}]"
 
-                    if not is_attivo and stato == "IN_ATTESA":
-                        stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #abb2bf; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>{'⚪ Ciclo Concluso (Spenta)' if storico else '⚪ Spenta / In Attesa'}</span>"
-                    elif not is_attivo:
-                        stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>🔴 SPENTA ({stato_display})</span>"
-                    elif stato == "FASE_2_STANDBY":
+                    stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
+                    if stato == "FASE_2_STANDBY":
                         stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
-                    else:
-                        stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
                     
                     has_anomalia = bool(dati.get("alert_falso_allarme") or dati.get("errore_avvio") or dati.get("errore_ripristino") or dati.get("msg_manuale"))
                     
                     if has_anomalia:
                         bg_color = "#FFC107" # Giallo
                         text_color = "black"
-                    elif is_attivo:
-                        bg_color = "#198754" # Verde
-                        text_color = "white"
                     else:
-                        bg_color = "#E97451" # Salmone
+                        bg_color = "#198754" # Verde
                         text_color = "white"
                         
                     marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
@@ -913,7 +1161,7 @@ else:
                     with c1:
                         st.markdown(f"<span class='{marker_class}'></span>{css_marker}", unsafe_allow_html=True)
                         if st.button(nome, key=f"wip_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
-                            mostra_diario_wip(nome, storico)
+                            mostra_diario_wip(nome, storico, conto=conto_selezionato)
                     
                     c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
                     c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; width: 95px; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
@@ -1463,7 +1711,7 @@ else:
                     pivot_strum = pivot_strum.reset_index()
                     pivot_strum = pivot_strum[['Strumento', 'P/L Tot.', 'F1', 'F2', 'F3', 'Altro']]
                     
-                    html_t1 = "<table class='stat-table'><thead><tr><th>STRUMENTO</th><th>P/L TOT.</th><th>F1</th><th>F2</th><th>F3</th><th>ALTRO</th></tr></thead><tbody>"
+                    html_t1 = "<div class='table-responsive'><table class='stat-table'><thead><tr><th>STRUMENTO</th><th>P/L TOT.</th><th>F1</th><th>F2</th><th>F3</th><th>ALTRO</th></tr></thead><tbody>"
                     for _, row in pivot_strum.iterrows():
                         strum = row['Strumento']
                         
@@ -1480,7 +1728,7 @@ else:
                         td_alt = format_td(row['Altro'])
                         
                         html_t1 += f"<tr><td>{strum}</td>{td_pl}{td_f1}{td_f2}{td_f3}{td_alt}</tr>"
-                    html_t1 += "</tbody></table>"
+                    html_t1 += "</tbody></table></div>"
                     
                     st.markdown(html_t1, unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -1494,7 +1742,7 @@ else:
                         Perdenti=('Profitto_EUR', lambda x: (x <= 0).sum())
                     ).reset_index()
                     
-                    html_t2 = "<table class='stat-table'><thead><tr><th>FASE</th><th>P/L TOT.</th><th>TOT. OP.</th><th>WIN</th><th>LOSS</th><th>WIN RATE %</th></tr></thead><tbody>"
+                    html_t2 = "<div class='table-responsive'><table class='stat-table'><thead><tr><th>FASE</th><th>P/L TOT.</th><th>TOT. OP.</th><th>WIN</th><th>LOSS</th><th>WIN RATE %</th></tr></thead><tbody>"
                     for _, row in df_fase.iterrows():
                         fase = row['Fase']
                         pnl = row['Pnl_Totale']
@@ -1511,7 +1759,7 @@ else:
                         wr_class = "text-green" if wr >= 50 else ("text-red" if wr > 0 else "")
                         
                         html_t2 += f"<tr><td>{fase}</td><td class='{pnl_class}'>{pnl_str}</td><td>{tot_op}</td><td class='{win_class}'>{win}</td><td class='{loss_class}'>{loss}</td><td class='{wr_class}'>{wr:.1f}%</td></tr>"
-                    html_t2 += "</tbody></table>"
+                    html_t2 += "</tbody></table></div>"
                     
                     st.markdown(html_t2, unsafe_allow_html=True)
                     
@@ -1623,6 +1871,7 @@ else:
                                 df = df_new
                                 
                             # Salva cache aggiornata per i click successivi
+                            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
                             df.to_csv(cache_file, index=False)
                             
                             # Calcolo Donchian Midlines
@@ -1740,514 +1989,3 @@ else:
                     st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
 
     # --- TAB SIMULATORE ---
-    with tab_simulatore:
-        st.markdown("<h2 style='text-align: center; color: #00FFCC;'>🔬 Simulatore Avanzato (Moviola Hedge Sincrono)</h2>", unsafe_allow_html=True)
-        st.markdown("Simula l'esecuzione del **Motore.py originale** senza alterarne il codice, tramite una staffetta sequenziale che riproduce fedelmente una partenza multiconto parallela.", unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        sm1, sm2 = st.columns(2)
-        # --- Ristrutturazione Simulatore ---
-        
-        # 1. Generatore Base Dati
-        st.markdown("<h3 style='color: #FFD700;'>1. Generatore Base Dati</h3>", unsafe_allow_html=True)
-        
-        g1, g2, g3 = st.columns(3)
-        with g1:
-            gen_strum = st.selectbox("Strumento", list(CONFIG_STRUMENTI.keys()), key="gen_strum")
-        with g2:
-            gen_scen = st.selectbox("Scenario Mercato", ["LATERALE", "TREND_UP", "TREND_DOWN", "CRASH", "RANDOM"], key="gen_scen")
-        with g3:
-            _gen_ticks = st.text_input("Durata", value="250", key="gen_ticks")
-            gen_ticks = int(_gen_ticks) if _gen_ticks.isdigit() else 250
-            
-        g4, g6 = st.columns(2)
-        with g4:
-            _gen_base_price = st.text_input("Prezzo di Partenza", value="2400.0", key="gen_base_price")
-            try: gen_base_price = float(_gen_base_price.replace(',', '.'))
-            except: gen_base_price = 2400.0
-        with g6:
-            _gen_size = st.text_input("Size", value="10", key="gen_size")
-            gen_size = int(_gen_size) if _gen_size.isdigit() else 10
-            
-        import Simulatore_Avanzato
-        import importlib
-        importlib.reload(Simulatore_Avanzato)
-        import os
-        
-        if st.button("🛠️ Crea Base Dati", use_container_width=True):
-            with st.spinner(f"Generazione file dati per {gen_strum} in corso..."):
-                molt = CONFIG_STRUMENTI.get(gen_strum, {}).get("moltiplicatore", 1.0)
-                dec = CONFIG_STRUMENTI.get(gen_strum, {}).get("decimali", 5)
-                
-                if molt == 1.0:
-                    real_tick = 1.0
-                else:
-                    real_tick = 2.5 * molt
-                    
-                f_path = Simulatore_Avanzato.genera_base_dati(gen_strum, gen_scen, gen_base_price, real_tick, gen_ticks, gen_size, decimali=dec)
-                st.success(f"Base dati generata e salvata: `{os.path.basename(f_path)}`")
-                
-        st.markdown("---")
-        
-        # 2. Esecutore Simulazione
-        st.markdown("<h3 style='color: #00FFCC;'>2. Esecutore Simulazione</h3>", unsafe_allow_html=True)
-        
-        e1, e2, e3 = st.columns(3)
-        with e1:
-            eseg_strum = st.selectbox("Seleziona Strumento", list(CONFIG_STRUMENTI.keys()), key="eseg_strum")
-        with e2:
-            eseg_dir = st.selectbox("Direzione", ["LONG", "SHORT"], index=0, key="eseg_dir")
-        with e3:
-            strum_pulito = Simulatore_Avanzato.pulisci_nome_strumento(eseg_strum)
-            dir_path = os.path.join(os.getcwd(), "Simulatore", strum_pulito)
-            file_list = []
-            if os.path.exists(dir_path):
-                file_list = [f for f in os.listdir(dir_path) if f.endswith(".csv")]
-            
-            eseg_file = st.selectbox("Seleziona Base Dati", file_list if file_list else ["Nessun file trovato"], key="eseg_file")
-            
-        st.markdown("**Parametri Griglia (Applicati a runtime)**")
-        e4, e5, e6, e7 = st.columns(4)
-        with e4:
-            sim_tp = st.number_input("Take Profit (TP)", value=80, step=5, key="eseg_tp")
-        with e5:
-            sim_opp = st.number_input("Opposto (OPP)", value=20, step=5, key="eseg_opp")
-        with e6:
-            sim_dts = st.number_input("Distanza Sicurezza (DTS)", value=10, step=5, key="eseg_dts")
-        with e7:
-            sim_size = st.number_input("Size Contratti", min_value=4, value=10, step=1, key="eseg_size")
-            
-        btn_disabled = (eseg_file == "Nessun file trovato")
-        
-        st.markdown("---")
-        import pandas as pd
-        if not btn_disabled:
-            try:
-                f_path_full = os.path.join(dir_path, eseg_file)
-                df_temp = pd.read_csv(f_path_full)
-                p_start = float(df_temp['Price'].iloc[0])
-            except:
-                p_start = 0.0
-        else:
-            p_start = 0.0
-            
-        molt = CONFIG_STRUMENTI.get(eseg_strum, {}).get("moltiplicatore", 1.0)
-        dec = CONFIG_STRUMENTI.get(eseg_strum, {}).get("decimali", 5)
-        v_punto = CONFIG_STRUMENTI.get(eseg_strum, {}).get("valore_punto", 1.0)
-        v_valuta = CONFIG_STRUMENTI.get(eseg_strum, {}).get("valuta", "EUR")
-        
-        real_tp = sim_tp * molt
-        
-        if eseg_dir == "LONG":
-            p_target = p_start + real_tp
-        else:
-            p_target = p_start - real_tp
-            
-        st.info(f"**Verifica Parametri:** {sim_tp} punti per **{eseg_strum}** partendo da **{p_start:.{dec}f}** -> Target a **{p_target:.{dec}f}** (Variazione di {real_tp:.{dec}f})")
-        
-        if st.button("▶️ Avvia Simulazione", use_container_width=True, disabled=btn_disabled):
-            with st.spinner(f"Elaborazione strategia su {eseg_file} in corso..."):
-                try:
-                    f_path_full = os.path.join(dir_path, eseg_file)
-                    
-                    # Esecuzione del Motore simulato (Forzato a Singolo)
-                    ris = Simulatore_Avanzato.esegui_hedge_sincrono(
-                        f_path_full, eseg_strum,
-                        sim_tp, sim_opp, sim_dts, sim_size,
-                        "Singolo", eseg_dir,
-                        mult=1.0,
-                        valore_punto=v_punto,
-                        valuta=v_valuta,
-                        molt_strum=molt
-                    )
-                    
-                    if not ris:
-                        st.error("Errore durante la simulazione. Controlla il terminale.")
-                        st.stop()
-                        
-                    st.success("Simulazione completata con successo!")
-                    
-                    st.markdown(f"### 📖 Diario di Bordo della Simulazione (WS) - {eseg_strum}")
-                    
-                    def renderizza_storico(conto_key):
-                        storico = ris["risultati"].get(conto_key, {}).get("log_ws", [])
-                        if storico:
-                            html_str = "<div style='font-size: 0.85rem; line-height: 1.6; margin-bottom: 20px;'>"
-                            for riga in storico:
-                                import re
-                                riga_colorata = re.sub(r"(\[EVENTO\]:.*)", r"<span style='color: #00FFFF;'>\1</span>", riga)
-                                
-                                def colora_parziale(match):
-                                    val = float(match.group(1))
-                                    colore = "#00FF00" if val >= 0 else "#FF4500"
-                                    return f"<span style='color: {colore};'>[Parziale: {val:+.0f} €]</span>"
-                                    
-                                riga_colorata = re.sub(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", colora_parziale, riga_colorata)
-                                riga_colorata = re.sub(r"(\[Totale:.*?\])", r"<span style='color: #FFD700;'><b>\1</b></span>", riga_colorata)
-                                html_str += f"&bull; {riga_colorata}<br>"
-                                
-                            html_str += "</div>"
-                            st.markdown(html_str, unsafe_allow_html=True)
-                            return True
-                        return False
-                        
-                    trovato_f = renderizza_storico("SIM_FIORDOK")
-                        
-                    if not trovato_f:
-                        st.warning("Nessun evento registrato durante questa simulazione.")
-                    
-                except Exception as e:
-                    st.error(f"Errore durante la simulazione: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
-
-
-    # --- TAB OTTIMIZZAZIONE GLOBALE ---
-    with tab_ottimizzazione:
-        st.title("🧪 Backtest (Simulazione Monte Carlo)")
-        st.markdown("Cerca i parametri migliori simulando migliaia di scenari (Laterali e Randomici).")
-        
-        import glob
-        cartella_salvataggi = os.path.join("Simulatore", "ottimizzazioni_salvate")
-        if not os.path.exists(cartella_salvataggi):
-            os.makedirs(cartella_salvataggi)
-            
-        def renderizza_risultati_ottimizzazione(df_full, modo_dati, nome_strumento=""):
-            # Raggruppamento Globale e Medie
-            df_global = df_full.groupby(["TP", "OPP", "DTS"]).mean().reset_index()
-            n_files = 10 if modo_dati == "Generazione Batch (LATERALE + RANDOM)" else 1
-            if "N_Simulazioni" not in df_full.columns:
-                df_global["N_Simulazioni"] = df_full.groupby(["TP", "OPP", "DTS"]).size().reset_index(drop=True) * n_files
-            else:
-                df_global["N_Simulazioni"] = df_full.groupby(["TP", "OPP", "DTS"]).size().reset_index(drop=True) * n_files
-            
-            # Calcolo Score RoMD e Win
-            df_global["Score RoMD"] = df_global["PNL Totale"] / df_global["Max Drawdown"].replace(0, 1)
-            df_global["Score Win"] = df_global["PNL Totale"] * (df_global["Win Rate %"] / 100.0)
-            
-            # Rinomino colonne per compattezza visiva
-            df_global = df_global.rename(columns={"Max Drawdown": "Max DD", "N_Simulazioni": "N. Test", "Score RoMD": "RoMD"})
-            
-            # Ordinamento per RoMD
-            df_global = df_global.sort_values(by="RoMD", ascending=False).reset_index(drop=True)
-            
-            # Formattazione per visualizzazione
-            col_display = ["TP", "OPP", "DTS", "PNL Long", "PNL Short", "PNL Totale", "Max DD", "Win Rate %", "RoMD", "Score Win", "N. Test"]
-            df_display = df_global[col_display].copy()
-            
-            # Stile per colorare la colonna Max DD di rosso salmone
-            def colora_max_dd(val):
-                return 'color: #FA8072; font-weight: bold;'
-            
-            if nome_strumento:
-                st.markdown(f"### 🏆 Classifica Globale {nome_strumento} - Parametri Migliori (Ordinata per RoMD)")
-            else:
-                st.markdown("### 🏆 Classifica Globale Parametri Migliori (Ordinata per RoMD)")
-            
-            # Applico stili: gradiente, colore Max DD
-            styled_df = df_display.style.background_gradient(subset=["RoMD", "PNL Totale"], cmap="RdYlGn")\
-                .map(colora_max_dd, subset=["Max DD"])\
-                .format({
-                "PNL Long": "{:.0f} €", "PNL Short": "{:.0f} €", "PNL Totale": "{:.0f} €", 
-                "Max DD": "-{:.0f} €", "RoMD": "{:.2f}", "Score Win": "{:.2f}"
-            })
-            
-            st.dataframe(styled_df, use_container_width=True)
-            
-            if "Median_CSV" in df_global.columns:
-                st.markdown("### 💾 Scarica i CSV dei Top 5 Risultati")
-                st.markdown("Questi file rappresentano lo scenario 'Mediano' (più vicino alla media statistica) per le combinazioni migliori. Scaricali e usali nel **Simulatore** per analizzare il dettaglio chirurgico (Fase 3, Micro, Ticket, ecc).")
-                
-                top_5 = df_global.head(5)
-                cols = st.columns(min(5, len(top_5)))
-                numeri_romani = ["I", "II", "III", "IV", "V"]
-                
-                for i, row in top_5.iterrows():
-                    csv_path = row.get("Median_CSV", "")
-                    if pd.notna(csv_path) and os.path.exists(str(csv_path)):
-                        with open(csv_path, "rb") as f:
-                            csv_data = f.read()
-                        
-                        nome_strum_clean = nome_strumento.replace("/", "").replace(" ", "") if nome_strumento else "Generico"
-                        suffisso = numeri_romani[i] if i < 5 else str(i+1)
-                        file_name = f"Backtest.{nome_strum_clean}.{suffisso}.csv"
-                        
-                        with cols[i]:
-                            st.download_button(
-                                label=f"↓ {suffisso} (TP:{int(row['TP'])})",
-                                data=csv_data,
-                                file_name=file_name,
-                                mime="text/csv",
-                                use_container_width=True
-                            )
-                            
-            st.markdown("### 🗺️ Mappa di Calore Globale (Robustezza RoMD)")
-            try:
-                import plotly.express as px
-                pivot_df = df_global.pivot_table(values="RoMD", index="DTS", columns="TP", aggfunc="mean")
-                fig = px.imshow(pivot_df, text_auto=".2f", color_continuous_scale="RdYlGn", aspect="auto", origin='lower')
-                fig.update_layout(title="RoMD Globale per Combinazione (TP vs DTS)", xaxis_title="Take Profit (TP)", yaxis_title="Distanza Sicurezza (DTS)")
-                st.plotly_chart(fig, use_container_width=True)
-            except Exception as e:
-                st.warning(f"Impossibile renderizzare la Heatmap: {e}")
-
-        # --- CARICAMENTO SALVATAGGI ---
-        st.markdown("### 📂 Carica Tabella Ottimizzazioni Salvate")
-        file_salvati = [f for f in os.listdir(cartella_salvataggi) if f.endswith(".csv")]
-        if file_salvati:
-            col_sel, col_btn = st.columns([3, 1])
-            with col_sel:
-                file_selezionato = st.selectbox("Seleziona un file salvato", ["-- Nessuno --"] + file_salvati, key="sel_file_ott_salvato")
-            with col_btn:
-                st.write("") # padding
-                st.write("")
-                btn_carica = st.button("Mostra Classifica", use_container_width=True)
-                
-            if btn_carica and file_selezionato != "-- Nessuno --":
-                st.markdown("---")
-                try:
-                    percorso_load = os.path.join(cartella_salvataggi, file_selezionato)
-                    df_loaded = pd.read_csv(percorso_load)
-                    st.success(f"Risultati caricati da {file_selezionato}")
-                    
-                    import re
-                    match = re.search(r"Ott\.(.+?)_\d+test", file_selezionato)
-                    strum_name = match.group(1).replace("_", " ") if match else file_selezionato.replace(".csv", "")
-                    
-                    renderizza_risultati_ottimizzazione(df_loaded, "Generazione Batch (LATERALE + RANDOM)", strum_name)
-                except Exception as e:
-                    st.error(f"Errore caricamento: {e}")
-                st.markdown("---")
-        else:
-            st.info("Nessun salvataggio presente.")
-            
-        st.markdown("---")
-        
-        st.markdown("### 1. Seleziona Strumento da Ottimizzare")
-        
-        r_nome_ott = st.selectbox("Seleziona lo Strumento per agganciare le quotazioni Live e i moltiplicatori reali:", tutti_strumenti, key="ott_r_nome")
-        
-        # Recupero config base per lo strumento selezionato
-        c_ott = CONFIG_STRUMENTI.get(r_nome_ott, {})
-        def_tick = c_ott.get("tick_size", 1.0)
-        def_mult = c_ott.get("moltiplicatore_dts", 1.0)
-        
-        # Gestione prezzo live se disponibile, altrimenti default
-        prezzo_live_ott = prezzi_live.get(r_nome_ott, 0.0)
-        if prezzo_live_ott > 0:
-            def_part = float(prezzo_live_ott)
-            lbl_partenza = f"Prezzo START (Live) su {r_nome_ott}"
-        else:
-            def_part = 2400.0 if "Gold" in r_nome_ott or "Cash" in r_nome_ott else (1.1000 if "USD" in r_nome_ott else 160.0)
-            lbl_partenza = f"Prezzo START (Default) su {r_nome_ott}"
-            
-        # Default per le griglie
-        if "USD" in r_nome_ott and "Gold" not in r_nome_ott and "Cash" not in r_nome_ott:
-            # Forex Major
-            def_tp_min, def_tp_max, def_tp_step = 20.0, 60.0, 20.0
-            def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
-            def_tic_tot = 10000
-        elif "JPY" in r_nome_ott:
-            # Forex JPY
-            def_tp_min, def_tp_max, def_tp_step = 20.0, 60.0, 20.0
-            def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
-            def_tic_tot = 10000
-        else:
-            # Oro / Indici
-            def_tp_min, def_tp_max, def_tp_step = 40.0, 100.0, 20.0
-            def_dts_min, def_dts_max, def_dts_step = 30.0, 80.0, 10.0
-            def_tic_tot = 5000
-            
-        def_size = 10.0
-        def_val_punto = 1.0
-        def_target_sim = 50
-        
-        # Caricamento memorie parametri
-        file_memoria_ott = os.path.join(cartella_salvataggi, "memoria_parametri_ott.json")
-        import json
-        if os.path.exists(file_memoria_ott):
-            try:
-                with open(file_memoria_ott, "r") as f:
-                    memoria_ott = json.load(f)
-                memoria_strumento = memoria_ott.get(r_nome_ott, {})
-                if memoria_strumento:
-                    def_tp_min = memoria_strumento.get("tp_min", def_tp_min)
-                    def_tp_max = memoria_strumento.get("tp_max", def_tp_max)
-                    def_tp_step = memoria_strumento.get("tp_step", def_tp_step)
-                    def_dts_min = memoria_strumento.get("dts_min", def_dts_min)
-                    def_dts_max = memoria_strumento.get("dts_max", def_dts_max)
-                    def_dts_step = memoria_strumento.get("dts_step", def_dts_step)
-                    def_size = memoria_strumento.get("size", def_size)
-                    def_val_punto = memoria_strumento.get("val_punto", def_val_punto)
-                    def_target_sim = memoria_strumento.get("target_sim", def_target_sim)
-                    def_tic_tot = memoria_strumento.get("tic_tot", def_tic_tot)
-            except Exception as e:
-                pass
-            
-        fmt = "%.4f" if def_tick < 0.01 else "%.2f"
-        
-        safe_nome = r_nome_ott.replace(" ", "_").replace("/", "")
-        ott_modo_dati = st.radio("Modalità Dati", ["Generazione Batch (LATERALE + RANDOM)", "File Singolo Esistente"], key=f"ott_modo_{safe_nome}")
-        
-        import pandas as pd
-        file_paths_ott = []
-        ott_partenza = def_part
-        ott_tick_size = def_tick
-        ott_tic_tot = def_tic_tot
-        
-        st.markdown("### 2. Dati di Partenza")
-        if ott_modo_dati == "File Singolo Esistente":
-            file_upload_ott = st.file_uploader("Carica Storico CSV", type=['csv'], key=f"ott_up_{safe_nome}")
-            if file_upload_ott is not None:
-                tmp_path = "temp_ottimizzazione.csv"
-                with open(tmp_path, "wb") as f: f.write(file_upload_ott.getbuffer())
-                file_paths_ott.append(tmp_path)
-        else:
-            c_g1, c_g2 = st.columns(2)
-            with c_g1: ott_partenza = st.number_input(lbl_partenza, value=def_part, step=def_tick*10, format=fmt, key=f"ott_part_{safe_nome}")
-            with c_g2: ott_tic_tot = st.number_input("Numero di Tick per file", value=def_tic_tot, step=1000, key=f"ott_tic_tot_{safe_nome}")
-            
-        st.markdown("### 3. Configura la Griglia dei Parametri")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown("#### TP (Take Profit)")
-            tp_min = st.number_input("TP Minimo", value=def_tp_min, step=def_tp_step, format=fmt, key=f"ott_tp_min_{safe_nome}")
-            tp_max = st.number_input("TP Massimo", value=def_tp_max, step=def_tp_step, format=fmt, key=f"ott_tp_max_{safe_nome}")
-            tp_step = st.number_input("TP Step", value=def_tp_step, step=def_tp_step, format=fmt, key=f"ott_tp_step_{safe_nome}")
-        with c2:
-            st.markdown("#### DTS (Distanza Sicurezza)")
-            dts_min = st.number_input("DTS Minimo", value=def_dts_min, step=def_dts_step, format=fmt, key=f"ott_dts_min_{safe_nome}")
-            dts_max = st.number_input("DTS Massimo", value=def_dts_max, step=def_dts_step, format=fmt, key=f"ott_dts_max_{safe_nome}")
-            dts_step = st.number_input("DTS Step", value=def_dts_step, step=def_dts_step, format=fmt, key=f"ott_dts_step_{safe_nome}")
-        with c3:
-            st.markdown("#### Variabili Fisse")
-            ott_size = st.number_input("Size Iniziale", value=def_size, step=1.0, key=f"ott_size_{safe_nome}")
-            ott_val_punto = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("valore_punto", 1.0)
-            
-        st.markdown("#### Automazione")
-        def_target_sim = min(def_target_sim, 1000) # Assicuriamoci che non superi il nuovo massimo
-        ott_target_sim = st.number_input("Target Simulazioni (File totali)", min_value=10, max_value=1000, value=def_target_sim, step=10, key=f"ott_target_sim_{safe_nome}")
-        
-        if st.button(f"🚀 Avvia Backtest per {r_nome_ott}", type="primary", use_container_width=True):
-            # Salvataggio parametri in memoria
-            try:
-                memoria_ott = {}
-                if os.path.exists(file_memoria_ott):
-                    with open(file_memoria_ott, "r") as f:
-                        memoria_ott = json.load(f)
-                memoria_ott[r_nome_ott] = {
-                    "tp_min": float(tp_min), "tp_max": float(tp_max), "tp_step": float(tp_step),
-                    "dts_min": float(dts_min), "dts_max": float(dts_max), "dts_step": float(dts_step),
-                    "size": float(ott_size), "val_punto": float(ott_val_punto), "target_sim": int(ott_target_sim),
-                    "tic_tot": int(ott_tic_tot)
-                }
-                with open(file_memoria_ott, "w") as f:
-                    json.dump(memoria_ott, f, indent=4)
-            except Exception as e:
-                pass
-                
-            import numpy as np
-            import shutil
-            tp_list = np.arange(tp_min, tp_max + tp_step, tp_step).tolist()
-            dts_list = np.arange(dts_min, dts_max + dts_step, dts_step).tolist()
-            tp_range = {"min": tp_min, "max": tp_max, "step": tp_step}
-            dts_range = {"min": dts_min, "max": dts_max, "step": dts_step}
-            storico_file = "ottimizzazione_storico_globale.csv"
-            
-            # Resetto sempre lo storico prima di un nuovo calcolo
-            if os.path.exists(storico_file):
-                os.remove(storico_file)
-            
-            if ott_modo_dati == "Generazione Batch (LATERALE + RANDOM)":
-                iterazioni = max(1, int(ott_target_sim / 10))
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                import time
-                for it in range(iterazioni):
-                    status_text.markdown(f"**Elaborazione in corso... Batch {it+1}/{iterazioni} ({(it+1)*10} file totali)**")
-                    
-                    file_paths_ott = []
-                    molt_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("moltiplicatore", 1.0)
-                    dec_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("decimali", 5)
-                    v_valuta_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("valuta", "EUR")
-                    if molt_ott == 1.0:
-                        real_tick_ott = 1.0
-                    else:
-                        real_tick_ott = 5.0 * molt_ott
-                    
-                    for i in range(5):
-                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "LATERALE", ott_partenza, real_tick_ott, ott_tic_tot, ott_size, decimali=dec_ott)
-                        file_paths_ott.append(p)
-                    for i in range(5):
-                        p = Simulatore_Avanzato.genera_base_dati(f"BATCH_OTT_{int(time.time()*1000)}_{i}", "RANDOM", ott_partenza, real_tick_ott, ott_tic_tot, ott_size, decimali=dec_ott)
-                        file_paths_ott.append(p)
-                        
-                    df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto, valuta=v_valuta_ott, molt_strum=molt_ott, save_median=(it==0))
-                    
-                    if not df_res.empty:
-                        if os.path.exists(storico_file):
-                            df_storico = pd.read_csv(storico_file)
-                            df_full = pd.concat([df_storico, df_res], ignore_index=True)
-                        else:
-                            df_full = df_res.copy()
-                        df_full.to_csv(storico_file, index=False)
-                        
-                    for p in file_paths_ott:
-                        if os.path.exists(p):
-                            os.remove(p)
-                            try:
-                                parent_dir = os.path.dirname(p)
-                                if os.path.exists(parent_dir) and not os.listdir(parent_dir):
-                                    os.rmdir(parent_dir)
-                            except:
-                                pass
-                    progress_bar.progress((it + 1) / iterazioni)
-                
-                tot_sim_effettive = iterazioni * 10
-                status_text.success(f"✅ Backtest completato! ({tot_sim_effettive} file elaborati)")
-                
-            else:
-                tot_sim_effettive = 1
-                if not file_paths_ott:
-                    st.error("Nessun dataset selezionato.")
-                else:
-                    with st.spinner("Backtest file singolo in corso..."):
-                        molt_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("moltiplicatore", 1.0)
-                        v_valuta_ott = CONFIG_STRUMENTI.get(r_nome_ott, {}).get("valuta", "EUR")
-                        df_res = Simulatore_Avanzato.esegui_ottimizzazione_griglia(file_paths_ott, tp_range, dts_range, size=ott_size, mult=def_mult, valore_punto=ott_val_punto, valuta=v_valuta_ott, molt_strum=molt_ott, save_median=True)
-                        if not df_res.empty:
-                            if os.path.exists(storico_file):
-                                df_storico = pd.read_csv(storico_file)
-                                df_full = pd.concat([df_storico, df_res], ignore_index=True)
-                            else:
-                                df_full = df_res.copy()
-                            df_full.to_csv(storico_file, index=False)
-                            st.success("✅ Backtest file singolo completato!")
-                            
-            if os.path.exists(storico_file):
-                df_full = pd.read_csv(storico_file)
-                
-                # Logica di salvataggio automatico e pulizia
-                nome_pulito = r_nome_ott.replace(" ", "_").replace("/", "")
-                base_file_name = f"Ott.{nome_pulito}_{tot_sim_effettive}test"
-                file_finale = f"{base_file_name}.csv"
-                path_finale = os.path.join(cartella_salvataggi, file_finale)
-                
-                # Gestione versionamento per non sovrascrivere file esistenti (v02, v03...)
-                counter = 2
-                while os.path.exists(path_finale):
-                    file_finale = f"{base_file_name}_v{counter:02d}.csv"
-                    path_finale = os.path.join(cartella_salvataggi, file_finale)
-                    counter += 1
-                
-                shutil.copy(storico_file, path_finale)
-                os.remove(storico_file)
-                
-                st.success(f"💾 Risultati salvati automaticamente in: `{file_finale}`")
-                
-                # Mostra subito i risultati
-                renderizza_risultati_ottimizzazione(df_full, ott_modo_dati, r_nome_ott)
-            else:
-                st.warning("Nessun risultato ottenuto (griglia vuota o nessun test eseguito).")
