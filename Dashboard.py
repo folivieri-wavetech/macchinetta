@@ -1997,6 +1997,7 @@ else:
                     url = f"{base_url}/prices/{epic}/{grafico_res}/{max_fetch}"
                     
                     resp = requests.get(url, headers=h_api)
+                    df = None
                     if resp.status_code == 200:
                         data = resp.json().get("prices", [])
                         if data:
@@ -2019,132 +2020,140 @@ else:
                             # Salva cache aggiornata per i click successivi
                             os.makedirs(os.path.dirname(cache_file), exist_ok=True)
                             df.to_csv(cache_file, index=False)
-                            
-                            # Calcolo Donchian Midlines
-                            df['Donchian_55'] = (df['High'].rolling(55).max() + df['Low'].rolling(55).min()) / 2
-                            df['Donchian_21'] = (df['High'].rolling(21).max() + df['Low'].rolling(21).min()) / 2
-                            
-                            # Calcolo HMA 377
-                            def WMA(s, period):
-                                weights = np.arange(1, period + 1)
-                                return s.rolling(period).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
-                            
-                            if len(df) >= 377:
-                                half_len = int(377 / 2)
-                                sqrt_len = int(np.sqrt(377))
-                                wmaf = WMA(df['Close'], half_len)
-                                wmas = WMA(df['Close'], 377)
-                                diff = 2 * wmaf - wmas
-                                df['HMA_377'] = WMA(diff, sqrt_len)
-                            else:
-                                df['HMA_377'] = np.nan
-                                
-                            # Punti Pivot (Daily e Weekly)
-                            df['Date'] = df['Time'].dt.date
-                            df['YearWeek'] = df['Time'].dt.isocalendar().year.astype(str) + '-' + df['Time'].dt.isocalendar().week.astype(str)
-                            
-                            daily_agg = df.groupby('Date').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
-                            daily_agg['Pivot_Daily'] = (daily_agg['High'] + daily_agg['Low'] + daily_agg['Close']) / 3
-                            daily_agg['Pivot_Daily'] = daily_agg['Pivot_Daily'].shift(1)
-                            
-                            weekly_agg = df.groupby('YearWeek').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
-                            weekly_agg['Pivot_Weekly'] = (weekly_agg['High'] + weekly_agg['Low'] + weekly_agg['Close']) / 3
-                            weekly_agg['Pivot_Weekly'] = weekly_agg['Pivot_Weekly'].shift(1)
-                            
-                            df = df.merge(daily_agg[['Pivot_Daily']], on='Date', how='left')
-                            df = df.merge(weekly_agg[['Pivot_Weekly']], on='YearWeek', how='left')
-                            
-                            # Costruzione Plotly Figure
-                            fig = go.Figure()
-                            
-                            # Candele
-                            fig.add_trace(go.Candlestick(
-                                x=df['Time'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
-                                name='Prezzo', 
-                                increasing_line_color='white', increasing_fillcolor='#7CFC00', 
-                                decreasing_line_color='white', decreasing_fillcolor='#FA8072'
-                            ))
-                            
-                            # Estrazione ultimi valori per la legenda
-                            val_d55 = round(df['Donchian_55'].iloc[-1], 5) if pd.notna(df['Donchian_55'].iloc[-1]) else "-"
-                            val_d21 = round(df['Donchian_21'].iloc[-1], 5) if pd.notna(df['Donchian_21'].iloc[-1]) else "-"
-                            val_hma = round(df['HMA_377'].iloc[-1], 5) if pd.notna(df['HMA_377'].iloc[-1]) else "-"
-                            val_pd = round(df['Pivot_Daily'].iloc[-1], 5) if pd.notna(df['Pivot_Daily'].iloc[-1]) else "-"
-                            val_pw = round(df['Pivot_Weekly'].iloc[-1], 5) if pd.notna(df['Pivot_Weekly'].iloc[-1]) else "-"
-                            
-                            # Kijun (Gialla, tratto-punto, spessa)
-                            fig.add_trace(go.Scatter(x=df['Time'], y=df['Donchian_55'], mode='lines', name=f'<span style="color:yellow;">Kijun<br><b>{val_d55}</b></span>', line=dict(color='yellow', dash='dashdot', width=2.5)))
-                            
-                            # Tenkan (Azzurro/Blu chiaro, tratto-punto, spessa)
-                            fig.add_trace(go.Scatter(x=df['Time'], y=df['Donchian_21'], mode='lines', name=f'<span style="color:#00BFFF;">Tenkan<br><b>{val_d21}</b></span>', line=dict(color='#00BFFF', dash='dashdot', width=2.5)))
-                            
-                            # HMA 377 (Grigio Chiaro, tratto-punto, spessa)
-                            if df['HMA_377'].notna().any():
-                                fig.add_trace(go.Scatter(x=df['Time'], y=df['HMA_377'], mode='lines', name=f'<span style="color:lightgray;">HMA 377<br><b>{val_hma}</b></span>', line=dict(color='lightgray', dash='dashdot', width=2.5)))
-                            
-                            # Pivot (Solo l'ultimo per non sporcare il grafico storico)
-                            fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', name=f'<span style="color:#4CAF50;">Pivot Daily<br><b>{val_pd}</b></span>', line=dict(color='#4CAF50', width=2)))
-                            fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', name=f'<span style="color:orange;">Pivot Weekly<br><b>{val_pw}</b></span>', line=dict(color='orange', width=2)))
-                            
-                            last_date = df['Date'].iloc[-1]
-                            group_daily = df[df['Date'] == last_date]
-                            if group_daily['Pivot_Daily'].notna().any():
-                                fig.add_trace(go.Scatter(x=group_daily['Time'], y=group_daily['Pivot_Daily'], mode='lines', showlegend=False, line=dict(color='#4CAF50', width=2)))
-                                
-                            last_week = df['YearWeek'].iloc[-1]
-                            group_weekly = df[df['YearWeek'] == last_week]
-                            if group_weekly['Pivot_Weekly'].notna().any():
-                                fig.add_trace(go.Scatter(x=group_weekly['Time'], y=group_weekly['Pivot_Weekly'], mode='lines', showlegend=False, line=dict(color='orange', width=2)))
-                            
-                            # Macro Supporti e Resistenze (ProRealTrend style)
-                            peaks_w, troughs_w = fetch_and_calc_sr(epic, h_api, base_url, "WEEK", 5)
-                            peaks_m, troughs_m = fetch_and_calc_sr(epic, h_api, base_url, "MONTH", 5)
-                            
-                            for p in peaks_w:
-                                fig.add_hline(y=p, line_dash="dot", line_color="salmon", opacity=0.8, annotation_text="Resistenza (W)", annotation_position="top left")
-                            for t in troughs_w:
-                                fig.add_hline(y=t, line_dash="dot", line_color="limegreen", opacity=0.8, annotation_text="Supporto (W)", annotation_position="bottom left")
-                            for p in peaks_m:
-                                fig.add_hline(y=p, line_dash="dash", line_color="salmon", opacity=1.0, line_width=2, annotation_text="Resistenza (M)", annotation_position="top right")
-                            for t in troughs_m:
-                                fig.add_hline(y=t, line_dash="dash", line_color="limegreen", opacity=1.0, line_width=2, annotation_text="Supporto (M)", annotation_position="bottom right")
-
-                            
-                            # Zoom Iniziale asse X e Y (ultime 100 candele per tutti i timeframe)
-                            visible = 100
-                            
-                            if visible < len(df):
-                                x_start = df['Time'].iloc[-visible]
-                                x_end = df['Time'].iloc[-1]
-                                xaxis_dict = dict(rangeslider=dict(visible=False), range=[x_start, x_end], rangebreaks=[dict(bounds=["sat", "mon"])])
-                                
-                                # Calcolo min/max per centrare asse Y sulle candele visibili
-                                df_vis = df.tail(visible)
-                                cols_to_check = ['High', 'Low', 'Donchian_55', 'Donchian_21', 'HMA_377', 'Pivot_Daily', 'Pivot_Weekly']
-                                min_y = df_vis[cols_to_check].min().min()
-                                max_y = df_vis[cols_to_check].max().max()
-                                padding = (max_y - min_y) * 0.05
-                                yaxis_dict = dict(side='right', range=[min_y - padding, max_y + padding])
-                            else:
-                                xaxis_dict = dict(rangeslider=dict(visible=False), rangebreaks=[dict(bounds=["sat", "mon"])])
-                                yaxis_dict = dict(side='right')
-                            
-                            fig.update_layout(
-                                title=f'{grafico_strum} - {grafico_res_label}',
-                                template='plotly_dark',
-                                dragmode='pan',
-                                yaxis=yaxis_dict,
-                                xaxis=xaxis_dict,
-                                height=750,
-                                margin=dict(l=20, r=20, t=100, b=20),
-                                legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0)
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
                         else:
-                            st.warning("Nessun dato restituito dall'API per questo timeframe.")
+                            if df_cache is not None and not df_cache.empty:
+                                df = df_cache
+                            else:
+                                st.warning("Nessun dato restituito dall'API per questo timeframe.")
                     else:
-                        st.error(f"Errore API IG: {resp.text}")
+                        if df_cache is not None and not df_cache.empty:
+                            df = df_cache
+                            st.warning("⚠️ Limite settimanale dati storici IG raggiunto. Grafico visualizzato dall'ultima cache salvata.")
+                        else:
+                            st.error(f"Errore API IG: {resp.text}\n(Nessuna cache locale disponibile per {grafico_strum}. Si sbloccherà al reset settimanale di IG).")
+                    
+                    if df is not None and not df.empty:
+                        # Calcolo Donchian Midlines
+                        df['Donchian_55'] = (df['High'].rolling(55).max() + df['Low'].rolling(55).min()) / 2
+                        df['Donchian_21'] = (df['High'].rolling(21).max() + df['Low'].rolling(21).min()) / 2
+                        
+                        # Calcolo HMA 377
+                        def WMA(s, period):
+                            weights = np.arange(1, period + 1)
+                            return s.rolling(period).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+                        
+                        if len(df) >= 377:
+                            half_len = int(377 / 2)
+                            sqrt_len = int(np.sqrt(377))
+                            wmaf = WMA(df['Close'], half_len)
+                            wmas = WMA(df['Close'], 377)
+                            diff = 2 * wmaf - wmas
+                            df['HMA_377'] = WMA(diff, sqrt_len)
+                        else:
+                            df['HMA_377'] = np.nan
+                            
+                        # Punti Pivot (Daily e Weekly)
+                        df['Date'] = df['Time'].dt.date
+                        df['YearWeek'] = df['Time'].dt.isocalendar().year.astype(str) + '-' + df['Time'].dt.isocalendar().week.astype(str)
+                        
+                        daily_agg = df.groupby('Date').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
+                        daily_agg['Pivot_Daily'] = (daily_agg['High'] + daily_agg['Low'] + daily_agg['Close']) / 3
+                        daily_agg['Pivot_Daily'] = daily_agg['Pivot_Daily'].shift(1)
+                        
+                        weekly_agg = df.groupby('YearWeek').agg({'High': 'max', 'Low': 'min', 'Close': 'last'})
+                        weekly_agg['Pivot_Weekly'] = (weekly_agg['High'] + weekly_agg['Low'] + weekly_agg['Close']) / 3
+                        weekly_agg['Pivot_Weekly'] = weekly_agg['Pivot_Weekly'].shift(1)
+                        
+                        df = df.merge(daily_agg[['Pivot_Daily']], on='Date', how='left')
+                        df = df.merge(weekly_agg[['Pivot_Weekly']], on='YearWeek', how='left')
+                        
+                        # Costruzione Plotly Figure
+                        fig = go.Figure()
+                        
+                        # Candele
+                        fig.add_trace(go.Candlestick(
+                            x=df['Time'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
+                            name='Prezzo', 
+                            increasing_line_color='white', increasing_fillcolor='#7CFC00', 
+                            decreasing_line_color='white', decreasing_fillcolor='#FA8072'
+                        ))
+                        
+                        # Estrazione ultimi valori per la legenda
+                        val_d55 = round(df['Donchian_55'].iloc[-1], 5) if pd.notna(df['Donchian_55'].iloc[-1]) else "-"
+                        val_d21 = round(df['Donchian_21'].iloc[-1], 5) if pd.notna(df['Donchian_21'].iloc[-1]) else "-"
+                        val_hma = round(df['HMA_377'].iloc[-1], 5) if pd.notna(df['HMA_377'].iloc[-1]) else "-"
+                        val_pd = round(df['Pivot_Daily'].iloc[-1], 5) if pd.notna(df['Pivot_Daily'].iloc[-1]) else "-"
+                        val_pw = round(df['Pivot_Weekly'].iloc[-1], 5) if pd.notna(df['Pivot_Weekly'].iloc[-1]) else "-"
+                        
+                        # Kijun (Gialla, tratto-punto, spessa)
+                        fig.add_trace(go.Scatter(x=df['Time'], y=df['Donchian_55'], mode='lines', name=f'<span style="color:yellow;">Kijun<br><b>{val_d55}</b></span>', line=dict(color='yellow', dash='dashdot', width=2.5)))
+                        
+                        # Tenkan (Azzurro/Blu chiaro, tratto-punto, spessa)
+                        fig.add_trace(go.Scatter(x=df['Time'], y=df['Donchian_21'], mode='lines', name=f'<span style="color:#00BFFF;">Tenkan<br><b>{val_d21}</b></span>', line=dict(color='#00BFFF', dash='dashdot', width=2.5)))
+                        
+                        # HMA 377 (Grigio Chiaro, tratto-punto, spessa)
+                        if df['HMA_377'].notna().any():
+                            fig.add_trace(go.Scatter(x=df['Time'], y=df['HMA_377'], mode='lines', name=f'<span style="color:lightgray;">HMA 377<br><b>{val_hma}</b></span>', line=dict(color='lightgray', dash='dashdot', width=2.5)))
+                        
+                        # Pivot (Solo l'ultimo per non sporcare il grafico storico)
+                        fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', name=f'<span style="color:#4CAF50;">Pivot Daily<br><b>{val_pd}</b></span>', line=dict(color='#4CAF50', width=2)))
+                        fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', name=f'<span style="color:orange;">Pivot Weekly<br><b>{val_pw}</b></span>', line=dict(color='orange', width=2)))
+                        
+                        last_date = df['Date'].iloc[-1]
+                        group_daily = df[df['Date'] == last_date]
+                        if group_daily['Pivot_Daily'].notna().any():
+                            fig.add_trace(go.Scatter(x=group_daily['Time'], y=group_daily['Pivot_Daily'], mode='lines', showlegend=False, line=dict(color='#4CAF50', width=2)))
+                            
+                        last_week = df['YearWeek'].iloc[-1]
+                        group_weekly = df[df['YearWeek'] == last_week]
+                        if group_weekly['Pivot_Weekly'].notna().any():
+                            fig.add_trace(go.Scatter(x=group_weekly['Time'], y=group_weekly['Pivot_Weekly'], mode='lines', showlegend=False, line=dict(color='orange', width=2)))
+                        
+                        # Macro Supporti e Resistenze (ProRealTrend style)
+                        peaks_w, troughs_w = fetch_and_calc_sr(epic, h_api, base_url, "WEEK", 5)
+                        peaks_m, troughs_m = fetch_and_calc_sr(epic, h_api, base_url, "MONTH", 5)
+                        
+                        for p in peaks_w:
+                            fig.add_hline(y=p, line_dash="dot", line_color="salmon", opacity=0.8, annotation_text="Resistenza (W)", annotation_position="top left")
+                        for t in troughs_w:
+                            fig.add_hline(y=t, line_dash="dot", line_color="limegreen", opacity=0.8, annotation_text="Supporto (W)", annotation_position="bottom left")
+                        for p in peaks_m:
+                            fig.add_hline(y=p, line_dash="dash", line_color="salmon", opacity=1.0, line_width=2, annotation_text="Resistenza (M)", annotation_position="top right")
+                        for t in troughs_m:
+                            fig.add_hline(y=t, line_dash="dash", line_color="limegreen", opacity=1.0, line_width=2, annotation_text="Supporto (M)", annotation_position="bottom right")
+
+                        
+                        # Zoom Iniziale asse X e Y (ultime 100 candele per tutti i timeframe)
+                        visible = 100
+                        
+                        if visible < len(df):
+                            x_start = df['Time'].iloc[-visible]
+                            x_end = df['Time'].iloc[-1]
+                            xaxis_dict = dict(rangeslider=dict(visible=False), range=[x_start, x_end], rangebreaks=[dict(bounds=["sat", "mon"])])
+                            
+                            # Calcolo min/max per centrare asse Y sulle candele visibili
+                            df_vis = df.tail(visible)
+                            cols_to_check = ['High', 'Low', 'Donchian_55', 'Donchian_21', 'HMA_377', 'Pivot_Daily', 'Pivot_Weekly']
+                            min_y = df_vis[cols_to_check].min().min()
+                            max_y = df_vis[cols_to_check].max().max()
+                            padding = (max_y - min_y) * 0.05
+                            yaxis_dict = dict(side='right', range=[min_y - padding, max_y + padding])
+                        else:
+                            xaxis_dict = dict(rangeslider=dict(visible=False), rangebreaks=[dict(bounds=["sat", "mon"])])
+                            yaxis_dict = dict(side='right')
+                        
+                        fig.update_layout(
+                            title=f'{grafico_strum} - {grafico_res_label}',
+                            template='plotly_dark',
+                            dragmode='pan',
+                            yaxis=yaxis_dict,
+                            xaxis=xaxis_dict,
+                            height=750,
+                            margin=dict(l=20, r=20, t=100, b=20),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0)
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
                 else:
                     st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
 
