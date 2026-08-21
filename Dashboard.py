@@ -1928,9 +1928,9 @@ else:
                 
                 cache_file = os.path.join(ROOT_DIR, "Logs_e_Cache", f"sr_cache_{epic}_{res}.json")
                 
-                # Check if valid cache exists (younger than 12 hours)
+                # Cache valida per 7 giorni (livelli W/M non cambiano intraday)
                 if os.path.exists(cache_file):
-                    if time.time() - os.path.getmtime(cache_file) < 43200: # 12 ore
+                    if time.time() - os.path.getmtime(cache_file) < 604800: # 7 giorni
                         try:
                             with open(cache_file, "r") as f:
                                 data = json.load(f)
@@ -1939,7 +1939,8 @@ else:
                             pass
                 
                 try:
-                    url = f"{base_url}/prices/{epic}/{res}/150"
+                    num_candles = 36 if res == "WEEK" else 24
+                    url = f"{base_url}/prices/{epic}/{res}/{num_candles}"
                     resp = requests.get(url, headers=h_api)
                     if resp.status_code == 200:
                         data = resp.json().get("prices", [])
@@ -1962,7 +1963,13 @@ else:
                                 
                             return peaks, troughs
                     else:
-                        st.sidebar.error(f"Errore IG Storico ({res}): {resp.text}")
+                        if os.path.exists(cache_file):
+                            try:
+                                with open(cache_file, "r") as f:
+                                    data = json.load(f)
+                                    return data.get("peaks", []), data.get("troughs", [])
+                            except Exception:
+                                pass
                 except Exception:
                     pass
                 return [], []
@@ -1971,10 +1978,10 @@ else:
                 epic = CONFIG_STRUMENTI[grafico_strum]["epic"]
                 h_api = get_ig_headers(conto_selezionato)
                 if h_api:
-                    # Logica Cache Intelligente per evitare limiti API
+                    # Logica Cache Intelligente per minimizzare consumo API
                     import os
                     cache_file = os.path.join(ROOT_DIR, "Logs_e_Cache", f"cache_candele_{epic}_{grafico_res}.csv")
-                    max_fetch = 600
+                    max_fetch = 350
                     df_cache = None
                     
                     if os.path.exists(cache_file):
@@ -1984,10 +1991,10 @@ else:
                                 last_time = df_cache['Time'].iloc[-1]
                                 gap_minutes = (pd.Timestamp.utcnow().tz_localize(None) - last_time).total_seconds() / 60
                                 res_to_min = {"MINUTE_5": 5, "MINUTE_15": 15, "HOUR": 60, "HOUR_4": 240, "DAY": 1440, "WEEK": 10080}
-                                # Calcoliamo le candele mancanti + un buffer enorme di 50 candele per gestire fusi orari
-                                candles_needed = int(abs(gap_minutes) / res_to_min.get(grafico_res, 60)) + 50
-                                if candles_needed < 600:
-                                    max_fetch = max(10, candles_needed)
+                                # Calcoliamo le candele mancanti + un buffer stretto di 10 candele
+                                candles_needed = int(abs(gap_minutes) / res_to_min.get(grafico_res, 60)) + 10
+                                if candles_needed < 350:
+                                    max_fetch = max(5, candles_needed)
                         except Exception:
                             pass
 
