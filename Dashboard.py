@@ -136,16 +136,15 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
         html_str += "<div style='margin-top: 15px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
         html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.2f} €</span></div>"
         
-        st.markdown(html_str, unsafe_allow_html=True)
+        st.html(html_str)
     else:
         st.info("Nessun evento registrato in questo ciclo.")
         
-    # --- TABELLINA RIASSUNTIVA STATISTICHE ---
     if conto:
         mem = carica_memoria(conto)
         stats = mem.get(nome_strumento, {}).get("stats", {})
         if stats:
-            st.markdown("<div style='margin-top: 15px; margin-bottom: 5px; font-weight: 700; color: #00FFCC; font-size: 0.95rem;'>📊 Riepilogo Statistiche Ciclo</div>", unsafe_allow_html=True)
+            st.html("<div style='margin-top: 15px; margin-bottom: 5px; font-weight: 700; color: #00FFCC; font-size: 0.95rem;'>📊 Riepilogo Statistiche Ciclo</div>")
             
             righe_tabella = []
             fasi_sotto = ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]
@@ -243,7 +242,7 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
             </table>
             </div>
             """
-            st.markdown(tabella_html, unsafe_allow_html=True)
+            st.html(tabella_html)
     st.markdown("---")
 
 def get_ig_headers(conto_selezionato):
@@ -957,7 +956,7 @@ else:
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
-            st.markdown(html_pos, unsafe_allow_html=True)
+            st.html(html_pos)
             
             # --- ELABORAZIONE ORDINI PENDENTI ---
             html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th></tr></thead>\n<tbody>\n"
@@ -1022,7 +1021,7 @@ else:
             
             if not ord_data: html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessun ordine pendente al momento.</p>"
 
-            st.markdown(html_ord, unsafe_allow_html=True)
+            st.html(html_ord)
             
         renderizza_portafoglio()
 
@@ -1742,8 +1741,8 @@ else:
                         html_t1 += f"<tr><td>{strum}</td>{td_pl}{td_f1}{td_f2}{td_f3}{td_alt}</tr>"
                     html_t1 += "</tbody></table></div>"
                     
-                    st.markdown(html_t1, unsafe_allow_html=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.html(html_t1)
+                    st.html("<br>")
                     
                     # --- RENDIMENTO PER FASE (Sotto) ---
                     st.subheader("Rendimento per Fase")
@@ -1773,7 +1772,7 @@ else:
                         html_t2 += f"<tr><td>{fase}</td><td class='{pnl_class}'>{pnl_str}</td><td>{tot_op}</td><td class='{win_class}'>{win}</td><td class='{loss_class}'>{loss}</td><td class='{wr_class}'>{wr:.1f}%</td></tr>"
                     html_t2 += "</tbody></table></div>"
                     
-                    st.markdown(html_t2, unsafe_allow_html=True)
+                    st.html(html_t2)
                     
 
                     
@@ -1813,7 +1812,7 @@ else:
                 '>
                     {logs_escaped}
                 </div>
-            """, unsafe_allow_html=True)
+            """)
             
         renderizza_console()
 
