@@ -681,12 +681,23 @@ else:
             
         def renderizza_risultati_ottimizzazione(df_full, modo_dati, nome_strumento=""):
             # Raggruppamento Globale e Medie
-            df_global = df_full.groupby(["TP", "OPP", "DTS"]).mean().reset_index()
+            groupby_cols = ["TP", "OPP", "DTS"]
+            numeric_cols = df_full.select_dtypes(include=[np.number]).columns.tolist()
+            for col in groupby_cols:
+                if col not in numeric_cols and col in df_full.columns:
+                    numeric_cols.append(col)
+                    
+            df_global = df_full[numeric_cols].groupby(groupby_cols).mean().reset_index()
+            
+            if "Median_CSV" in df_full.columns:
+                median_map = df_full.groupby(groupby_cols)["Median_CSV"].first().reset_index()
+                df_global = df_global.merge(median_map, on=groupby_cols, how="left")
+                
             n_files = 10 if modo_dati == "Generazione Batch (LATERALE + RANDOM)" else 1
             if "N_Simulazioni" not in df_full.columns:
-                df_global["N_Simulazioni"] = df_full.groupby(["TP", "OPP", "DTS"]).size().reset_index(drop=True) * n_files
+                df_global["N_Simulazioni"] = df_full.groupby(groupby_cols).size().reset_index(drop=True) * n_files
             else:
-                df_global["N_Simulazioni"] = df_full.groupby(["TP", "OPP", "DTS"]).size().reset_index(drop=True) * n_files
+                df_global["N_Simulazioni"] = df_full.groupby(groupby_cols).size().reset_index(drop=True) * n_files
             
             # Calcolo Score RoMD e Win
             df_global["Score RoMD"] = df_global["PNL Totale"] / df_global["Max Drawdown"].replace(0, 1)
