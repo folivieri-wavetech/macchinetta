@@ -108,20 +108,25 @@ def mostra_diario_wip(nome_strumento, storico):
     st.markdown("---")
     if storico:
         totale = 0.0
-        html_str = "<div style='font-size: 0.85rem; line-height: 1.6;'>"
+        righe_eventi = []
         for riga in storico:
             match = re.search(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", riga)
             if match:
                 totale += float(match.group(1))
             
             riga_colorata = re.sub(r"(\[Parziale:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
-            html_str += f"&bull; {riga_colorata}<br>"
+            righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
         segno = "+" if totale > 0 else ""
-        html_str += "<br>========================<br>"
-        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.0f} €</span></div>"
+        col_tot = "#09ab3b" if totale > 0 else ("#ff4b4b" if totale < 0 else "#FFD700")
         
-        st.markdown(html_str, unsafe_allow_html=True)
+        html_str = f"<div style='margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
+        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> <span style='color: {col_tot}; font-weight: bold;'>{segno}{totale:.2f} €</span></span></div>"
+        html_str += "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
+        html_str += "".join(righe_eventi)
+        html_str += "</div>"
+        
+        st.html(html_str)
     else:
         st.info("Nessun evento registrato in questo ciclo.")
     st.markdown("---")
@@ -787,11 +792,15 @@ else:
         
         st.markdown("### 1. Seleziona Strumento da Ottimizzare")
         
+        tutti_strumenti = list(CONFIG_STRUMENTI.keys())
+        stato = leggi_stato_sistema(conto_selezionato)
+        prezzi_live = stato.get("prezzi_live", {})
+        
         r_nome_ott = st.selectbox("Seleziona lo Strumento per agganciare le quotazioni Live e i moltiplicatori reali:", tutti_strumenti, key="ott_r_nome")
         
         # Recupero config base per lo strumento selezionato
         c_ott = CONFIG_STRUMENTI.get(r_nome_ott, {})
-        def_tick = c_ott.get("tick_size", 1.0)
+        def_tick = c_ott.get("tick_size", c_ott.get("moltiplicatore", 1.0))
         def_mult = c_ott.get("moltiplicatore_dts", 1.0)
         
         # Gestione prezzo live se disponibile, altrimenti default

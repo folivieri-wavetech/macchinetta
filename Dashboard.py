@@ -45,7 +45,7 @@ CONFIG_STRUMENTI = {
 config = dotenv_values(".env")
 DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
 
-st.set_page_config(page_title="Macchinetta IG", layout="wide")
+st.set_page_config(page_title="Macchinetta IG", layout="wide", initial_sidebar_state="expanded")
 if DEV_MODE:
     st.error("⚠️ **MODALITÀ SVILUPPO (DEV_MODE) ATTIVA** - I motori stanno scrivendo messaggi fittizi. Le connessioni API a IG sono sospese.")
 
@@ -122,19 +122,23 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
     st.markdown("---")
     if storico:
         totale = 0.0
-        html_str = "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
+        righe_eventi = []
         for riga in storico:
             match = re.search(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", riga)
             if match:
                 totale += float(match.group(1))
             
             riga_colorata = re.sub(r"(\[Parziale:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
-            html_str += f"&bull; {riga_colorata}<br>"
+            righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
         segno = "+" if totale > 0 else ""
+        col_tot = "#09ab3b" if totale > 0 else ("#ff4b4b" if totale < 0 else "#FFD700")
+        
+        html_str = f"<div style='margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
+        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> <span style='color: {col_tot}; font-weight: bold;'>{segno}{totale:.2f} €</span></span></div>"
+        html_str += "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
+        html_str += "".join(righe_eventi)
         html_str += "</div>"
-        html_str += "<div style='margin-top: 15px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
-        html_str += f"<span style='color: #FFD700;'><b>Totale aggiornato:</b> {segno}{totale:.2f} €</span></div>"
         
         st.html(html_str)
     else:
@@ -146,7 +150,7 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
         if stats:
             st.html("<div style='margin-top: 15px; margin-bottom: 5px; font-weight: 700; color: #00FFCC; font-size: 0.95rem;'>📊 Riepilogo Statistiche Ciclo</div>")
             
-            righe_tabella = []
+            righe_sottotrading = []
             fasi_sotto = ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]
             tot_pnl_sub = 0.0
             tot_trade_sub = 0
@@ -166,7 +170,7 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
                 
                 col_p = "#09ab3b" if pnl > 0 else ("#ff4b4b" if pnl < 0 else "#aaa")
                 seg = "+" if pnl > 0 else ""
-                righe_tabella.append(f"""
+                righe_sottotrading.append(f"""
                 <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
                     <td style='padding: 6px 10px; text-align: left;'><b>{k}</b></td>
                     <td style='padding: 6px 10px; text-align: center;'>{tot}</td>
@@ -176,12 +180,25 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
                 </tr>
                 """)
             
+            col_sub = "#09ab3b" if tot_pnl_sub > 0 else ("#ff4b4b" if tot_pnl_sub < 0 else "#aaa")
+            seg_sub = "+" if tot_pnl_sub > 0 else ""
+            
+            riga_totale_sub = f"""
+            <tr style='background-color: rgba(255,215,0,0.08); border-top: 1px solid rgba(255,215,0,0.3); border-bottom: 1px solid rgba(255,215,0,0.3); font-weight: bold;'>
+                <td style='padding: 8px 10px; text-align: left; color: #FFD700;'>Totale Sottotrading</td>
+                <td style='padding: 8px 10px; text-align: center; color: #FFD700;'>{tot_trade_sub}</td>
+                <td style='padding: 8px 10px; text-align: center; color: #09ab3b;'>{tot_prof_sub}</td>
+                <td style='padding: 8px 10px; text-align: center; color: #ff4b4b;'>{tot_loss_sub}</td>
+                <td style='padding: 8px 10px; text-align: right; color: {col_sub}; font-weight: bold;'>{seg_sub}{tot_pnl_sub:.2f} €</td>
+            </tr>
+            """
+            
             # Assicurazione e Fase3
             ass_data = stats.get("Assicurazione", {"pnl": 0.0})
             ass_pnl = ass_data.get("pnl", 0.0)
             col_ass = "#09ab3b" if ass_pnl > 0 else ("#ff4b4b" if ass_pnl < 0 else "#aaa")
             seg_ass = "+" if ass_pnl > 0 else ""
-            righe_tabella.append(f"""
+            riga_ass = f"""
             <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
                 <td style='padding: 6px 10px; text-align: left;'><b>Assicurazione</b></td>
                 <td style='padding: 6px 10px; text-align: center;'>-</td>
@@ -189,13 +206,13 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
                 <td style='padding: 6px 10px; text-align: center;'>-</td>
                 <td style='padding: 6px 10px; text-align: right; color: {col_ass}; font-weight: bold;'>{seg_ass}{ass_pnl:.2f} €</td>
             </tr>
-            """)
+            """
             
             f3_data = stats.get("Fase3", {"pnl": 0.0})
             f3_pnl = f3_data.get("pnl", 0.0)
             col_f3 = "#09ab3b" if f3_pnl > 0 else ("#ff4b4b" if f3_pnl < 0 else "#aaa")
             seg_f3 = "+" if f3_pnl > 0 else ""
-            righe_tabella.append(f"""
+            riga_f3 = f"""
             <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
                 <td style='padding: 6px 10px; text-align: left;'><b>Fase 3</b></td>
                 <td style='padding: 6px 10px; text-align: center;'>-</td>
@@ -203,15 +220,18 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
                 <td style='padding: 6px 10px; text-align: center;'>-</td>
                 <td style='padding: 6px 10px; text-align: right; color: {col_f3}; font-weight: bold;'>{seg_f3}{f3_pnl:.2f} €</td>
             </tr>
-            """)
-            
-            # Totale Sottotrading & Totale Ciclo
-            col_sub = "#09ab3b" if tot_pnl_sub > 0 else ("#ff4b4b" if tot_pnl_sub < 0 else "#aaa")
-            seg_sub = "+" if tot_pnl_sub > 0 else ""
+            """
             
             tot_generale = tot_pnl_sub + ass_pnl + f3_pnl
             col_gen = "#09ab3b" if tot_generale > 0 else ("#ff4b4b" if tot_generale < 0 else "#aaa")
             seg_gen = "+" if tot_generale > 0 else ""
+            
+            riga_totale_ciclo = f"""
+            <tr style='background-color: rgba(0,255,204,0.08); border-top: 1px solid rgba(0,255,204,0.3); font-weight: bold;'>
+                <td colspan='4' style='padding: 8px 10px; text-align: left; color: #00FFCC;'>TOTALE CICLO (Sub + Ass + F3)</td>
+                <td style='padding: 8px 10px; text-align: right; color: {col_gen}; font-weight: bold; font-size: 0.9rem;'>{seg_gen}{tot_generale:.2f} €</td>
+            </tr>
+            """
             
             tabella_html = f"""
             <div class='table-responsive'>
@@ -226,18 +246,11 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
                     </tr>
                 </thead>
                 <tbody>
-                    {''.join(righe_tabella)}
-                    <tr style='background-color: rgba(255,215,0,0.08); border-top: 1px solid rgba(255,215,0,0.3); font-weight: bold;'>
-                        <td style='padding: 8px 10px; text-align: left; color: #FFD700;'>Totale Sottotrading</td>
-                        <td style='padding: 8px 10px; text-align: center; color: #FFD700;'>{tot_trade_sub}</td>
-                        <td style='padding: 8px 10px; text-align: center; color: #09ab3b;'>{tot_prof_sub}</td>
-                        <td style='padding: 8px 10px; text-align: center; color: #ff4b4b;'>{tot_loss_sub}</td>
-                        <td style='padding: 8px 10px; text-align: right; color: {col_sub}; font-weight: bold;'>{seg_sub}{tot_pnl_sub:.2f} €</td>
-                    </tr>
-                    <tr style='background-color: rgba(0,255,204,0.08); border-top: 1px solid rgba(0,255,204,0.3); font-weight: bold;'>
-                        <td colspan='4' style='padding: 8px 10px; text-align: left; color: #00FFCC;'>TOTALE CICLO (Sub + Ass + F3)</td>
-                        <td style='padding: 8px 10px; text-align: right; color: {col_gen}; font-weight: bold; font-size: 0.9rem;'>{seg_gen}{tot_generale:.2f} €</td>
-                    </tr>
+                    {''.join(righe_sottotrading)}
+                    {riga_totale_sub}
+                    {riga_ass}
+                    {riga_f3}
+                    {riga_totale_ciclo}
                 </tbody>
             </table>
             </div>
@@ -1069,7 +1082,7 @@ else:
                 pass
 
             st.html(f"""
-            <div style='display: flex; justify-content: space-between; align-items: flex-end; margin-top: -15px; margin-bottom: 20px;'>
+            <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
                 <div>
                     <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Strumenti</h3>
                     {ultima_operazione_testo}
@@ -1163,7 +1176,7 @@ else:
                             mostra_diario_wip(nome, storico, conto=conto_selezionato)
                     
                     c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
-                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; width: 95px; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
+                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
                     ultimo_evento = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
                     c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
                     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
