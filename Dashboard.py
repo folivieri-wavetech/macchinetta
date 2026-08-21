@@ -445,7 +445,6 @@ st.markdown("""
             display: flex !important;
             justify-content: flex-start !important;
             align-items: center !important;
-            text-align: left !important;
             padding: 2px 8px !important;
             border-radius: 6px !important;
             font-size: 0.72rem !important;
@@ -455,23 +454,26 @@ st.markdown("""
             margin-bottom: 2px !important;
             white-space: nowrap !important;
         }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] div[data-testid="stMarkdownContainer"] {
+            width: 100% !important;
+            display: flex !important;
+        }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
             display: flex !important;
-            justify-content: flex-start !important;
+            justify-content: space-between !important;
             align-items: center !important;
-            text-align: left !important;
             width: 100% !important;
             margin: 0 !important;
             font-size: 0.72rem !important;
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="color: rgb(255, 171, 0)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="color:rgb(255, 171, 0)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="orange"] {
             color: #FFD700 !important;
             font-weight: 700 !important;
+            margin-left: auto !important;
+            text-align: right !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
             box-shadow: 0 2px 8px rgba(25, 135, 84, 0.4) !important;
@@ -711,7 +713,7 @@ else:
                 st_cr = leggi_stato_sistema(cr)
                 cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                 is_sel = (cr == conto_selezionato)
-                label_cr = f"🔴 {nome_cr_clean}:\u00a0\u00a0\u00a0\u00a0\u00a0:orange[{cap_cr} €]"
+                label_cr = f"🔴 {nome_cr_clean}: :orange[{cap_cr} €]"
                 if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                     if not is_sel:
                         st.session_state.conto_selezionato = cr
@@ -725,7 +727,7 @@ else:
                 st_cd = leggi_stato_sistema(cd)
                 cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                 is_sel = (cd == conto_selezionato)
-                label_cd = f"🔵 {nome_cd_clean}:\u00a0\u00a0\u00a0\u00a0\u00a0:orange[{cap_cd} €]"
+                label_cd = f"🔵 {nome_cd_clean}: :orange[{cap_cd} €]"
                 if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                     if not is_sel:
                         st.session_state.conto_selezionato = cd
