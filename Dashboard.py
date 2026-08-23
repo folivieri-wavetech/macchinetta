@@ -76,8 +76,8 @@ def formatta_mercato_con_bandiere(nome):
         c1, c2 = nome[:3], nome[4:]
         if c1 in flags and c2 in flags:
             nome_clean = nome.replace("/", "")
-            img1 = f"<img src='https://flagcdn.com/w20/{flags[c1]}.png' width='18' style='border-radius:2px; box-shadow: 0 0 2px rgba(0,0,0,0.5); margin-bottom: 2px;'>"
-            img2 = f"<img src='https://flagcdn.com/w20/{flags[c2]}.png' width='18' style='border-radius:2px; box-shadow: 0 0 2px rgba(0,0,0,0.5); margin-top: 2px;'>"
+            img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-bottom: 4px;'>"
+            img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-top: 4px;'>"
             return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'>{img1}<u style='color: #FFD700; font-size: 1.15em;'>{nome_clean}</u>{img2}</div>"
     
     return f"<u style='color: #FFD700; margin-left: 10px;'>{nome}</u>"
