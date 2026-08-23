@@ -62,21 +62,23 @@ def formatta_numero(valore, dec):
 
 def formatta_mercato_con_bandiere(nome):
     flags = {
-        "AUD": "🇦🇺",
-        "CAD": "🇨🇦",
-        "CHF": "🇨🇭",
-        "EUR": "🇪🇺",
-        "GBP": "🇬🇧",
-        "JPY": "🇯🇵",
-        "NZD": "🇳🇿",
-        "USD": "🇺🇸"
+        "AUD": "au",
+        "CAD": "ca",
+        "CHF": "ch",
+        "EUR": "eu",
+        "GBP": "gb",
+        "JPY": "jp",
+        "NZD": "nz",
+        "USD": "us"
     }
     
     if len(nome) == 7 and nome[3] == '/':
         c1, c2 = nome[:3], nome[4:]
         if c1 in flags and c2 in flags:
             nome_clean = nome.replace("/", "")
-            return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 0.85em; margin-left: 10px;'><span>{flags[c1]}</span><u style='color: #FFD700; font-size: 1.15em;'>{nome_clean}</u><span>{flags[c2]}</span></div>"
+            img1 = f"<img src='https://flagcdn.com/w20/{flags[c1]}.png' width='18' style='border-radius:2px; box-shadow: 0 0 2px rgba(0,0,0,0.5); margin-bottom: 2px;'>"
+            img2 = f"<img src='https://flagcdn.com/w20/{flags[c2]}.png' width='18' style='border-radius:2px; box-shadow: 0 0 2px rgba(0,0,0,0.5); margin-top: 2px;'>"
+            return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'>{img1}<u style='color: #FFD700; font-size: 1.15em;'>{nome_clean}</u>{img2}</div>"
     
     return f"<u style='color: #FFD700; margin-left: 10px;'>{nome}</u>"
 
