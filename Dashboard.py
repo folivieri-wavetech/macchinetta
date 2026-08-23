@@ -60,6 +60,26 @@ def formatta_numero(valore, dec):
     r = round(float(valore), dec)
     return f"{r:.{dec}f}"
 
+def formatta_mercato_con_bandiere(nome):
+    flags = {
+        "AUD": "🇦🇺",
+        "CAD": "🇨🇦",
+        "CHF": "🇨🇭",
+        "EUR": "🇪🇺",
+        "GBP": "🇬🇧",
+        "JPY": "🇯🇵",
+        "NZD": "🇳🇿",
+        "USD": "🇺🇸"
+    }
+    
+    if len(nome) == 7 and nome[3] == '/':
+        c1, c2 = nome[:3], nome[4:]
+        if c1 in flags and c2 in flags:
+            nome_clean = nome.replace("/", "")
+            return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 0.85em; margin-left: 10px;'><span>{flags[c1]}</span><u style='color: #FFD700; font-size: 1.15em;'>{nome_clean}</u><span>{flags[c2]}</span></div>"
+    
+    return f"<u style='color: #FFD700; margin-left: 10px;'>{nome}</u>"
+
 def formatta_eur(valore_str):
     try:
         val_float = float(valore_str)
@@ -786,7 +806,7 @@ else:
         renderizza_sidebar_stats()
 
     # TABS RIORDINATI
-    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_grafici, tab_console = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📊 Grafici", "💻 Console"])
+    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console"])
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
@@ -1005,7 +1025,7 @@ else:
 
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
-                    td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><u style='color: #FFD700;'>{nome}</u></td>"
+                    td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><div style='display: flex; align-items: center;'><span class='ig-dot'></span>{formatta_mercato_con_bandiere(nome)}</div></td>"
                 else:
                     td_mercato = ""
 
@@ -1100,7 +1120,7 @@ else:
                 
                 if is_first_of_instrument_ord:
                     r_span = ord_counts.get(nome, 1)
-                    td_mercato_ord = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><span class='ig-dot'></span><span style='color: #FFD700; font-weight: normal;'>{nome}</span></td>"
+                    td_mercato_ord = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><div style='display: flex; align-items: center;'><span class='ig-dot'></span>{formatta_mercato_con_bandiere(nome)}</div></td>"
                 else:
                     td_mercato_ord = ""
                 
@@ -1904,6 +1924,33 @@ else:
             """)
             
         renderizza_console()
+
+    with tab_report:
+        st.markdown("<h2 style='text-align: center; color: #00FFCC;'>📄 Report Giornaliero</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Visualizza lo storico dei valori salvati automaticamente ogni giorno feriale alle 21:30.</p>", unsafe_allow_html=True)
+        
+        file_report = os.path.join(conto_selezionato, "report_giornaliero.csv") if conto_selezionato else "report_giornaliero.csv"
+        if os.path.exists(file_report):
+            df_report = pd.read_csv(file_report)
+            
+            if 'Data' in df_report.columns:
+                df_report['Data_dt'] = pd.to_datetime(df_report['Data'], format="%Y-%m-%d", errors='coerce')
+                min_date = df_report['Data_dt'].min().date() if not pd.isna(df_report['Data_dt'].min()) else datetime.today().date()
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    da_data = st.date_input("Da data", value=min_date)
+                with c2:
+                    a_data = st.date_input("A data", value=datetime.today().date())
+                    
+                mask = (df_report['Data_dt'].dt.date >= da_data) & (df_report['Data_dt'].dt.date <= a_data)
+                df_filtrato = df_report.loc[mask].drop(columns=['Data_dt'])
+                
+                st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_report, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nessun report giornaliero disponibile al momento. Il primo salvataggio avverrà alle 21:30 (da lunedì a venerdì).")
 
     with tab_grafici:
         st.markdown("<h2 style='text-align: center; color: #FFD700;'>📊 Grafici Interattivi (IG Live)</h2>", unsafe_allow_html=True)

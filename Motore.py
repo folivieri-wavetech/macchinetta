@@ -311,32 +311,19 @@ def stampa_riepilogo_statistiche(nome_strumento):
         for key in ["Micro", "Flip", "Ticket1", "Ticket2", "OverGain", "OverLoss", "Ultima"]:
             st = stats[key]
             val = st['pnl']
-            if val > 0:
-                color = "#2ECC71" # Verde Smeraldo
-            elif val < 0:
-                color = "#FA8072" # Rosso Salmone
-            else:
-                color = "#A9A9A9" # Grigio scuro
             riga = f"{key} [{val:+.0f} €] Totale: {st['totale']} - Profit: {st['profit']} - Loss: {st['loss']}"
-            riepilogo.append(f"<span style='color: {color};'>{riga}</span>")
+            riepilogo.append(riga)
             
-        riepilogo.append(f"<span style='color: #FFD700;'><b>{riga_totale}</b></span>")
+        riepilogo.append(riga_totale)
         
         st_ass = stats.get("Assicurazione", {"pnl": 0.0})
         riga_ass = f"Assicurazione [{st_ass['pnl']:+.0f} €]"
-        riepilogo.append(f"<span style='color: #FFD700;'>{riga_ass}</span>")
+        riepilogo.append(riga_ass)
         
         st_f3 = stats.get("Fase3", {"pnl": 0.0})
         val_f3 = st_f3['pnl']
-        if val_f3 > 0:
-            color_f3 = "#2ECC71"
-        elif val_f3 < 0:
-            color_f3 = "#FA8072"
-        else:
-            color_f3 = "#A9A9A9"
-            
         riga_f3 = f"FASE3 [{val_f3:+.0f} €]"
-        riepilogo.append(f"<span style='color: {color_f3};'>{riga_f3}</span>")
+        riepilogo.append(riga_f3)
         riepilogo.append("-----------------------------------------------------------")
         
         for r in riepilogo:
@@ -391,7 +378,40 @@ def aggiorna_memoria(nome_strumento, aggiornamenti, log_wip=None):
             time.sleep(0.5)
     print_log(nome_strumento, "⚠️ Errore salvataggio Diario: File bloccato.")
 
+ULTIMO_SALVATAGGIO_REPORT = None
+
+def salva_report_giornaliero(saldo, margine, drawdown):
+    global ULTIMO_SALVATAGGIO_REPORT
+    ora = now_it()
+    
+    # Lunedì=0, Venerdì=4. Escludiamo Sabato (5) e Domenica (6)
+    if ora.weekday() > 4:
+        return
+        
+    # Alle 21:30 o successivo
+    if ora.hour >= 21:
+        if ora.hour == 21 and ora.minute < 30:
+            return
+            
+        data_odierna = ora.strftime("%Y-%m-%d")
+        
+        if ULTIMO_SALVATAGGIO_REPORT != data_odierna:
+            file_report = "report_giornaliero.csv"
+            file_esiste = os.path.exists(file_report)
+            
+            try:
+                with open(file_report, "a", encoding="utf-8") as f:
+                    if not file_esiste:
+                        f.write("Data,Capitale Totale,Margine Utilizzato,Drawdown\n")
+                    f.write(f"{data_odierna},{saldo},{margine},{drawdown}\n")
+                    
+                ULTIMO_SALVATAGGIO_REPORT = data_odierna
+                print_log("SISTEMA", "💾 Salvato report giornaliero delle 21:30.")
+            except Exception as e:
+                print_log("SISTEMA", f"⚠️ Errore salvataggio report giornaliero: {e}")
+
 def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None):
+    salva_report_giornaliero(saldo, margine, drawdown)
     dati = {
         "saldo": str(saldo),
         "disponibile": str(disponibile),
@@ -853,7 +873,7 @@ def esegui_motore():
             else:
                 tempo_creazione = os.path.getmtime(FILE_TOKEN)
                 if (time.time() - tempo_creazione) > (70 * 3600):
-                    print_log("SISTEMA", "⚠️ Sessione vicina alle 72h: Forza rinnovo automatico...")
+                    print_log("SISTEMA", "⚠️ Sessione vicina alle 72h: Mi preparo al rinnovo automatico del Token IG.")
                     richiede_rinnovo = True
             
             if richiede_rinnovo:
@@ -1591,6 +1611,9 @@ def esegui_motore():
                                     aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"✅ [EVENTO]: Stop TICKET1 colpito a {formatta_numero(prezzo_attuale, dec)}. PIAZZATI: SAT1 OCO{oco_str_short}.{pnl_str}")
 
                     elif stato == "FASE_2_SATELLITI":
+                        if not bid or not ask:
+                            continue
+                        prezzo_attuale = round((bid + ask) / 2, dec)
                         s_mezzo = max(1.0, s_core / 2)
                         dir_core = param.get("direzione")
                         prezzo_base = param.get("prezzo_base") 
@@ -1711,16 +1734,23 @@ def esegui_motore():
                             
                             if sat2_dir == "SELL":
                                 print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_sell} e [OVERLOSS] a {lvl_ol_sell}...")
-                                invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                succ_og = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
                                 time.sleep(3.0) 
-                                invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
+                                succ_ol = invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
                                 time.sleep(3.0)
                             else:
                                 print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_buy} e [OVERLOSS] a {lvl_ol_buy}...")
-                                invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                succ_og = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
                                 time.sleep(3.0) 
-                                invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
+                                succ_ol = invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
                                 time.sleep(3.0)
+                                
+                            if not succ_og or not succ_ol:
+                                print_log(nome, f"⚠️ Impossibile inserire [OVERGAIN]/[OVERLOSS]. Passaggio a MANUALE.")
+                                pulisci_mercato(epic, h, nome)
+                                invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento immissione ordini FASE 3 (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
+                                aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione ordini FASE 3 a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento ordini FASE 3. Macchina in MANUALE.")
+                                continue
                                 
                             lvl_og = round(sat_price + tp4_val, dec) if sat2_dir == "SELL" else round(sat_price - tp4_val, dec)
                             lvl_ol = round(sat_price - tp4_val, dec) if sat2_dir == "SELL" else round(sat_price + tp4_val, dec)
@@ -1766,14 +1796,22 @@ def esegui_motore():
                                     prezzo_sat_long = round((prezzo_base + opp_val) + tp2_val, dec)
                                     prezzo_sat_short = round(prezzo_base - tp2_val, dec)
                                     
+                                fallito_rimpiazzo = False
                                 if not pend_sat_l:
-                                    invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, prezzo_sat_long, "STOP", round(prezzo_sat_long + tp2_val, dec), round(prezzo_sat_long - tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO BUY]")
-                                    time.sleep(3.0) 
+                                    succ_l = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, prezzo_sat_long, "STOP", round(prezzo_sat_long + tp2_val, dec), round(prezzo_sat_long - tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO BUY]")
+                                    if not succ_l: fallito_rimpiazzo = True
+                                    else: time.sleep(3.0) 
                                 
-                                if not pend_sat_s:
-                                    invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, prezzo_sat_short, "STOP", round(prezzo_sat_short - tp2_val, dec), round(prezzo_sat_short + tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO SELL]")
-                                
-                                time.sleep(3.0) 
+                                if not pend_sat_s and not fallito_rimpiazzo:
+                                    succ_s = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, prezzo_sat_short, "STOP", round(prezzo_sat_short - tp2_val, dec), round(prezzo_sat_short + tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO SELL]")
+                                    if not succ_s: fallito_rimpiazzo = True
+                                    else: time.sleep(3.0) 
+                                    
+                                if fallito_rimpiazzo:
+                                    print_log(nome, "⚠️ Impossibile ripristinare ordini OCO (possibile gap). Passo in FASE_2_STANDBY.")
+                                    pulisci_mercato(epic, h, nome, solo_pendenti=True)
+                                    aggiorna_memoria(nome, {"stato": "FASE_2_STANDBY"}, log_wip="✅ [EVENTO]: Rimpiazzo OCO fallito (gap). Passaggio in STANDBY.")
+                                    continue 
 
                     elif stato.startswith("FASE_2_SATELLITE_"):
                         s_mezzo = max(1.0, s_core / 2)
@@ -1938,20 +1976,36 @@ def esegui_motore():
                                     
                                     if sat2_dir == "SELL":
                                         print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_sell} / [OVERLOSS] a {lvl_ol_sell} mancante...")
+                                        fallito_f3 = False
                                         if not pend_og:
-                                            invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
-                                            time.sleep(3.0) 
-                                        if not pend_ol:
-                                            invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
-                                            time.sleep(3.0)
+                                            succ_og = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                            if not succ_og: fallito_f3 = True
+                                            else: time.sleep(3.0) 
+                                        if not pend_ol and not fallito_f3:
+                                            succ_ol = invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
+                                            if not succ_ol: fallito_f3 = True
+                                            else: time.sleep(3.0)
+                                            
+                                        if fallito_f3:
+                                            pulisci_mercato(epic, h, nome)
+                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": "❌ Fallito rimpiazzo ordini FASE 3 (possibile gap). Passaggio a MANUALE."}, log_wip="🛑 Fallito rimpiazzo FASE 3. Macchina in MANUALE.")
+                                            continue
                                     else:
                                         print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_buy} / [OVERLOSS] a {lvl_ol_buy} mancante...")
+                                        fallito_f3 = False
                                         if not pend_og:
-                                            invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
-                                            time.sleep(3.0) 
-                                        if not pend_ol:
-                                            invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
-                                            time.sleep(3.0)
+                                            succ_og = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                            if not succ_og: fallito_f3 = True
+                                            else: time.sleep(3.0) 
+                                        if not pend_ol and not fallito_f3:
+                                            succ_ol = invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, round(sat_price, dec), h, dec, etichetta="[ORDINE OVERLOSS]")
+                                            if not succ_ol: fallito_f3 = True
+                                            else: time.sleep(3.0)
+                                            
+                                        if fallito_f3:
+                                            pulisci_mercato(epic, h, nome)
+                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": "❌ Fallito rimpiazzo ordini FASE 3 (possibile gap). Passaggio a MANUALE."}, log_wip="🛑 Fallito rimpiazzo FASE 3. Macchina in MANUALE.")
+                                            continue
 
                     elif stato == "FASE_3_INIT":
                         sat_dir = param.get("fase3_dir")
