@@ -82,6 +82,29 @@ def formatta_mercato_con_bandiere(nome):
     
     return f"<u style='color: #FFD700; margin-left: 10px; font-weight: bold;'>{nome}</u>"
 
+def formatta_titolo_con_bandiere_orizzontale(nome, badge):
+    flags = {
+        "AUD": "au",
+        "CAD": "ca",
+        "CHF": "ch",
+        "EUR": "eu",
+        "GBP": "gb",
+        "JPY": "jp",
+        "NZD": "nz",
+        "USD": "us"
+    }
+    
+    titolo = f"<span style='color: #FFD700;'>{nome}</span>"
+    
+    if len(nome) == 7 and nome[3] == '/':
+        c1, c2 = nome[:3], nome[4:]
+        if c1 in flags and c2 in flags:
+            img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-right: 5px;'>"
+            img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5);'>"
+            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{img1}{img2}</div><span style='color: #FFD700;'>{nome}</span>"
+            
+    return f"<div style='font-size: 1.4rem; font-weight: bold; white-space: nowrap; margin-bottom: -5px;'>{titolo} <span style='font-size: 0.85rem; padding-left: 4px; vertical-align: middle; color: #abb2bf;'>{badge}</span></div>"
+
 def formatta_eur(valore_str):
     try:
         val_float = float(valore_str)
@@ -1356,7 +1379,8 @@ else:
                     col_titolo, col_salva, col_pulisci = st.columns([2.7, 0.9, 1.2], vertical_alignment="center")
                     with col_titolo:
                         badge = "🟢 <b>[ Auto ]</b>" if not modalita_manuale else "🟠 <b>[ Manuale ]</b>"
-                        st.markdown(f"<div style='font-size: 1.4rem; font-weight: bold; white-space: nowrap; margin-bottom: -5px;'><span style='color: #FFD700;'>{nome}</span> <span style='font-size: 0.85rem; padding-left: 4px; vertical-align: middle; color: #abb2bf;'>{badge}</span></div>", unsafe_allow_html=True)
+                        titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
+                        st.markdown(titolo_html, unsafe_allow_html=True)
                         prezzi_ba = prezzi_bid_ask.get(nome, {})
                         bid_ask_str = f"Bid: <span style='color:#ff4b4b;'>{prezzi_ba.get('bid', '-')}</span> | Ask: <span style='color:#09ab3b;'>{prezzi_ba.get('ask', '-')}</span>" if prezzi_ba else "<span style='color: #666;'>In aggiornamento...</span>"
                         st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
