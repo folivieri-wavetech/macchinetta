@@ -78,9 +78,9 @@ def formatta_mercato_con_bandiere(nome):
             nome_clean = nome.replace("/", "")
             img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-bottom: 4px;'>"
             img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-top: 4px;'>"
-            return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'>{img1}<u style='color: #FFD700; font-size: 1.15em;'>{nome_clean}</u>{img2}</div>"
+            return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'>{img1}<u style='color: #FFD700; font-size: 1.15em; font-weight: bold;'>{nome_clean}</u>{img2}</div>"
     
-    return f"<u style='color: #FFD700; margin-left: 10px;'>{nome}</u>"
+    return f"<u style='color: #FFD700; margin-left: 10px; font-weight: bold;'>{nome}</u>"
 
 def formatta_eur(valore_str):
     try:
