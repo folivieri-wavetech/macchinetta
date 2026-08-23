@@ -99,9 +99,10 @@ def formatta_titolo_con_bandiere_orizzontale(nome, badge):
     if len(nome) == 7 and nome[3] == '/':
         c1, c2 = nome[:3], nome[4:]
         if c1 in flags and c2 in flags:
+            nome_spaziato = nome.replace("/", " / ")
             img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-right: 5px;'>"
             img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5);'>"
-            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{img1}{img2}</div><span style='color: #FFD700;'>{nome}</span>"
+            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{img1}{img2}</div><span style='color: #FFD700;'>{nome_spaziato}</span>"
             
     return f"<div style='font-size: 1.4rem; font-weight: bold; white-space: nowrap; margin-bottom: -5px;'>{titolo} <span style='font-size: 0.85rem; padding-left: 4px; vertical-align: middle; color: #abb2bf;'>{badge}</span></div>"
 
