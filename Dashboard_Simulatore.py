@@ -439,6 +439,20 @@ def salva_memoria(conto_selezionato, dati):
     with open(path, "w") as f:
         json.dump(dati, f, indent=4)
 
+def carica_preferenze(conto_selezionato):
+    path = os.path.join(conto_selezionato, "preferenze_ui.json")
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f: return json.load(f)
+        except: return {}
+    return {}
+
+def salva_preferenze(conto_selezionato, prefs):
+    path = os.path.join(conto_selezionato, "preferenze_ui.json")
+    try:
+        with open(path, "w") as f: json.dump(prefs, f, indent=4)
+    except: pass
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -509,6 +523,7 @@ else:
         @st.fragment(run_every=15)
         def renderizza_sidebar_stats():
             stato_side = leggi_stato_sistema(conto_selezionato)
+            prefs_side = carica_preferenze(conto_selezionato)
             
             motore_attivo_side = False
             path_stato_side = os.path.join(conto_selezionato, STATO_SISTEMA)
@@ -530,10 +545,46 @@ else:
             st.markdown("---")
             st.markdown(f"**Stato Sistema:** {badge_motore_side}")
             st.markdown("---")
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa;'>Capitale Totale</div><div style='font-size: 1.2rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.2rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Margine Residuo</div><div style='font-size: 1.2rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.9rem; color: #aaa; margin-top: 10px;'>Drawdown (P/L)</div><div style='font-size: 1.2rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
+            
+            # --- INVESTIMENTO INIZIALE ---
+            inv_iniziale_saved = float(prefs_side.get("investimento_iniziale", 0.0))
+            def salva_inv_side():
+                key_k = f"side_inv_input_sim_{conto_selezionato}"
+                if key_k in st.session_state:
+                    p = carica_preferenze(conto_selezionato)
+                    p["investimento_iniziale"] = float(st.session_state[key_k])
+                    salva_preferenze(conto_selezionato, p)
+
+            st.number_input(
+                "💰 Investimento Iniziale (€)",
+                min_value=0.0,
+                value=inv_iniziale_saved,
+                step=500.0,
+                format="%.2f",
+                key=f"side_inv_input_sim_{conto_selezionato}",
+                on_change=salva_inv_side
+            )
+
+            # Calcolo Delta assoluto e percentuale rispetto a Capitale Totale
+            delta_str = ""
+            inv_attuale = float(st.session_state.get(f"side_inv_input_sim_{conto_selezionato}", inv_iniziale_saved))
+            if inv_attuale > 0:
+                try:
+                    saldo_float = float(stato_side.get('saldo', 0.0))
+                    diff_val = saldo_float - inv_attuale
+                    diff_pct = (diff_val / inv_attuale) * 100.0
+                    col_diff = "#4ade80" if diff_val > 0 else ("#ef4444" if diff_val < 0 else "#aaa")
+                    sign_diff = "+" if diff_val > 0 else ""
+                    sign_pct = "+" if diff_pct > 0 else ""
+                    diff_eur_str = formatta_eur(diff_val)
+                    delta_str = f" <span style='font-size: 0.82rem; font-weight: bold; color: {col_diff};'>({sign_diff}{diff_eur_str} {sign_pct}{diff_pct:.2f}%)</span>"
+                except Exception:
+                    pass
+
+            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 6px;'>Capitale Totale</div><div style='font-size: 1.05rem; font-weight: bold; color: #FFD700;'>{val_capitale} €{delta_str}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
         
         renderizza_sidebar_stats()
 
