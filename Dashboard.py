@@ -867,19 +867,26 @@ else:
                 on_change=salva_inv_side
             )
 
-            # Calcolo Delta assoluto e percentuale rispetto a Capitale Totale
+            # Calcolo Delta assoluto e percentuale rispetto al Margine Utilizzato
             delta_html = ""
             inv_attuale = float(st.session_state.get(f"side_inv_input_{conto_selezionato}", inv_iniziale_saved))
             if inv_attuale > 0:
                 try:
                     saldo_float = float(stato_side.get('saldo', 0.0))
+                    margine_float = float(stato_side.get('margine', 0.0))
                     diff_val = saldo_float - inv_attuale
-                    diff_pct = (diff_val / inv_attuale) * 100.0
                     col_diff = "#4ade80" if diff_val > 0 else ("#ef4444" if diff_val < 0 else "#aaa")
                     sign_diff = "+" if diff_val > 0 else ""
-                    sign_pct = "+" if diff_pct > 0 else ""
                     diff_eur_str = formatta_eur(diff_val)
-                    delta_html = f"<div style='font-size: 0.82rem; font-weight: bold; color: {col_diff}; margin-top: 1px;'>({sign_diff}{diff_eur_str} {sign_pct}{diff_pct:.2f}%)</div>"
+                    
+                    if margine_float > 0:
+                        diff_pct = (diff_val / margine_float) * 100.0
+                        sign_pct = "+" if diff_pct > 0 else ""
+                        pct_str = f" {sign_pct}{diff_pct:.2f}%"
+                    else:
+                        pct_str = ""
+                        
+                    delta_html = f"<div style='font-size: 0.82rem; font-weight: bold; color: {col_diff}; margin-top: 1px;'>({sign_diff}{diff_eur_str}{pct_str})</div>"
                 except Exception:
                     pass
 
