@@ -834,11 +834,19 @@ else:
             except:
                 col_dd = "inherit"
 
-            st.markdown("---")
-            st.markdown(f"**Stato Sistema:** {badge_motore_side}")
-            if motore_attivo_side:
-                st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: -8px; margin-bottom: 8px;'>⏱️ Sessione: <b style='color: #4ade80;'>{durata_str}</b></div>", unsafe_allow_html=True)
-            st.markdown("---")
+            stato_box_html = f"""
+            <div style='margin: 6px 0; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1);'>
+                <div style='font-size: 0.78rem; color: #bbb; display: flex; justify-content: space-between; align-items: center;'>
+                    <span>Stato Sistema:</span>
+                    <span>{badge_motore_side}</span>
+                </div>
+                <div style='font-size: 0.75rem; color: #888; margin-top: 2px; display: flex; justify-content: space-between; align-items: center;'>
+                    <span>⏱️ Sessione:</span>
+                    <b style='color: #4ade80;'>{durata_str}</b>
+                </div>
+            </div>
+            """
+            st.markdown(stato_box_html, unsafe_allow_html=True)
             
             # --- INVESTIMENTO INIZIALE ---
             inv_iniziale_saved = float(prefs_side.get("investimento_iniziale", 0.0))
@@ -871,14 +879,14 @@ else:
                     sign_diff = "+" if diff_val > 0 else ""
                     sign_pct = "+" if diff_pct > 0 else ""
                     diff_eur_str = formatta_eur(diff_val)
-                    delta_html = f"<div style='font-size: 0.85rem; font-weight: bold; color: {col_diff}; margin-top: 2px;'>({sign_diff}{diff_eur_str} {sign_pct}{diff_pct:.2f}%)</div>"
+                    delta_html = f"<div style='font-size: 0.82rem; font-weight: bold; color: {col_diff}; margin-top: 1px;'>({sign_diff}{diff_eur_str} {sign_pct}{diff_pct:.2f}%)</div>"
                 except Exception:
                     pass
 
-            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 6px;'>Capitale Totale</div><div style='font-size: 1.05rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>{delta_html}", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 4px;'>Capitale Totale</div><div style='font-size: 1.05rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>{delta_html}", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
         
         renderizza_sidebar_stats()
 
