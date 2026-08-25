@@ -566,7 +566,7 @@ else:
             )
 
             # Calcolo Delta assoluto e percentuale rispetto a Capitale Totale
-            delta_str = ""
+            delta_html = ""
             inv_attuale = float(st.session_state.get(f"side_inv_input_sim_{conto_selezionato}", inv_iniziale_saved))
             if inv_attuale > 0:
                 try:
@@ -577,11 +577,11 @@ else:
                     sign_diff = "+" if diff_val > 0 else ""
                     sign_pct = "+" if diff_pct > 0 else ""
                     diff_eur_str = formatta_eur(diff_val)
-                    delta_str = f" <span style='font-size: 0.82rem; font-weight: bold; color: {col_diff};'>({sign_diff}{diff_eur_str} {sign_pct}{diff_pct:.2f}%)</span>"
+                    delta_html = f"<div style='font-size: 0.85rem; font-weight: bold; color: {col_diff}; margin-top: 2px;'>({sign_diff}{diff_eur_str} {sign_pct}{diff_pct:.2f}%)</div>"
                 except Exception:
                     pass
 
-            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 6px;'>Capitale Totale</div><div style='font-size: 1.05rem; font-weight: bold; color: #FFD700;'>{val_capitale} €{delta_str}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 6px;'>Capitale Totale</div><div style='font-size: 1.05rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>{delta_html}", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.85rem; color: #aaa; margin-top: 10px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
