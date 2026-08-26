@@ -1464,6 +1464,7 @@ else:
                     direzione = dati_salvati.get("direzione", "")
                     modalita_manuale = dati_salvati.get("modalita_manuale", False)
                     is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
+                    is_sosp_rollover = dati_salvati.get("sospeso_rollover", False) and stato_attivo
                     msg_weekend = dati_salvati.get("msg_weekend", "")
                     msg_manuale = dati_salvati.get("msg_manuale", "")
                     errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
@@ -1536,6 +1537,8 @@ else:
                             memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                             salva_memoria(conto_selezionato, memoria_attuale)
                             st.rerun()
+                    elif is_sosp_rollover:
+                        st.warning("🌙 **PAUSA NOTTURNA (ROLLOVER) ATTIVA.** Le funzioni sono bloccate e gli ordini pendenti rimossi temporaneamente per protezione dallo spread. Ripresa automatica alle 00:10.")
                     elif modalita_manuale:
                         st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
                         col_m1, col_m2 = st.columns(2, vertical_alignment="center")
@@ -1588,6 +1591,10 @@ else:
                                     memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
+                            elif is_sosp_rollover:
+                                st.warning("🌙 ROLLOVER")
+                            else:
+                                st.success("✔️ OK")
                         with c_sync:
                             if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch"):
                                 dialog_sync(conto_selezionato, nome)
@@ -1595,6 +1602,7 @@ else:
                     if not modalita_manuale:
                         if stato_attivo:
                             if is_sospeso_wk: st.warning(f"🌴 IN PAUSA WEEKEND ({direzione}) | In attesa di ripresa")
+                            elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:10")
                             elif stato_corrente == "FASE_2_STANDBY": st.markdown("<div style='background-color: #FFD700; color: #000000; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 1rem;'>⏳ IN ATTESA DI RIENTRO | Motore in Stand-By</div>", unsafe_allow_html=True)
                             else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
                         else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")

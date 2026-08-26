@@ -1074,6 +1074,63 @@ def esegui_motore():
                         aggiorna_memoria(nome, {"kill_switch": False, "attivo": False, "stato": "IN_ATTESA", "sospeso_weekend": False, "allarme_distanza": False, "errore_avvio": False, "errore_ripristino": False, "ticket2_active": False}, log_wip=f"✅ [EVENTO]: Tutte le posizioni chiuse da Tasto STOP.{pnl_str}")
                         continue
 
+                    # --- GESTIONE AUTOMATICA PAUSA ROLLOVER ---
+                    ora_it = now_it()
+                    is_rollover_time = False
+                    # Dal lunedì (0) al giovedì (3)
+                    if 0 <= ora_it.weekday() <= 3:
+                        t_min = datetime.time(22, 55)
+                        t_max = datetime.time(23, 59, 59)
+                        t_min2 = datetime.time(0, 0)
+                        t_max2 = datetime.time(0, 9, 59)
+                        t_curr = ora_it.time()
+                        if (t_min <= t_curr <= t_max) or (t_min2 <= t_curr <= t_max2):
+                            is_rollover_time = True
+                            
+                    is_sosp_rollover = param.get("sospeso_rollover", False)
+                    
+                    if param.get("attivo", False) and not param.get("sospeso_weekend", False) and param.get("stato") != "MANUALE":
+                        if is_rollover_time and not is_sosp_rollover:
+                            print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:55): Sgancio SL e cancello Pendenti...")
+                            snap_pos = [{"dealId": p['position']['dealId'], "stopLevel": p['position'].get('stopLevel')} for p in posizioni if p['position'].get('stopLevel')]
+                            snap_ord = [{"dealId": o['workingOrder']['dealId'], "direction": o['workingOrder']['direction'], "level": o['workingOrder']['level'], "size": o['workingOrder']['orderSize'], "type": o['workingOrder']['orderType'], "lim": o['workingOrder'].get('limitDistance'), "stop": o['workingOrder'].get('stopDistance')} for o in pendenti]
+                            
+                            for p in posizioni:
+                                if p['position'].get('stopLevel'):
+                                    aggiorna_stop_posizione(p['position']['dealId'], None, h)
+                                    time.sleep(1.0)
+                            
+                            pulisci_mercato(epic, h, nome, solo_pendenti=True)
+                            
+                            aggiorna_memoria(nome, {"sospeso_rollover": True, "rollover_snapshot": {"posizioni": snap_pos, "pendenti": snap_ord}}, log_wip="🌙 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.")
+                            continue
+                            
+                        elif is_sosp_rollover and not is_rollover_time:
+                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:10): Ripristino SL e Pendenti...")
+                            snap = param.get("rollover_snapshot", {})
+                            snap_pos = snap.get("posizioni", [])
+                            snap_ord = snap.get("pendenti", [])
+                            
+                            for sp in snap_pos:
+                                pos_esiste = [p for p in posizioni if p['position']['dealId'] == sp['dealId']]
+                                if pos_esiste:
+                                    succ = aggiorna_stop_posizione(sp['dealId'], sp['stopLevel'], h)
+                                    if not succ:
+                                        print_log(nome, f"⚠️ Impossibile ripristinare SL su {sp['dealId']}. Probabile GAP. Chiudo a mercato.")
+                                        dir_chiusura = "SELL" if pos_esiste[0]['position']['direction'] == "BUY" else "BUY"
+                                        chiudi_parziale(nome, sp['dealId'], epic, dir_chiusura, pos_esiste[0]['position']['size'], valuta, h, etichetta="[CHIUSURA EMERGENZA GAP]")
+                                    time.sleep(3.0)
+                                    
+                            for so in snap_ord:
+                                invia_ordine_pendente(nome, epic, valuta, so['direction'], so['size'], so['level'], so['type'], so.get('lim'), so.get('stop'), h, dec, etichetta="[RIPRISTINO ROLLOVER]")
+                                time.sleep(4.0)
+                                
+                            aggiorna_memoria(nome, {"sospeso_rollover": False, "rollover_snapshot": {}}, log_wip="☀️ [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.")
+                            continue
+                            
+                    if is_sosp_rollover:
+                        continue
+                        
                     if param.get("comando_weekend", False):
                         print_log(nome, "🌴 Avvio SOSPENSIONE WEEKEND. Isolo le Core...")
                         pnl_str = ""
