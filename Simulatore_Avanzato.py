@@ -657,7 +657,7 @@ class SimulatoreMatematico:
                                 self.aggiungi_pendente("ULTIMA", dir_contro, s_last, lvl_last, "LIMIT", tp=self.fase3_base)
                                 
                             elif pos_nome == "Fase3_Core" and tipo == "SL":
-                                # SCENARIO C: Sconfitta Fase 3
+                                # SCENARIO C: Uscita da Fase 3 (SL nuova Core)
                                 self.svuota_pendenti()
                                 pnl_f3_core = pnl
                                 pnl_ultima = 0.0

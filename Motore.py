@@ -1744,7 +1744,7 @@ def esegui_motore():
                             lvl_og = round(sat_price + tp4_val, dec) if sat2_dir == "SELL" else round(sat_price - tp4_val, dec)
                             lvl_ol = round(sat_price - tp4_val, dec) if sat2_dir == "SELL" else round(sat_price + tp4_val, dec)
                             
-                            msg_dettagliato = f"SAT1 [{to_market_dir(sat_dir)}] a {formatta_numero(sat_price, dec)}. SAT2 [{to_market_dir(sat2_dir)}] a mercato. Pendenti: OG {formatta_numero(lvl_og, dec)}, OL {formatta_numero(lvl_ol, dec)}"
+                            msg_dettagliato = f"SAT1 [{to_market_dir(sat_dir)}] a {formatta_numero(sat_price, dec)}. SAT2 [{to_market_dir(sat2_dir)}] a mercato. Ordini: OG {formatta_numero(lvl_og, dec)}, OL {formatta_numero(lvl_ol, dec)}"
                             
                             invia_notifica(f"🎯 SAT1 INNESCATO: {nome}", f"[{nome}] {msg_dettagliato}", "dart")
                             suona_drumroll()
@@ -1896,7 +1896,7 @@ def esegui_motore():
                                 v_str = f"+{int(round(pnl_c_vincente))}" if pnl_c_vincente > 0 else str(int(round(pnl_c_vincente)))
                                 t_str = f"{int(round(pnl_c_tossica))}"
                                 sub_str = f"+{int(round(pnl_sottotrading))}" if pnl_sottotrading > 0 else str(int(round(pnl_sottotrading)))
-                                dett_macro = f" (Good: {v_str}€ | 1/2 Bad: {t_str}€ | Sotto: {sub_str}€)"
+                                dett_macro = f" (Good: {v_str}€ | 1/2 Bad: {t_str}€ | Sottotrading: {sub_str}€)"
                                 
                                 registra_operazione(nome, f"TP Core [{to_market_dir(sat_dir)}] (Avvio Fase 3)", pnl_tot_f3)
                                 pulisci_mercato(epic, h, nome, mantieni_core_size=s_core)
@@ -2117,11 +2117,11 @@ def esegui_motore():
                                 rate = get_eur_rate(valuta, prezzi_live)
                                 pnl_tot = (pnl_core_valuta * rate) + pnl_contro_eur
                                 
-                                registra_operazione(nome, "Stop Loss FASE 3 (Sconfitta)", pnl_tot)
+                                registra_operazione(nome, "Stop Loss FASE 3", pnl_tot)
                                 
                                 pulisci_mercato(epic, h, nome)
-                                invia_notifica(f"🏁 FASE 3 STOP: {nome}", f"[{nome}] Sconfitta Fase 3 (SL a {formatta_numero(prezzo_attuale, dec)}). Macchinetta SPENTA.{formatta_pnl(pnl_tot)}", "checkered_flag")
-                                aggiorna_memoria(nome, {"stato": "IN_ATTESA", "tentativi_sat": 0, "attivo": False, "ticket2_active": False}, log_wip=f"✅ [EVENTO]: Sconfitta in Fase 3 (SL colpito) a {formatta_numero(prezzo_attuale, dec)}. Macchinetta SPENTA.{formatta_pnl(pnl_tot)}")
+                                invia_notifica(f"🏁 FASE 3 STOP: {nome}", f"[{nome}] Uscita da Fase 3, colpito SL nuova Core a {formatta_numero(prezzo_attuale, dec)}. Macchinetta SPENTA.{formatta_pnl(pnl_tot)}", "checkered_flag")
+                                aggiorna_memoria(nome, {"stato": "IN_ATTESA", "tentativi_sat": 0, "attivo": False, "ticket2_active": False}, log_wip=f"✅ [EVENTO]: Uscita da Fase 3, colpito SL nuova Core a {formatta_numero(prezzo_attuale, dec)}. Macchinetta SPENTA.{formatta_pnl(pnl_tot)}")
                                 stampa_riepilogo_statistiche(nome)
                             else:
                                 if pendenti:

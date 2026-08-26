@@ -121,14 +121,26 @@ kubectl rollout restart deploy -n macchinetta
 # l'init del pod che riparte ri-esegue cp -a /app/. /data/
 ```
 
-### 4.4 Rollout
+### 4.4 Rollout (Regola Riavvi Selettivi)
 
-```bash
-kubectl rollout restart deploy/macchinetta-dashboard -n macchinetta
-kubectl rollout status deploy/macchinetta-dashboard -n macchinetta --timeout=180s
-# se è cambiato Motore.py, riavviare anche i motori:
-kubectl rollout restart deploy/macchinetta-motore-bongiolo deploy/macchinetta-motore-dany deploy/macchinetta-motore-fiordok -n macchinetta
-```
+> ⚠️ **IMPORTANTE:** Per evitare disconnessioni inutili all'utente o riavvii dei bot non necessari, applicare sempre la regola del riavvio selettivo.
+
+- **Se si è modificato SOLTANTO il Core/Motore (`Motore.py`, etc.):**
+  Riavviare unicamente i motori, lasciando inalterata la Dashboard.
+  ```bash
+  kubectl rollout restart deploy/macchinetta-motore-bongiolo deploy/macchinetta-motore-dany deploy/macchinetta-motore-fiordok -n macchinetta
+  ```
+
+- **Se si è modificata SOLTANTO l'Interfaccia (`Dashboard.py`, `Dashboard_Simulatore.py`, etc.):**
+  Riavviare unicamente la Dashboard, lasciando in esecuzione i motori.
+  ```bash
+  kubectl rollout restart deploy/macchinetta-dashboard -n macchinetta
+  kubectl rollout status deploy/macchinetta-dashboard -n macchinetta --timeout=180s
+  ```
+
+- **Se si sono modificati ENTRAMBI:**
+  Riavviare tutti i deployment usando entrambi i comandi.
+
 
 ### 4.5 Verifica
 
