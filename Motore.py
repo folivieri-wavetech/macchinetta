@@ -1111,6 +1111,10 @@ def esegui_motore():
                             snap_pos = snap.get("posizioni", [])
                             snap_ord = snap.get("pendenti", [])
                             
+                            for so in snap_ord:
+                                invia_ordine_pendente(nome, epic, valuta, so['direction'], so['size'], so['level'], so['type'], so.get('lim'), so.get('stop'), h, dec, etichetta="[RIPRISTINO ROLLOVER]")
+                                time.sleep(4.0)
+                                
                             for sp in snap_pos:
                                 pos_esiste = [p for p in posizioni if p['position']['dealId'] == sp['dealId']]
                                 if pos_esiste:
@@ -1120,10 +1124,6 @@ def esegui_motore():
                                         dir_chiusura = "SELL" if pos_esiste[0]['position']['direction'] == "BUY" else "BUY"
                                         chiudi_parziale(nome, sp['dealId'], epic, dir_chiusura, pos_esiste[0]['position']['size'], valuta, h, etichetta="[CHIUSURA EMERGENZA GAP]")
                                     time.sleep(3.0)
-                                    
-                            for so in snap_ord:
-                                invia_ordine_pendente(nome, epic, valuta, so['direction'], so['size'], so['level'], so['type'], so.get('lim'), so.get('stop'), h, dec, etichetta="[RIPRISTINO ROLLOVER]")
-                                time.sleep(4.0)
                                 
                             aggiorna_memoria(nome, {"sospeso_rollover": False, "rollover_snapshot": {}}, log_wip="☀️ [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.")
                             continue
