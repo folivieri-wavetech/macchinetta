@@ -100,49 +100,18 @@ def formatta_ultimo_evento_sintesi(msg, dati=None, nome=None):
     return msg
 
 def formatta_mercato_con_bandiere(nome):
-    flags = {
-        "AUD": "au",
-        "CAD": "ca",
-        "CHF": "ch",
-        "EUR": "eu",
-        "GBP": "gb",
-        "JPY": "jp",
-        "NZD": "nz",
-        "USD": "us"
-    }
-    
     if len(nome) == 7 and nome[3] == '/':
-        c1, c2 = nome[:3], nome[4:]
-        if c1 in flags and c2 in flags:
-            nome_clean = nome.replace("/", "")
-            img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-bottom: 4px;'>"
-            img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-top: 4px;'>"
-            return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'>{img1}<u style='color: #FFD700; font-size: 1.15em; font-weight: bold;'>{nome_clean}</u>{img2}</div>"
+        nome_clean = nome.replace("/", "")
+        return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'><u style='color: #FFD700; font-size: 1.15em; font-weight: bold;'>{nome_clean}</u></div>"
     
     return f"<u style='color: #FFD700; margin-left: 10px; font-weight: bold;'>{nome}</u>"
 
 def formatta_titolo_con_bandiere_orizzontale(nome, badge):
-    flags = {
-        "AUD": "au",
-        "CAD": "ca",
-        "CHF": "ch",
-        "EUR": "eu",
-        "GBP": "gb",
-        "JPY": "jp",
-        "NZD": "nz",
-        "USD": "us"
-    }
-    
     titolo = f"<span style='color: #FFD700;'>{nome}</span>"
-    
     if len(nome) == 7 and nome[3] == '/':
-        c1, c2 = nome[:3], nome[4:]
-        if c1 in flags and c2 in flags:
-            nome_spaziato = nome.replace("/", " / ")
-            img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-right: 5px;'>"
-            img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5);'>"
-            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{img1}{img2}</div><span style='color: #FFD700;'>{nome_spaziato}</span>"
-            
+        nome_spaziato = nome.replace("/", " / ")
+        titolo = f"<span style='color: #FFD700;'>{nome_spaziato}</span>"
+        
     return f"<div style='font-size: 1.4rem; font-weight: bold; white-space: nowrap; margin-bottom: -5px;'>{titolo} <span style='font-size: 0.85rem; padding-left: 4px; vertical-align: middle; color: #abb2bf;'>{badge}</span></div>"
 
 def formatta_eur(valore_str):
