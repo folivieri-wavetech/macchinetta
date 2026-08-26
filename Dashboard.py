@@ -60,6 +60,45 @@ def formatta_numero(valore, dec):
     r = round(float(valore), dec)
     return f"{r:.{dec}f}"
 
+def formatta_ultimo_evento_sintesi(msg, dati=None, nome=None):
+    if not msg or not isinstance(msg, str):
+        return "Nessun evento registrato in questo ciclo."
+    
+    # 1) Ping-Pong / TICKET1 target
+    # Es: [25/08 02:37:01] ✅ [EVENTO]: TICKET1 a target a 1.19993! Ping-Pong: Rigirato in SHORT. [Parziale: +31 €]
+    # Diventa: [25/08 02:37:01] Profit TICKET1 a 1.19993. Ora [SHORT] a 1.19993
+    m_pp = re.search(r'(?:\[(\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\]\s*)?(?:✅\s*)?(?:\[EVENTO\]:\s*)?(?:\[?TICKET1?\]?)\s+a\s+target\s+a\s+([\d\.]+).*?Ping-Pong:\s*Rigirato\s*(?:in\s*)?([A-Za-z]+)(?:\s+a\s+([\d\.]+))?', msg, re.IGNORECASE)
+    if m_pp:
+        ts = m_pp.group(1)
+        ts_prefix = f"[{ts}] " if ts else ""
+        target_price = m_pp.group(2)
+        raw_dir = m_pp.group(3).upper()
+        dir_clean = "LONG" if raw_dir in ["BUY", "LONG"] else ("SHORT" if raw_dir in ["SELL", "SHORT"] else raw_dir)
+        explicit_price = m_pp.group(4)
+        if explicit_price:
+            prezzo_nuovo = explicit_price
+        elif dati and (dati.get("ticket1_entry") is not None or dati.get("ticket1_base") is not None):
+            dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5) if nome else 5
+            val = dati.get("ticket1_entry") if dati.get("ticket1_entry") is not None else dati.get("ticket1_base")
+            prezzo_nuovo = formatta_numero(val, dec)
+        else:
+            prezzo_nuovo = target_price
+        return f"{ts_prefix}Profit TICKET1 a {target_price}. Ora [{dir_clean}] a {prezzo_nuovo}"
+
+    # 2) ASSICURAZIONE chiusa -> Entrata in Fase 2
+    # Es: [25/08 00:02:20] ✅ [EVENTO]: ASSICURAZIONE chiusa [Parziale: +4 €]. ➡️ Entrata in Fase 2 - [TICKET1] LONG eseguito a 1.19717.
+    # Diventa: [25/08 00:02:20] Fase 2 - [Ticket1] LONG a 1.19717
+    m_ass = re.search(r'(?:\[(\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\]\s*)?(?:✅\s*)?(?:\[EVENTO\]:\s*)?(?:\[?ASSICURAZIONE\]?)\s+chiusa.*?Entrata\s+in\s+Fase\s+2\s*-\s*\[?TICKET1?\]?\s*([A-Za-z]+)\s+eseguito\s+a\s+([\d\.]+)', msg, re.IGNORECASE)
+    if m_ass:
+        ts = m_ass.group(1)
+        ts_prefix = f"[{ts}] " if ts else ""
+        raw_dir = m_ass.group(2).upper()
+        dir_clean = "LONG" if raw_dir in ["BUY", "LONG"] else ("SHORT" if raw_dir in ["SELL", "SHORT"] else raw_dir)
+        entry_price = m_ass.group(3).rstrip('.')
+        return f"{ts_prefix}Fase 2 - [Ticket1] {dir_clean} a {entry_price}"
+
+    return msg
+
 def formatta_mercato_con_bandiere(nome):
     flags = {
         "AUD": "au",
@@ -1365,7 +1404,8 @@ else:
                     
                     c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
                     c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
-                    ultimo_evento = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
+                    ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
+                    ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
                     c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
                     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
                     
