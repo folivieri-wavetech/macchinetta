@@ -1463,7 +1463,7 @@ else:
                     stato_attivo = dati_salvati.get("attivo", False)
                     direzione = dati_salvati.get("direzione", "")
                     modalita_manuale = dati_salvati.get("modalita_manuale", False)
-                    is_sospeso_wk = dati_salvati.get("sospeso_weekend", False)
+                    is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
                     msg_weekend = dati_salvati.get("msg_weekend", "")
                     msg_manuale = dati_salvati.get("msg_manuale", "")
                     errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
@@ -1541,7 +1541,7 @@ else:
                         col_m1, col_m2 = st.columns(2, vertical_alignment="center")
                         with col_m1:
                             if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": ""}
+                                memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": "", "sospeso_weekend": False}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
                         with col_m2:
