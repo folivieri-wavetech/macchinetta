@@ -1330,13 +1330,10 @@ else:
                 st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-                # Mostra ESCLUSIVAMENTE gli strumenti attivi
-                strumenti_attivi = [x for x in tutti_strumenti if memoria.get(x, {}).get("attivo", False)]
+                # Mostra tutti gli strumenti, ordina mettendo prima quelli attivi, poi in ordine alfabetico
+                strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 
-                if not strumenti_attivi:
-                    st.info("ℹ️ Nessuno strumento attivo al momento.")
-                
-                for nome in strumenti_attivi:
+                for nome in strumenti_ordinati:
                     dati = memoria.get(nome, {})
                     stato = dati.get("stato", "IN_ATTESA")
                     is_attivo = dati.get("attivo", False)
@@ -1373,17 +1370,26 @@ else:
                             spia_t2 = " 🟢" if (prezzo > t2_entry if t2_dir == "BUY" else prezzo < t2_entry) else " 🔴"
                             stato_display += f" [+ TICKET2 {spia_t2}]"
 
-                    stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
-                    if stato == "FASE_2_STANDBY":
-                        stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
+                    if is_attivo:
+                        stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
+                        if stato == "FASE_2_STANDBY":
+                            stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
+                    else:
+                        if stato == "MANUALE":
+                            stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚠️ MANUALE</span>"
+                        else:
+                            stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏸️ IN ATTESA</span>"
                     
                     has_anomalia = bool(dati.get("alert_falso_allarme") or dati.get("errore_avvio") or dati.get("errore_ripristino") or dati.get("msg_manuale"))
                     
                     if has_anomalia:
                         bg_color = "#FFC107" # Giallo
                         text_color = "black"
-                    else:
+                    elif is_attivo:
                         bg_color = "#198754" # Verde
+                        text_color = "white"
+                    else:
+                        bg_color = "#495057" # Grigio scuro
                         text_color = "white"
                         
                     marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
