@@ -771,22 +771,49 @@ if "logged_in" not in st.session_state:
     st.session_state.tutti_i_conti = False
 
 if not st.session_state.logged_in:
-    st.title("🔐 Fiordok Trading")
-    st.subheader("Accedi al pannello di controllo")
-    with st.form("login_form"):
-        user = st.text_input("Account")
-        pw = st.text_input("Password", type="password")
-        if st.form_submit_button("Accedi"):
-            res = auth_manager.verifica_login(user, pw)
-            if res.get("success"):
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.session_state.ruolo = res.get("ruolo", "VIEWER")
-                st.session_state.conti_autorizzati = res.get("conti_autorizzati", [])
-                st.session_state.tutti_i_conti = res.get("tutti_i_conti", False)
-                st.rerun()
-            else:
-                st.error("Credenziali errate")
+    if st.session_state.get("must_change_password"):
+        st.title("🔐 Cambio Password Obbligatorio")
+        st.warning("È il tuo primo accesso o la password è stata resettata. Inserisci una nuova password per continuare.")
+        with st.form("change_pwd_form"):
+            new_pw = st.text_input("Nuova Password", type="password")
+            new_pw2 = st.text_input("Conferma Password", type="password")
+            if st.form_submit_button("Salva e Accedi"):
+                if new_pw and new_pw == new_pw2 and new_pw != "init":
+                    auth_manager.modifica_password(st.session_state.temp_user, new_pw)
+                    st.session_state.must_change_password = False
+                    st.session_state.logged_in = True
+                    st.session_state.user = st.session_state.temp_user
+                    res = auth_manager.verifica_login(st.session_state.user, new_pw)
+                    st.session_state.ruolo = res.get("ruolo", "VIEWER")
+                    st.session_state.conti_autorizzati = res.get("conti_autorizzati", [])
+                    st.session_state.tutti_i_conti = res.get("tutti_i_conti", False)
+                    st.rerun()
+                elif new_pw == "init":
+                    st.error("La nuova password non può essere 'init'.")
+                else:
+                    st.error("Le password non coincidono o sono vuote.")
+    else:
+        st.title("🔐 Fiordok Trading")
+        st.subheader("Accedi al pannello di controllo")
+        with st.form("login_form"):
+            user = st.text_input("Account")
+            pw = st.text_input("Password", type="password")
+            if st.form_submit_button("Accedi"):
+                res = auth_manager.verifica_login(user, pw)
+                if res.get("success"):
+                    if pw == "init":
+                        st.session_state.must_change_password = True
+                        st.session_state.temp_user = user
+                        st.rerun()
+                    else:
+                        st.session_state.logged_in = True
+                        st.session_state.user = user
+                        st.session_state.ruolo = res.get("ruolo", "VIEWER")
+                        st.session_state.conti_autorizzati = res.get("conti_autorizzati", [])
+                        st.session_state.tutti_i_conti = res.get("tutti_i_conti", False)
+                        st.rerun()
+                else:
+                    st.error("Credenziali errate")
 else:
     conti_disponibili = get_accounts()
     if not conti_disponibili:
@@ -940,9 +967,9 @@ else:
         tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
         tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "📊 Statistiche", "📄 Report", "📊 Grafici"])
-        tab_portafoglio, tab_sintesi, tab_statistiche, tab_report, tab_grafici = tabs
-        tab_operativa = tab_restore = tab_console = tab_autorizzazioni = None
+        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "📄 Report", "📊 Grafici"])
+        tab_portafoglio, tab_sintesi, tab_report, tab_grafici = tabs
+        tab_operativa = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
@@ -1874,179 +1901,181 @@ else:
                             if st.button(f"🚀 Entra a MERCATO adesso (Prezzo Live: {prezzo_live})", use_container_width=True, type="primary"):
                                 piazza_restore(conto_selezionato, r_nome, cmd_data)
 
-    with tab_statistiche:
-        st.title("📊 Analisi Operazioni & Profitti (EUR)")
-        path_storico = os.path.join(conto_selezionato, FILE_STORICO)
-        if os.path.exists(path_storico):
-            # Cerca prima data
-            prima_data_db = None
-            try:
-                df_temp = pd.read_csv(path_storico)
-                if not df_temp.empty:
-                    df_temp['Data_Op'] = pd.to_datetime(df_temp['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
-                    prima_data_db = df_temp['Data_Op'].min()
-            except:
-                pass
-                
-            if prima_data_db:
-                st.markdown(f"<div style='font-size: 0.9rem; color: #888; margin-bottom: 15px;'>ℹ️ <b>Prima data disponibile nel database attuale:</b> {prima_data_db.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
-                
-            pref_file = os.path.join(conto_selezionato, "preferenze_ui.json")
-            prefs = {}
-            if os.path.exists(pref_file):
+    if tab_statistiche is not None:
+        with tab_statistiche:
+
+            st.title("📊 Analisi Operazioni & Profitti (EUR)")
+            path_storico = os.path.join(conto_selezionato, FILE_STORICO)
+            if os.path.exists(path_storico):
+                # Cerca prima data
+                prima_data_db = None
                 try:
-                    with open(pref_file, "r") as f: prefs = json.load(f)
-                except: pass
+                    df_temp = pd.read_csv(path_storico)
+                    if not df_temp.empty:
+                        df_temp['Data_Op'] = pd.to_datetime(df_temp['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
+                        prima_data_db = df_temp['Data_Op'].min()
+                except:
+                    pass
                 
-            saved_inizio_str = prefs.get("data_inizio", (datetime.today() - timedelta(days=30)).strftime("%Y-%m-%d"))
-            saved_fine_str = prefs.get("data_fine", datetime.today().strftime("%Y-%m-%d"))
-            try:
-                def_inizio = datetime.strptime(saved_inizio_str, "%Y-%m-%d").date()
-                def_fine = datetime.strptime(saved_fine_str, "%Y-%m-%d").date()
-            except:
-                def_inizio = (datetime.today() - timedelta(days=30)).date()
-                def_fine = datetime.today().date()
-
-            c_data1, c_data2 = st.columns(2)
-            with c_data1:
-                data_inizio = st.date_input("📅 Data iniziale:", def_inizio, key="date_inizio")
-            with c_data2:
-                data_fine = st.date_input("📅 Data finale:", def_fine, key="date_fine")
+                if prima_data_db:
+                    st.markdown(f"<div style='font-size: 0.9rem; color: #888; margin-bottom: 15px;'>ℹ️ <b>Prima data disponibile nel database attuale:</b> {prima_data_db.strftime('%d/%m/%Y')}</div>", unsafe_allow_html=True)
                 
-            if data_inizio != def_inizio or data_fine != def_fine:
-                prefs["data_inizio"] = data_inizio.strftime("%Y-%m-%d")
-                prefs["data_fine"] = data_fine.strftime("%Y-%m-%d")
-                with open(pref_file, "w") as f: json.dump(prefs, f, indent=4)
-                
-            st.write("")
-            with st.expander("🗄️ Archiviazione Storico"):
-                st.markdown("Usa questo strumento per alleggerire la Dashboard spostando i dati vecchi in un file di archivio (`storico_archiviato.csv`), rimuovendoli dalla vista principale ma senza perderli definitivamente.")
-                prima_data_str = prima_data_db.strftime('%d/%m/%Y') if prima_data_db else "inizio"
-                max_date = datetime.today().date() - timedelta(days=1)
-                
-                data_archiviazione = st.date_input(f"Archivia tutte le operazioni dal giorno {prima_data_str} al giorno (incluso):", value=max_date, max_value=max_date, format="DD/MM/YYYY", key="archivia_date")
-                if st.button("🗄️ Archivia Ora", type="primary"):
+                pref_file = os.path.join(conto_selezionato, "preferenze_ui.json")
+                prefs = {}
+                if os.path.exists(pref_file):
                     try:
-                        df_arch = pd.read_csv(path_storico)
-                        df_arch['Data_Op'] = pd.to_datetime(df_arch['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
-                        mask_arch = df_arch['Data_Op'] <= data_archiviazione
-                        
-                        df_to_archive = df_arch.loc[mask_arch].copy()
-                        df_to_keep = df_arch.loc[~mask_arch].copy()
-                        
-                        if not df_to_archive.empty:
-                            df_to_archive = df_to_archive.drop(columns=['Data_Op'])
-                            df_to_keep = df_to_keep.drop(columns=['Data_Op'])
-                            
-                            path_archivio = os.path.join(conto_selezionato, "storico_archiviato.csv")
-                            if os.path.exists(path_archivio):
-                                df_to_archive.to_csv(path_archivio, mode='a', header=False, index=False)
-                            else:
-                                df_to_archive.to_csv(path_archivio, index=False)
-                                
-                            df_to_keep.to_csv(path_storico, index=False)
-                            st.success(f"✅ Archiviate {len(df_to_archive)} operazioni! Il database principale ora contiene {len(df_to_keep)} operazioni.")
-                            time.sleep(1.5)
-                            st.rerun()
-                        else:
-                            st.info("Non ci sono operazioni precedenti a questa data da archiviare.")
-                    except Exception as e:
-                        st.error(f"Errore durante l'archiviazione: {e}")
-            st.write("")
-            
-            try:
-                df = pd.read_csv(path_storico)
-                df['Data_Operazione'] = pd.to_datetime(df['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
-                mask = (df['Data_Operazione'] >= data_inizio) & (df['Data_Operazione'] <= data_fine)
-                df_filtrato = df.loc[mask].copy()
+                        with open(pref_file, "r") as f: prefs = json.load(f)
+                    except: pass
                 
-                if not df_filtrato.empty:
-                    st.markdown("---")
-                    st.metric("💰 TOTALONE P/L NEL PERIODO", f"€ {df_filtrato['Profitto_EUR'].sum():.2f}")
-                    st.markdown("---")
-                    
-                    def categorizza_fase(fase_str):
-                        f = str(fase_str).upper()
-                        if "1" in f or "MICRO" in f or "ASSICURAZIONE" in f: return "F1"
-                        if "2" in f or "TICKET1" in f or "TICKET2" in f or "SAT" in f or "OVERGAIN" in f or "OVERLOSS" in f or "OG" in f or "OL" in f: return "F2"
-                        if "3" in f or "ULTIMA" in f or "TAGLIO" in f or "VITTORIA" in f: return "F3"
-                        return "Altro"
+                saved_inizio_str = prefs.get("data_inizio", (datetime.today() - timedelta(days=30)).strftime("%Y-%m-%d"))
+                saved_fine_str = prefs.get("data_fine", datetime.today().strftime("%Y-%m-%d"))
+                try:
+                    def_inizio = datetime.strptime(saved_inizio_str, "%Y-%m-%d").date()
+                    def_fine = datetime.strptime(saved_fine_str, "%Y-%m-%d").date()
+                except:
+                    def_inizio = (datetime.today() - timedelta(days=30)).date()
+                    def_fine = datetime.today().date()
 
-                    df_filtrato['MacroFase'] = df_filtrato['Fase'].apply(categorizza_fase)
-
-                    # --- RENDIMENTO PER STRUMENTO (Sopra) ---
-                    st.subheader("Rendimento per Strumento")
-                    
-                    pivot_strum = pd.pivot_table(df_filtrato, values='Profitto_EUR', index='Strumento', columns='MacroFase', aggfunc='sum', fill_value=0)
-                    
-                    for col in ['F1', 'F2', 'F3', 'Altro']:
-                        if col not in pivot_strum.columns:
-                            pivot_strum[col] = 0.0
+                c_data1, c_data2 = st.columns(2)
+                with c_data1:
+                    data_inizio = st.date_input("📅 Data iniziale:", def_inizio, key="date_inizio")
+                with c_data2:
+                    data_fine = st.date_input("📅 Data finale:", def_fine, key="date_fine")
+                
+                if data_inizio != def_inizio or data_fine != def_fine:
+                    prefs["data_inizio"] = data_inizio.strftime("%Y-%m-%d")
+                    prefs["data_fine"] = data_fine.strftime("%Y-%m-%d")
+                    with open(pref_file, "w") as f: json.dump(prefs, f, indent=4)
+                
+                st.write("")
+                with st.expander("🗄️ Archiviazione Storico"):
+                    st.markdown("Usa questo strumento per alleggerire la Dashboard spostando i dati vecchi in un file di archivio (`storico_archiviato.csv`), rimuovendoli dalla vista principale ma senza perderli definitivamente.")
+                    prima_data_str = prima_data_db.strftime('%d/%m/%Y') if prima_data_db else "inizio"
+                    max_date = datetime.today().date() - timedelta(days=1)
+                
+                    data_archiviazione = st.date_input(f"Archivia tutte le operazioni dal giorno {prima_data_str} al giorno (incluso):", value=max_date, max_value=max_date, format="DD/MM/YYYY", key="archivia_date")
+                    if st.button("🗄️ Archivia Ora", type="primary"):
+                        try:
+                            df_arch = pd.read_csv(path_storico)
+                            df_arch['Data_Op'] = pd.to_datetime(df_arch['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
+                            mask_arch = df_arch['Data_Op'] <= data_archiviazione
+                        
+                            df_to_archive = df_arch.loc[mask_arch].copy()
+                            df_to_keep = df_arch.loc[~mask_arch].copy()
+                        
+                            if not df_to_archive.empty:
+                                df_to_archive = df_to_archive.drop(columns=['Data_Op'])
+                                df_to_keep = df_to_keep.drop(columns=['Data_Op'])
                             
-                    pivot_strum['P/L Tot.'] = pivot_strum[['F1', 'F2', 'F3', 'Altro']].sum(axis=1)
-                    pivot_strum = pivot_strum.reset_index()
-                    pivot_strum = pivot_strum[['Strumento', 'P/L Tot.', 'F1', 'F2', 'F3', 'Altro']]
+                                path_archivio = os.path.join(conto_selezionato, "storico_archiviato.csv")
+                                if os.path.exists(path_archivio):
+                                    df_to_archive.to_csv(path_archivio, mode='a', header=False, index=False)
+                                else:
+                                    df_to_archive.to_csv(path_archivio, index=False)
+                                
+                                df_to_keep.to_csv(path_storico, index=False)
+                                st.success(f"✅ Archiviate {len(df_to_archive)} operazioni! Il database principale ora contiene {len(df_to_keep)} operazioni.")
+                                time.sleep(1.5)
+                                st.rerun()
+                            else:
+                                st.info("Non ci sono operazioni precedenti a questa data da archiviare.")
+                        except Exception as e:
+                            st.error(f"Errore durante l'archiviazione: {e}")
+                st.write("")
+            
+                try:
+                    df = pd.read_csv(path_storico)
+                    df['Data_Operazione'] = pd.to_datetime(df['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
+                    mask = (df['Data_Operazione'] >= data_inizio) & (df['Data_Operazione'] <= data_fine)
+                    df_filtrato = df.loc[mask].copy()
+                
+                    if not df_filtrato.empty:
+                        st.markdown("---")
+                        st.metric("💰 TOTALONE P/L NEL PERIODO", f"€ {df_filtrato['Profitto_EUR'].sum():.2f}")
+                        st.markdown("---")
                     
-                    html_t1 = "<div class='table-responsive'><table class='stat-table'><thead><tr><th>STRUMENTO</th><th>P/L TOT.</th><th>F1</th><th>F2</th><th>F3</th><th>ALTRO</th></tr></thead><tbody>"
-                    for _, row in pivot_strum.iterrows():
-                        strum = row['Strumento']
-                        
-                        def format_td(val, is_bold=False):
-                            if abs(val) < 0.001: return "<td></td>"
-                            color_class = "text-green" if val > 0 else "text-red"
-                            bold_class = "text-bold" if is_bold else ""
-                            return f"<td class='{color_class} {bold_class}'>€ {val:.2f}</td>"
+                        def categorizza_fase(fase_str):
+                            f = str(fase_str).upper()
+                            if "1" in f or "MICRO" in f or "ASSICURAZIONE" in f: return "F1"
+                            if "2" in f or "TICKET1" in f or "TICKET2" in f or "SAT" in f or "OVERGAIN" in f or "OVERLOSS" in f or "OG" in f or "OL" in f: return "F2"
+                            if "3" in f or "ULTIMA" in f or "TAGLIO" in f or "VITTORIA" in f: return "F3"
+                            return "Altro"
+
+                        df_filtrato['MacroFase'] = df_filtrato['Fase'].apply(categorizza_fase)
+
+                        # --- RENDIMENTO PER STRUMENTO (Sopra) ---
+                        st.subheader("Rendimento per Strumento")
+                    
+                        pivot_strum = pd.pivot_table(df_filtrato, values='Profitto_EUR', index='Strumento', columns='MacroFase', aggfunc='sum', fill_value=0)
+                    
+                        for col in ['F1', 'F2', 'F3', 'Altro']:
+                            if col not in pivot_strum.columns:
+                                pivot_strum[col] = 0.0
                             
-                        td_pl = format_td(row['P/L Tot.'], is_bold=False)
-                        td_f1 = format_td(row['F1'])
-                        td_f2 = format_td(row['F2'])
-                        td_f3 = format_td(row['F3'])
-                        td_alt = format_td(row['Altro'])
-                        
-                        html_t1 += f"<tr><td>{strum}</td>{td_pl}{td_f1}{td_f2}{td_f3}{td_alt}</tr>"
-                    html_t1 += "</tbody></table></div>"
+                        pivot_strum['P/L Tot.'] = pivot_strum[['F1', 'F2', 'F3', 'Altro']].sum(axis=1)
+                        pivot_strum = pivot_strum.reset_index()
+                        pivot_strum = pivot_strum[['Strumento', 'P/L Tot.', 'F1', 'F2', 'F3', 'Altro']]
                     
-                    st.html(html_t1)
-                    st.html("<br>")
-                    
-                    # --- RENDIMENTO PER FASE (Sotto) ---
-                    st.subheader("Rendimento per Fase")
-                    df_fase = df_filtrato.groupby('Fase').agg(
-                        Pnl_Totale=('Profitto_EUR', 'sum'),
-                        Tot_Op=('Profitto_EUR', 'count'),
-                        Vincenti=('Profitto_EUR', lambda x: (x > 0).sum()),
-                        Perdenti=('Profitto_EUR', lambda x: (x <= 0).sum())
-                    ).reset_index()
-                    
-                    html_t2 = "<div class='table-responsive'><table class='stat-table'><thead><tr><th>FASE</th><th>P/L TOT.</th><th>TOT. OP.</th><th>WIN</th><th>LOSS</th><th>WIN RATE %</th></tr></thead><tbody>"
-                    for _, row in df_fase.iterrows():
-                        fase = row['Fase']
-                        pnl = row['Pnl_Totale']
-                        tot_op = row['Tot_Op']
-                        win = row['Vincenti']
-                        loss = row['Perdenti']
-                        wr = (win / tot_op * 100) if tot_op > 0 else 0
+                        html_t1 = "<div class='table-responsive'><table class='stat-table'><thead><tr><th>STRUMENTO</th><th>P/L TOT.</th><th>F1</th><th>F2</th><th>F3</th><th>ALTRO</th></tr></thead><tbody>"
+                        for _, row in pivot_strum.iterrows():
+                            strum = row['Strumento']
                         
-                        pnl_class = "text-green" if pnl > 0 else ("text-red" if pnl < 0 else "")
-                        pnl_str = f"€ {pnl:.2f}" if abs(pnl) >= 0.001 else "€ 0.00"
+                            def format_td(val, is_bold=False):
+                                if abs(val) < 0.001: return "<td></td>"
+                                color_class = "text-green" if val > 0 else "text-red"
+                                bold_class = "text-bold" if is_bold else ""
+                                return f"<td class='{color_class} {bold_class}'>€ {val:.2f}</td>"
+                            
+                            td_pl = format_td(row['P/L Tot.'], is_bold=False)
+                            td_f1 = format_td(row['F1'])
+                            td_f2 = format_td(row['F2'])
+                            td_f3 = format_td(row['F3'])
+                            td_alt = format_td(row['Altro'])
                         
-                        win_class = "text-green" if win > 0 else ""
-                        loss_class = "text-red" if loss > 0 else ""
-                        wr_class = "text-green" if wr >= 50 else ("text-red" if wr > 0 else "")
-                        
-                        html_t2 += f"<tr><td>{fase}</td><td class='{pnl_class}'>{pnl_str}</td><td>{tot_op}</td><td class='{win_class}'>{win}</td><td class='{loss_class}'>{loss}</td><td class='{wr_class}'>{wr:.1f}%</td></tr>"
-                    html_t2 += "</tbody></table></div>"
+                            html_t1 += f"<tr><td>{strum}</td>{td_pl}{td_f1}{td_f2}{td_f3}{td_alt}</tr>"
+                        html_t1 += "</tbody></table></div>"
                     
-                    st.html(html_t2)
+                        st.html(html_t1)
+                        st.html("<br>")
+                    
+                        # --- RENDIMENTO PER FASE (Sotto) ---
+                        st.subheader("Rendimento per Fase")
+                        df_fase = df_filtrato.groupby('Fase').agg(
+                            Pnl_Totale=('Profitto_EUR', 'sum'),
+                            Tot_Op=('Profitto_EUR', 'count'),
+                            Vincenti=('Profitto_EUR', lambda x: (x > 0).sum()),
+                            Perdenti=('Profitto_EUR', lambda x: (x <= 0).sum())
+                        ).reset_index()
+                    
+                        html_t2 = "<div class='table-responsive'><table class='stat-table'><thead><tr><th>FASE</th><th>P/L TOT.</th><th>TOT. OP.</th><th>WIN</th><th>LOSS</th><th>WIN RATE %</th></tr></thead><tbody>"
+                        for _, row in df_fase.iterrows():
+                            fase = row['Fase']
+                            pnl = row['Pnl_Totale']
+                            tot_op = row['Tot_Op']
+                            win = row['Vincenti']
+                            loss = row['Perdenti']
+                            wr = (win / tot_op * 100) if tot_op > 0 else 0
+                        
+                            pnl_class = "text-green" if pnl > 0 else ("text-red" if pnl < 0 else "")
+                            pnl_str = f"€ {pnl:.2f}" if abs(pnl) >= 0.001 else "€ 0.00"
+                        
+                            win_class = "text-green" if win > 0 else ""
+                            loss_class = "text-red" if loss > 0 else ""
+                            wr_class = "text-green" if wr >= 50 else ("text-red" if wr > 0 else "")
+                        
+                            html_t2 += f"<tr><td>{fase}</td><td class='{pnl_class}'>{pnl_str}</td><td>{tot_op}</td><td class='{win_class}'>{win}</td><td class='{loss_class}'>{loss}</td><td class='{wr_class}'>{wr:.1f}%</td></tr>"
+                        html_t2 += "</tbody></table></div>"
+                    
+                        st.html(html_t2)
                     
 
                     
-                else:
-                    st.info("Nessuna operazione registrata nel periodo selezionato.")
-            except Exception as e:
-                st.error(f"Errore nella lettura del file storico: {e}")
-        else:
-            st.warning("Nessun dato statistico disponibile. Il file storico verrà creato alla prima operazione chiusa.")
+                    else:
+                        st.info("Nessuna operazione registrata nel periodo selezionato.")
+                except Exception as e:
+                    st.error(f"Errore nella lettura del file storico: {e}")
+            else:
+                st.warning("Nessun dato statistico disponibile. Il file storico verrà creato alla prima operazione chiusa.")
 
     if tab_console is not None:
         with tab_console:
@@ -2377,19 +2406,19 @@ else:
             with st.expander("➕ Aggiungi Nuovo Utente", expanded=False):
                 with st.form("form_nuovo_utente"):
                     n_user = st.text_input("Nickname (Username)")
-                    n_pwd = st.text_input("Password (Temporanea)", type="password")
                     n_ruolo = st.selectbox("Ruolo", ["VIEWER", "REGISTA"])
                     tutti_i_folders_disp = [c for c in os.listdir() if os.path.isdir(c) and (c.endswith("_DEMO") or c.endswith("_REALE"))]
                     n_conti = st.multiselect("Conti Visibili", tutti_i_folders_disp)
+                    st.info("La password iniziale sarà impostata in automatico a 'init'. L'utente dovrà cambiarla al primo accesso.")
                     if st.form_submit_button("Crea Utente"):
-                        if n_user and n_pwd:
-                            ok, msg = auth_manager.aggiungi_utente(n_user, n_pwd, n_ruolo, n_conti)
+                        if n_user:
+                            ok, msg = auth_manager.aggiungi_utente(n_user, "init", n_ruolo, n_conti)
                             if ok: 
                                 st.success(msg)
                             else: 
                                 st.error(msg)
                         else:
-                            st.error("Inserire username e password.")
+                            st.error("Inserire l'username.")
             
             st.markdown("### Elenco Utenti")
             utenti = auth_manager.get_tutti_utenti()
@@ -2402,20 +2431,30 @@ else:
                     if d.get('ruolo') != "REGISTA":
                         sel_conti = st.multiselect(f"Conti visibili per {u}", tutti_i_folders, default=[c for c in d.get("conti_autorizzati", []) if c in tutti_i_folders], key=f"conti_{u}")
                         
-                        col1, col2 = st.columns([1, 1])
+                        col1, col2, col3 = st.columns([1, 1, 1])
                         with col1:
                             if st.button("💾 Salva Permessi", key=f"salva_{u}"):
                                 auth_manager.aggiorna_conti_utente(u, sel_conti)
                                 st.success(f"Permessi aggiornati per {u}")
                         with col2:
+                            if st.button("🔑 Reset Password", key=f"reset_{u}"):
+                                auth_manager.modifica_password(u, "init")
+                                st.success(f"Password per {u} resettata a 'init'.")
+                        with col3:
                             if st.button("🗑️ Elimina", key=f"del_{u}"):
                                 ok, msg = auth_manager.elimina_utente(u)
                                 if ok: st.success(msg)
                                 else: st.error(msg)
                     else:
-                        if st.button("🗑️ Elimina Regista", key=f"del_reg_{u}"):
-                            ok, msg = auth_manager.elimina_utente(u)
-                            if ok: st.success(msg)
-                            else: st.error(msg)
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            if st.button("🔑 Reset Password", key=f"reset_reg_{u}"):
+                                auth_manager.modifica_password(u, "init")
+                                st.success(f"Password per {u} resettata a 'init'.")
+                        with col2:
+                            if st.button("🗑️ Elimina Regista", key=f"del_reg_{u}"):
+                                ok, msg = auth_manager.elimina_utente(u)
+                                if ok: st.success(msg)
+                                else: st.error(msg)
 
     # --- TAB SIMULATORE ---
