@@ -39,6 +39,7 @@ Write-Host "Trovato pod Dashboard: $POD_DASH" -ForegroundColor Yellow
 .\kubectl.exe --kubeconfig=.\local.yaml cp Dashboard.py "macchinetta/${POD_DASH}:/data/Dashboard.py"
 .\kubectl.exe --kubeconfig=.\local.yaml cp Dashboard_Simulatore.py "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
 .\kubectl.exe --kubeconfig=.\local.yaml cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
+.\kubectl.exe --kubeconfig=.\local.yaml cp Sistema "macchinetta/${POD_DASH}:/data/Sistema"
 Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
 
 Write-Host "`n==========================================" -ForegroundColor Cyan

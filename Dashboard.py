@@ -26,7 +26,7 @@ FILE_TOKEN = "token_ig.json"
 FILE_STORICO = "storico_operazioni.csv"
 CONSOLE_LOG_FILE = "console_live.log"
 STATO_SISTEMA = "stato_sistema.json"
-CREDENTIALS = {os.getenv("DASHBOARD_USER", "Marco"): os.getenv("DASHBOARD_PASSWORD", "Bolzano&1971")} 
+import Sistema.auth_manager as auth_manager
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
@@ -52,7 +52,12 @@ if DEV_MODE:
 # --- FUNZIONI HELPER MULTI-CONTO ---
 def get_accounts():
     """Scansiona la root e trova tutte le cartelle conto valide."""
-    return [d for d in os.listdir() if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
+    tutti = [d for d in os.listdir() if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
+    if hasattr(st, "session_state") and getattr(st.session_state, "logged_in", False):
+        if not st.session_state.get("tutti_i_conti", False):
+            autorizzati = st.session_state.get("conti_autorizzati", [])
+            tutti = [c for c in tutti if c in autorizzati]
+    return tutti
 
 def formatta_numero(valore, dec):
     if valore is None:
@@ -761,6 +766,9 @@ def salva_preferenze(conto_selezionato, prefs):
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+    st.session_state.ruolo = "VIEWER"
+    st.session_state.conti_autorizzati = []
+    st.session_state.tutti_i_conti = False
 
 if not st.session_state.logged_in:
     st.title("🔐 Fiordok Trading")
@@ -769,9 +777,13 @@ if not st.session_state.logged_in:
         user = st.text_input("Account")
         pw = st.text_input("Password", type="password")
         if st.form_submit_button("Accedi"):
-            if CREDENTIALS.get(user) == pw:
+            res = auth_manager.verifica_login(user, pw)
+            if res.get("success"):
                 st.session_state.logged_in = True
                 st.session_state.user = user
+                st.session_state.ruolo = res.get("ruolo", "VIEWER")
+                st.session_state.conti_autorizzati = res.get("conti_autorizzati", [])
+                st.session_state.tutti_i_conti = res.get("tutti_i_conti", False)
                 st.rerun()
             else:
                 st.error("Credenziali errate")
@@ -921,8 +933,16 @@ else:
         
         renderizza_sidebar_stats()
 
-    # TABS RIORDINATI
-    tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console"])
+    ruolo = st.session_state.get("ruolo", "VIEWER")
+    is_regista = (ruolo == "REGISTA")
+
+    if is_regista:
+        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
+        tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
+    else:
+        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "📊 Statistiche", "📄 Report", "📊 Grafici"])
+        tab_portafoglio, tab_sintesi, tab_statistiche, tab_report, tab_grafici = tabs
+        tab_operativa = tab_restore = tab_console = tab_autorizzazioni = None
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
@@ -1402,453 +1422,457 @@ else:
                     
         renderizza_sintesi()
 
-    with tab_operativa:
-        @st.fragment(run_every=15)
-        def renderizza_dati_live():
-            memoria_attuale = carica_memoria(conto_selezionato) 
-            stato = leggi_stato_sistema(conto_selezionato)
-            distanze_minime = stato.get("distanze_minime", {})
-            prezzi_live = stato.get("prezzi_live", {})
-            prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
+    if tab_operativa is not None:
+        with tab_operativa:
+
+            @st.fragment(run_every=15)
+            def renderizza_dati_live():
+                memoria_attuale = carica_memoria(conto_selezionato) 
+                stato = leggi_stato_sistema(conto_selezionato)
+                distanze_minime = stato.get("distanze_minime", {})
+                prezzi_live = stato.get("prezzi_live", {})
+                prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
-            col_titolo_main, col_btn_restart = st.columns([4, 1])
-            with col_titolo_main:
-                st.markdown("<h1 style='color: #FFD700; margin-top: -15px;'>⚙️ Dashboard Macchinetta IG</h1>", unsafe_allow_html=True)
-            with col_btn_restart:
-                st.write("") 
-                if st.button("🔄 RESTART VM", help="Elimina il token attuale e forza il rinnovo della sessione IG", width="stretch", key=f"RESTART_{conto_selezionato}"):
-                    path_token = os.path.join(conto_selezionato, FILE_TOKEN)
-                    if os.path.exists(path_token): os.remove(path_token) 
-                    st.rerun()
+                col_titolo_main, col_btn_restart = st.columns([4, 1])
+                with col_titolo_main:
+                    st.markdown("<h1 style='color: #FFD700; margin-top: -15px;'>⚙️ Dashboard Macchinetta IG</h1>", unsafe_allow_html=True)
+                with col_btn_restart:
+                    st.write("") 
+                    if st.button("🔄 RESTART VM", help="Elimina il token attuale e forza il rinnovo della sessione IG", width="stretch", key=f"RESTART_{conto_selezionato}"):
+                        path_token = os.path.join(conto_selezionato, FILE_TOKEN)
+                        if os.path.exists(path_token): os.remove(path_token) 
+                        st.rerun()
 
-            motore_attivo = False
-            path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
-            if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
+                motore_attivo = False
+                path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
+                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
 
-            col_head1, col_head2 = st.columns([1.6, 2])
-            with col_head1:
-                with st.container(border=True):
-                    st.markdown(f"**Stato Sistema:** {'🟢 Connesso' if motore_attivo else '🔴 Motore Offline'}")
-                    st.markdown(f"📶 **IG API:** {'OK' if motore_attivo else 'SCONNESSO'} &nbsp;&nbsp; | &nbsp;&nbsp; 📈 **Stream:** {'Live' if motore_attivo else 'FERMO'}")
-                    st.markdown(f"<div style='white-space: nowrap;'>🕒 <b>LAST:</b> {stato['ultimo_aggiornamento']} &nbsp;|&nbsp; ⏱️ <b>Sessione:</b> {stato['durata_sessione']}</div>", unsafe_allow_html=True)
-                    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                    if st.button("🔄 Aggiorna dati Dashboard", width="stretch", key=f"REFRESH_{conto_selezionato}"): st.rerun()
+                col_head1, col_head2 = st.columns([1.6, 2])
+                with col_head1:
+                    with st.container(border=True):
+                        st.markdown(f"**Stato Sistema:** {'🟢 Connesso' if motore_attivo else '🔴 Motore Offline'}")
+                        st.markdown(f"📶 **IG API:** {'OK' if motore_attivo else 'SCONNESSO'} &nbsp;&nbsp; | &nbsp;&nbsp; 📈 **Stream:** {'Live' if motore_attivo else 'FERMO'}")
+                        st.markdown(f"<div style='white-space: nowrap;'>🕒 <b>LAST:</b> {stato['ultimo_aggiornamento']} &nbsp;|&nbsp; ⏱️ <b>Sessione:</b> {stato['durata_sessione']}</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+                        if st.button("🔄 Aggiorna dati Dashboard", width="stretch", key=f"REFRESH_{conto_selezionato}"): st.rerun()
 
-            with col_head2:
-                with st.container(border=True):
-                    c_bal1, c_bal2 = st.columns(2)
-                    c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
-                    c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
+                with col_head2:
+                    with st.container(border=True):
+                        c_bal1, c_bal2 = st.columns(2)
+                        c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
+                        c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
                     
-                    st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
                     
-                    c_bal3, c_bal4 = st.columns(2)
-                    c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
+                        c_bal3, c_bal4 = st.columns(2)
+                        c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
                     
-                    try:
-                        dd_num_op = float(stato.get('drawdown', '0'))
-                        dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
-                    except:
-                        dd_col_op = "white"
+                        try:
+                            dd_num_op = float(stato.get('drawdown', '0'))
+                            dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
+                        except:
+                            dd_col_op = "white"
                         
-                    c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
-                    st.caption(stato.get('messaggio', ''))
+                        c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
+                        st.caption(stato.get('messaggio', ''))
 
-            st.markdown("---")
+                st.markdown("---")
 
-            def crea_riquadro_strumento(nome, tipo, tp_default, opp_default, dts_default, size_default=4):
-                with st.container(border=True):
-                    dati_salvati = memoria_attuale.get(nome, {})
-                    stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
-                    stato_attivo = dati_salvati.get("attivo", False)
-                    direzione = dati_salvati.get("direzione", "")
-                    modalita_manuale = dati_salvati.get("modalita_manuale", False)
-                    is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
-                    is_sosp_rollover = dati_salvati.get("sospeso_rollover", False) and stato_attivo
-                    msg_weekend = dati_salvati.get("msg_weekend", "")
-                    msg_manuale = dati_salvati.get("msg_manuale", "")
-                    errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
-                    stato_corrente_disp = stato_corrente.replace("OverGain", "OG").replace("OverLoss", "OL")
+                def crea_riquadro_strumento(nome, tipo, tp_default, opp_default, dts_default, size_default=4):
+                    with st.container(border=True):
+                        dati_salvati = memoria_attuale.get(nome, {})
+                        stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
+                        stato_attivo = dati_salvati.get("attivo", False)
+                        direzione = dati_salvati.get("direzione", "")
+                        modalita_manuale = dati_salvati.get("modalita_manuale", False)
+                        is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
+                        is_sosp_rollover = dati_salvati.get("sospeso_rollover", False) and stato_attivo
+                        msg_weekend = dati_salvati.get("msg_weekend", "")
+                        msg_manuale = dati_salvati.get("msg_manuale", "")
+                        errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
+                        stato_corrente_disp = stato_corrente.replace("OverGain", "OG").replace("OverLoss", "OL")
                     
-                    tp_val, opp_val, dts_val = dati_salvati.get("tp", tp_default), dati_salvati.get("opp", opp_default), dati_salvati.get("dts", dts_default)
-                    min_impostato = min(opp_val, dts_val, tp_val / 4)
-                    min_richiesto_ig = distanze_minime.get(nome, 0)
-                    is_distanza_pericolosa = min_richiesto_ig > 0 and min_impostato <= min_richiesto_ig
+                        tp_val, opp_val, dts_val = dati_salvati.get("tp", tp_default), dati_salvati.get("opp", opp_default), dati_salvati.get("dts", dts_default)
+                        min_impostato = min(opp_val, dts_val, tp_val / 4)
+                        min_richiesto_ig = distanze_minime.get(nome, 0)
+                        is_distanza_pericolosa = min_richiesto_ig > 0 and min_impostato <= min_richiesto_ig
 
-                    col_titolo, col_salva, col_pulisci = st.columns([2.7, 0.9, 1.2], vertical_alignment="center")
-                    with col_titolo:
-                        badge = "🟢 <b>[ Auto ]</b>" if not modalita_manuale else "🟠 <b>[ Manuale ]</b>"
-                        titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
-                        st.markdown(titolo_html, unsafe_allow_html=True)
-                        prezzi_ba = prezzi_bid_ask.get(nome, {})
-                        bid_ask_str = f"Bid: <span style='color:#ff4b4b;'>{prezzi_ba.get('bid', '-')}</span> | Ask: <span style='color:#09ab3b;'>{prezzi_ba.get('ask', '-')}</span>" if prezzi_ba else "<span style='color: #666;'>In aggiornamento...</span>"
-                        st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
+                        col_titolo, col_salva, col_pulisci = st.columns([2.7, 0.9, 1.2], vertical_alignment="center")
+                        with col_titolo:
+                            badge = "🟢 <b>[ Auto ]</b>" if not modalita_manuale else "🟠 <b>[ Manuale ]</b>"
+                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
+                            st.markdown(titolo_html, unsafe_allow_html=True)
+                            prezzi_ba = prezzi_bid_ask.get(nome, {})
+                            bid_ask_str = f"Bid: <span style='color:#ff4b4b;'>{prezzi_ba.get('bid', '-')}</span> | Ask: <span style='color:#09ab3b;'>{prezzi_ba.get('ask', '-')}</span>" if prezzi_ba else "<span style='color: #666;'>In aggiornamento...</span>"
+                            st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
                         
-                    with col_salva:
-                        if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help="Conferma e salva TP, OPP, DTS e Size", width="stretch"):
-                            memoria_attuale[nome] = {
-                                **dati_salvati, 
-                                "tp": st.session_state.get(f"{conto_selezionato}_{nome}_tp", tp_val), 
-                                "opp": st.session_state.get(f"{conto_selezionato}_{nome}_opp", opp_val), 
-                                "dts": st.session_state.get(f"{conto_selezionato}_{nome}_dts", dts_val), 
-                                "size": st.session_state.get(f"{conto_selezionato}_{nome}_size", dati_salvati.get("size", size_default)),
-                                "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""
-                            }
-                            salva_memoria(conto_selezionato, memoria_attuale)
-                            st.rerun() 
+                        with col_salva:
+                            if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help="Conferma e salva TP, OPP, DTS e Size", width="stretch"):
+                                memoria_attuale[nome] = {
+                                    **dati_salvati, 
+                                    "tp": st.session_state.get(f"{conto_selezionato}_{nome}_tp", tp_val), 
+                                    "opp": st.session_state.get(f"{conto_selezionato}_{nome}_opp", opp_val), 
+                                    "dts": st.session_state.get(f"{conto_selezionato}_{nome}_dts", dts_val), 
+                                    "size": st.session_state.get(f"{conto_selezionato}_{nome}_size", dati_salvati.get("size", size_default)),
+                                    "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""
+                                }
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun() 
                             
-                    with col_pulisci:
-                        if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help="Forza pulizia su IG e resetta a zero", width="stretch"):
-                            memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                            salva_memoria(conto_selezionato, memoria_attuale)
-                            st.rerun()
+                        with col_pulisci:
+                            if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help="Forza pulizia su IG e resetta a zero", width="stretch"):
+                                memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
                     
-                    if errore_avvio: st.error("🛑 **AVVIO BLOCCATO:** IG ha rifiutato la griglia.")
-                    elif errore_ripristino: st.error("🛑 **RIPRISTINO BLOCCATO:** 4 tentativi falliti. Passaggio in **MANUALE**.")
-                    elif is_distanza_pericolosa: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 15px;'>⚠️ <b>ATTENZIONE:</b> Stop Minimo IG: <b>{min_richiesto_ig} pt</b>. Impostato: <b>{min_impostato} pt</b>.</div>", unsafe_allow_html=True)
-                    else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
+                        if errore_avvio: st.error("🛑 **AVVIO BLOCCATO:** IG ha rifiutato la griglia.")
+                        elif errore_ripristino: st.error("🛑 **RIPRISTINO BLOCCATO:** 4 tentativi falliti. Passaggio in **MANUALE**.")
+                        elif is_distanza_pericolosa: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 15px;'>⚠️ <b>ATTENZIONE:</b> Stop Minimo IG: <b>{min_richiesto_ig} pt</b>. Impostato: <b>{min_impostato} pt</b>.</div>", unsafe_allow_html=True)
+                        else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
                     
-                    margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
-                    if margine_u != "N/D":
-                        st.caption(f"🛡️ Margine (Size=1): **{margine_u}€**")
+                        margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
+                        if margine_u != "N/D":
+                            st.caption(f"🛡️ Margine (Size=1): **{margine_u}€**")
 
-                    if msg_weekend: st.error(f"🛑 {msg_weekend}")
-                    if msg_manuale: st.error(msg_manuale)
+                        if msg_weekend: st.error(f"🛑 {msg_weekend}")
+                        if msg_manuale: st.error(msg_manuale)
                     
-                    alert_falso = dati_salvati.get("alert_falso_allarme")
-                    if alert_falso:
-                        st.error(f"🛑 **{alert_falso}**")
-                        if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}"):
-                            memoria_attuale[nome] = {**dati_salvati, "alert_falso_allarme": ""}
-                            salva_memoria(conto_selezionato, memoria_attuale)
-                            st.rerun()
+                        alert_falso = dati_salvati.get("alert_falso_allarme")
+                        if alert_falso:
+                            st.error(f"🛑 **{alert_falso}**")
+                            if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}"):
+                                memoria_attuale[nome] = {**dati_salvati, "alert_falso_allarme": ""}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
                     
-                    c_in1, c_in2 = st.columns(2)
-                    with c_in1: tp = st.number_input("TP", value=int(tp_val), step=5, format="%d", key=f"{conto_selezionato}_{nome}_tp")
-                    with c_in2: opp = st.number_input("OPP", value=int(opp_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_opp")
+                        c_in1, c_in2 = st.columns(2)
+                        with c_in1: tp = st.number_input("TP", value=int(tp_val), step=5, format="%d", key=f"{conto_selezionato}_{nome}_tp")
+                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_opp")
                         
-                    c_in3, c_in4 = st.columns(2)
-                    with c_in3: dts = st.number_input("DTS", value=int(dts_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_dts")
-                    with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
+                        c_in3, c_in4 = st.columns(2)
+                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_dts")
+                        with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
                     
-                    if is_sospeso_wk:
-                        st.warning("🌴 **MACCHINA IN SOSPENSIONE WEEKEND.** Le funzioni generali sono bloccate per proteggere la memoria. Clicca Riprendi per sbloccare la console e piazzare i Satelliti.")
-                        if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
-                            memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                            salva_memoria(conto_selezionato, memoria_attuale)
-                            st.rerun()
-                    elif is_sosp_rollover:
-                        st.warning("🌙 **PAUSA NOTTURNA (ROLLOVER) ATTIVA.** Le funzioni sono bloccate e gli ordini pendenti rimossi temporaneamente per protezione dallo spread. Ripresa automatica alle 00:10.")
-                    elif modalita_manuale:
-                        st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
-                        col_m1, col_m2 = st.columns(2, vertical_alignment="center")
-                        with col_m1:
-                            if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": "", "sospeso_weekend": False}
+                        if is_sospeso_wk:
+                            st.warning("🌴 **MACCHINA IN SOSPENSIONE WEEKEND.** Le funzioni generali sono bloccate per proteggere la memoria. Clicca Riprendi per sbloccare la console e piazzare i Satelliti.")
+                            if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                                memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
-                        with col_m2:
-                            if st.button("🔄 Restart Fase 1", key=f"RES_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                    elif not stato_attivo:
-                        col_l, col_s = st.columns(2)
-                        with col_l:
-                            if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                        with col_s:
-                            if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                        if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True):
-                            st.session_state[f"sync_open_{nome}"] = True
-                            st.rerun()
-                            
-                        if st.session_state.get(f"sync_open_{nome}", False):
-                            dialog_sync_start(conto_selezionato, nome)
-                    else:
-                        c_stop, c_man, c_wk, c_sync = st.columns([1.7, 2.3, 2.3, 1.7], vertical_alignment="center")
-                        with c_stop:
-                            if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help="Chiude tutto e resetta a zero", width="stretch"):
-                                pl = prezzi_live.get(nome, "")
-                                vecchio_wip = dati_salvati.get("storico_wip", [])
-                                vecchio_wip.append(f"[{datetime.now().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
-                                memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                        with c_man:
-                            if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {**dati_salvati, "comando_manuale": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                        with c_wk:
-                            if "FASE_2" in stato_corrente:
-                                if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                        elif is_sosp_rollover:
+                            st.warning("🌙 **PAUSA NOTTURNA (ROLLOVER) ATTIVA.** Le funzioni sono bloccate e gli ordini pendenti rimossi temporaneamente per protezione dallo spread. Ripresa automatica alle 00:10.")
+                        elif modalita_manuale:
+                            st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
+                            col_m1, col_m2 = st.columns(2, vertical_alignment="center")
+                            with col_m1:
+                                if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": "", "sospeso_weekend": False}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
-                            elif is_sosp_rollover:
-                                st.warning("🌙 ROLLOVER")
-                            else:
-                                st.success("✔️ OK")
-                        with c_sync:
-                            if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch"):
-                                dialog_sync(conto_selezionato, nome)
-
-                    if not modalita_manuale:
-                        if stato_attivo:
-                            if is_sospeso_wk: st.warning(f"🌴 IN PAUSA WEEKEND ({direzione}) | In attesa di ripresa")
-                            elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:10")
-                            elif stato_corrente == "FASE_2_STANDBY": st.markdown("<div style='background-color: #FFD700; color: #000000; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 1rem;'>⏳ IN ATTESA DI RIENTRO | Motore in Stand-By</div>", unsafe_allow_html=True)
-                            else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
-                        else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
-
-            tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-            for i in range(0, len(tutti_strumenti), 2):
-                c1, c2 = st.columns(2)
-                with c1:
-                    crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
-                with c2:
-                    if i + 1 < len(tutti_strumenti):
-                        crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
-
-        renderizza_dati_live()
-
-    with tab_restore:
-        st.title("🛠️ Strumento di Recovery")
-        st.markdown("Wizard guidato per l'inserimento manuale o la correzione tattica di un ordine mancante. Calcolato in tempo reale in base alla tua strategia.")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-            r_nome = st.selectbox("1. Seleziona Strumento", tutti_strumenti)
-        with col2:
-            r_fase = st.selectbox("2. Seleziona Fase", ["FASE 1", "FASE 2", "FASE 3"])
-
-        memoria_attuale = carica_memoria(conto_selezionato)
-        dati = memoria_attuale.get(r_nome, {})
-        stato = leggi_stato_sistema(conto_selezionato)
-        prezzi_live = stato.get("prezzi_live", {})
-        prezzo_live = prezzi_live.get(r_nome)
-        
-        opzioni = []
-        if r_fase == "FASE 1": 
-            opzioni = ["Ordine MICRO (Pendente)"]
-        elif r_fase == "FASE 2": 
-            opzioni = ["Posizione TICKET1 (A Mercato)", "Ordine TICKET2 (Pendente)", "Ordini SAT1 OCO (Entrambi)", "Ordine SAT1 OCO (Solo BUY)", "Ordine SAT1 OCO (Solo SELL)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
-        else: 
-            opzioni = ["Ordine ULTIMA (Pendente)", "Posizione TAGLIO CORE (A Mercato)"]
-
-        with col3:
-            r_anom = st.selectbox("3. Seleziona Elemento Mancante", opzioni)
-
-        st.markdown("---")
-        st.subheader("🩺 Diagnosi & Recovery")
-
-        if not dati:
-            st.warning("Lo strumento non ha dati in memoria. Impossibile calcolare il Recovery.")
-        elif not prezzo_live:
-            st.warning("Prezzo live non disponibile. Attendi la connessione con IG.")
-        else:
-            c = CONFIG_STRUMENTI[r_nome]
-            dec = c["decimali"]
-            mult = c["moltiplicatore"]
-            s_core = float(dati.get("size", 4))
-            s_mezzo = max(1.0, s_core / 2)
-            s_quarto = max(0.1, s_core / 4)
-            tp4_val = round((dati.get("tp", 50) / 4) * mult, dec)
-            opp_val = round(dati.get("opp", 20) * mult, dec)
-            dir_core = dati.get("direzione")
-            
-            # --- TENTATIVO DI RECUPERO DATI SAT1 DA LIVE ---
-            s_dir = dati.get("sat_dir")
-            s_price = dati.get("sat_price")
-            if not s_dir or not s_price:
-                pos_live = stato.get("posizioni", [])
-                t_epic = c.get("epic")
-                core_ids = [p['position']['dealId'] for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_core]
-                sat1_live = [p for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
-                if sat1_live:
-                    if not s_dir: s_dir = sat1_live[0]['position']['direction']
-                    if not s_price: s_price = float(sat1_live[0]['position']['level'])
-            # -----------------------------------------------
-            
-            cmd_data = None
-            
-            if "MICRO" in r_anom:
-                p_base = dati.get("prezzo_base")
-                if not p_base:
-                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare la Micro:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_micro_{conto_selezionato}_{r_nome}")
-                if not p_base or p_base <= 0:
-                    st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
-                else:
-                    m_dir = "SELL" if dir_core == "LONG" else "BUY"
-                    lvl = round(p_base + tp4_val if m_dir == "SELL" else p_base - tp4_val, dec)
-                    lim = p_base
-                    stop = round(p_base + 2*tp4_val if m_dir == "SELL" else p_base - 2*tp4_val, dec)
-                    cmd_data = {"azione": "PENDENTE", "dir": m_dir, "size": s_mezzo, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": stop, "etichetta": "[RECOVERY MICRO]"}
-
-            elif "TICKET1" in r_anom:
-                t_dir = "BUY" if dir_core == "LONG" else "SELL"
-                st.info("Il Ticket (post-assicurazione) è una POSIZIONE A MERCATO. Cliccando il bottone, la macchina entrerà immediatamente al prezzo live e ricalcolerà Stop e Limit in base all'OPP.")
-                
-                t_base = dati.get("ticket1_base") or prezzo_live
-                lim = round(t_base + opp_val if t_dir == "BUY" else t_base - opp_val, dec)
-                stop = round(t_base - opp_val if t_dir == "BUY" else t_base + opp_val, dec)
-                cmd_data = {"azione": "MERCATO", "dir": t_dir, "size": s_mezzo, "lim": lim, "stop": stop, "etichetta": "[RECOVERY TICKET1]"}
-
-            elif "TICKET2" in r_anom:
-                t2_dir = dati.get("ticket2_dir")
-                t2_entry = dati.get("ticket2_entry")
-                if not t2_dir or not t2_entry:
-                    st.error("Dati TICKET2 non trovati in memoria. Verifica che il Ticket2 sia stato attivato dal Motore.")
-                else:
-                    st.info("Il Ticket2 (Ping-Pong) è un ORDINE PENDENTE LIMIT. Sarà reinserito al livello originale.")
-                    lim_lvl_t2 = round(t2_entry + tp4_val if t2_dir == "BUY" else t2_entry - tp4_val, dec)
-                    cmd_data = {"azione": "PENDENTE", "dir": t2_dir, "size": s_mezzo, "livello": t2_entry, "tipo": "LIMIT", "lim": lim_lvl_t2, "stop": None, "etichetta": "[RECOVERY TICKET2]"}
-
-            elif "SAT1 OCO" in r_anom:
-                p_base = dati.get("prezzo_base")
-                if not p_base:
-                    p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare i Satelliti OCO:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_sat1_{conto_selezionato}_{r_nome}")
-                if not p_base or p_base <= 0:
-                    st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
-                else:
-                    tp2_val = round((dati.get("tp", 50) / 2) * mult, dec)
-                    if dir_core == "LONG":
-                        lvl_l = round(p_base + tp2_val, dec)
-                        lvl_s = round((p_base - opp_val) - tp2_val, dec)
-                    else:
-                        lvl_l = round((p_base + opp_val) + tp2_val, dec)
-                        lvl_s = round(p_base - tp2_val, dec)
-                        
-                    lim_l = round(lvl_l + tp2_val, dec)
-                    stop_l = round(lvl_l - tp2_val, dec)
-                    lim_s = round(lvl_s - tp2_val, dec)
-                    stop_s = round(lvl_s + tp2_val, dec)
-                    
-                    if "Solo BUY" in r_anom:
-                        st.info("Verrà reinserito SOLO l'ordine SAT1 OCO lato BUY.")
-                        cmd_data = {"azione": "PENDENTE", "dir": "BUY", "size": s_mezzo, "livello": lvl_l, "tipo": "STOP", "lim": lim_l, "stop": stop_l, "etichetta": "[RECOVERY SAT1 OCO BUY]"}
-                    elif "Solo SELL" in r_anom:
-                        st.info("Verrà reinserito SOLO l'ordine SAT1 OCO lato SELL.")
-                        cmd_data = {"azione": "PENDENTE", "dir": "SELL", "size": s_mezzo, "livello": lvl_s, "tipo": "STOP", "lim": lim_s, "stop": stop_s, "etichetta": "[RECOVERY SAT1 OCO SELL]"}
-                    else:
-                        st.info("Verranno ricalcolati e inseriti ENTRAMBI gli ordini SAT1 OCO (Buy e Sell).")
-                        cmd_data = {
-                            "azione": "SAT1_OCO", "size": s_mezzo, 
-                            "lvl_l": lvl_l, "lim_l": lim_l, "stop_l": stop_l,
-                            "lvl_s": lvl_s, "lim_s": lim_s, "stop_s": stop_s,
-                            "etichetta": "[RECOVERY SAT1 OCO]"
-                        }
-
-            elif "SAT2" in r_anom:
-                if not s_dir:
-                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
-                else:
-                    i_dir = "SELL" if s_dir == "BUY" else "BUY"
-                    st.info("SAT2 è una POSIZIONE A MERCATO. Cliccando il bottone, la macchina entrerà immediatamente al prezzo live calcolando 1/4 della size Core.")
-                    cmd_data = {"azione": "MERCATO", "dir": i_dir, "size": s_quarto, "lim": None, "stop": None, "etichetta": "[RECOVERY SAT2]"}
-
-            elif "OVERGAIN" in r_anom:
-                if not s_dir or not s_price:
-                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
-                else:
-                    i_dir = "SELL" if s_dir == "BUY" else "BUY"
-                    lvl = round(s_price + tp4_val if i_dir == "SELL" else s_price - tp4_val, dec)
-                    lim = s_price
-                    cmd_data = {"azione": "PENDENTE", "dir": i_dir, "size": s_mezzo, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": None, "etichetta": "[RECOVERY OVERGAIN]"}
-
-            elif "OVERLOSS" in r_anom:
-                if not s_dir or not s_price:
-                    st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
-                else:
-                    i_dir = "SELL" if s_dir == "BUY" else "BUY"
-                    lvl = round(s_price - tp4_val if i_dir == "SELL" else s_price + tp4_val, dec)
-                    stop = s_price
-                    cmd_data = {"azione": "PENDENTE", "dir": i_dir, "size": s_quarto, "livello": lvl, "tipo": "STOP", "lim": None, "stop": stop, "etichetta": "[RECOVERY OVERLOSS]"}
-
-            elif "ULTIMA" in r_anom:
-                f3_dir = dati.get("fase3_dir")
-                f3_current_base = dati.get("fase3_current_base")
-                f3_step = dati.get("fase3_step", 1)
-                if not f3_dir or not f3_current_base:
-                    st.error("Dati Fase 3 mancanti in memoria.")
-                else:
-                    d_contro = "SELL" if f3_dir == "BUY" else "BUY"
-                    s_last = s_mezzo if f3_step == 1 else (s_core * 0.15)
-                    lvl = round(f3_current_base + tp4_val if d_contro == "SELL" else f3_current_base - tp4_val, dec)
-                    lim = f3_current_base
-                    cmd_data = {"azione": "PENDENTE", "dir": d_contro, "size": s_last, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": None, "etichetta": "[RECOVERY ULTIMA]"}
-
-            elif "TAGLIO CORE" in r_anom:
-                f3_dir = dati.get("fase3_dir")
-                f3_step = dati.get("fase3_step", 1)
-                if not f3_dir:
-                    st.error("Dati Fase 3 mancanti in memoria.")
-                else:
-                    d_contro = "SELL" if f3_dir == "BUY" else "BUY"
-                    s_taglio = round(s_core * 0.35, 2) if f3_step == 1 else s_core # actually we should just try to close what is there, let's use 0.35 for step 1
-                    # Wait, s_taglio is handled correctly if we just provide the command
-                    st.info("Il Taglio Core è un ORDINE A MERCATO per chiudere parte (o tutta) la posizione. Il motore eseguirà la chiusura parziale.")
-                    cmd_data = {"azione": "MERCATO", "dir": d_contro, "size": s_taglio, "lim": None, "stop": None, "etichetta": f"[RECOVERY TAGLIO CORE STEP {f3_step}]"}
-
-            if cmd_data:
-                with st.container(border=True):
-                    if cmd_data["azione"] == "PENDENTE":
-                        oltrepassato = is_oltrepassato(cmd_data["tipo"], cmd_data["dir"], cmd_data["livello"], prezzo_live)
-                        
-                        st.markdown(f"**Direzione Calcolata:** `{cmd_data['dir']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Tipo Ottimale:** `{cmd_data['tipo']}`")
-                        st.markdown(f"**Livello Matematico Ideale:** <span style='font-size: 1.2rem; color: #FFD700;'>{formatta_numero(cmd_data['livello'], dec)}</span> &nbsp;&nbsp;|&nbsp;&nbsp; *(Prezzo Live attuale: {prezzo_live})*", unsafe_allow_html=True)
-                        
-                        st.write("")
-                        
-                        if oltrepassato:
-                            st.error(f"⚠️ **ATTENZIONE: MERCATO SCAVALCATO.** Il prezzo attuale ({prezzo_live}) ha oltrepassato il livello ideale ({formatta_numero(cmd_data['livello'], dec)}). I server IG rifiuteranno l'inserimento di un ordine {cmd_data['tipo']}.")
+                            with col_m2:
+                                if st.button("🔄 Restart Fase 1", key=f"RES_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                        elif not stato_attivo:
+                            col_l, col_s = st.columns(2)
+                            with col_l:
+                                if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with col_s:
+                                if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True):
+                                st.session_state[f"sync_open_{nome}"] = True
+                                st.rerun()
                             
-                            st.markdown("### Azioni di Ripristino Disponibili:")
-                            st.markdown(f"**1️⃣ ATTESA TATTICA:** Piazza un ordine inverso (`LIMIT` a `{formatta_numero(cmd_data['livello'], dec)}`). Non paghi slippage. Ripristini l'esatta geometria della strategia attendendo che il prezzo faccia pullback (ritracci). Rischio: se il prezzo non torna indietro, resti scoperto.")
-                            st.markdown(f"**2️⃣ COPERTURA IMMEDIATA:** Entra a `MERCATO` al prezzo attuale (`{prezzo_live}`). Chiudi subito la falla di sicurezza, ma accetti uno slippage pari alla differenza tra il prezzo ideale e quello attuale.")
-                            st.markdown(f"**3️⃣ TENTATIVO STANDARD:** Prova a forzare l'ordine originale (`{cmd_data['tipo']}` a `{formatta_numero(cmd_data['livello'], dec)}`). Da usare SOLO se vedi che il prezzo sta fluttuando e potrebbe rientrare nei limiti concessi da IG proprio mentre clicchi.")
-                            
-                            st.write("")
-                            colA, colB, colC = st.columns(3)
-                            
-                            trap_type = "LIMIT" if cmd_data["tipo"] == "STOP" else "STOP"
-                                
-                            with colA:
-                                if st.button(f"1️⃣ Tattica: {trap_type} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, help="Piazza la trappola attendendo il rimbalzo del mercato."):
-                                    cmd_trap = cmd_data.copy()
-                                    cmd_trap["tipo"] = trap_type
-                                    cmd_trap["etichetta"] += " (LIMIT TATTICO)"
-                                    piazza_restore(conto_selezionato, r_nome, cmd_trap)
-                            with colB:
-                                if st.button(f"2️⃣ Copertura: MERCATO a {prezzo_live}", use_container_width=True, help="Copri la posizione istantaneamente al prezzo di adesso."):
-                                    cmd_mkt = cmd_data.copy()
-                                    cmd_mkt["azione"] = "MERCATO"
-                                    cmd_mkt["etichetta"] += " (FORZATURA MERCATO)"
-                                    piazza_restore(conto_selezionato, r_nome, cmd_mkt)
-                            with colC:
-                                if st.button(f"3️⃣ Forza: {cmd_data['tipo']} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, help="Tenta di inviare la richiesta originale a IG."):
-                                    piazza_restore(conto_selezionato, r_nome, cmd_data)
+                            if st.session_state.get(f"sync_open_{nome}", False):
+                                dialog_sync_start(conto_selezionato, nome)
                         else:
-                            st.success(f"🟢 **Condizioni nei parametri.** Il livello {formatta_numero(cmd_data['livello'], dec)} è piazzabile in sicurezza senza incorrere in rifiuti di IG.")
-                            if st.button(f"🚀 Invia Ordine a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, type="primary"):
-                                piazza_restore(conto_selezionato, r_nome, cmd_data)
-                    elif cmd_data["azione"] == "SAT1_OCO":
-                        st.markdown(f"**Ordini da Inviare:** `BUY` a {formatta_numero(cmd_data['lvl_l'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; `SELL` a {formatta_numero(cmd_data['lvl_s'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}`")
-                        st.success("🟢 **Ordini Simultanei Pronti.** I livelli teorici sono stati calcolati in base alla strategia in corso.")
-                        if st.button("🚀 Invia Entrambi gli Ordini (OCO SAT1)", use_container_width=True, type="primary"):
-                            piazza_restore(conto_selezionato, r_nome, cmd_data)
+                            c_stop, c_man, c_wk, c_sync = st.columns([1.7, 2.3, 2.3, 1.7], vertical_alignment="center")
+                            with c_stop:
+                                if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help="Chiude tutto e resetta a zero", width="stretch"):
+                                    pl = prezzi_live.get(nome, "")
+                                    vecchio_wip = dati_salvati.get("storico_wip", [])
+                                    vecchio_wip.append(f"[{datetime.now().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with c_man:
+                                if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "comando_manuale": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with c_wk:
+                                if "FASE_2" in stato_corrente:
+                                    if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                                        memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                        salva_memoria(conto_selezionato, memoria_attuale)
+                                        st.rerun()
+                                elif is_sosp_rollover:
+                                    st.warning("🌙 ROLLOVER")
+                                else:
+                                    st.success("✔️ OK")
+                            with c_sync:
+                                if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch"):
+                                    dialog_sync(conto_selezionato, nome)
 
-                    else: # MERCATO (Es. Ticket o SAT2)
-                        st.markdown(f"**Direzione:** `{cmd_data.get('dir', 'N/D')}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Azione Reale:** `INGRESSO A MERCATO`")
-                        if st.button(f"🚀 Entra a MERCATO adesso (Prezzo Live: {prezzo_live})", use_container_width=True, type="primary"):
-                            piazza_restore(conto_selezionato, r_nome, cmd_data)
+                        if not modalita_manuale:
+                            if stato_attivo:
+                                if is_sospeso_wk: st.warning(f"🌴 IN PAUSA WEEKEND ({direzione}) | In attesa di ripresa")
+                                elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:10")
+                                elif stato_corrente == "FASE_2_STANDBY": st.markdown("<div style='background-color: #FFD700; color: #000000; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 1rem;'>⏳ IN ATTESA DI RIENTRO | Motore in Stand-By</div>", unsafe_allow_html=True)
+                                else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
+                            else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
+
+                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                for i in range(0, len(tutti_strumenti), 2):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
+                    with c2:
+                        if i + 1 < len(tutti_strumenti):
+                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
+
+            renderizza_dati_live()
+
+    if tab_restore is not None:
+        with tab_restore:
+
+            st.title("🛠️ Strumento di Recovery")
+            st.markdown("Wizard guidato per l'inserimento manuale o la correzione tattica di un ordine mancante. Calcolato in tempo reale in base alla tua strategia.")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                r_nome = st.selectbox("1. Seleziona Strumento", tutti_strumenti)
+            with col2:
+                r_fase = st.selectbox("2. Seleziona Fase", ["FASE 1", "FASE 2", "FASE 3"])
+
+            memoria_attuale = carica_memoria(conto_selezionato)
+            dati = memoria_attuale.get(r_nome, {})
+            stato = leggi_stato_sistema(conto_selezionato)
+            prezzi_live = stato.get("prezzi_live", {})
+            prezzo_live = prezzi_live.get(r_nome)
+        
+            opzioni = []
+            if r_fase == "FASE 1": 
+                opzioni = ["Ordine MICRO (Pendente)"]
+            elif r_fase == "FASE 2": 
+                opzioni = ["Posizione TICKET1 (A Mercato)", "Ordine TICKET2 (Pendente)", "Ordini SAT1 OCO (Entrambi)", "Ordine SAT1 OCO (Solo BUY)", "Ordine SAT1 OCO (Solo SELL)", "Posizione SAT2 (A Mercato)", "Ordine OVERGAIN (Pendente)", "Ordine OVERLOSS (Pendente)"]
+            else: 
+                opzioni = ["Ordine ULTIMA (Pendente)", "Posizione TAGLIO CORE (A Mercato)"]
+
+            with col3:
+                r_anom = st.selectbox("3. Seleziona Elemento Mancante", opzioni)
+
+            st.markdown("---")
+            st.subheader("🩺 Diagnosi & Recovery")
+
+            if not dati:
+                st.warning("Lo strumento non ha dati in memoria. Impossibile calcolare il Recovery.")
+            elif not prezzo_live:
+                st.warning("Prezzo live non disponibile. Attendi la connessione con IG.")
+            else:
+                c = CONFIG_STRUMENTI[r_nome]
+                dec = c["decimali"]
+                mult = c["moltiplicatore"]
+                s_core = float(dati.get("size", 4))
+                s_mezzo = max(1.0, s_core / 2)
+                s_quarto = max(0.1, s_core / 4)
+                tp4_val = round((dati.get("tp", 50) / 4) * mult, dec)
+                opp_val = round(dati.get("opp", 20) * mult, dec)
+                dir_core = dati.get("direzione")
+            
+                # --- TENTATIVO DI RECUPERO DATI SAT1 DA LIVE ---
+                s_dir = dati.get("sat_dir")
+                s_price = dati.get("sat_price")
+                if not s_dir or not s_price:
+                    pos_live = stato.get("posizioni", [])
+                    t_epic = c.get("epic")
+                    core_ids = [p['position']['dealId'] for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_core]
+                    sat1_live = [p for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids]
+                    if sat1_live:
+                        if not s_dir: s_dir = sat1_live[0]['position']['direction']
+                        if not s_price: s_price = float(sat1_live[0]['position']['level'])
+                # -----------------------------------------------
+            
+                cmd_data = None
+            
+                if "MICRO" in r_anom:
+                    p_base = dati.get("prezzo_base")
+                    if not p_base:
+                        p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare la Micro:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_micro_{conto_selezionato}_{r_nome}")
+                    if not p_base or p_base <= 0:
+                        st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
+                    else:
+                        m_dir = "SELL" if dir_core == "LONG" else "BUY"
+                        lvl = round(p_base + tp4_val if m_dir == "SELL" else p_base - tp4_val, dec)
+                        lim = p_base
+                        stop = round(p_base + 2*tp4_val if m_dir == "SELL" else p_base - 2*tp4_val, dec)
+                        cmd_data = {"azione": "PENDENTE", "dir": m_dir, "size": s_mezzo, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": stop, "etichetta": "[RECOVERY MICRO]"}
+
+                elif "TICKET1" in r_anom:
+                    t_dir = "BUY" if dir_core == "LONG" else "SELL"
+                    st.info("Il Ticket (post-assicurazione) è una POSIZIONE A MERCATO. Cliccando il bottone, la macchina entrerà immediatamente al prezzo live e ricalcolerà Stop e Limit in base all'OPP.")
+                
+                    t_base = dati.get("ticket1_base") or prezzo_live
+                    lim = round(t_base + opp_val if t_dir == "BUY" else t_base - opp_val, dec)
+                    stop = round(t_base - opp_val if t_dir == "BUY" else t_base + opp_val, dec)
+                    cmd_data = {"azione": "MERCATO", "dir": t_dir, "size": s_mezzo, "lim": lim, "stop": stop, "etichetta": "[RECOVERY TICKET1]"}
+
+                elif "TICKET2" in r_anom:
+                    t2_dir = dati.get("ticket2_dir")
+                    t2_entry = dati.get("ticket2_entry")
+                    if not t2_dir or not t2_entry:
+                        st.error("Dati TICKET2 non trovati in memoria. Verifica che il Ticket2 sia stato attivato dal Motore.")
+                    else:
+                        st.info("Il Ticket2 (Ping-Pong) è un ORDINE PENDENTE LIMIT. Sarà reinserito al livello originale.")
+                        lim_lvl_t2 = round(t2_entry + tp4_val if t2_dir == "BUY" else t2_entry - tp4_val, dec)
+                        cmd_data = {"azione": "PENDENTE", "dir": t2_dir, "size": s_mezzo, "livello": t2_entry, "tipo": "LIMIT", "lim": lim_lvl_t2, "stop": None, "etichetta": "[RECOVERY TICKET2]"}
+
+                elif "SAT1 OCO" in r_anom:
+                    p_base = dati.get("prezzo_base")
+                    if not p_base:
+                        p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare i Satelliti OCO:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_sat1_{conto_selezionato}_{r_nome}")
+                    if not p_base or p_base <= 0:
+                        st.error("Prezzo base Core mancante. Inseriscilo per proseguire.")
+                    else:
+                        tp2_val = round((dati.get("tp", 50) / 2) * mult, dec)
+                        if dir_core == "LONG":
+                            lvl_l = round(p_base + tp2_val, dec)
+                            lvl_s = round((p_base - opp_val) - tp2_val, dec)
+                        else:
+                            lvl_l = round((p_base + opp_val) + tp2_val, dec)
+                            lvl_s = round(p_base - tp2_val, dec)
+                        
+                        lim_l = round(lvl_l + tp2_val, dec)
+                        stop_l = round(lvl_l - tp2_val, dec)
+                        lim_s = round(lvl_s - tp2_val, dec)
+                        stop_s = round(lvl_s + tp2_val, dec)
+                    
+                        if "Solo BUY" in r_anom:
+                            st.info("Verrà reinserito SOLO l'ordine SAT1 OCO lato BUY.")
+                            cmd_data = {"azione": "PENDENTE", "dir": "BUY", "size": s_mezzo, "livello": lvl_l, "tipo": "STOP", "lim": lim_l, "stop": stop_l, "etichetta": "[RECOVERY SAT1 OCO BUY]"}
+                        elif "Solo SELL" in r_anom:
+                            st.info("Verrà reinserito SOLO l'ordine SAT1 OCO lato SELL.")
+                            cmd_data = {"azione": "PENDENTE", "dir": "SELL", "size": s_mezzo, "livello": lvl_s, "tipo": "STOP", "lim": lim_s, "stop": stop_s, "etichetta": "[RECOVERY SAT1 OCO SELL]"}
+                        else:
+                            st.info("Verranno ricalcolati e inseriti ENTRAMBI gli ordini SAT1 OCO (Buy e Sell).")
+                            cmd_data = {
+                                "azione": "SAT1_OCO", "size": s_mezzo, 
+                                "lvl_l": lvl_l, "lim_l": lim_l, "stop_l": stop_l,
+                                "lvl_s": lvl_s, "lim_s": lim_s, "stop_s": stop_s,
+                                "etichetta": "[RECOVERY SAT1 OCO]"
+                            }
+
+                elif "SAT2" in r_anom:
+                    if not s_dir:
+                        st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
+                    else:
+                        i_dir = "SELL" if s_dir == "BUY" else "BUY"
+                        st.info("SAT2 è una POSIZIONE A MERCATO. Cliccando il bottone, la macchina entrerà immediatamente al prezzo live calcolando 1/4 della size Core.")
+                        cmd_data = {"azione": "MERCATO", "dir": i_dir, "size": s_quarto, "lim": None, "stop": None, "etichetta": "[RECOVERY SAT2]"}
+
+                elif "OVERGAIN" in r_anom:
+                    if not s_dir or not s_price:
+                        st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
+                    else:
+                        i_dir = "SELL" if s_dir == "BUY" else "BUY"
+                        lvl = round(s_price + tp4_val if i_dir == "SELL" else s_price - tp4_val, dec)
+                        lim = s_price
+                        cmd_data = {"azione": "PENDENTE", "dir": i_dir, "size": s_mezzo, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": None, "etichetta": "[RECOVERY OVERGAIN]"}
+
+                elif "OVERLOSS" in r_anom:
+                    if not s_dir or not s_price:
+                        st.error("Dati direzionali del SAT1 innescato mancanti in memoria e non rilevabili tra le posizioni aperte.")
+                    else:
+                        i_dir = "SELL" if s_dir == "BUY" else "BUY"
+                        lvl = round(s_price - tp4_val if i_dir == "SELL" else s_price + tp4_val, dec)
+                        stop = s_price
+                        cmd_data = {"azione": "PENDENTE", "dir": i_dir, "size": s_quarto, "livello": lvl, "tipo": "STOP", "lim": None, "stop": stop, "etichetta": "[RECOVERY OVERLOSS]"}
+
+                elif "ULTIMA" in r_anom:
+                    f3_dir = dati.get("fase3_dir")
+                    f3_current_base = dati.get("fase3_current_base")
+                    f3_step = dati.get("fase3_step", 1)
+                    if not f3_dir or not f3_current_base:
+                        st.error("Dati Fase 3 mancanti in memoria.")
+                    else:
+                        d_contro = "SELL" if f3_dir == "BUY" else "BUY"
+                        s_last = s_mezzo if f3_step == 1 else (s_core * 0.15)
+                        lvl = round(f3_current_base + tp4_val if d_contro == "SELL" else f3_current_base - tp4_val, dec)
+                        lim = f3_current_base
+                        cmd_data = {"azione": "PENDENTE", "dir": d_contro, "size": s_last, "livello": lvl, "tipo": "LIMIT", "lim": lim, "stop": None, "etichetta": "[RECOVERY ULTIMA]"}
+
+                elif "TAGLIO CORE" in r_anom:
+                    f3_dir = dati.get("fase3_dir")
+                    f3_step = dati.get("fase3_step", 1)
+                    if not f3_dir:
+                        st.error("Dati Fase 3 mancanti in memoria.")
+                    else:
+                        d_contro = "SELL" if f3_dir == "BUY" else "BUY"
+                        s_taglio = round(s_core * 0.35, 2) if f3_step == 1 else s_core # actually we should just try to close what is there, let's use 0.35 for step 1
+                        # Wait, s_taglio is handled correctly if we just provide the command
+                        st.info("Il Taglio Core è un ORDINE A MERCATO per chiudere parte (o tutta) la posizione. Il motore eseguirà la chiusura parziale.")
+                        cmd_data = {"azione": "MERCATO", "dir": d_contro, "size": s_taglio, "lim": None, "stop": None, "etichetta": f"[RECOVERY TAGLIO CORE STEP {f3_step}]"}
+
+                if cmd_data:
+                    with st.container(border=True):
+                        if cmd_data["azione"] == "PENDENTE":
+                            oltrepassato = is_oltrepassato(cmd_data["tipo"], cmd_data["dir"], cmd_data["livello"], prezzo_live)
+                        
+                            st.markdown(f"**Direzione Calcolata:** `{cmd_data['dir']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Tipo Ottimale:** `{cmd_data['tipo']}`")
+                            st.markdown(f"**Livello Matematico Ideale:** <span style='font-size: 1.2rem; color: #FFD700;'>{formatta_numero(cmd_data['livello'], dec)}</span> &nbsp;&nbsp;|&nbsp;&nbsp; *(Prezzo Live attuale: {prezzo_live})*", unsafe_allow_html=True)
+                        
+                            st.write("")
+                        
+                            if oltrepassato:
+                                st.error(f"⚠️ **ATTENZIONE: MERCATO SCAVALCATO.** Il prezzo attuale ({prezzo_live}) ha oltrepassato il livello ideale ({formatta_numero(cmd_data['livello'], dec)}). I server IG rifiuteranno l'inserimento di un ordine {cmd_data['tipo']}.")
+                            
+                                st.markdown("### Azioni di Ripristino Disponibili:")
+                                st.markdown(f"**1️⃣ ATTESA TATTICA:** Piazza un ordine inverso (`LIMIT` a `{formatta_numero(cmd_data['livello'], dec)}`). Non paghi slippage. Ripristini l'esatta geometria della strategia attendendo che il prezzo faccia pullback (ritracci). Rischio: se il prezzo non torna indietro, resti scoperto.")
+                                st.markdown(f"**2️⃣ COPERTURA IMMEDIATA:** Entra a `MERCATO` al prezzo attuale (`{prezzo_live}`). Chiudi subito la falla di sicurezza, ma accetti uno slippage pari alla differenza tra il prezzo ideale e quello attuale.")
+                                st.markdown(f"**3️⃣ TENTATIVO STANDARD:** Prova a forzare l'ordine originale (`{cmd_data['tipo']}` a `{formatta_numero(cmd_data['livello'], dec)}`). Da usare SOLO se vedi che il prezzo sta fluttuando e potrebbe rientrare nei limiti concessi da IG proprio mentre clicchi.")
+                            
+                                st.write("")
+                                colA, colB, colC = st.columns(3)
+                            
+                                trap_type = "LIMIT" if cmd_data["tipo"] == "STOP" else "STOP"
+                                
+                                with colA:
+                                    if st.button(f"1️⃣ Tattica: {trap_type} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, help="Piazza la trappola attendendo il rimbalzo del mercato."):
+                                        cmd_trap = cmd_data.copy()
+                                        cmd_trap["tipo"] = trap_type
+                                        cmd_trap["etichetta"] += " (LIMIT TATTICO)"
+                                        piazza_restore(conto_selezionato, r_nome, cmd_trap)
+                                with colB:
+                                    if st.button(f"2️⃣ Copertura: MERCATO a {prezzo_live}", use_container_width=True, help="Copri la posizione istantaneamente al prezzo di adesso."):
+                                        cmd_mkt = cmd_data.copy()
+                                        cmd_mkt["azione"] = "MERCATO"
+                                        cmd_mkt["etichetta"] += " (FORZATURA MERCATO)"
+                                        piazza_restore(conto_selezionato, r_nome, cmd_mkt)
+                                with colC:
+                                    if st.button(f"3️⃣ Forza: {cmd_data['tipo']} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, help="Tenta di inviare la richiesta originale a IG."):
+                                        piazza_restore(conto_selezionato, r_nome, cmd_data)
+                            else:
+                                st.success(f"🟢 **Condizioni nei parametri.** Il livello {formatta_numero(cmd_data['livello'], dec)} è piazzabile in sicurezza senza incorrere in rifiuti di IG.")
+                                if st.button(f"🚀 Invia Ordine a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, type="primary"):
+                                    piazza_restore(conto_selezionato, r_nome, cmd_data)
+                        elif cmd_data["azione"] == "SAT1_OCO":
+                            st.markdown(f"**Ordini da Inviare:** `BUY` a {formatta_numero(cmd_data['lvl_l'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; `SELL` a {formatta_numero(cmd_data['lvl_s'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}`")
+                            st.success("🟢 **Ordini Simultanei Pronti.** I livelli teorici sono stati calcolati in base alla strategia in corso.")
+                            if st.button("🚀 Invia Entrambi gli Ordini (OCO SAT1)", use_container_width=True, type="primary"):
+                                piazza_restore(conto_selezionato, r_nome, cmd_data)
+
+                        else: # MERCATO (Es. Ticket o SAT2)
+                            st.markdown(f"**Direzione:** `{cmd_data.get('dir', 'N/D')}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Azione Reale:** `INGRESSO A MERCATO`")
+                            if st.button(f"🚀 Entra a MERCATO adesso (Prezzo Live: {prezzo_live})", use_container_width=True, type="primary"):
+                                piazza_restore(conto_selezionato, r_nome, cmd_data)
 
     with tab_statistiche:
         st.title("📊 Analisi Operazioni & Profitti (EUR)")
@@ -2024,38 +2048,40 @@ else:
         else:
             st.warning("Nessun dato statistico disponibile. Il file storico verrà creato alla prima operazione chiusa.")
 
-    with tab_console:
-        @st.fragment(run_every=2)
-        def renderizza_console():
-            st.markdown("### 💻 Terminale di Bordo (Live)")
-            st.markdown("Monitoraggio in tempo reale del Motore. Auto-aggiornamento ogni 2 secondi.")
+    if tab_console is not None:
+        with tab_console:
+
+            @st.fragment(run_every=2)
+            def renderizza_console():
+                st.markdown("### 💻 Terminale di Bordo (Live)")
+                st.markdown("Monitoraggio in tempo reale del Motore. Auto-aggiornamento ogni 2 secondi.")
             
-            try:
-                path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
-                with open(path_log, "r", encoding="utf-8") as f:
-                    logs = f.read()
-            except FileNotFoundError:
-                logs = f"> In attesa di connessione col Motore per {conto_selezionato}..."
+                try:
+                    path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
+                    with open(path_log, "r", encoding="utf-8") as f:
+                        logs = f.read()
+                except FileNotFoundError:
+                    logs = f"> In attesa di connessione col Motore per {conto_selezionato}..."
                 
-            logs_escaped = logs.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-            st.html(f"""
-                <div style='
-                    background-color: #1E1E1E; 
-                    color: #D4D4D4; 
-                    font-family: "Courier New", Courier, monospace; 
-                    font-size: 0.82rem; 
-                    padding: 10px; 
-                    border-radius: 5px; 
-                    max-height: 500px; 
-                    overflow-y: auto;
-                    line-height: 1.4;
-                    white-space: nowrap;
-                '>
-                    {logs_escaped}
-                </div>
-            """)
+                logs_escaped = logs.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                st.html(f"""
+                    <div style='
+                        background-color: #1E1E1E; 
+                        color: #D4D4D4; 
+                        font-family: "Courier New", Courier, monospace; 
+                        font-size: 0.82rem; 
+                        padding: 10px; 
+                        border-radius: 5px; 
+                        max-height: 500px; 
+                        overflow-y: auto;
+                        line-height: 1.4;
+                        white-space: nowrap;
+                    '>
+                        {logs_escaped}
+                    </div>
+                """)
             
-        renderizza_console()
+            renderizza_console()
 
     with tab_report:
         st.markdown("<h2 style='text-align: center; color: #00FFCC;'>📄 Report Giornaliero</h2>", unsafe_allow_html=True)
@@ -2342,5 +2368,54 @@ else:
                         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
                 else:
                     st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
+
+    if tab_autorizzazioni is not None:
+        with tab_autorizzazioni:
+            st.markdown("## 🔐 Gestione Autorizzazioni")
+            st.write("Solo il Regista ha accesso a questa sezione. Qui puoi gestire gli account Viewer e assegnare i conti visibili.")
+            
+            with st.expander("➕ Aggiungi Nuovo Utente", expanded=False):
+                with st.form("form_nuovo_utente"):
+                    n_user = st.text_input("Nickname (Username)")
+                    n_pwd = st.text_input("Password (Temporanea)", type="password")
+                    n_ruolo = st.selectbox("Ruolo", ["VIEWER", "REGISTA"])
+                    tutti_i_folders_disp = [c for c in os.listdir() if os.path.isdir(c) and (c.endswith("_DEMO") or c.endswith("_REALE"))]
+                    n_conti = st.multiselect("Conti Visibili", tutti_i_folders_disp)
+                    if st.form_submit_button("Crea Utente"):
+                        if n_user and n_pwd:
+                            ok, msg = auth_manager.aggiungi_utente(n_user, n_pwd, n_ruolo, n_conti)
+                            if ok: 
+                                st.success(msg)
+                            else: 
+                                st.error(msg)
+                        else:
+                            st.error("Inserire username e password.")
+            
+            st.markdown("### Elenco Utenti")
+            utenti = auth_manager.get_tutti_utenti()
+            tutti_i_folders = [c for c in os.listdir() if os.path.isdir(c) and (c.endswith("_DEMO") or c.endswith("_REALE"))]
+            
+            for u, d in utenti.items():
+                with st.container(border=True):
+                    st.markdown(f"**👤 {u}** | Ruolo: `{d.get('ruolo')}`")
+                    
+                    if d.get('ruolo') != "REGISTA":
+                        sel_conti = st.multiselect(f"Conti visibili per {u}", tutti_i_folders, default=[c for c in d.get("conti_autorizzati", []) if c in tutti_i_folders], key=f"conti_{u}")
+                        
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            if st.button("💾 Salva Permessi", key=f"salva_{u}"):
+                                auth_manager.aggiorna_conti_utente(u, sel_conti)
+                                st.success(f"Permessi aggiornati per {u}")
+                        with col2:
+                            if st.button("🗑️ Elimina", key=f"del_{u}"):
+                                ok, msg = auth_manager.elimina_utente(u)
+                                if ok: st.success(msg)
+                                else: st.error(msg)
+                    else:
+                        if st.button("🗑️ Elimina Regista", key=f"del_reg_{u}"):
+                            ok, msg = auth_manager.elimina_utente(u)
+                            if ok: st.success(msg)
+                            else: st.error(msg)
 
     # --- TAB SIMULATORE ---
