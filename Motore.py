@@ -702,6 +702,26 @@ def chiudi_parziale(nome_strumento, dealId, epic, dir_chiusura, size, valuta, he
             
     return False
 
+def aggiorna_stop_posizione(deal_id, stop_level, headers):
+    url = f"{BASE_URL}/positions/otc/{deal_id}"
+    payload = {}
+    if stop_level is not None:
+        payload["stopLevel"] = str(stop_level)
+    else:
+        payload["stopLevel"] = None
+    
+    # Non usiamo chiamata_api_sicura qui perché vogliamo il codice di stato nudo e crudo
+    try:
+        r = requests.put(url, headers=headers, json=payload, timeout=10)
+        if r.status_code == 200:
+            return True
+        else:
+            print(f"Errore aggiorna stop {deal_id}: {r.text}")
+            return False
+    except Exception as e:
+        print(f"Eccezione aggiorna_stop_posizione: {e}")
+        return False
+
 def pulisci_mercato(epic, headers_auth, nome_strumento, solo_pendenti=False, mantieni_core_size=None):
     resp_ordini = chiamata_api_sicura('GET', f"{BASE_URL}/workingorders", headers_auth)
     
