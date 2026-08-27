@@ -36,3 +36,11 @@ Per sincronizzare le modifiche sul server, esegui i seguenti passaggi in sequenz
 ## Note in caso di pacchetti mancanti
 Se hai aggiunto una libreria a `requirements.txt` (es. `werkzeug`), l'immagine Docker non la conterrà finché l'amministratore non farà il rebuild. 
 In tal caso, fai un `pip install <libreria> -t /data/libs` usando `kubectl exec` sul pod della Dashboard, e assicurati che `Dashboard.py` o `Motore.py` abbiano `sys.path.append("/data/libs")`.
+
+
+## Gestione Scadenza Token Kubeconfig
+Il token di Kubernetes generato da Rancher ha una scadenza di 30 giorni. Se durante un deploy o una copia file ricevi un errore di tipo Forbidden o Unauthorized da parte di Kubernetes:
+1. **NON dire all'utente di contattare l'amministratore.**
+2. Informa l'utente che il token è scaduto e chiedigli di fornirti il nuovo contenuto del file kubeconfig (tramite copia e incolla).
+3. Una volta ricevuto, sovrascrivi integralmente il contenuto del file local.yaml presente nella root del progetto con il nuovo testo fornito.
+4. Riprova l'operazione di deploy o kubectl: funzionerà immediatamente.
