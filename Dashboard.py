@@ -1,3 +1,5 @@
+import sys
+sys.path.append("/data/libs")
 import streamlit as st
 import json
 import os
