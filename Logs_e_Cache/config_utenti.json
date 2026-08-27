@@ -1,0 +1,17 @@
+{
+    "Marco": {
+        "ruolo": "REGISTA",
+        "password_hash": "scrypt:32768:8:1$KoKoZTdz87GmN38q$3ddb8f7c46e5cca66444b33f4e247870852c414d07abf2c967dca4b49a90fa9e3747013c7a664c8f00db7a9eb3a5804a9a6de6a1a5258a7917407d1d17bdef3b",
+        "tutti_i_conti": true,
+        "conti_autorizzati": []
+    },
+    "Daniele": {
+        "ruolo": "VIEWER",
+        "password_hash": "scrypt:32768:8:1$eKXqxe3y6J212uNb$c492845cf7a37ebe18527e473e881f97199fc66fdff7472a7076d74c9e7ed1cd200b3b3e34e22356f58d1a783d483ca25b4c246300eb110196fe08ee080c4a14",
+        "tutti_i_conti": false,
+        "conti_autorizzati": [
+            "FIORDOK_DEMO",
+            "DANY_DEMO"
+        ]
+    }
+}
