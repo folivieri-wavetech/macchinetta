@@ -1097,21 +1097,20 @@ def esegui_motore():
                     # --- GESTIONE AUTOMATICA PAUSA ROLLOVER ---
                     ora_it = now_it()
                     is_rollover_time = False
-                    # Dal lunedì (0) al giovedì (3)
-                    if 0 <= ora_it.weekday() <= 3:
-                        t_min = datetime.time(22, 55)
-                        t_max = datetime.time(23, 59, 59)
-                        t_min2 = datetime.time(0, 0)
-                        t_max2 = datetime.time(0, 9, 59)
-                        t_curr = ora_it.time()
-                        if (t_min <= t_curr <= t_max) or (t_min2 <= t_curr <= t_max2):
-                            is_rollover_time = True
+                    # Dal lunedì sera al venerdì mattina presto:
+                    # Lun-Gio 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
+                    # Mar-Ven 00:00 - 00:29:59 (weekday 1, 2, 3, 4)
+                    t_curr = ora_it.time()
+                    if ora_it.weekday() in (0, 1, 2, 3) and (datetime.time(22, 45) <= t_curr <= datetime.time(23, 59, 59)):
+                        is_rollover_time = True
+                    elif ora_it.weekday() in (1, 2, 3, 4) and (datetime.time(0, 0) <= t_curr <= datetime.time(0, 29, 59)):
+                        is_rollover_time = True
                             
                     is_sosp_rollover = param.get("sospeso_rollover", False)
                     
                     if param.get("attivo", False) and not param.get("sospeso_weekend", False) and param.get("stato") != "MANUALE":
                         if is_rollover_time and not is_sosp_rollover:
-                            print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:55): Sgancio SL e cancello Pendenti...")
+                            print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:45): Sgancio SL e cancello Pendenti...")
                             snap_pos = [{"dealId": p['position']['dealId'], "stopLevel": p['position'].get('stopLevel')} for p in posizioni if p['position'].get('stopLevel')]
                             snap_ord = [{"dealId": o['workingOrderData']['dealId'], "direction": o['workingOrderData']['direction'], "level": o['workingOrderData']['orderLevel'], "size": o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0)), "type": o['workingOrderData'].get('orderType', 'LIMIT'), "lim": o['workingOrderData'].get('limitDistance'), "stop": o['workingOrderData'].get('stopDistance')} for o in pendenti]
                             
@@ -1126,7 +1125,7 @@ def esegui_motore():
                             continue
                             
                         elif is_sosp_rollover and not is_rollover_time:
-                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:10): Ripristino SL e Pendenti...")
+                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:29): Ripristino SL e Pendenti...")
                             snap = param.get("rollover_snapshot", {})
                             snap_pos = snap.get("posizioni", [])
                             snap_ord = snap.get("pendenti", [])
@@ -1197,9 +1196,20 @@ def esegui_motore():
                             invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, sat_long, "STOP", round(sat_long + tp2_val, dec), round(sat_long - tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO BUY]")
                             time.sleep(3.0) 
                             invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, sat_short, "STOP", round(sat_short - tp2_val, dec), round(sat_short + tp2_val, dec), h, dec, etichetta="[ORDINE SAT1 OCO SELL]")
-                            invia_notifica(f"🛰️ SAT1 OCO: {nome}", f"[{nome}] Ripresa weekend. SAT1 OCO (SHORT: {formatta_numero(sat_short, dec)} | LONG: {formatta_numero(sat_long, dec)}).", "satellite")
-                            aggiorna_memoria(nome, {"comando_riprendi": False, "sospeso_weekend": False, "msg_weekend": "", "stato": "FASE_2_SATELLITI", "tentativi_sat": 1}, log_wip=f"✅ [EVENTO]: Ripresa da Weekend completata a {formatta_numero(prezzo_attuale, dec)}. Nuovi OCO piazzati.")
-                            print_log(nome, f"✅ Ripresa completata. SAT1 OCO piazzati{oco_str}.")
+                            
+                            t2_str = ""
+                            if param.get("ticket2_active"):
+                                t2_dir = param.get("ticket2_dir")
+                                t2_entry = param.get("ticket2_entry")
+                                if t2_dir and t2_entry is not None:
+                                    time.sleep(3.0)
+                                    lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
+                                    invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
+                                    t2_str = f" + Ticket2 [{to_market_dir(t2_dir)} @ {formatta_numero(t2_entry, dec)}]"
+                            
+                            invia_notifica(f"🛰️ SAT1 OCO: {nome}", f"[{nome}] Ripresa weekend. SAT1 OCO (SHORT: {formatta_numero(sat_short, dec)} | LONG: {formatta_numero(sat_long, dec)}){t2_str}.", "satellite")
+                            aggiorna_memoria(nome, {"comando_riprendi": False, "sospeso_weekend": False, "msg_weekend": "", "stato": "FASE_2_SATELLITI", "tentativi_sat": 1}, log_wip=f"✅ [EVENTO]: Ripresa da Weekend completata a {formatta_numero(prezzo_attuale, dec)}. Nuovi OCO piazzati{t2_str}.")
+                            print_log(nome, f"✅ Ripresa completata. SAT1 OCO piazzati{t2_str}.")
                         continue
 
                     if param.get("sospeso_weekend", False):
