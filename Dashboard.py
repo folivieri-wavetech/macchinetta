@@ -1399,10 +1399,7 @@ else:
                                 spia = " 🟢" if (prezzo < f3_base + (dati.get("tp", 50)/4)*mult if f3_dir == "BUY" else prezzo > f3_base - (dati.get("tp", 50)/4)*mult) else " 🔴"
                     
                     if dati.get("ticket2_active"):
-                        t2_dir, t2_entry = dati.get("ticket2_dir"), dati.get("ticket2_entry")
-                        if t2_dir and t2_entry is not None:
-                            spia_t2 = " 🟢" if (prezzo > t2_entry if t2_dir == "BUY" else prezzo < t2_entry) else " 🔴"
-                            stato_display += f" [+ TICKET2 {spia_t2}]"
+                        stato_display += " [+ Ticket2]"
 
                     if is_attivo:
                         stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
