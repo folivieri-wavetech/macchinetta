@@ -2121,19 +2121,60 @@ else:
         st.markdown("<p style='text-align: center; color: #888; font-size: 0.9rem;'>Visualizza lo storico dei valori salvati automaticamente ogni giorno feriale alle 21:30.</p>", unsafe_allow_html=True)
         
         file_report = os.path.join(conto_selezionato, "report_giornaliero.csv") if conto_selezionato else "report_giornaliero.csv"
+        
+        @st.dialog("🗑️ Reset Database Report")
+        def dialog_reset_db_report(f_rep, min_d, max_d, df_rep):
+            st.markdown(f"Seleziona l'intervallo temporale da eliminare per il conto **{conto_selezionato}**.")
+            st.markdown("<p style='font-size: 0.8rem; color: #888;'>L'eliminazione è definitiva e rimuoverà i dati storici dal file report del conto.</p>", unsafe_allow_html=True)
+            
+            today_d = datetime.today().date()
+            c_r1, c_r2 = st.columns(2)
+            with c_r1:
+                res_da = st.date_input("Data Iniziale", value=min_d, min_value=min_d, max_value=today_d, key="dialog_reset_da")
+            with c_r2:
+                def_max = max_d if max_d <= today_d else today_d
+                res_a = st.date_input("Data Finale (compresa)", value=def_max, min_value=res_da, max_value=today_d, key="dialog_reset_a")
+                
+            m_del = (df_rep['Data_dt'].dt.date >= res_da) & (df_rep['Data_dt'].dt.date <= res_a)
+            num_del = int(m_del.sum())
+            
+            if num_del > 0:
+                st.warning(f"⚠️ Verranno eliminati **{num_del}** record compresi tra il **{res_da}** e il **{res_a}**.")
+            else:
+                st.info(f"Nessun record trovato tra il {res_da} e il {res_a}.")
+                
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            btn_c1, btn_c2 = st.columns(2)
+            with btn_c1:
+                if st.button("❌ Annulla", key="cancel_reset_rep", use_container_width=True):
+                    st.rerun()
+            with btn_c2:
+                if st.button("🗑️ Elimina Record", type="primary", key="confirm_reset_rep", use_container_width=True, disabled=(num_del == 0)):
+                    df_rimasti = df_rep.loc[~m_del].drop(columns=['Data_dt'], errors='ignore')
+                    df_rimasti.to_csv(f_rep, index=False)
+                    st.success(f"✅ {num_del} record eliminati con successo!")
+                    time.sleep(1)
+                    st.rerun()
+
         if os.path.exists(file_report):
             df_report = pd.read_csv(file_report)
             
             if 'Data' in df_report.columns:
                 df_report = df_report.drop_duplicates(subset=['Data'], keep='last')
                 df_report['Data_dt'] = pd.to_datetime(df_report['Data'], format="%Y-%m-%d", errors='coerce')
-                min_date = df_report['Data_dt'].min().date() if not pd.isna(df_report['Data_dt'].min()) else datetime.today().date()
+                df_report = df_report.dropna(subset=['Data_dt'])
+                min_date = df_report['Data_dt'].min().date() if not df_report.empty else datetime.today().date()
+                max_date = df_report['Data_dt'].max().date() if not df_report.empty else datetime.today().date()
                 
-                c1, c2 = st.columns(2)
+                c1, c2, c3 = st.columns([2, 2, 1])
                 with c1:
                     da_data = st.date_input("Da data", value=min_date, key=f"rep_da_data_{conto_selezionato}")
                 with c2:
                     a_data = st.date_input("A data", value=datetime.today().date(), key=f"rep_a_data_{conto_selezionato}")
+                with c3:
+                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                    if st.button("🗑️ Reset DB", key=f"btn_open_reset_db_{conto_selezionato}", use_container_width=True, help="Elimina un intervallo di date dal DB del report"):
+                        dialog_reset_db_report(file_report, min_date, max_date, df_report)
                 
                 prefs_tab = carica_preferenze(conto_selezionato)
                 inv_iniziale_tab = float(st.session_state.get(f"side_inv_input_{conto_selezionato}", prefs_tab.get("investimento_iniziale", 0.0)))
