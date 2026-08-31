@@ -1428,6 +1428,18 @@ else:
                         bg_color = "#495057" # Grigio scuro
                         text_color = "white"
                         
+                    totale_wip = 0.0
+                    if storico:
+                        for riga in storico:
+                            match = re.search(r"\[Parziale:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
+                            if match:
+                                totale_wip += float(match.group(1).replace(",", "."))
+                    
+                    segno_wip = "+" if totale_wip > 0 else ""
+                    col_tot_wip = "#4ade80" if totale_wip > 0 else ("#ff6b6b" if totale_wip < 0 else "#aaa")
+                    valore_tot_str = f"{segno_wip}{totale_wip:.2f} €".replace(".", ",")
+                    html_tot_wip = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: {col_tot_wip};'>{valore_tot_str}</b></div>"
+
                     marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
                     css_marker = f"""<style>
                     div[data-testid="stHorizontalBlock"]:has(.{marker_class}) {{
@@ -1441,6 +1453,7 @@ else:
                     c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
                     with c1:
                         st.markdown(f"<span class='{marker_class}'></span>{css_marker}", unsafe_allow_html=True)
+                        st.markdown(html_tot_wip, unsafe_allow_html=True)
                         if st.button(nome, key=f"wip_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
                             mostra_diario_wip(nome, storico, conto=conto_selezionato)
                     
