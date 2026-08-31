@@ -559,7 +559,7 @@ st.markdown("""
             box-shadow: 0 2px 8px rgba(25, 135, 84, 0.4) !important;
         }
         @media (min-width: 769px) {
-            section[data-testid="stSidebar"] { min-width: 220px !important; max-width: 220px !important; }
+            section[data-testid="stSidebar"] { min-width: 240px !important; max-width: 240px !important; }
         }
         button[data-testid="stNumberInputStepUp"], button[data-testid="stNumberInputStepDown"] { display: flex !important; }
         div[data-testid="stNumberInputContainer"] { padding-left: 0.2rem !important; padding-right: 0.2rem !important; }
@@ -838,7 +838,7 @@ else:
         def renderizza_sidebar_conti():
             conto_attivo = st.session_state.get("conto_selezionato", conto_selezionato)
             
-            def get_subtext_connessione(acc, st_acc):
+            def get_tempo_connessione(acc, st_acc):
                 motore_attivo = False
                 path_stato = os.path.join(acc, STATO_SISTEMA)
                 if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60:
@@ -858,19 +858,19 @@ else:
                     durata_str = st_acc.get("durata_sessione", "--")
 
                 if motore_attivo:
-                    return f"<div style='font-size: 0.71rem; color: #aaa; margin-top: 6px; margin-bottom: -10px; padding-left: 9px; line-height: 1.1;'>🟢 Connesso: <b style='color: #4ade80;'>{durata_str}</b></div>"
+                    return f"🟢 {durata_str}"
                 else:
-                    return "<div style='font-size: 0.71rem; color: #888; margin-top: 6px; margin-bottom: -10px; padding-left: 9px; line-height: 1.1;'>🔴 <span style='color: #ef4444; font-weight: 600;'>Offline</span></div>"
+                    return "🔴 Off"
 
             if conti_reali:
-                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 2px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
                 for cr in conti_reali:
                     nome_cr_clean = cr.replace("_REALE", "")
                     st_cr = leggi_stato_sistema(cr)
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                     is_sel = (cr == conto_attivo)
-                    label_cr = f"🔴 {nome_cr_clean}: :orange[{cap_cr} €]"
-                    st.markdown(get_subtext_connessione(cr, st_cr), unsafe_allow_html=True)
+                    tempo_conn = get_tempo_connessione(cr, st_cr)
+                    label_cr = f"🔴 {nome_cr_clean} ({tempo_conn}): :orange[{cap_cr} €]"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cr
@@ -878,14 +878,14 @@ else:
                 st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
                 
             if conti_demo:
-                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 8px 0 2px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
                 for cd in conti_demo:
                     nome_cd_clean = cd.replace("_DEMO", "")
                     st_cd = leggi_stato_sistema(cd)
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                     is_sel = (cd == conto_attivo)
-                    label_cd = f"🔵 {nome_cd_clean}: :orange[{cap_cd} €]"
-                    st.markdown(get_subtext_connessione(cd, st_cd), unsafe_allow_html=True)
+                    tempo_conn = get_tempo_connessione(cd, st_cd)
+                    label_cd = f"🔵 {nome_cd_clean} ({tempo_conn}): :orange[{cap_cd} €]"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cd
