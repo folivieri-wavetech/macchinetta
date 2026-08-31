@@ -541,27 +541,23 @@ st.markdown("""
             gap: 2px !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
-            margin: 0 !important;
-            line-height: 1.25 !important;
-        }
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:first-child {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            width: 100% !important;
-            font-size: 0.72rem !important;
-            font-weight: 700 !important;
-            white-space: nowrap !important;
-        }
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) {
             display: flex !important;
             justify-content: flex-start !important;
             align-items: center !important;
             width: 100% !important;
-            font-size: 0.72rem !important;
+            margin: 0 !important;
+            line-height: 1.25 !important;
+            white-space: nowrap !important;
+            gap: 4px !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:first-child {
+            font-size: 0.74rem !important;
+            font-weight: 700 !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) {
+            font-size: 0.68rem !important;
             font-weight: 500 !important;
             color: #bbb !important;
-            white-space: nowrap !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="color: rgb(255, 171, 0)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="color:rgb(255, 171, 0)"],
@@ -874,9 +870,9 @@ else:
                     durata_str = st_acc.get("durata_sessione", "--")
 
                 if motore_attivo:
-                    return f":green[●] Connesso: {durata_str}"
+                    return f"🟢 Connesso: {durata_str}"
                 else:
-                    return ":red[●] Offline"
+                    return "🔴 Offline"
 
             if conti_reali:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
@@ -886,7 +882,7 @@ else:
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                     is_sel = (cr == conto_attivo)
                     tempo_conn = get_tempo_connessione(cr, st_cr)
-                    label_cr = f":red[●] **{nome_cr_clean}** :orange[{cap_cr} €]\n\n{tempo_conn}"
+                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cr
@@ -901,7 +897,7 @@ else:
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                     is_sel = (cd == conto_attivo)
                     tempo_conn = get_tempo_connessione(cd, st_cd)
-                    label_cd = f":blue[●] **{nome_cd_clean}** :orange[{cap_cd} €]\n\n{tempo_conn}"
+                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cd
