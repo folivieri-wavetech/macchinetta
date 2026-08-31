@@ -549,7 +549,7 @@ st.markdown("""
             justify-content: space-between !important;
             align-items: center !important;
             width: 100% !important;
-            font-size: 0.74rem !important;
+            font-size: 0.72rem !important;
             font-weight: 700 !important;
             white-space: nowrap !important;
         }
@@ -558,7 +558,7 @@ st.markdown("""
             justify-content: flex-start !important;
             align-items: center !important;
             width: 100% !important;
-            font-size: 0.68rem !important;
+            font-size: 0.72rem !important;
             font-weight: 500 !important;
             color: #bbb !important;
             white-space: nowrap !important;
