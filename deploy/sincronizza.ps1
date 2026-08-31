@@ -29,25 +29,33 @@ Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "3. COPIA FILE NELLA PVC KUBERNETES (/data)" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
-$POD_DASH = (.\kubectl.exe --kubeconfig=.\local.yaml get pod -n macchinetta -l component=dashboard -o jsonpath="{.items[0].metadata.name}")
+$ROOT = Resolve-Path "$PSScriptRoot\.."
+$KUBECTL = "$ROOT\kubectl.exe"
+$KUBECONFIG = "$ROOT\local.yaml"
+
+$POD_DASH = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}")
+if (-not $POD_DASH) {
+    # Fallback se in fase di rollout
+    $POD_DASH = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard -o jsonpath="{.items[0].metadata.name}")
+}
 if (-not $POD_DASH) {
     Write-Host "Nessun pod Dashboard trovato nel namespace macchinetta." -ForegroundColor Red
     exit 1
 }
 Write-Host "Trovato pod Dashboard: $POD_DASH" -ForegroundColor Yellow
 
-.\kubectl.exe --kubeconfig=.\local.yaml cp Dashboard.py "macchinetta/${POD_DASH}:/data/Dashboard.py"
-.\kubectl.exe --kubeconfig=.\local.yaml cp Dashboard_Simulatore.py "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
-.\kubectl.exe --kubeconfig=.\local.yaml cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
-.\kubectl.exe --kubeconfig=.\local.yaml cp Sistema/auth_manager.py "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
+& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Dashboard.py" "macchinetta/${POD_DASH}:/data/Dashboard.py"
+& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Dashboard_Simulatore.py" "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
+& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Motore.py" "macchinetta/${POD_DASH}:/data/Motore.py"
+& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Sistema\auth_manager.py" "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
 Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
 
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "4. ROLLOUT RESTART DEI DEPLOYMENT" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
-.\kubectl.exe --kubeconfig=.\local.yaml rollout restart deploy/macchinetta-dashboard -n macchinetta
-.\kubectl.exe --kubeconfig=.\local.yaml rollout restart deploy/macchinetta-motore-bongiolo deploy/macchinetta-motore-dany deploy/macchinetta-motore-fiordok -n macchinetta
-.\kubectl.exe --kubeconfig=.\local.yaml rollout status deploy/macchinetta-dashboard -n macchinetta --timeout=120s
+& $KUBECTL --kubeconfig=$KUBECONFIG rollout restart deploy/macchinetta-dashboard -n macchinetta
+& $KUBECTL --kubeconfig=$KUBECONFIG rollout restart deploy/macchinetta-motore-bongiolo deploy/macchinetta-motore-dany deploy/macchinetta-motore-fiordok -n macchinetta
+& $KUBECTL --kubeconfig=$KUBECONFIG rollout status deploy/macchinetta-dashboard -n macchinetta --timeout=120s
 
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "5. VERIFICA HEALTH CHECK" -ForegroundColor Cyan
