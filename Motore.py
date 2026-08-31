@@ -566,13 +566,13 @@ def verifica_conferma_deal(deal_ref, headers):
             if r.status_code == 200:
                 data = r.json()
                 if data.get("dealStatus") == "ACCEPTED":
-                    return True, "ACCEPTED"
+                    return True, data
                 elif data.get("dealStatus") == "REJECTED":
                     return False, data.get("reason", "Unknown")
         except Exception:
             pass
             
-    return True, "UNCONFIRMED"
+    return True, {}
 
 def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers, dec, limit_lvl=None, stop_lvl=None, etichetta="[ORDINE]"):
     size_str = str(int(size)) if float(size).is_integer() else str(size)
@@ -599,16 +599,41 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
             r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=p, timeout=10)
             if r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
+                real_level = None
+                deal_id = None
                 if deal_ref:
-                    accettato, motivo = verifica_conferma_deal(deal_ref, headers)
+                    accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
                     if not accettato:
+                        motivo = confirm_data if isinstance(confirm_data, str) else "Unknown"
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {direzione}: {motivo}")
                         print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
                         time.sleep(20)
                         continue
-                print_log(nome_strumento, f"✅ {etichetta} eseguito con successo.")
+                    if isinstance(confirm_data, dict):
+                        if confirm_data.get("level") is not None:
+                            real_level = float(confirm_data.get("level"))
+                        if confirm_data.get("dealId"):
+                            deal_id = confirm_data.get("dealId")
+
+                if real_level is None:
+                    try:
+                        time.sleep(1.0)
+                        resp_p = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers)
+                        if resp_p and resp_p.status_code == 200:
+                            p_list = [pos for pos in resp_p.json().get('positions', []) if pos['market']['epic'] == epic and pos['position']['direction'] == direzione and abs(float(pos['position']['size']) - float(size)) < 0.001]
+                            if p_list:
+                                real_level = float(p_list[0]['position']['level'])
+                                deal_id = p_list[0]['position']['dealId']
+                    except Exception:
+                        pass
+
+                if real_level is not None:
+                    real_level = round(float(real_level), dec)
+
+                livello_log = f" a {formatta_numero(real_level, dec)}" if real_level is not None else ""
+                print_log(nome_strumento, f"✅ {etichetta} eseguito con successo{livello_log}.")
                 suona_drumroll()
-                return True
+                return True, real_level, deal_id
 
             else:
                 if r.status_code == 403 and "exceeded-api-key" in r.text:
@@ -623,7 +648,7 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
             print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
             time.sleep(20)
             
-    return False
+    return False, None, None
 
 def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello, tipo, lim, stop, headers, dec, etichetta="[ORDINE]"):
     size_str = str(int(size)) if float(size).is_integer() else str(size)
@@ -824,14 +849,14 @@ def esegui_fase_1(nome, dir, size, tp, opp, dts, bid, ask, mult, dec, epic, val,
         
         if pend_core_ok and pend_micro_ok:
             print_log(nome, "✅ Griglia accettata da IG. Procedo con l'entrata a mercato...")
-            succ_core = invia_ordine_mercato(nome, epic, val, "BUY", s_core, h, dec, etichetta="[ORDINE CORE]")
+            succ_core, lvl_core, deal_core = invia_ordine_mercato(nome, epic, val, "BUY", s_core, h, dec, etichetta="[ORDINE CORE]")
             time.sleep(3.0) 
-            succ_ass = invia_ordine_mercato(nome, epic, val, "SELL", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
-            return succ_core, succ_ass
+            succ_ass, lvl_ass, deal_ass = invia_ordine_mercato(nome, epic, val, "SELL", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
+            return succ_core, succ_ass, lvl_core
         else:
             print_log(nome, "❌ Griglia RIFIUTATA da IG. Rollback di sicurezza. Non entro a mercato.")
             pulisci_mercato(epic, h, nome, solo_pendenti=True)
-            return False, False
+            return False, False, None
             
     else:
         pend_core_ok = invia_ordine_pendente(nome, epic, val, "BUY", s_core, round(base + opp_val, dec), "STOP", None, None, h, dec, etichetta="[ORDINE CORE]")
@@ -840,14 +865,14 @@ def esegui_fase_1(nome, dir, size, tp, opp, dts, bid, ask, mult, dec, epic, val,
         
         if pend_core_ok and pend_micro_ok:
             print_log(nome, "✅ Griglia accettata da IG. Procedo con l'entrata a mercato...")
-            succ_core = invia_ordine_mercato(nome, epic, val, "SELL", s_core, h, dec, etichetta="[ORDINE CORE]")
+            succ_core, lvl_core, deal_core = invia_ordine_mercato(nome, epic, val, "SELL", s_core, h, dec, etichetta="[ORDINE CORE]")
             time.sleep(3.0)
-            succ_ass = invia_ordine_mercato(nome, epic, val, "BUY", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
-            return succ_core, succ_ass
+            succ_ass, lvl_ass, deal_ass = invia_ordine_mercato(nome, epic, val, "BUY", s_ass, h, dec, etichetta="[ORDINE ASSICURAZIONE]")
+            return succ_core, succ_ass, lvl_core
         else:
             print_log(nome, "❌ Griglia RIFIUTATA da IG. Rollback di sicurezza. Non entro a mercato.")
             pulisci_mercato(epic, h, nome, solo_pendenti=True)
-            return False, False
+            return False, False, None
 
 def esegui_motore():
     try:
@@ -1005,7 +1030,7 @@ def esegui_motore():
                         print_log(nome, f"🛠️ Ricevuto comando RECOVERY: {cmd.get('etichetta', '')}")
                         
                         if cmd["azione"] == "MERCATO":
-                            succ = invia_ordine_mercato(nome, epic, valuta, cmd["dir"], cmd["size"], h, dec, limit_lvl=cmd.get("lim"), stop_lvl=cmd.get("stop"), etichetta=cmd.get("etichetta", "[RECOVERY]"))
+                            succ, lvl_rec, deal_rec = invia_ordine_mercato(nome, epic, valuta, cmd["dir"], cmd["size"], h, dec, limit_lvl=cmd.get("lim"), stop_lvl=cmd.get("stop"), etichetta=cmd.get("etichetta", "[RECOVERY]"))
                         elif cmd["azione"] == "SAT1_OCO":
                             succ1 = invia_ordine_pendente(nome, epic, valuta, "BUY", cmd["size"], cmd["lvl_l"], "STOP", cmd["lim_l"], cmd["stop_l"], h, dec, etichetta="[ORDINE SAT1 OCO BUY]")
                             time.sleep(3.0)
@@ -1258,9 +1283,11 @@ def esegui_motore():
                             
                             dir_contro = "SELL" if dir_core == "LONG" else "BUY"
                             s_ass = max(1.0, s_core / 2)
-                            succ_core, succ_ass = esegui_fase_1(nome, dir_core, s_core, param.get("tp"), param.get("opp"), param.get("dts"), bid, ask, mult, dec, epic, valuta, h)
+                            succ_core, succ_ass, real_core_lvl = esegui_fase_1(nome, dir_core, s_core, param.get("tp"), param.get("opp"), param.get("dts"), bid, ask, mult, dec, epic, valuta, h)
                             
                             if succ_core and succ_ass:
+                                if real_core_lvl is not None:
+                                    prezzo_base = real_core_lvl
                                 is_flip = len(param.get("storico_wip", [])) > 0
                                 segno = "+" if to_market_dir(dir_core) == "LONG" else "-"
                                 if not is_flip:
@@ -1408,32 +1435,29 @@ def esegui_motore():
                             lim_lvl = round(ticket1_base + opp_val, dec) if ticket1_dir == "BUY" else round(ticket1_base - opp_val, dec)
                             stop_lvl = round(ticket1_base - opp_val, dec) if ticket1_dir == "BUY" else round(ticket1_base + opp_val, dec)
                             
-                            successo_ticket1 = invia_ordine_mercato(nome, epic, valuta, ticket1_dir, s_ass, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET1]")
+                            successo_ticket1, real_t1_lvl, new_deal_id = invia_ordine_mercato(nome, epic, valuta, ticket1_dir, s_ass, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET1]")
                             time.sleep(3.0) 
                             
-                            real_ticket1_lvl = ticket1_base
-                            new_deal_id = None
+                            real_ticket1_lvl = real_t1_lvl if real_t1_lvl is not None else ticket1_base
                             
                             if successo_ticket1:
-                                resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
-                                if resp_ticket and resp_ticket.status_code == 200:
-                                    pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == ticket1_dir and float(p['position']['size']) == s_ass]
-                                    if pos_t:
-                                        real_ticket1_lvl = float(pos_t[0]['position']['level'])
-                                        new_deal_id = pos_t[0]['position']['dealId']
-                                        
-                                        invia_notifica(f"🎫 ENTRY FASE 2: {nome}", f"[{nome}] Assicurazione chiusa{pnl_str}. Ticket1 [{to_market_dir(ticket1_dir)}] a {formatta_numero(real_ticket1_lvl, dec)}", "ticket")
-                                        aggiorna_memoria(nome, {
-                                            "stato": "FASE_2_TICKET1", 
-                                            "ticket1_dir": ticket1_dir, 
-                                            "ticket1_base": ticket1_base, 
-                                            "ticket1_entry": real_ticket1_lvl,
-                                            "ticket1_deal_id": new_deal_id
-                                        }, log_wip=f"✅ [EVENTO]: ASSICURAZIONE chiusa{pnl_str}. ➡️ Entrata in Fase 2 - [TICKET1] {ticket1_dir} eseguito a {formatta_numero(real_ticket1_lvl, dec)}.")
-                                        continue
-                                    else:
-                                        print_log(nome, "⚠️ Ordine [TICKET1] non trovato su IG nonostante la conferma.")
-                                        continue
+                                if real_t1_lvl is None or new_deal_id is None:
+                                    resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
+                                    if resp_ticket and resp_ticket.status_code == 200:
+                                        pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == ticket1_dir and float(p['position']['size']) == s_ass]
+                                        if pos_t:
+                                            real_ticket1_lvl = float(pos_t[0]['position']['level'])
+                                            new_deal_id = pos_t[0]['position']['dealId']
+                                
+                                invia_notifica(f"🎫 ENTRY FASE 2: {nome}", f"[{nome}] Assicurazione chiusa{pnl_str}. Ticket1 [{to_market_dir(ticket1_dir)}] a {formatta_numero(real_ticket1_lvl, dec)}", "ticket")
+                                aggiorna_memoria(nome, {
+                                    "stato": "FASE_2_TICKET1", 
+                                    "ticket1_dir": ticket1_dir, 
+                                    "ticket1_base": ticket1_base, 
+                                    "ticket1_entry": real_ticket1_lvl,
+                                    "ticket1_deal_id": new_deal_id
+                                }, log_wip=f"✅ [EVENTO]: ASSICURAZIONE chiusa{pnl_str}. ➡️ Entrata in Fase 2 - [TICKET1] {ticket1_dir} eseguito a {formatta_numero(real_ticket1_lvl, dec)}.")
+                                continue
                             else:
                                 print_log(nome, "⚠️ [TICKET1] Impossibile aprire. Riprovo al prossimo giro.")
                                 continue
@@ -1612,7 +1636,7 @@ def esegui_motore():
                             lim_lvl = round(nuova_ticket_base - opp_val, dec) if nuova_ticket_dir == "SELL" else round(nuova_ticket_base + opp_val, dec)
                             stop_lvl = round(nuova_ticket_base + opp_val, dec) if nuova_ticket_dir == "SELL" else round(nuova_ticket_base - opp_val, dec)
                             
-                            succ_tick = invia_ordine_mercato(nome, epic, valuta, nuova_ticket_dir, s_mezzo, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET1]")
+                            succ_tick, real_t1_lvl, new_deal_id = invia_ordine_mercato(nome, epic, valuta, nuova_ticket_dir, s_mezzo, h, dec, limit_lvl=lim_lvl, stop_lvl=stop_lvl, etichetta="[TICKET1]")
                             time.sleep(3.0)
                             
                             if succ_tick:
@@ -1623,14 +1647,14 @@ def esegui_motore():
                                 
                                 registra_operazione(nome, "Ping-Pong TICKET1 (Fase 2)", pnl_eur)
                                 
-                                resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
-                                real_ticket1_lvl = nuova_ticket_base
-                                new_deal_id = None
-                                if resp_ticket and resp_ticket.status_code == 200:
-                                    pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == nuova_ticket_dir and float(p['position']['size']) == s_mezzo]
-                                    if pos_t:
-                                        real_ticket1_lvl = float(pos_t[0]['position']['level'])
-                                        new_deal_id = pos_t[0]['position']['dealId']
+                                real_ticket1_lvl = real_t1_lvl if real_t1_lvl is not None else nuova_ticket_base
+                                if real_t1_lvl is None or new_deal_id is None:
+                                    resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
+                                    if resp_ticket and resp_ticket.status_code == 200:
+                                        pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == nuova_ticket_dir and float(p['position']['size']) == s_mezzo]
+                                        if pos_t:
+                                            real_ticket1_lvl = float(pos_t[0]['position']['level'])
+                                            new_deal_id = pos_t[0]['position']['dealId']
                                 
                                 invia_notifica(f"🎫 PING-PONG TICKET1: {nome}", f"[{nome}] Ticket1 a target a {formatta_numero(prezzo_attuale, dec)}! Rigirato [{to_market_dir(nuova_ticket_dir)}] a {formatta_numero(real_ticket1_lvl, dec)}.{formatta_pnl(pnl_eur)}", "ticket")
                                         
@@ -1640,7 +1664,7 @@ def esegui_motore():
                                     "ticket1_base": nuova_ticket_base,
                                     "ticket1_entry": real_ticket1_lvl,
                                     "ticket1_deal_id": new_deal_id
-                                }, log_wip=f"✅ [EVENTO]: TICKET1 a target a {formatta_numero(prezzo_attuale, dec)}! Ping-Pong: Rigirato in {nuova_ticket_dir}.{formatta_pnl(pnl_eur)}")
+                                }, log_wip=f"✅ [EVENTO]: TICKET1 a target a {formatta_numero(prezzo_attuale, dec)}! Ping-Pong: Rigirato in {nuova_ticket_dir} a {formatta_numero(real_ticket1_lvl, dec)}.{formatta_pnl(pnl_eur)}")
                             else:
                                 print_log(nome, "⚠️ IG ha rifiutato il FLIP del Ticket.")
                         else:
@@ -1680,15 +1704,17 @@ def esegui_motore():
                                     print_log(nome, "➡️ Condizione OPP == TP/4 verificata. Apertura [TICKET2] a mercato...")
                                     ticket2_dir = ticket1_dir
                                     lim_lvl_t2 = round(prezzo_attuale + (param.get("tp") / 4) * mult, dec) if ticket2_dir == "BUY" else round(prezzo_attuale - (param.get("tp") / 4) * mult, dec)
-                                    succ_t2 = invia_ordine_mercato(nome, epic, valuta, ticket2_dir, s_mezzo, h, dec, limit_lvl=lim_lvl_t2, stop_lvl=None, etichetta="[TICKET2]")
+                                    succ_t2, real_t2_lvl, deal_id_t2 = invia_ordine_mercato(nome, epic, valuta, ticket2_dir, s_mezzo, h, dec, limit_lvl=lim_lvl_t2, stop_lvl=None, etichetta="[TICKET2]")
                                     if succ_t2:
+                                        real_t2_entry = real_t2_lvl if real_t2_lvl is not None else prezzo_attuale
                                         extra_mem = {
                                             "ticket2_active": True,
-                                            "ticket2_entry": prezzo_attuale,
-                                            "ticket2_dir": ticket2_dir
+                                            "ticket2_entry": real_t2_entry,
+                                            "ticket2_dir": ticket2_dir,
+                                            "ticket2_deal_id": deal_id_t2
                                         }
-                                        invia_notifica(f"🛰️ STOP TICKET1: {nome}", f"[{nome}] Stop Ticket1 a {formatta_numero(prezzo_attuale, dec)}.{pnl_str} SAT1 OCO{oco_str_short} + Ticket2 [{to_market_dir(ticket2_dir)}] a {formatta_numero(prezzo_attuale, dec)}", "satellite")
-                                        aggiorna_memoria(nome, {**extra_mem, "stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"✅ [EVENTO]: Stop TICKET1 colpito a {formatta_numero(prezzo_attuale, dec)}.{pnl_str} PIAZZATI: SAT1 OCO{oco_str_short} + Ticket2 [{to_market_dir(ticket2_dir)}] a {formatta_numero(prezzo_attuale, dec)}")
+                                        invia_notifica(f"🛰️ STOP TICKET1: {nome}", f"[{nome}] Stop Ticket1 a {formatta_numero(prezzo_attuale, dec)}.{pnl_str} SAT1 OCO{oco_str_short} + Ticket2 [{to_market_dir(ticket2_dir)}] a {formatta_numero(real_t2_entry, dec)}", "satellite")
+                                        aggiorna_memoria(nome, {**extra_mem, "stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"✅ [EVENTO]: Stop TICKET1 colpito a {formatta_numero(prezzo_attuale, dec)}.{pnl_str} PIAZZATI: SAT1 OCO{oco_str_short} + Ticket2 [{to_market_dir(ticket2_dir)}] a {formatta_numero(real_t2_entry, dec)}")
                                     else:
                                         invia_notifica(f"🛰️ STOP TICKET1: {nome}", f"[{nome}] Stop Ticket1 a {formatta_numero(prezzo_attuale, dec)}.{pnl_str} SAT1 OCO{oco_str_short}", "satellite")
                                         aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITI", "tentativi_sat": 0}, log_wip=f"✅ [EVENTO]: Stop TICKET1 colpito a {formatta_numero(prezzo_attuale, dec)}. PIAZZATI: SAT1 OCO{oco_str_short}.{pnl_str}")
@@ -1785,7 +1811,7 @@ def esegui_motore():
                             sat2_gia_presente = [p for p in posizioni if float(p['position']['size']) == s_quarto and p['position']['direction'] == sat2_dir]
                             if not sat2_gia_presente:
                                 print_log(nome, f"➡️ Inserisco [SAT2] a mercato...")
-                                succ_sat2 = invia_ordine_mercato(nome, epic, valuta, sat2_dir, s_quarto, h, dec, etichetta=f"[SAT2]")
+                                succ_sat2, lvl_sat2, deal_sat2 = invia_ordine_mercato(nome, epic, valuta, sat2_dir, s_quarto, h, dec, etichetta=f"[SAT2]")
                                 time.sleep(3.0) 
                             else:
                                 print_log(nome, f"✅ [SAT2] già presente a mercato. Salto inserimento.")
@@ -2142,12 +2168,15 @@ def esegui_motore():
                         
                         lim_core = round(f3_base + tp2_val, dec) if sat_dir == "BUY" else round(f3_base - tp2_val, dec)
                         stop_core = round(f3_base - dts_val, dec) if sat_dir == "BUY" else round(f3_base + dts_val, dec)
-                        succ_f3 = invia_ordine_mercato(nome, epic, valuta, sat_dir, s_core, h, dec, limit_lvl=lim_core, stop_lvl=stop_core, etichetta="[ORDINE FASE 3]")
+                        succ_f3, lvl_f3, deal_f3 = invia_ordine_mercato(nome, epic, valuta, sat_dir, s_core, h, dec, limit_lvl=lim_core, stop_lvl=stop_core, etichetta="[ORDINE FASE 3]")
                         if not succ_f3:
                             pulisci_mercato(epic, h, nome)
                             invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento immissione [ORDINE FASE 3] a mercato (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
                             aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione [ORDINE FASE 3] a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento [ORDINE FASE 3]. Macchina in MANUALE.")
                             continue
+                            
+                        if lvl_f3 is not None:
+                            f3_base = lvl_f3
                             
                         time.sleep(3.0) 
                         
@@ -2157,7 +2186,7 @@ def esegui_motore():
                         segno = "+" if sat_dir in ["BUY", "LONG"] else "-"
                         segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
                         base_log = param.get("temp_fase3_log", f"Avvio FASE 3.")
-                        msg_init = f"{base_log} Nuova Core [{to_market_dir(sat_dir)}] [{segno}{s_core}] e Ordine ULTIMA [{to_market_dir(dir_contro)}] [{segno_u}{s_mezzo}] a {formatta_numero(lvl_last, dec)}"
+                        msg_init = f"{base_log} Nuova Core [{to_market_dir(sat_dir)}] [{segno}{s_core}] a {formatta_numero(f3_base, dec)} e Ordine ULTIMA [{to_market_dir(dir_contro)}] [{segno_u}{s_mezzo}] a {formatta_numero(lvl_last, dec)}"
                         invia_notifica(f"🔥 ENTRATA FASE 3: {nome}", f"[{nome}] {msg_init}", "fire")
                         aggiorna_memoria(nome, {"stato": "FASE_3", "fase3_step": 1, "fase3_current_base": f3_base}, log_wip=f"✅ [EVENTO]: {msg_init}")
 
@@ -2272,20 +2301,21 @@ def esegui_motore():
                                     lim_core = round(prezzo_attuale + tp2_val, dec) if sat_dir == "BUY" else round(prezzo_attuale - tp2_val, dec)
                                     stop_core = round(prezzo_attuale - dts_val, dec) if sat_dir == "BUY" else round(prezzo_attuale + dts_val, dec)
                                     
-                                    invia_ordine_mercato(nome, epic, valuta, sat_dir, s_core, h, dec, limit_lvl=lim_core, stop_lvl=stop_core, etichetta="[ORDINE FASE 3]")
+                                    succ_f3_taglio, lvl_f3_taglio, deal_f3_taglio = invia_ordine_mercato(nome, epic, valuta, sat_dir, s_core, h, dec, limit_lvl=lim_core, stop_lvl=stop_core, etichetta="[ORDINE FASE 3]")
                                     time.sleep(3.0) 
                                     
+                                    base_taglio = lvl_f3_taglio if lvl_f3_taglio is not None else prezzo_attuale
                                     new_s_last = s_core * 0.15
-                                    lvl_last = round(prezzo_attuale + tp4_val, dec) if sat_dir == "BUY" else round(prezzo_attuale - tp4_val, dec)
+                                    lvl_last = round(base_taglio + tp4_val, dec) if sat_dir == "BUY" else round(base_taglio - tp4_val, dec)
                                     
-                                    invia_ordine_pendente(nome, epic, valuta, dir_contro, new_s_last, lvl_last, "LIMIT", round(prezzo_attuale, dec), None, h, dec, etichetta="[ORDINE ULTIMA FASE 3]")
+                                    invia_ordine_pendente(nome, epic, valuta, dir_contro, new_s_last, lvl_last, "LIMIT", round(base_taglio, dec), None, h, dec, etichetta="[ORDINE ULTIMA FASE 3]")
                                     
                                     segno = "+" if sat_dir in ["BUY", "LONG"] else "-"
                                     segno_u = "+" if dir_contro in ["BUY", "LONG"] else "-"
                                     pct = 35 if new_step==2 else 15
-                                    msg_taglio = f"Taglio {pct}%.{formatta_pnl(pnl)} Nuova Core [{to_market_dir(sat_dir)}] [{segno}{s_core}] a {formatta_numero(prezzo_attuale, dec)} e ULTIMA [{to_market_dir(dir_contro)}] [{segno_u}{new_s_last}] a {formatta_numero(lvl_last, dec)}"
+                                    msg_taglio = f"Taglio {pct}%.{formatta_pnl(pnl)} Nuova Core [{to_market_dir(sat_dir)}] [{segno}{s_core}] a {formatta_numero(base_taglio, dec)} e ULTIMA [{to_market_dir(dir_contro)}] [{segno_u}{new_s_last}] a {formatta_numero(lvl_last, dec)}"
                                     invia_notifica(f"✂️ TAGLIO FASE 3: {nome}", f"[{nome}] {msg_taglio}", "scissors")
-                                    aggiorna_memoria(nome, {"fase3_step": new_step, "fase3_current_base": prezzo_attuale, "stato": "FASE_3"}, log_wip=f"✅ [EVENTO]: {msg_taglio}")
+                                    aggiorna_memoria(nome, {"fase3_step": new_step, "fase3_current_base": base_taglio, "stato": "FASE_3"}, log_wip=f"✅ [EVENTO]: {msg_taglio}")
                         else:
                             if not last_pos:
                                 pend_ultima = [o for o in pendenti if float(o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0))) == s_last and o['workingOrderData']['direction'] == dir_contro]
