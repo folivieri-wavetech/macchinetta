@@ -2118,7 +2118,7 @@ else:
 
     with tab_report:
         st.markdown("<h2 style='text-align: center; color: #00FFCC;'>📄 Report Giornaliero</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Visualizza lo storico dei valori salvati automaticamente ogni giorno feriale alle 21:30.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.9rem;'>Visualizza lo storico dei valori salvati automaticamente ogni giorno feriale alle 21:30.</p>", unsafe_allow_html=True)
         
         file_report = os.path.join(conto_selezionato, "report_giornaliero.csv") if conto_selezionato else "report_giornaliero.csv"
         if os.path.exists(file_report):
@@ -2131,14 +2131,97 @@ else:
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    da_data = st.date_input("Da data", value=min_date)
+                    da_data = st.date_input("Da data", value=min_date, key=f"rep_da_data_{conto_selezionato}")
                 with c2:
-                    a_data = st.date_input("A data", value=datetime.today().date())
+                    a_data = st.date_input("A data", value=datetime.today().date(), key=f"rep_a_data_{conto_selezionato}")
+                
+                prefs_tab = carica_preferenze(conto_selezionato)
+                inv_iniziale_tab = float(st.session_state.get(f"side_inv_input_{conto_selezionato}", prefs_tab.get("investimento_iniziale", 0.0)))
+                
+                st.markdown(f"""
+                <div style='text-align: center; margin: 10px auto 20px auto; padding: 6px 14px; background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.25); border-radius: 8px; max-width: 440px;'>
+                    <span style='color: #bbb; font-size: 0.85rem;'>💰 Investimento Iniziale di riferimento:</span>
+                    <b style='color: #FFD700; font-size: 1.05rem; margin-left: 6px;'>{formatta_eur(inv_iniziale_tab)} €</b>
+                </div>
+                """, unsafe_allow_html=True)
                     
                 mask = (df_report['Data_dt'].dt.date >= da_data) & (df_report['Data_dt'].dt.date <= a_data)
-                df_filtrato = df_report.loc[mask].drop(columns=['Data_dt'])
+                df_filtrato = df_report.loc[mask].sort_values(by='Data_dt', ascending=False)
                 
-                st.dataframe(df_filtrato, use_container_width=True, hide_index=True)
+                if df_filtrato.empty:
+                    st.info("Nessun dato registrato nell'intervallo di date selezionato.")
+                else:
+                    righe_tabella = []
+                    for _, riga in df_filtrato.iterrows():
+                        d_str = str(riga.get('Data', ''))
+                        try:
+                            cap_val = float(riga.get('Capitale Totale', 0.0))
+                        except:
+                            cap_val = 0.0
+                        try:
+                            marg_val = float(riga.get('Margine Utilizzato', 0.0))
+                        except:
+                            marg_val = 0.0
+                        try:
+                            dd_val = float(riga.get('Drawdown', 0.0))
+                        except:
+                            dd_val = 0.0
+                            
+                        # Calcolo Rendimento
+                        diff_abs = cap_val - inv_iniziale_tab if inv_iniziale_tab > 0 else 0.0
+                        diff_pct = (diff_abs / inv_iniziale_tab * 100.0) if inv_iniziale_tab > 0 else 0.0
+                        
+                        if inv_iniziale_tab <= 0:
+                            rend_html = "<span style='color: #888;'>--</span>"
+                        elif diff_abs > 0:
+                            pct_str = f"{diff_pct:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                            rend_html = f"<span style='color: #4ade80; font-weight: 600;'>+{formatta_eur(diff_abs)} € (+{pct_str}%)</span>"
+                        elif diff_abs < 0:
+                            pct_str = f"{abs(diff_pct):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                            rend_html = f"<span style='color: #ff6b6b; font-weight: 600;'>-{formatta_eur(abs(diff_abs))} € (-{pct_str}%)</span>"
+                        else:
+                            rend_html = "<span style='color: #bbb;'>0,00 € (0,00%)</span>"
+                            
+                        # Drawdown styling
+                        if dd_val < 0:
+                            dd_html = f"<span style='color: #ff6b6b; font-weight: 600;'>{formatta_eur(dd_val)} €</span>"
+                        elif dd_val > 0:
+                            dd_html = f"<span style='color: #4ade80; font-weight: 600;'>+{formatta_eur(dd_val)} €</span>"
+                        else:
+                            dd_html = "<span style='color: #bbb;'>0,00 €</span>"
+                            
+                        cap_html = f"<span style='color: #FFD700; font-weight: 600;'>{formatta_eur(cap_val)} €</span>"
+                        marg_html = f"<span style='color: #d1d4dc;'>{formatta_eur(marg_val)} €</span>"
+                        
+                        righe_tabella.append(f"""
+                        <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                            <td style='padding: 8px 12px; text-align: center; color: #fff; font-weight: 500;'>{d_str}</td>
+                            <td style='padding: 8px 12px; text-align: center;'>{cap_html}</td>
+                            <td style='padding: 8px 12px; text-align: center;'>{rend_html}</td>
+                            <td style='padding: 8px 12px; text-align: center;'>{marg_html}</td>
+                            <td style='padding: 8px 12px; text-align: center;'>{dd_html}</td>
+                        </tr>
+                        """)
+                        
+                    tabella_report_html = f"""
+                    <div class='table-responsive'>
+                    <table style='width: 90%; max-width: 900px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 0.86rem; background-color: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.25);'>
+                        <thead>
+                            <tr style='background-color: rgba(0,255,204,0.08); border-bottom: 1px solid rgba(0,255,204,0.25); color: #00FFCC; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.5px;'>
+                                <th style='padding: 10px 12px; text-align: center;'>📅 Data</th>
+                                <th style='padding: 10px 12px; text-align: center;'>💰 Capitale Totale</th>
+                                <th style='padding: 10px 12px; text-align: center;'>📈 Rendimento (%)</th>
+                                <th style='padding: 10px 12px; text-align: center;'>🔒 Margine Utilizzato</th>
+                                <th style='padding: 10px 12px; text-align: center;'>📉 Drawdown</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join(righe_tabella)}
+                        </tbody>
+                    </table>
+                    </div>
+                    """
+                    st.html(tabella_report_html)
             else:
                 st.dataframe(df_report, use_container_width=True, hide_index=True)
         else:
