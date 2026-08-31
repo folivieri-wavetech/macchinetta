@@ -559,6 +559,7 @@ st.markdown("""
             font-weight: 500 !important;
             color: #bbb !important;
         }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:first-child > span:last-child,
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="color: rgb(255, 171, 0)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="color:rgb(255, 171, 0)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="orange"] {
@@ -566,6 +567,7 @@ st.markdown("""
             font-weight: 700 !important;
             margin-left: auto !important;
             text-align: right !important;
+            white-space: nowrap !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
             box-shadow: 0 2px 8px rgba(25, 135, 84, 0.4) !important;
