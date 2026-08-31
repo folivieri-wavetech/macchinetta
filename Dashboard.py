@@ -858,38 +858,38 @@ else:
                     durata_str = st_acc.get("durata_sessione", "--")
 
                 if motore_attivo:
-                    return f"<div style='font-size: 0.70rem; color: #aaa; margin-top: -1px; margin-bottom: 7px; padding-left: 6px;'>🟢 Connesso: <b style='color: #4ade80;'>{durata_str}</b></div>"
+                    return f"<div style='font-size: 0.69rem; color: #aaa; margin-top: 6px; margin-bottom: -10px; padding-left: 4px; line-height: 1.1;'>🟢 Connesso: <b style='color: #4ade80;'>{durata_str}</b></div>"
                 else:
-                    return "<div style='font-size: 0.70rem; color: #888; margin-top: -1px; margin-bottom: 7px; padding-left: 6px;'>🔴 <span style='color: #ef4444; font-weight: 600;'>Offline</span></div>"
+                    return "<div style='font-size: 0.69rem; color: #888; margin-top: 6px; margin-bottom: -10px; padding-left: 4px; line-height: 1.1;'>🔴 <span style='color: #ef4444; font-weight: 600;'>Offline</span></div>"
 
             if conti_reali:
-                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 2px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
                 for cr in conti_reali:
                     nome_cr_clean = cr.replace("_REALE", "")
                     st_cr = leggi_stato_sistema(cr)
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                     is_sel = (cr == conto_attivo)
                     label_cr = f"🔴 {nome_cr_clean}: :orange[{cap_cr} €]"
+                    st.markdown(get_subtext_connessione(cr, st_cr), unsafe_allow_html=True)
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cr
                             st.rerun()
-                    st.markdown(get_subtext_connessione(cr, st_cr), unsafe_allow_html=True)
                 st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
                 
             if conti_demo:
-                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 8px 0 2px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
                 for cd in conti_demo:
                     nome_cd_clean = cd.replace("_DEMO", "")
                     st_cd = leggi_stato_sistema(cd)
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                     is_sel = (cd == conto_attivo)
                     label_cd = f"🔵 {nome_cd_clean}: :orange[{cap_cd} €]"
+                    st.markdown(get_subtext_connessione(cd, st_cd), unsafe_allow_html=True)
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cd
                             st.rerun()
-                    st.markdown(get_subtext_connessione(cd, st_cd), unsafe_allow_html=True)
                             
         renderizza_sidebar_conti()
                         
