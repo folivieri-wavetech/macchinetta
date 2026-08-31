@@ -44,11 +44,16 @@ if (-not $POD_DASH) {
 }
 Write-Host "Trovato pod Dashboard: $POD_DASH" -ForegroundColor Yellow
 
-& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Dashboard.py" "macchinetta/${POD_DASH}:/data/Dashboard.py"
-& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Dashboard_Simulatore.py" "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
-& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Motore.py" "macchinetta/${POD_DASH}:/data/Motore.py"
-& $KUBECTL --kubeconfig=$KUBECONFIG cp "$ROOT\Sistema\auth_manager.py" "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
-Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
+Push-Location $ROOT
+try {
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard.py "macchinetta/${POD_DASH}:/data/Dashboard.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard_Simulatore.py "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp Sistema/auth_manager.py "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
+    Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
+} finally {
+    Pop-Location
+}
 
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "4. ROLLOUT RESTART DEI DEPLOYMENT" -ForegroundColor Cyan
