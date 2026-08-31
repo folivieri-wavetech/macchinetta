@@ -837,6 +837,31 @@ else:
         @st.fragment(run_every=15)
         def renderizza_sidebar_conti():
             conto_attivo = st.session_state.get("conto_selezionato", conto_selezionato)
+            
+            def get_subtext_connessione(acc, st_acc):
+                motore_attivo = False
+                path_stato = os.path.join(acc, STATO_SISTEMA)
+                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60:
+                    motore_attivo = True
+
+                durata_str = "--"
+                path_token = os.path.join(acc, FILE_TOKEN)
+                if motore_attivo and os.path.exists(path_token):
+                    try:
+                        durata_sec = time.time() - os.path.getmtime(path_token)
+                        ore = int(durata_sec // 3600)
+                        minuti = int((durata_sec % 3600) // 60)
+                        durata_str = f"{ore}h {minuti}m"
+                    except Exception:
+                        durata_str = st_acc.get("durata_sessione", "--")
+                elif motore_attivo:
+                    durata_str = st_acc.get("durata_sessione", "--")
+
+                if motore_attivo:
+                    return f"<div style='font-size: 0.70rem; color: #aaa; margin-top: -1px; margin-bottom: 7px; padding-left: 6px;'>🟢 Connesso: <b style='color: #4ade80;'>{durata_str}</b></div>"
+                else:
+                    return "<div style='font-size: 0.70rem; color: #888; margin-top: -1px; margin-bottom: 7px; padding-left: 6px;'>🔴 <span style='color: #ef4444; font-weight: 600;'>Offline</span></div>"
+
             if conti_reali:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
                 for cr in conti_reali:
@@ -849,7 +874,8 @@ else:
                         if not is_sel:
                             st.session_state.conto_selezionato = cr
                             st.rerun()
-                st.markdown("<div style='margin: 8px 0;'></div>", unsafe_allow_html=True)
+                    st.markdown(get_subtext_connessione(cr, st_cr), unsafe_allow_html=True)
+                st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
                 
             if conti_demo:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
@@ -863,6 +889,7 @@ else:
                         if not is_sel:
                             st.session_state.conto_selezionato = cd
                             st.rerun()
+                    st.markdown(get_subtext_connessione(cd, st_cd), unsafe_allow_html=True)
                             
         renderizza_sidebar_conti()
                         
@@ -876,25 +903,6 @@ else:
         def renderizza_sidebar_stats():
             stato_side = leggi_stato_sistema(conto_selezionato)
             prefs_side = carica_preferenze(conto_selezionato)
-            
-            motore_attivo_side = False
-            path_stato_side = os.path.join(conto_selezionato, STATO_SISTEMA)
-            if os.path.exists(path_stato_side) and (time.time() - os.path.getmtime(path_stato_side)) < 60: 
-                motore_attivo_side = True
-            badge_motore_side = "🟢 Connesso" if motore_attivo_side else "🔴 Offline"
-
-            durata_str = "--"
-            path_token = os.path.join(conto_selezionato, FILE_TOKEN)
-            if motore_attivo_side and os.path.exists(path_token):
-                try:
-                    durata_sec = time.time() - os.path.getmtime(path_token)
-                    ore = int(durata_sec // 3600)
-                    minuti = int((durata_sec % 3600) // 60)
-                    durata_str = f"{ore}h {minuti}m"
-                except Exception:
-                    durata_str = stato_side.get("durata_sessione", "--")
-            elif motore_attivo_side:
-                durata_str = stato_side.get("durata_sessione", "--")
 
             val_capitale = formatta_eur(stato_side.get('saldo', '0'))
             val_margine = formatta_eur(stato_side.get('margine', '0'))
@@ -906,20 +914,6 @@ else:
                 col_dd = "#ef4444" if dd_num < 0 else ("#09ab3b" if dd_num > 0 else "inherit")
             except:
                 col_dd = "inherit"
-
-            stato_box_html = f"""
-            <div style='margin: 6px 0; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1);'>
-                <div style='font-size: 0.78rem; color: #bbb; display: flex; justify-content: space-between; align-items: center;'>
-                    <span>Stato Sistema:</span>
-                    <span>{badge_motore_side}</span>
-                </div>
-                <div style='font-size: 0.75rem; color: #888; margin-top: 2px; display: flex; justify-content: space-between; align-items: center;'>
-                    <span>⏱️ Sessione:</span>
-                    <b style='color: #4ade80;'>{durata_str}</b>
-                </div>
-            </div>
-            """
-            st.markdown(stato_box_html, unsafe_allow_html=True)
             
             # --- INVESTIMENTO INIZIALE ---
             inv_iniziale_saved = float(prefs_side.get("investimento_iniziale", 0.0))
