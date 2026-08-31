@@ -1085,7 +1085,8 @@ else:
                 gruppi_pos[key].append(p)
             
             # Intestazioni centrate e bianche
-            html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>APERTURA</u></th><th style='text-align: center; color: white;'><u>ULTIMO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th><th style='text-align: center; color: white;'><u>P/L (EUR)</u></th></tr></thead>\n<tbody>\n"
+            th_tipo_pos = "<th style='text-align: center; color: white;'><u>TIPO</u></th>" if is_regista else ""
+            html_pos = f"<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>APERTURA</u></th><th style='text-align: center; color: white;'><u>ULTIMO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th>{th_tipo_pos}<th style='text-align: center; color: white;'><u>P/L (EUR)</u></th></tr></thead>\n<tbody>\n"
             
             totale_pnl_portafoglio = 0.0
             
@@ -1199,7 +1200,8 @@ else:
                 else:
                     td_mercato = ""
 
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td><td><span class='{size_class}' style='font-weight: normal;'><u>{ruolo_master_str}</u></span></td><td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal;'><u>{ruolo_master_str}</u></span></td>" if is_regista else ""
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td>{td_tipo_master}<td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     for idx, p in enumerate(posizioni):
@@ -1228,17 +1230,20 @@ else:
                         is_last_subrow = (idx == len(posizioni) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td><td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
+                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td>" if is_regista else ""
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
-            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td><td></td><td></td><td></td><td></td><td></td><td></td><td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.0f} €</td></tr>\n</tbody></table></div>"
+            empty_tds = "<td></td><td></td><td></td><td></td><td></td><td></td>" if is_regista else "<td></td><td></td><td></td><td></td><td></td>"
+            html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td>{empty_tds}<td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.0f} €</td></tr>\n</tbody></table></div>"
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
 
             st.html(html_pos)
             
             # --- ELABORAZIONE ORDINI PENDENTI ---
-            html_ord = "<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th><th style='text-align: center; color: white;'><u>TIPO</u></th></tr></thead>\n<tbody>\n"
+            th_tipo_ord = "<th style='text-align: center; color: white;'><u>TIPO</u></th>" if is_regista else ""
+            html_ord = f"<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th>{th_tipo_ord}</tr></thead>\n<tbody>\n"
             
             # Ordino i pendenti per nome e poi per size
             ord_data_sorted = sorted(ord_data, key=lambda x: (
@@ -1294,7 +1299,8 @@ else:
                 else:
                     td_mercato_ord = ""
                 
-                html_ord += f"<tr class='ig-row' style='{row_style}'>{td_mercato_ord}<td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td><td><span class='{size_class}' style='font-weight: normal;'>{ruolo_ord}</span></td></tr>\n"
+                td_tipo_ord = f"<td><span class='{size_class}' style='font-weight: normal;'>{ruolo_ord}</span></td>" if is_regista else ""
+                html_ord += f"<tr class='ig-row' style='{row_style}'>{td_mercato_ord}<td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td>{td_tipo_ord}</tr>\n"
                 
             html_ord += "</tbody></table></div>"
             
