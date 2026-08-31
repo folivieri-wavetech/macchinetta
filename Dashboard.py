@@ -1428,17 +1428,20 @@ else:
                         bg_color = "#495057" # Grigio scuro
                         text_color = "white"
                         
-                    totale_wip = 0.0
-                    if storico:
-                        for riga in storico:
-                            match = re.search(r"\[Parziale:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
-                            if match:
-                                totale_wip += float(match.group(1).replace(",", "."))
-                    
-                    segno_wip = "+" if totale_wip > 0 else ""
-                    col_tot_wip = "#4ade80" if totale_wip > 0 else ("#ff6b6b" if totale_wip < 0 else "#aaa")
-                    valore_tot_str = f"{segno_wip}{totale_wip:.2f} €".replace(".", ",")
-                    html_tot_wip = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: {col_tot_wip};'>{valore_tot_str}</b></div>"
+                    if not is_attivo or stato == "IN_ATTESA":
+                        html_tot_wip = "<div style='font-size: 0.71rem; color: #888; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: #888;'>WIP</b></div>"
+                    else:
+                        totale_wip = 0.0
+                        if storico:
+                            for riga in storico:
+                                match = re.search(r"\[Parziale:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
+                                if match:
+                                    totale_wip += float(match.group(1).replace(",", "."))
+                        
+                        segno_wip = "+" if totale_wip > 0 else ""
+                        col_tot_wip = "#4ade80" if totale_wip > 0 else ("#ff6b6b" if totale_wip < 0 else "#aaa")
+                        valore_tot_str = f"{segno_wip}{totale_wip:.2f} €".replace(".", ",")
+                        html_tot_wip = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: {col_tot_wip};'>{valore_tot_str}</b></div>"
 
                     marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
                     css_marker = f"""<style>
