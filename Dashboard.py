@@ -858,9 +858,9 @@ else:
                     durata_str = st_acc.get("durata_sessione", "--")
 
                 if motore_attivo:
-                    return f"<div style='font-size: 0.69rem; color: #aaa; margin-top: 6px; margin-bottom: -10px; padding-left: 4px; line-height: 1.1;'>🟢 Connesso: <b style='color: #4ade80;'>{durata_str}</b></div>"
+                    return f"<div style='font-size: 0.71rem; color: #aaa; margin-top: 6px; margin-bottom: -10px; padding-left: 9px; line-height: 1.1;'>🟢 Connesso: <b style='color: #4ade80;'>{durata_str}</b></div>"
                 else:
-                    return "<div style='font-size: 0.69rem; color: #888; margin-top: 6px; margin-bottom: -10px; padding-left: 4px; line-height: 1.1;'>🔴 <span style='color: #ef4444; font-weight: 600;'>Offline</span></div>"
+                    return "<div style='font-size: 0.71rem; color: #888; margin-top: 6px; margin-bottom: -10px; padding-left: 9px; line-height: 1.1;'>🔴 <span style='color: #ef4444; font-weight: 600;'>Offline</span></div>"
 
             if conti_reali:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 2px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
