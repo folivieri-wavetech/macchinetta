@@ -834,32 +834,37 @@ else:
         conti_reali = [c for c in conti_disponibili if "_REALE" in c.upper()]
         conti_demo = [c for c in conti_disponibili if "_REALE" not in c.upper()]
         
-        if conti_reali:
-            st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
-            for cr in conti_reali:
-                nome_cr_clean = cr.replace("_REALE", "")
-                st_cr = leggi_stato_sistema(cr)
-                cap_cr = formatta_eur(st_cr.get('saldo', '0'))
-                is_sel = (cr == conto_selezionato)
-                label_cr = f"🔴 {nome_cr_clean}: :orange[{cap_cr} €]"
-                if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
-                    if not is_sel:
-                        st.session_state.conto_selezionato = cr
-                        st.rerun()
-            st.markdown("<div style='margin: 8px 0;'></div>", unsafe_allow_html=True)
-            
-        if conti_demo:
-            st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
-            for cd in conti_demo:
-                nome_cd_clean = cd.replace("_DEMO", "")
-                st_cd = leggi_stato_sistema(cd)
-                cap_cd = formatta_eur(st_cd.get('saldo', '0'))
-                is_sel = (cd == conto_selezionato)
-                label_cd = f"🔵 {nome_cd_clean}: :orange[{cap_cd} €]"
-                if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
-                    if not is_sel:
-                        st.session_state.conto_selezionato = cd
-                        st.rerun()
+        @st.fragment(run_every=15)
+        def renderizza_sidebar_conti():
+            conto_attivo = st.session_state.get("conto_selezionato", conto_selezionato)
+            if conti_reali:
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
+                for cr in conti_reali:
+                    nome_cr_clean = cr.replace("_REALE", "")
+                    st_cr = leggi_stato_sistema(cr)
+                    cap_cr = formatta_eur(st_cr.get('saldo', '0'))
+                    is_sel = (cr == conto_attivo)
+                    label_cr = f"🔴 {nome_cr_clean}: :orange[{cap_cr} €]"
+                    if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
+                        if not is_sel:
+                            st.session_state.conto_selezionato = cr
+                            st.rerun()
+                st.markdown("<div style='margin: 8px 0;'></div>", unsafe_allow_html=True)
+                
+            if conti_demo:
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 10px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
+                for cd in conti_demo:
+                    nome_cd_clean = cd.replace("_DEMO", "")
+                    st_cd = leggi_stato_sistema(cd)
+                    cap_cd = formatta_eur(st_cd.get('saldo', '0'))
+                    is_sel = (cd == conto_attivo)
+                    label_cd = f"🔵 {nome_cd_clean}: :orange[{cap_cd} €]"
+                    if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
+                        if not is_sel:
+                            st.session_state.conto_selezionato = cd
+                            st.rerun()
+                            
+        renderizza_sidebar_conti()
                         
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
         if st.button("🚪 Logout", key="btn_logout_side", use_container_width=True):
@@ -2120,6 +2125,7 @@ else:
             df_report = pd.read_csv(file_report)
             
             if 'Data' in df_report.columns:
+                df_report = df_report.drop_duplicates(subset=['Data'], keep='last')
                 df_report['Data_dt'] = pd.to_datetime(df_report['Data'], format="%Y-%m-%d", errors='coerce')
                 min_date = df_report['Data_dt'].min().date() if not pd.isna(df_report['Data_dt'].min()) else datetime.today().date()
                 

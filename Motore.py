@@ -399,6 +399,16 @@ def salva_report_giornaliero(saldo, margine, drawdown):
             file_report = "report_giornaliero.csv"
             file_esiste = os.path.exists(file_report)
             
+            if file_esiste:
+                try:
+                    with open(file_report, "r", encoding="utf-8") as f:
+                        for riga in f:
+                            if riga.startswith(f"{data_odierna},"):
+                                ULTIMO_SALVATAGGIO_REPORT = data_odierna
+                                return
+                except Exception:
+                    pass
+            
             try:
                 with open(file_report, "a", encoding="utf-8") as f:
                     if not file_esiste:
