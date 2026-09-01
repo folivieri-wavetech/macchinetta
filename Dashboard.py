@@ -1850,7 +1850,7 @@ else:
 
 
 
-                def crea_riquadro_trend(nome, def_body=10, def_size=1, def_size_max=3):
+                def crea_riquadro_trend(nome, def_body=10, def_size=3, def_size_max=5):
                     with st.container(border=True):
                         dati_salvati = memoria_attuale.get(nome, {})
                         stato_corrente = dati_salvati.get("stato", "FLAT")
@@ -1861,17 +1861,20 @@ else:
                         size_val = dati_salvati.get("size", def_size)
                         size_max_val = dati_salvati.get("size_max", def_size_max)
                         body_val = dati_salvati.get("min_body", def_body)
-                        auto_restart = dati_salvati.get("auto_restart", True)
+                        auto_restart = dati_salvati.get("auto_restart", False)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         
-                        col_titolo, col_auto, col_salva = st.columns([2, 1, 1], vertical_alignment="center")
+                        col_titolo, col_salva = st.columns([3, 1], vertical_alignment="center")
                         with col_titolo:
+                            auto_restart = st.checkbox("Auto-Restart", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
+                            
                             badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
                             titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
                             st.markdown(titolo_html, unsafe_allow_html=True)
                             
-                        with col_auto:
-                            auto_restart = st.checkbox("Auto-Restart (A)", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
+                            bid = prezzi_bid_ask.get(nome, {}).get("bid", "-")
+                            ask = prezzi_bid_ask.get(nome, {}).get("ask", "-")
+                            st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 5px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
@@ -1888,10 +1891,12 @@ else:
 
                         c_in1, c_in2, c_in3, c_in4 = st.columns(4)
                         with c_in1:
-                            opts_tf = ["MINUTE_5", "MINUTE_10", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
-                            st.selectbox("Timeframe", opts_tf, index=opts_tf.index(tf_val) if tf_val in opts_tf else 0, key=f"tf_{conto_selezionato}_{nome}")
+                            tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                            tf_keys = list(tf_map.keys())
+                            idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
+                            st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
                         with c_in2:
-                            st.number_input("Size Iniz.", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
+                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
                         with c_in3:
                             st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
                         with c_in4:
