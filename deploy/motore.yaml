@@ -39,7 +39,7 @@ spec:
         - name: motore
           image: docker.wavetech.it/macchinetta:latest
           imagePullPolicy: Always
-          command: ["python", "/data/Motore.py", "BONGIOLO_DEMO"]
+          command: ["python", "-u", "/data/Motore.py", "BONGIOLO_DEMO"]
           workingDir: /data
           envFrom:
             - secretRef:
@@ -57,7 +57,7 @@ spec:
         - name: motore-trend
           image: docker.wavetech.it/macchinetta:latest
           imagePullPolicy: Always
-          command: ["python", "/data/Motore_Trend.py", "BONGIOLO_DEMO"]
+          command: ["python", "-u", "/data/Motore_Trend.py", "BONGIOLO_DEMO"]
           workingDir: /data
           envFrom:
             - secretRef:
@@ -122,7 +122,7 @@ spec:
         - name: motore
           image: docker.wavetech.it/macchinetta:latest
           imagePullPolicy: Always
-          command: ["python", "/data/Motore.py", "DANY_DEMO"]
+          command: ["python", "-u", "/data/Motore.py", "DANY_DEMO"]
           workingDir: /data
           envFrom:
             - secretRef:
@@ -140,7 +140,7 @@ spec:
         - name: motore-trend
           image: docker.wavetech.it/macchinetta:latest
           imagePullPolicy: Always
-          command: ["python", "/data/Motore_Trend.py", "DANY_DEMO"]
+          command: ["python", "-u", "/data/Motore_Trend.py", "DANY_DEMO"]
           workingDir: /data
           envFrom:
             - secretRef:
@@ -205,7 +205,7 @@ spec:
         - name: motore
           image: docker.wavetech.it/macchinetta:latest
           imagePullPolicy: Always
-          command: ["python", "/data/Motore.py", "FIORDOK_DEMO"]
+          command: ["python", "-u", "/data/Motore.py", "FIORDOK_DEMO"]
           workingDir: /data
           envFrom:
             - secretRef:
@@ -223,7 +223,7 @@ spec:
         - name: motore-trend
           image: docker.wavetech.it/macchinetta:latest
           imagePullPolicy: Always
-          command: ["python", "/data/Motore_Trend.py", "FIORDOK_DEMO"]
+          command: ["python", "-u", "/data/Motore_Trend.py", "FIORDOK_DEMO"]
           workingDir: /data
           envFrom:
             - secretRef:

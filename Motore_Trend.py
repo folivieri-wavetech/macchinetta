@@ -457,7 +457,8 @@ if __name__ == "__main__":
         try:
             esegui_ciclo_trend(is_candle_close=False)
         except Exception as e:
-            pass
+            print(f"Errore ciclo Trend (False): {e}")
+            traceback.print_exc()
 
         attesa = calcola_attesa(5)
         if attesa < 2.5:
