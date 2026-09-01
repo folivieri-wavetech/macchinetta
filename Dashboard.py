@@ -1063,13 +1063,13 @@ else:
                     if deal_id:
                         for idx, i_d in enumerate(pos_incr):
                             if i_d.get("ticket") == deal_id:
-                                return f"<span style='color: #FF8C00; font-weight: bold;'>Add-On {idx+1}</span>"
+                                return f"<span style='color: #FF8C00; font-weight: bold;'>+{idx+1}</span>"
                     
                     # Fallback per size
                     s_c = float(param_memoria.get("size", 1))
                     if abs(sz_pos - s_c) < 0.001:
                         return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({'LONG' if dir_pos=='BUY' else 'SHORT'})</span>"
-                    return f"<span style='color: #FF8C00; font-weight: bold;'>Add-On</span>"
+                    return f"<span style='color: #FF8C00; font-weight: bold;'>+ (Incr)</span>"
                     
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
@@ -1278,14 +1278,20 @@ else:
                 if not is_first_of_instrument:
                     prezzo_str = ""
 
+                is_trend = memoria_attuale.get(nome, {}).get("tipo_strategia", "RANGE") == "TREND"
+                trend_color = "#FF8C00" if is_trend else None
+                color_style = f"color: {trend_color};" if is_trend else ""
+                u_style = f"border-bottom: 1px solid {trend_color}; text-decoration: none;" if is_trend else ""
+
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
                     td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><div style='display: flex; align-items: center;'><span class='ig-dot'></span>{formatta_mercato_con_bandiere(nome, color=trend_color)}</div></td>"
                 else:
                     td_mercato = ""
 
-                td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal;'><u>{ruolo_master_str}</u></span></td>" if is_regista else ""
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}'><u>{sign}{tot_size:g}</u></td><td class='{size_class}'><u>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td>{td_tipo_master}<td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span></td>" if is_regista else ""
+                
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{tot_size:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td>{td_tipo_master}<td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     for idx, p in enumerate(posizioni):
@@ -1314,13 +1320,14 @@ else:
                             pnl_child_eur = pts * sz * valore_punto * rate
                             
                         pnl_c_class = "pnl-pos" if pnl_child_eur >= 0 else "pnl-neg"
-                        ruolo_child = get_role_pos(nome, dir, sz, memoria_attuale.get(nome, {}), p['position'])
+                        raw_ruolo = get_role_pos(nome, dir, sz, memoria_attuale.get(nome, {}), p['position'])
+                        ruolo_child = raw_ruolo.replace("Add-On 1", "+1").replace("Add-On 2", "+2")
                         
                         is_last_subrow = (idx == len(posizioni) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal;'>{ruolo_child}</span></td>" if is_regista else ""
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}<br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
+                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span></td>" if is_regista else ""
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
             empty_tds = "<td></td><td></td><td></td><td></td><td></td><td></td>" if is_regista else "<td></td><td></td><td></td><td></td><td></td>"
