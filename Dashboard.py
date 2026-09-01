@@ -536,19 +536,17 @@ st.markdown("""
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] div[data-testid="stMarkdownContainer"] {
             width: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 2px !important;
+            display: grid !important;
+            grid-template-columns: 1fr auto !important;
+            align-items: center !important;
+            row-gap: 2px !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
-            display: flex !important;
-            justify-content: flex-start !important;
-            align-items: center !important;
-            width: 100% !important;
-            margin: 0 !important;
-            line-height: 1.25 !important;
-            white-space: nowrap !important;
-            gap: 4px !important;
+            display: contents !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button strong {
+            font-weight: normal !important;
+            padding-left: 0.35rem !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:first-child {
             font-size: 0.74rem !important;
@@ -565,7 +563,7 @@ st.markdown("""
         section[data-testid="stSidebar"] div[data-testid="stButton"] span[style*="orange"] {
             color: #FFD700 !important;
             font-weight: 700 !important;
-            margin-left: auto !important;
+            margin-left: 0 !important;
             text-align: right !important;
             white-space: nowrap !important;
         }
@@ -901,7 +899,7 @@ else:
                     is_sel = (cr == conto_attivo)
                     tempo_conn = get_tempo_connessione(cr, st_cr)
                     salute = get_stato_salute(cr)
-                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute}"
+                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} **{salute}**"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cr
@@ -917,7 +915,7 @@ else:
                     is_sel = (cd == conto_attivo)
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
-                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} {salute}"
+                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} **{salute}**"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cd
