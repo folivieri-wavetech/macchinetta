@@ -129,8 +129,9 @@ def verifica_conferma_deal(deal_ref, headers):
 
 def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers, dec, limit_lvl=None, stop_lvl=None, etichetta="[ORDINE]"):
     size_str = str(int(size)) if float(size).is_integer() else str(size)
+    dir_ig = "BUY" if direzione.upper() == "LONG" else "SELL"
     p = {
-        "epic": epic, "expiry": "-", "direction": direzione, "size": size_str, 
+        "epic": epic, "expiry": "-", "direction": dir_ig, "size": size_str, 
         "orderType": "MARKET", "timeInForce": "EXECUTE_AND_ELIMINATE", 
         "guaranteedStop": False, "forceOpen": True, "currencyCode": valuta
     }
