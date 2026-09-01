@@ -999,11 +999,11 @@ else:
     st.markdown("""
         <style>
         div[data-testid="stTabs"] > div[role="tablist"] {
-            gap: 2px !important;
+            gap: 5px !important;
         }
         div[data-testid="stTabs"] button {
-            padding-left: 0.2rem !important;
-            padding-right: 0.2rem !important;
+            padding-left: 0.3rem !important;
+            padding-right: 0.3rem !important;
             padding-top: 0.2rem !important;
             padding-bottom: 0.2rem !important;
             font-size: 0.75rem !important;
@@ -1013,7 +1013,7 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Trading Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Regia"])
         tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
     else:
         tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report", "📊 Grafici"])
