@@ -1529,9 +1529,9 @@ else:
                 prezzi_live = stato.get("prezzi_live", {})
                 prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
-                col_titolo_main, col_btn_restart = st.columns([4, 1])
+                col_titolo_main, col_btn_restart = st.columns([5, 1])
                 with col_titolo_main:
-                    st.markdown("<h1 style='color: #FFD700; margin-top: -15px;'>⚙️ Dashboard Macchinetta IG</h1>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='color: #FFD700; margin-top: -15px; white-space: nowrap;'>⚙️ Dashboard Trading Range</h1>", unsafe_allow_html=True)
                 with col_btn_restart:
                     st.write("") 
                     if st.button("🔄 RESTART VM", help="Elimina il token attuale e forza il rinnovo della sessione IG", width="stretch", key=f"RESTART_{conto_selezionato}"):
@@ -1743,9 +1743,9 @@ else:
                 memoria_attuale = carica_memoria(conto_selezionato) 
                 stato = leggi_stato_sistema(conto_selezionato)
             
-                col_titolo_main, col_btn_restart = st.columns([4, 1])
+                col_titolo_main, col_btn_restart = st.columns([5, 1])
                 with col_titolo_main:
-                    st.markdown("<h1 style='color: #00BFFF; margin-top: -15px;'>📈 Dashboard Trend (Kijun/Tenkan)</h1>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='color: #00BFFF; margin-top: -15px; white-space: nowrap;'>📈 Dashboard Trend (Kijun/Tenkan)</h1>", unsafe_allow_html=True)
                 with col_btn_restart:
                     st.write("") 
 
