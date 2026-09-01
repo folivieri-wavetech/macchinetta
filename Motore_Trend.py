@@ -301,7 +301,10 @@ def esegui_ciclo_trend(is_candle_close=True):
             
         # 1. Recupera candele da IG per calcolo Donchian e close
         prices = scarica_candele(epic, tf, limit=300, headers=headers)
-        if not prices: continue
+        if not prices: 
+            print_log(nome, "⚠️ Nessuna candela restituita da IG!")
+            continue
+        print_log(nome, f"DEBUG: Scaricate {len(prices)} candele da IG.")
         
         # Seed dello storico
         storic_candles = []
@@ -316,6 +319,7 @@ def esegui_ciclo_trend(is_candle_close=True):
             except Exception: pass
             
         engine.seed_history(storic_candles)
+        print_log(nome, f"DEBUG: engine.candles ha {len(engine.candles)} elementi. KJ periods: {engine.config.get('kj_periods', 26)}")
         
         tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
         kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
