@@ -1890,18 +1890,20 @@ else:
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
 
-                        c_in1, c_in2, c_in3, c_in4 = st.columns(4)
-                        with c_in1:
+                        c_r1_1, c_r1_2 = st.columns(2)
+                        with c_r1_1:
                             tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                             tf_keys = list(tf_map.keys())
                             idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
                             st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
-                        with c_in2:
-                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
-                        with c_in3:
-                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
-                        with c_in4:
+                        with c_r1_2:
                             st.number_input("Body Min", value=int(body_val), min_value=1, step=1, key=f"bd_{conto_selezionato}_{nome}")
+                        
+                        c_r2_1, c_r2_2 = st.columns(2)
+                        with c_r2_1:
+                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
+                        with c_r2_2:
+                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
                         
                         if tipo_strategia == "RANGE" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")

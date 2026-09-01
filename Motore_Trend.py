@@ -25,7 +25,7 @@ from core_engine import CoreEngine, Candle
 FILE_MEMORIA = "memoria_parametri.json"
 FILE_TOKEN = "token_ig.json"
 STATO_SISTEMA = "stato_sistema.json"
-CONSOLE_LOG_FILE = "console_live_trend.log"
+CONSOLE_LOG_FILE = "console_live.log"
 STATO_TREND = "stato_trend.json"
 
 if len(sys.argv) < 2:
