@@ -1837,6 +1837,7 @@ else:
             def renderizza_dati_trend():
                 memoria_attuale = carica_memoria(conto_selezionato) 
                 stato = leggi_stato_sistema(conto_selezionato)
+                prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
                 col_titolo_main, col_btn_restart = st.columns([5, 1])
                 with col_titolo_main:
