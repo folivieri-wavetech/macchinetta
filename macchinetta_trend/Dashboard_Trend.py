@@ -97,7 +97,7 @@ tot_future = len(future_data)
 def get_current_portfolio_str(pm, current_price):
     """Genera una stringa riassuntiva del portafoglio attuale per il log"""
     if not pm.core_position and not pm.increments:
-        return "Piatto (0)", "0.0"
+        return "FLAT", "0"
         
     parts = []
     tot_pnl = 0.0
@@ -106,16 +106,19 @@ def get_current_portfolio_str(pm, current_price):
         pm.core_position.is_closed = False # Solo per simulare il pnl
         tot_pnl += pnl
         sign_c = "+" if pm.core_position.direction == "LONG" else "-"
-        parts.append(f"Core {sign_c}{pm.core_position.size}@{pm.core_position.entry_price:.0f}")
+        parts.append(f"{sign_c}{pm.core_position.size}@{pm.core_position.entry_price:.0f}")
         
-    for i, inc in enumerate(pm.increments):
-        pnl = inc.close(current_price)
-        inc.is_closed = False
-        tot_pnl += pnl
-        sign_i = "+" if inc.direction == "LONG" else "-"
-        parts.append(f"Inc {sign_i}{inc.size}@{inc.entry_price:.0f}")
+    if pm.increments:
+        tot_inc_size = sum(inc.size for inc in pm.increments)
+        sign_i = "+" if pm.increments[0].direction == "LONG" else "-"
+        parts.append(f"{sign_i}{tot_inc_size}")
         
-    return " | ".join(parts), f"{tot_pnl:.0f} €"
+        for inc in pm.increments:
+            pnl = inc.close(current_price)
+            inc.is_closed = False
+            tot_pnl += pnl
+        
+    return " ".join(parts), f"{tot_pnl:.0f} €"
 
 # --- INIZIO BACKTEST ---
 if st.session_state.current_step == 0:
@@ -131,25 +134,43 @@ if st.session_state.current_step == 0:
         
         # Facciamo entrare il bot a mercato sull'ultima candela del seed
         last_c = seed_data[-1]
-        entry_price = last_c['close']
+        eval_price = last_c['close']
+        exec_price = future_data[0]['open'] if future_data else eval_price
         
-        # Determinazione direzione iniziale intelligente basata sulla Kijun
+        # Determinazione direzione iniziale intelligente basata sulla Kijun e Tenkan
         kj_iniziale = st.session_state.engine._calculate_donchian(cfg.get('kj_periods'))
         tk_iniziale = st.session_state.engine._calculate_donchian(cfg.get('tk_periods'))
-        dir_iniziale = "LONG" if entry_price > kj_iniziale else "SHORT"
-        sign_start = "+" if dir_iniziale == "LONG" else "-"
         
-        st.session_state.engine.start(entry_price, dir_iniziale)
+        dir_iniziale = "FLAT"
+        tolleranza = cfg.get('min_body') * cfg.get('pip_value')
+        max_dist = cfg.get('max_kj_distance') * cfg.get('pip_value')
+        
+        if eval_price > tk_iniziale and (tk_iniziale > kj_iniziale or abs(tk_iniziale - kj_iniziale) <= tolleranza):
+            if abs(exec_price - kj_iniziale) <= max_dist:
+                dir_iniziale = "LONG"
+        elif eval_price < tk_iniziale and (tk_iniziale < kj_iniziale or abs(tk_iniziale - kj_iniziale) <= tolleranza):
+            if abs(exec_price - kj_iniziale) <= max_dist:
+                dir_iniziale = "SHORT"
+            
+        if dir_iniziale != "FLAT":
+            st.session_state.engine.start(exec_price, dir_iniziale)
+            sign_start = "+" if dir_iniziale == "LONG" else "-"
+            azione = f"START {sign_start}{cfg.get('size_i')}{dir_iniziale[0]}@{exec_price}"
+        else:
+            st.session_state.engine.is_running = True
+            st.session_state.engine.current_direction = "FLAT"
+            azione = "START FLAT (In Attesa)"
         
         # Inizializza il diario di bordo con la candela di innesco
         st.session_state.logs = []
-        portf, latente = get_current_portfolio_str(st.session_state.engine.pm, entry_price)
+        portf, latente = get_current_portfolio_str(st.session_state.engine.pm, exec_price)
         
         st.session_state.logs.append({
             "#": kj_p,
             "OHLC": f"{last_c['open']}-{last_c['high']}-{last_c['low']}-{last_c['close']}",
-            "TK/KJ": f"{tk_iniziale:.0f}/{kj_iniziale:.0f}",
-            "Azione": f"START {sign_start}{cfg.get('size_i')}{dir_iniziale[0]}@{entry_price}",
+            "TK": f"{tk_iniziale:.0f}",
+            "KJ": f"{kj_iniziale:.0f}",
+            "Azione": azione,
             "Chiusure": "",
             "P/L Rea": "",
             "Portafoglio": portf,
@@ -166,7 +187,9 @@ if st.session_state.current_step == 0:
 def elabora_candela_step(indice_relativo):
     d = future_data[indice_relativo]
     c = Candle(d['open'], d['high'], d['low'], d['close'])
-    evs = st.session_state.engine.on_candle_close(c)
+    
+    next_open = future_data[indice_relativo + 1]['open'] if indice_relativo + 1 < len(future_data) else d['close']
+    evs = st.session_state.engine.on_candle_close(c, next_open)
     azione_txt = ""
     chiusure_txt = ""
     pnl_real_txt = ""
@@ -184,8 +207,11 @@ def elabora_candela_step(indice_relativo):
             elif e['type'] == 'increments_cleared':
                 azioni.append("TkCross")
             elif e['type'] == 'reversal':
-                sign_rev = "+" if e['new_direction'] == 'LONG' else "-"
-                azioni.append(f"Rev->{sign_rev}{cfg.get('size_i')}{e['new_direction'][0]}")
+                if e['new_direction'] == 'FLAT':
+                    azioni.append("STOP -> FLAT")
+                else:
+                    sign_rev = "+" if e['new_direction'] == 'LONG' else "-"
+                    azioni.append(f"Rev->{sign_rev}{cfg.get('size_i')}{e['new_direction'][0]}")
             elif e['type'] == 'fifo_close':
                 azioni.append("FIFO")
             
@@ -207,7 +233,8 @@ def elabora_candela_step(indice_relativo):
     st.session_state.logs.append({
         "#": kj_p + indice_relativo + 1,
         "OHLC": f"{d['open']}-{d['high']}-{d['low']}-{d['close']}",
-        "TK/KJ": f"{tk_val:.0f}/{kj_val:.0f}" if tk_val else "-",
+        "TK": f"{tk_val:.0f}" if tk_val else "-",
+        "KJ": f"{kj_val:.0f}" if kj_val else "-",
         "Azione": azione_txt,
         "Chiusure": chiusure_txt,
         "P/L Rea": pnl_real_txt,
@@ -236,8 +263,8 @@ if st.session_state.backtest_data:
                     open=df_vis['open'], high=df_vis['high'],
                     low=df_vis['low'], close=df_vis['close'],
                     name='Prezzo'))
-    fig.add_trace(go.Scatter(x=df_vis.index, y=df_vis['TK'], line=dict(color='blue', width=1), name='Tenkan (TK)'))
-    fig.add_trace(go.Scatter(x=df_vis.index, y=df_vis['KJ'], line=dict(color='red', width=2), name='Kijun (KJ)'))
+    fig.add_trace(go.Scatter(x=df_vis.index, y=df_vis['TK'], line=dict(color='#00BFFF', width=1), name='Tenkan (TK)'))
+    fig.add_trace(go.Scatter(x=df_vis.index, y=df_vis['KJ'], line=dict(color='#FFD700', width=2), name='Kijun (KJ)'))
     
     fig.update_layout(height=400, margin=dict(l=20, r=20, t=20, b=20), xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
@@ -329,9 +356,9 @@ if st.session_state.current_step > tot_future:
         st.session_state.logs = []
         st.rerun()
 
-st.subheader("📜 Diario Operativo Dettagliato")
+st.subheader("📜 Diario Operativo Dettagliato (Ultime 10 Righe)")
 if st.session_state.logs:
-    df_logs = pd.DataFrame(st.session_state.logs)
+    df_logs = pd.DataFrame(st.session_state.logs).tail(10)
     
     def color_ohlc(val):
         """Colora la cella OHLC di verde o rosso in base a open e close."""
@@ -349,5 +376,14 @@ if st.session_state.logs:
             pass
         return ''
         
-    styled_df = df_logs.style.map(color_ohlc, subset=['OHLC'])
+    def color_tk(val):
+        return 'color: #00BFFF; font-weight: bold' # Azzurro chiaro
+        
+    def color_kj(val):
+        return 'color: #FFD700; font-weight: bold' # Giallo oro
+        
+    styled_df = df_logs.style.map(color_ohlc, subset=['OHLC']) \
+                             .map(color_tk, subset=['TK']) \
+                             .map(color_kj, subset=['KJ'])
+                             
     st.dataframe(styled_df, use_container_width=True, hide_index=True)

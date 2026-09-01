@@ -989,6 +989,9 @@ def esegui_motore():
                     continue
                             
                 for nome, param in dati.items():
+                    if param.get("tipo_strategia", "RANGE") == "TREND":
+                        continue
+                        
                     epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
                     c = CONFIG_STRUMENTI.get(nome)
                     

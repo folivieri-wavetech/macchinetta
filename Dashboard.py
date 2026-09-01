@@ -997,12 +997,12 @@ else:
     is_regista = (ruolo == "REGISTA")
 
     if is_regista:
-        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Operatività", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
-        tab_portafoglio, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Trading Range", "📈 Trend", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
+        tab_portafoglio, tab_sintesi, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
     else:
         tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "📄 Report", "📊 Grafici"])
         tab_portafoglio, tab_sintesi, tab_report, tab_grafici = tabs
-        tab_operativa = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
+        tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
@@ -1735,6 +1735,114 @@ else:
                             crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
 
             renderizza_dati_live()
+
+    if tab_trend is not None:
+        with tab_trend:
+            @st.fragment(run_every=15)
+            def renderizza_dati_trend():
+                memoria_attuale = carica_memoria(conto_selezionato) 
+                stato = leggi_stato_sistema(conto_selezionato)
+            
+                col_titolo_main, col_btn_restart = st.columns([4, 1])
+                with col_titolo_main:
+                    st.markdown("<h1 style='color: #00BFFF; margin-top: -15px;'>📈 Dashboard Trend (Kijun/Tenkan)</h1>", unsafe_allow_html=True)
+                with col_btn_restart:
+                    st.write("") 
+
+                st.markdown("---")
+
+                def crea_riquadro_trend(nome, def_body=10, def_size=1, def_size_max=3):
+                    with st.container(border=True):
+                        dati_salvati = memoria_attuale.get(nome, {})
+                        stato_corrente = dati_salvati.get("stato", "FLAT")
+                        stato_attivo = dati_salvati.get("attivo", False)
+                        direzione = dati_salvati.get("direzione", "")
+                        
+                        tf_val = dati_salvati.get("timeframe", "MINUTE_5")
+                        size_val = dati_salvati.get("size", def_size)
+                        size_max_val = dati_salvati.get("size_max", def_size_max)
+                        body_val = dati_salvati.get("min_body", def_body)
+                        auto_restart = dati_salvati.get("auto_restart", True)
+                        tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
+                        
+                        if tipo_strategia != "TREND":
+                            st.markdown(f"### {nome}")
+                            st.warning("Attualmente configurato in **Trading Range**.")
+                            if st.button("➡️ Passa a TREND", key=f"to_trend_{conto_selezionato}_{nome}"):
+                                memoria_attuale[nome] = {"tipo_strategia": "TREND", "attivo": False, "stato": "FLAT"}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
+                            return
+
+                        col_titolo, col_salva, col_range = st.columns([2, 1, 1], vertical_alignment="center")
+                        with col_titolo:
+                            badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
+                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
+                            st.markdown(titolo_html, unsafe_allow_html=True)
+                            
+                        with col_salva:
+                            if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
+                                memoria_attuale[nome] = {
+                                    **dati_salvati,
+                                    "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
+                                    "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                    "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                    "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
+                                    "auto_restart": st.session_state.get(f"auto_{conto_selezionato}_{nome}", auto_restart)
+                                }
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
+                        with col_range:
+                            if st.button("⬅️ Passa a RANGE", key=f"to_range_{conto_selezionato}_{nome}"):
+                                memoria_attuale[nome] = {"tipo_strategia": "RANGE", "attivo": False, "stato": "IN_ATTESA"}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
+
+                        c_in1, c_in2, c_in3, c_in4, c_in5 = st.columns(5)
+                        with c_in1:
+                            opts_tf = ["MINUTE_5", "MINUTE_10", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
+                            st.selectbox("Timeframe", opts_tf, index=opts_tf.index(tf_val) if tf_val in opts_tf else 0, key=f"tf_{conto_selezionato}_{nome}")
+                        with c_in2:
+                            st.number_input("Size Iniz.", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
+                        with c_in3:
+                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
+                        with c_in4:
+                            st.number_input("Body Min", value=int(body_val), min_value=1, step=1, key=f"bd_{conto_selezionato}_{nome}")
+                        with c_in5:
+                            st.checkbox("Auto-Restart (A)", value=auto_restart, key=f"auto_{conto_selezionato}_{nome}")
+                        
+                        if not stato_attivo:
+                            c_btn1, c_btn2 = st.columns(2)
+                            with c_btn1:
+                                if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "LONG", "stato": "FLAT"}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with c_btn2:
+                                if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "SHORT", "stato": "FLAT"}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                        else:
+                            c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
+                            with c_stop:
+                                if st.button("⏹️ STOP (FLAT)", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT"}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with c_info:
+                                st.success(f"🟢 ATTIVO ({direzione}) | Trend Motore in esecuzione ({tf_val})")
+
+                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                for i in range(0, len(tutti_strumenti), 2):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        crea_riquadro_trend(tutti_strumenti[i])
+                    with c2:
+                        if i + 1 < len(tutti_strumenti):
+                            crea_riquadro_trend(tutti_strumenti[i+1])
+
+            renderizza_dati_trend()
 
     if tab_restore is not None:
         with tab_restore:

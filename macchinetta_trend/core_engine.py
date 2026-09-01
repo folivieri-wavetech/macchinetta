@@ -24,8 +24,11 @@ class CoreEngine:
         
         # Stato del motore
         self.is_running = False
-        self.current_direction = None # "LONG" o "SHORT"
+        self.current_direction = "FLAT" # "LONG", "SHORT" o "FLAT"
         self.candles = []  # Storico delle candele
+        self.retracement_start_price = None # Traccia da dove parte un ritracciamento per gli incrementi cumulativi
+        self.active_signal = None
+        self.signal_candles_elapsed = 0
         
         # Stato Indicatori calcolati all'ultima candela chiusa
         self.current_tk = None
@@ -35,6 +38,9 @@ class CoreEngine:
         """Resetta lo stato della macchinetta."""
         self.is_running = False
         self.pm = PositionManager() # Reset completo della memoria trade
+        self.retracement_start_price = None
+        self.active_signal = None
+        self.signal_candles_elapsed = 0
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -45,6 +51,7 @@ class CoreEngine:
         """Inizializza la macchinetta entrando a mercato con la Core nella direzione specificata."""
         self.is_running = True
         self.current_direction = direction
+        self.retracement_start_price = None
         self.pm.open_core(current_price, self.config.get("size_i"), direction)
         print(f"START: Eseguita Core a Mercato {direction} a Prezzo={current_price}")
 
@@ -57,7 +64,7 @@ class CoreEngine:
         lowest = min(c.low for c in recent_candles)
         return (highest + lowest) / 2.0
 
-    def on_candle_close(self, closed_candle):
+    def on_candle_close(self, closed_candle, next_open_price=None):
         """
         Metodo da chiamare OGNI VOLTA che si chiude una candela sul TF stabilito.
         """
@@ -77,6 +84,7 @@ class CoreEngine:
             return events
             
         c_close = closed_candle.close
+        exec_price = next_open_price if next_open_price is not None else c_close
         tk = self.current_tk
         kj = self.current_kj
         pip_val = self.config.get("pip_value")
@@ -89,65 +97,139 @@ class CoreEngine:
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
             if c_close < kj:
-                # Sotto la Kijun: Chiude tutto e REVERSA in SHORT
-                events.extend(self.pm.close_all_increments(c_close))
-                ev = self.pm.close_core(c_close)
+                # Sotto la Kijun: Chiude tutto e passa in FLAT
+                events.extend(self.pm.close_all_increments(exec_price))
+                ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_below_kj", "new_direction": "SHORT"})
+                events.append({"type": "reversal", "reason": "close_below_kj", "new_direction": "FLAT"})
                 
-                # Apre SHORT
-                self.start(c_close, "SHORT")
-                return events
+                self.current_direction = "FLAT"
+                self.retracement_start_price = None
+                # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
             elif c_close < tk:
                 # Sotto Tenkan: Chiude solo gli incrementi
-                chiusure_inc = self.pm.close_all_increments(c_close)
+                chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
                     events.append({"type": "increments_cleared", "reason": "close_below_tk"})
+                self.retracement_start_price = None
 
-            # --- INGRESSI LONG ---
-            # Paletto: TK > KJ e la candela deve aver APERTO SOPRA la TK (close precedente > TK)
-            if tk > kj and closed_candle.open > tk and c_close >= tk:
-                if closed_candle.is_red() and closed_candle.body_size() >= min_body_price:
-                    entry_price = c_close 
-                    if self.pm.total_active_size() >= self.config.get("size_f"):
-                        oldest = self.pm.force_close_oldest_increment(entry_price)
-                        if oldest:
-                            events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
-                    self.pm.open_increment(entry_price, size=1, direction="LONG")
-                    events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG"})
+            if self.current_direction == "LONG":
+                # --- INGRESSI INCREMENTO LONG ---
+                # Paletto: TK > KJ (o tollerato) e la candela deve aver APERTO SOPRA la TK (close precedente > TK)
+                if (tk > kj or abs(tk - kj) <= min_body_price) and closed_candle.open > tk and c_close >= tk:
+                    if closed_candle.is_red():
+                        if self.retracement_start_price is None:
+                            self.retracement_start_price = closed_candle.open
+                            
+                        distanza_percorsa = self.retracement_start_price - c_close
+                        
+                        if distanza_percorsa >= min_body_price:
+                            entry_price = exec_price 
+                            if self.pm.total_active_size() >= self.config.get("size_f"):
+                                oldest = self.pm.force_close_oldest_increment(entry_price)
+                                if oldest:
+                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
+                            self.pm.open_increment(entry_price, size=1, direction="LONG")
+                            events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG"})
+                            
+                            self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
+                    else:
+                        self.retracement_start_price = None # Ritracciamento interrotto da candela verde
+                else:
+                    self.retracement_start_price = None # Fuori dai paletti
 
-        elif self.current_direction == "SHORT":
+        if self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
             if c_close > kj:
-                # Sopra la Kijun: Chiude tutto e REVERSA in LONG
-                events.extend(self.pm.close_all_increments(c_close))
-                ev = self.pm.close_core(c_close)
+                # Sopra la Kijun: Chiude tutto e passa in FLAT
+                events.extend(self.pm.close_all_increments(exec_price))
+                ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_above_kj", "new_direction": "LONG"})
+                events.append({"type": "reversal", "reason": "close_above_kj", "new_direction": "FLAT"})
                 
-                # Apre LONG
-                self.start(c_close, "LONG")
-                return events
+                self.current_direction = "FLAT"
+                self.retracement_start_price = None
+                # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
                 
             elif c_close > tk:
                 # Sopra Tenkan: Chiude solo gli incrementi
-                chiusure_inc = self.pm.close_all_increments(c_close)
+                chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
                     events.append({"type": "increments_cleared", "reason": "close_above_tk"})
+                self.retracement_start_price = None
 
-            # --- INGRESSI SHORT ---
-            # Paletto: TK < KJ e la candela deve aver APERTO SOTTO la TK (close precedente < TK)
-            if tk < kj and closed_candle.open < tk and c_close <= tk:
-                if closed_candle.is_green() and closed_candle.body_size() >= min_body_price:
-                    entry_price = c_close 
-                    if self.pm.total_active_size() >= self.config.get("size_f"):
-                        oldest = self.pm.force_close_oldest_increment(entry_price)
-                        if oldest:
-                            events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
-                    self.pm.open_increment(entry_price, size=1, direction="SHORT")
-                    events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT"})
+            if self.current_direction == "SHORT":
+                # --- INGRESSI INCREMENTO SHORT ---
+                # Paletto: TK < KJ (o tollerato) e la candela deve aver APERTO SOTTO la TK (close precedente < TK)
+                if (tk < kj or abs(tk - kj) <= min_body_price) and closed_candle.open < tk and c_close <= tk:
+                    if closed_candle.is_green():
+                        if self.retracement_start_price is None:
+                            self.retracement_start_price = closed_candle.open
+                            
+                        distanza_percorsa = c_close - self.retracement_start_price
+                        
+                        if distanza_percorsa >= min_body_price:
+                            entry_price = exec_price 
+                            if self.pm.total_active_size() >= self.config.get("size_f"):
+                                oldest = self.pm.force_close_oldest_increment(entry_price)
+                                if oldest:
+                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
+                            self.pm.open_increment(entry_price, size=1, direction="SHORT")
+                            events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT"})
+                            
+                            self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
+                    else:
+                        self.retracement_start_price = None # Ritracciamento interrotto da candela rossa
+                else:
+                    self.retracement_start_price = None # Fuori dai paletti
+
+        # --- VALUTAZIONE INGRESSO DA STATO FLAT ---
+        if self.current_direction == "FLAT":
+            is_long_cond = c_close > tk and (tk > kj or abs(tk - kj) <= min_body_price)
+            is_short_cond = c_close < tk and (tk < kj or abs(tk - kj) <= min_body_price)
+            
+            if is_long_cond:
+                if self.active_signal != "LONG":
+                    self.active_signal = "LONG"
+                    self.signal_candles_elapsed = 0
+                self.signal_candles_elapsed += 1
+                
+                max_dist = self.config.get("max_kj_distance") * pip_val
+                max_delay = self.config.get("max_entry_delay")
+                
+                if abs(exec_price - kj) <= max_dist:
+                    if self.signal_candles_elapsed <= max_delay:
+                        self.start(exec_price, "LONG")
+                        reason = "condizioni_long_allineate" if tk > kj else "condizioni_long_tollerate"
+                        events.append({"type": "reversal", "reason": reason, "new_direction": "LONG"})
+                        self.active_signal = None
+                        self.signal_candles_elapsed = 0
+            
+            elif is_short_cond:
+                if self.active_signal != "SHORT":
+                    self.active_signal = "SHORT"
+                    self.signal_candles_elapsed = 0
+                self.signal_candles_elapsed += 1
+                
+                max_dist = self.config.get("max_kj_distance") * pip_val
+                max_delay = self.config.get("max_entry_delay")
+                
+                if abs(kj - exec_price) <= max_dist:
+                    if self.signal_candles_elapsed <= max_delay:
+                        self.start(exec_price, "SHORT")
+                        reason = "condizioni_short_allineate" if tk < kj else "condizioni_short_tollerate"
+                        events.append({"type": "reversal", "reason": reason, "new_direction": "SHORT"})
+                        self.active_signal = None
+                        self.signal_candles_elapsed = 0
+            
+            else:
+                # Se nessuna delle due condizioni base è vera, il segnale decade e si resetta tutto
+                self.active_signal = None
+                self.signal_candles_elapsed = 0
 
         return events
+                
+
