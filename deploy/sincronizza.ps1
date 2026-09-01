@@ -49,6 +49,8 @@ try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard.py "macchinetta/${POD_DASH}:/data/Dashboard.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard_Simulatore.py "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore_Trend.py "macchinetta/${POD_DASH}:/data/Motore_Trend.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp macchinetta_trend "macchinetta/${POD_DASH}:/data/macchinetta_trend"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Sistema/auth_manager.py "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
     Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
 } finally {
