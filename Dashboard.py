@@ -1048,6 +1048,27 @@ else:
             
             # --- HELPER: Riconoscimento Ruolo Chirurgico ---
             def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
+                tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
+                
+                if tipo_strategia == "TREND":
+                    pos_core = param_memoria.get("posizioni_core", [])
+                    pos_incr = param_memoria.get("posizioni_incr", [])
+                    deal_id = pos_dict.get("dealId")
+                    
+                    if deal_id and any(c.get("ticket") == deal_id for c in pos_core):
+                        return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({'LONG' if dir_pos=='BUY' else 'SHORT'})</span>"
+                    
+                    if deal_id:
+                        for idx, i_d in enumerate(pos_incr):
+                            if i_d.get("ticket") == deal_id:
+                                return f"<span style='color: #FF8C00; font-weight: bold;'>Add-On {idx+1}</span>"
+                    
+                    # Fallback per size
+                    s_c = float(param_memoria.get("size", 1))
+                    if abs(sz_pos - s_c) < 0.001:
+                        return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({'LONG' if dir_pos=='BUY' else 'SHORT'})</span>"
+                    return f"<span style='color: #FF8C00; font-weight: bold;'>Add-On</span>"
+                    
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
                 stato_sys = param_memoria.get("stato", "")
