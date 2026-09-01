@@ -1013,7 +1013,7 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Regia"])
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "📊 Grafici", "💻 Log", "🔐 Regia"])
         tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
     else:
         tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report", "📊 Grafici"])
@@ -1418,12 +1418,12 @@ else:
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
-                strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "RANGE"]
                 
                 for nome in strumenti_ordinati:
                     dati = memoria.get(nome, {})
                     stato = dati.get("stato", "IN_ATTESA")
                     is_attivo = dati.get("attivo", False)
+                    tipo_strategia = dati.get("tipo_strategia", "RANGE")
                     storico = dati.get("storico_wip", [])
                     prezzo = prezzi_live.get(nome, "In aggiornamento...")
                     spia = ""
@@ -1455,9 +1455,12 @@ else:
                         stato_display += " [+ Ticket2]"
 
                     if is_attivo:
-                        stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
-                        if stato == "FASE_2_STANDBY":
-                            stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
+                        if tipo_strategia == "TREND":
+                            stato_visivo = f"<span style='background-color: rgba(0, 191, 255, 0.15); color: #00BFFF; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>📈 IN TREND</span>"
+                        else:
+                            stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
+                            if stato == "FASE_2_STANDBY":
+                                stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
                     else:
                         if stato == "MANUALE":
                             stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚠️ MANUALE</span>"
@@ -1469,8 +1472,11 @@ else:
                     if has_anomalia:
                         bg_color = "#FFC107" # Giallo
                         text_color = "black"
-                    elif is_attivo:
+                    elif is_attivo and tipo_strategia == "RANGE":
                         bg_color = "#198754" # Verde
+                        text_color = "white"
+                    elif is_attivo and tipo_strategia == "TREND":
+                        bg_color = "#00BFFF" # Azzurro
                         text_color = "white"
                     else:
                         bg_color = "#495057" # Grigio scuro
@@ -1544,11 +1550,6 @@ else:
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
-                strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "TREND"]
-
-                if not strumenti_ordinati:
-                    st.info("Nessuno strumento sta attualmente operando in modalità Trend.")
-                    return
                 
                 st.html("""
                 <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
@@ -1586,12 +1587,16 @@ else:
                         c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
                         c1.markdown(f"**{nome}**")
                         
-                        if is_attivo:
+                        tipo_strat = dati.get("tipo_strategia", "RANGE")
+                        
+                        if is_attivo and tipo_strat == "TREND":
                             color = "#198754" if dir_t == "LONG" else "#dc3545"
                             if dir_t == "": color = "#FFD700"
                             str_core = f"Core: {core_count} @ {core_entry:.2f}" if core_count > 0 else "Core: 0"
                             str_incr = f" | Incr: {incr_count} @ {incr_avg:.2f}" if incr_count > 0 else " | Incr: 0"
                             c2.markdown(f"<div style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;'>⚡ {dir_t} ({tf} | {sz})</div><div style='color:#ccc; font-size:0.8rem; margin-top:2px;'>{str_core}{str_incr}</div>", unsafe_allow_html=True)
+                        elif is_attivo and tipo_strat == "RANGE":
+                            c2.markdown("<span style='background-color: rgba(23,162,184,0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
                             c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
                             
