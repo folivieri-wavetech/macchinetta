@@ -317,6 +317,9 @@ def esegui_ciclo_trend(is_candle_close=True):
             
         engine.seed_history(storic_candles)
         
+        tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
+        kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
+        
         # --- RIPRISTINO STATO DA MEMORIA ---
         pos_core = dati.get("posizioni_core", [])
         pos_incr = dati.get("posizioni_incr", [])
@@ -408,17 +411,26 @@ def esegui_ciclo_trend(is_candle_close=True):
         if engine.is_running:
             core_dict = [engine.pm.core_position.to_dict()] if engine.pm.core_position else []
             incr_dict = [p.to_dict() for p in engine.pm.increments]
-            update_data = {"posizioni_core": core_dict, "posizioni_incr": incr_dict}
+            update_data = {
+                "posizioni_core": core_dict, 
+                "posizioni_incr": incr_dict,
+                "current_tk": tk_val,
+                "current_kj": kj_val
+            }
             if ha_fatto_eventi:
                 if len(storico) > 20: storico = storico[-20:]
                 update_data["storico_wip_trend"] = storico
             aggiorna_memoria(nome, update_data)
         elif events and not auto_restart:
             # Se si è spento e ha svuotato le posizioni
-            aggiorna_memoria(nome, {"posizioni_core": [], "posizioni_incr": []})
+            update_data_off = {"posizioni_core": [], "posizioni_incr": [], "current_tk": tk_val, "current_kj": kj_val}
             if ha_fatto_eventi:
                 if len(storico) > 20: storico = storico[-20:]
-                aggiorna_memoria(nome, {"storico_wip_trend": storico})
+                update_data_off["storico_wip_trend"] = storico
+            aggiorna_memoria(nome, update_data_off)
+        elif is_candle_close or needs_start:
+            # Aggiorna TK e KJ anche se non c'erano eventi e il motore è FLAT
+            aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
 
 def calcola_attesa(min_tf=5):
     ora_attuale = now_it()

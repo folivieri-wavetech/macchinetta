@@ -1225,16 +1225,31 @@ else:
                 size_class = "size-trend" if is_trend else ("size-buy" if dir == "BUY" else "size-sell")
                 
                 stop_str = ""
-                if len(stops) > 1: stop_str = "<span class='ig-multiplo'>Multiplo</span>"
-                elif len(stops) == 1:
-                    val = list(stops)[0]
-                    stop_str = formatta_numero(val, dec) if val != "NONE" else ""
-                
                 lim_str = ""
-                if len(limits) > 1: lim_str = "<span class='ig-multiplo'>Multiplo</span>"
-                elif len(limits) == 1:
-                    val = list(limits)[0]
-                    lim_str = formatta_numero(val, dec) if val != "NONE" else ""
+                
+                if is_trend:
+                    kj_val = memoria_attuale.get(nome, {}).get("current_kj")
+                    tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                    
+                    if kj_val is not None:
+                        stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>"
+                    else:
+                        stop_str = "-"
+                        
+                    if tk_val is not None:
+                        lim_str = f"<span style='color: #00BFFF;' title='Tenkan-sen (TK)'>{formatta_numero(tk_val, dec)}</span>"
+                    else:
+                        lim_str = "-"
+                else:
+                    if len(stops) > 1: stop_str = "<span class='ig-multiplo'>Multiplo</span>"
+                    elif len(stops) == 1:
+                        val = list(stops)[0]
+                        stop_str = formatta_numero(val, dec) if val != "NONE" else ""
+                    
+                    if len(limits) > 1: lim_str = "<span class='ig-multiplo'>Multiplo</span>"
+                    elif len(limits) == 1:
+                        val = list(limits)[0]
+                        lim_str = formatta_numero(val, dec) if val != "NONE" else ""
                 
                 pnl_class = "pnl-pos" if tot_pnl_eur >= 0 else "pnl-neg"
                 pnl_str = f"{tot_pnl_eur:.0f} €"
@@ -1281,12 +1296,17 @@ else:
                         data_str = dt_utc.astimezone().strftime("%d/%m/%y %H:%M")
                         
                         s_str = ""
-                        if p['position'].get('stopLevel'): s_str = formatta_numero(p['position']['stopLevel'], dec)
-                        elif p['position'].get('stopDistance'): s_str = "Stop" 
-                        
                         l_str = ""
-                        if p['position'].get('limitLevel'): l_str = formatta_numero(p['position']['limitLevel'], dec)
-                        elif p['position'].get('limitDistance'): l_str = "Limite"
+                        
+                        if is_trend:
+                            s_str = "-"
+                            l_str = "-"
+                        else:
+                            if p['position'].get('stopLevel'): s_str = formatta_numero(p['position']['stopLevel'], dec)
+                            elif p['position'].get('stopDistance'): s_str = "Stop" 
+                            
+                            if p['position'].get('limitLevel'): l_str = formatta_numero(p['position']['limitLevel'], dec)
+                            elif p['position'].get('limitDistance'): l_str = "Limite"
                         
                         pnl_child_eur = 0.0
                         if prezzo_attuale:
