@@ -106,12 +106,12 @@ def formatta_ultimo_evento_sintesi(msg, dati=None, nome=None):
 
     return msg
 
-def formatta_mercato_con_bandiere(nome):
+def formatta_mercato_con_bandiere(nome, color="#FFD700"):
     if len(nome) == 7 and nome[3] == '/':
         nome_clean = nome.replace("/", "")
-        return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'><u style='color: #FFD700; font-size: 1.15em; font-weight: bold;'>{nome_clean}</u></div>"
+        return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'><u style='color: {color}; font-size: 1.15em; font-weight: bold;'>{nome_clean}</u></div>"
     
-    return f"<u style='color: #FFD700; margin-left: 10px; font-weight: bold;'>{nome}</u>"
+    return f"<u style='color: {color}; margin-left: 10px; font-weight: bold;'>{nome}</u>"
 
 def formatta_titolo_con_bandiere_orizzontale(nome, badge):
     flags = {
@@ -609,11 +609,13 @@ st.markdown("""
 
         .size-buy { color: #3b82f6; }
         .size-sell { color: #ef4444; }
-        .ig-row .size-buy, .ig-row .size-sell { font-weight: normal; text-align: center !important; }
+        .size-trend { color: #FF8C00 !important; }
+        .ig-row .size-buy, .ig-row .size-sell, .ig-row .size-trend { font-weight: normal; text-align: center !important; }
         
         /* Modifica per far ereditare correttamente il colore della size nei subrows */
         .ig-subrow td.size-buy { color: #3b82f6 !important; font-weight: normal !important; }
         .ig-subrow td.size-sell { color: #ef4444 !important; font-weight: normal !important; }
+        .ig-subrow td.size-trend { color: #FF8C00 !important; font-weight: normal !important; }
 
         .pnl-pos { color: #3b82f6; font-weight: bold; }
         .pnl-neg { color: #ef4444; font-weight: bold; }
@@ -1216,8 +1218,11 @@ else:
                 totale_pnl_portafoglio += tot_pnl_eur
                 avg_entry = sum_level_size / tot_size
                 
+                is_trend = memoria_attuale.get(nome, {}).get("tipo_strategia", "RANGE") == "TREND"
+                trend_color = "#FF8C00" if is_trend else "#FFD700"
+                
                 sign = "+" if dir == "BUY" else "-"
-                size_class = "size-buy" if dir == "BUY" else "size-sell"
+                size_class = "size-trend" if is_trend else ("size-buy" if dir == "BUY" else "size-sell")
                 
                 stop_str = ""
                 if len(stops) > 1: stop_str = "<span class='ig-multiplo'>Multiplo</span>"
@@ -1260,7 +1265,7 @@ else:
 
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
-                    td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><div style='display: flex; align-items: center;'><span class='ig-dot'></span>{formatta_mercato_con_bandiere(nome)}</div></td>"
+                    td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><div style='display: flex; align-items: center;'><span class='ig-dot'></span>{formatta_mercato_con_bandiere(nome, color=trend_color)}</div></td>"
                 else:
                     td_mercato = ""
 
