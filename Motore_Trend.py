@@ -20,6 +20,22 @@ from dotenv import dotenv_values
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'macchinetta_trend'))
 from core_engine import CoreEngine, Candle
+from position_manager import PositionManager
+
+# --- MAPPA TIMEFRAMES (IN MINUTI) ---
+TF_MAP = {
+    "MINUTE_2": 2,
+    "MINUTE_3": 3,
+    "MINUTE_5": 5,
+    "MINUTE_10": 10,
+    "MINUTE_15": 15,
+    "MINUTE_30": 30,
+    "HOUR": 60,
+    "HOUR_2": 120,
+    "HOUR_3": 180,
+    "HOUR_4": 240,
+    "DAY": 1440
+}
 
 # --- CONFIGURAZIONI GLOBALI ---
 FILE_MEMORIA = "memoria_parametri.json"
@@ -247,20 +263,20 @@ def aggiorna_memoria(nome, update_dict):
             for k, v in update_dict.items():
                 p[nome][k] = v
             with open(FILE_MEMORIA, "w") as f: json.dump(p, f, indent=4)
-    except Exception as e:
+    except Exception:
         pass
 
-def esegui_ciclo_trend(is_candle_close=True):
+def esegui_ciclo_trend():
     headers = ottieni_headers_ig()
     if not headers:
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
         return
-
+        
     try:
         with open(FILE_MEMORIA, "r") as f: parametri = json.load(f)
     except Exception:
         return
-
+        
     for nome, dati in parametri.items():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
             continue
@@ -296,19 +312,30 @@ def esegui_ciclo_trend(is_candle_close=True):
         engine = stato_motore.motori[nome]
         
         needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
-        if not is_candle_close and not needs_start:
-            continue
-            
-        # 1. Recupera candele da IG per calcolo Donchian e close
+        
+        # 1. Recupera candele da IG per calcolo Donchian e chiusura
         prices = scarica_candele(epic, tf, limit=300, headers=headers)
         if not prices: 
             print_log(nome, "⚠️ Nessuna candela restituita da IG!")
             continue
-        print_log(nome, f"DEBUG: Scaricate {len(prices)} candele da IG.")
+            
+        if len(prices) < 2:
+            continue
+            
+        # 2. Controllo Timestamp Lock
+        last_closed_candle = prices[-2]
+        snapshot_time = last_closed_candle.get("snapshotTime", "")
+        saved_candle_time = dati.get("last_candle_time", "")
         
-        # Seed dello storico
+        # Se il timestamp è identico e non abbiamo un avvio manuale pendente, ignoriamo
+        if snapshot_time == saved_candle_time and not needs_start:
+            continue
+            
+        print_log(nome, f"DEBUG: Nuova candela chiusa rilevata. Snapshot: {snapshot_time}")
+        
+        # Seed dello storico (tutte le candele chiuse TRANNE l'ultima, che verrà aggiunta da on_candle_close)
         storic_candles = []
-        for pr in prices[:-1]: 
+        for pr in prices[:-2]: 
             try:
                 bid_o, ask_o = pr['openPrice']['bid'], pr['openPrice']['ask']
                 bid_h, ask_h = pr['highPrice']['bid'], pr['highPrice']['ask']
@@ -324,10 +351,16 @@ def esegui_ciclo_trend(is_candle_close=True):
         tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
         kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
         
-        # Salva SEMPRE tk e kj al termine della candela
-        aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
+        # Salva SEMPRE tk, kj e il timestamp della candela
+        aggiorna_memoria(nome, {
+            "current_tk": tk_val, 
+            "current_kj": kj_val,
+            "last_candle_time": snapshot_time
+        })
         
-        # --- RIPRISTINO STATO DA MEMORIA ---
+        # Se eravamo FLAT e non c'è needs_start, abbiamo solo aggiornato le linee, possiamo saltare il calcolo trading
+        if not engine.is_running and not needs_start:
+            continue
         pos_core = dati.get("posizioni_core", [])
         pos_incr = dati.get("posizioni_incr", [])
         
@@ -431,14 +464,39 @@ def esegui_ciclo_trend(is_candle_close=True):
                 update_data_off["storico_wip_trend"] = storico
             aggiorna_memoria(nome, update_data_off)
 
-def calcola_attesa(min_tf=5):
-    ora_attuale = now_it()
-    minuti_attuali = ora_attuale.minute
-    minuti_mancanti = min_tf - (minuti_attuali % min_tf)
-    prossima_scadenza = ora_attuale + datetime.timedelta(minutes=minuti_mancanti)
-    prossima_scadenza = prossima_scadenza.replace(second=1, microsecond=0)
-    attesa_sec = (prossima_scadenza - now_it()).total_seconds()
-    return max(1, attesa_sec)
+def calcola_attesa_dinamica(parametri):
+    now = now_it()
+    next_wake = now + datetime.timedelta(days=1)
+    has_active = False
+    
+    for nome, dati in parametri.items():
+        if dati.get("tipo_strategia", "RANGE") != "TREND": continue
+        if not dati.get("attivo", False): continue
+        
+        tf = dati.get("timeframe", "MINUTE_5")
+        min_tf = TF_MAP.get(tf, 5)
+        
+        min_tot = now.hour * 60 + now.minute
+        
+        # Offset di 60 minuti per H4 (240) e DAY (1440) per centrare 1:00 italiana
+        offset = 60 if min_tf in (240, 1440) else 0
+        
+        minuti_mancanti = min_tf - ((min_tot - offset) % min_tf)
+        if minuti_mancanti == 0:
+            minuti_mancanti = min_tf
+            
+        prossima = now + datetime.timedelta(minutes=minuti_mancanti)
+        prossima = prossima.replace(second=1, microsecond=0)
+        
+        if prossima < next_wake:
+            next_wake = prossima
+        has_active = True
+        
+    if not has_active:
+        return 10.0 # Se non c'è nulla, svegliati ogni 10 secondi
+        
+    attesa = (next_wake - now_it()).total_seconds()
+    return max(1.0, attesa)
 
 if __name__ == "__main__":
     try:
@@ -449,22 +507,35 @@ if __name__ == "__main__":
         print(f"\n🚨 ERRORE CRITICO: Il Motore Trend per il conto '{NOME_CONTO}' è già in esecuzione!")
         sys.exit()
 
-    print(f"🚀 Avvio Motore Trend per il conto {NOME_CONTO}...")
+    print(f"🚀 Avvio Motore Trend Multi-Timeframe per il conto {NOME_CONTO}...")
+    
+    # Eseguiamo un ciclo immediato all'avvio per forzare le inizializzazioni
+    try:
+        esegui_ciclo_trend()
+    except Exception as e:
+        print(f"Errore primo ciclo Trend: {e}")
+        traceback.print_exc()
+
     while True:
         try:
-            esegui_ciclo_trend(is_candle_close=False)
-        except Exception as e:
-            print(f"Errore ciclo Trend (False): {e}")
-            traceback.print_exc()
-
-        attesa = calcola_attesa(5)
+            with open(FILE_MEMORIA, "r") as f: parametri = json.load(f)
+        except:
+            parametri = {}
+            
+        attesa = calcola_attesa_dinamica(parametri)
+        
         if attesa < 2.5:
             print(f"Candela in chiusura... attesa {attesa:.1f} secondi.")
             time.sleep(attesa + 1)
             try:
-                esegui_ciclo_trend(is_candle_close=True)
+                esegui_ciclo_trend()
             except Exception as e:
                 print(f"Errore ciclo Trend (Candle Close): {e}")
                 traceback.print_exc()
         else:
-            time.sleep(2)
+            time.sleep(10) # Risveglio parziale ogni 10s per leggere eventuali nuovi avvii (needs_start)
+            try:
+                esegui_ciclo_trend()
+            except Exception as e:
+                print(f"Errore ciclo Trend (Wakeup): {e}")
+                traceback.print_exc()
