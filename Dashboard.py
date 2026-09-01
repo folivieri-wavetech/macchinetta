@@ -1000,6 +1000,7 @@ else:
         <style>
         div[data-testid="stTabs"] > div[role="tablist"] {
             gap: 5px !important;
+            justify-content: flex-start !important;
         }
         div[data-testid="stTabs"] button {
             padding-left: 0.3rem !important;
