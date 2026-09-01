@@ -294,7 +294,7 @@ def esegui_ciclo_trend(is_candle_close=True):
         
         engine = stato_motore.motori[nome]
         
-        needs_start = not engine.is_running and stato_corrente in ("LONG", "SHORT")
+        needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
         if not is_candle_close and not needs_start:
             continue
             
@@ -320,9 +320,9 @@ def esegui_ciclo_trend(is_candle_close=True):
         pos_core = dati.get("posizioni_core", [])
         pos_incr = dati.get("posizioni_incr", [])
         
-        if not engine.is_running and (pos_core or pos_incr or stato_corrente in ("LONG", "SHORT")):
+        if not engine.is_running and (pos_core or pos_incr or (stato_corrente != "FLAT" and stato_corrente != "IN_ATTESA")):
             engine.is_running = True
-            engine.current_direction = stato_corrente
+            engine.current_direction = stato_corrente if stato_corrente in ("LONG", "SHORT") else direzione
             for c_d in pos_core:
                 pos = engine.pm.open_core(c_d.get("entry", 0), c_d.get("size", 1), c_d.get("direction", "LONG"))
                 pos.ticket = c_d.get("ticket")
@@ -346,13 +346,13 @@ def esegui_ciclo_trend(is_candle_close=True):
         
         # Se lo stato su dashboard è FLAT ma l'utente ha premuto AVVIA LONG/SHORT, forziamo l'engine
         if needs_start:
-            pos = engine.start(closed_candle.close, stato_corrente)
-            ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, stato_corrente, size_i, headers, dec, etichetta="[CORE]")
+            pos = engine.start(closed_candle.close, direzione)
+            ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, direzione, size_i, headers, dec, etichetta="[CORE]")
             if ok:
                 pos.entry_price = real_lvl if real_lvl else closed_candle.close
                 pos.ticket = deal_id
-                aggiorna_memoria(nome, {"stato": stato_corrente, "direzione": stato_corrente, "posizioni_core": [pos.to_dict()], "posizioni_incr": [], "storico_wip_trend": [f"🚀 Apertura Core {stato_corrente} a {pos.entry_price}"]})
-                print_log(nome, f"🚀 Motore Partito in {stato_corrente}. Core piazzata a {pos.entry_price}.")
+                aggiorna_memoria(nome, {"stato": direzione, "direzione": direzione, "posizioni_core": [pos.to_dict()], "posizioni_incr": [], "storico_wip_trend": [f"🚀 Apertura Core {direzione} a {pos.entry_price}"]})
+                print_log(nome, f"🚀 Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.")
             else:
                 engine.reset()
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
