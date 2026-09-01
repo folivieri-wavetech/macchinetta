@@ -252,6 +252,8 @@ def scarica_candele(epic, timeframe, limit=100, headers=None):
             return r.json().get('prices', [])
         else:
             print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
+            if r.status_code == 403 and "historical-data-allowance" in r.text:
+                return "QUOTA_ESAURITA"
     except Exception as e:
         print_log("SISTEMA", f"Errore fetching prezzi {epic}: {e}")
     return []
@@ -315,6 +317,14 @@ def esegui_ciclo_trend():
         
         # 1. Recupera candele da IG per calcolo Donchian e chiusura
         prices = scarica_candele(epic, tf, limit=300, headers=headers)
+        
+        if prices == "QUOTA_ESAURITA":
+            print_log(nome, "🛑 QUOTA IG ESAURITA! Arresto automatico del Trend per evitare chiamate a vuoto.")
+            aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE"})
+            if engine.is_running:
+                engine.stop()
+            continue
+            
         if not prices: 
             print_log(nome, "⚠️ Nessuna candela restituita da IG!")
             continue
