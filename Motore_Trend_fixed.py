@@ -315,18 +315,6 @@ def esegui_ciclo_trend():
         
         needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
         
-        # OTTIMIZZAZIONE API IG: Scarichiamo le candele storiche SOLO nei primi 20 secondi del nuovo blocco
-        # o se l'utente ha esplicitamente richiesto l'avvio della macchina.
-        now_t = now_it()
-        min_tf = TF_MAP.get(tf, 5)
-        min_tot = now_t.hour * 60 + now_t.minute
-        offset = 60 if min_tf in (240, 1440) else 0
-        is_candle_boundary = (min_tot - offset) % min_tf == 0
-        is_just_closed = is_candle_boundary and now_t.second < 20
-        
-        if not is_just_closed and not needs_start:
-            continue
-        
         # 1. Recupera candele da IG per calcolo Donchian e chiusura
         prices = scarica_candele(epic, tf, limit=300, headers=headers)
         
