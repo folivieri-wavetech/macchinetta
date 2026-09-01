@@ -1539,6 +1539,9 @@ else:
             @st.fragment(run_every=15)
             def renderizza_sintesi_trend():
                 memoria = carica_memoria(conto_selezionato)
+                stato_sys = leggi_stato_sistema(conto_selezionato)
+                prezzi_live = stato_sys.get("prezzi_live", {})
+                
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "TREND"]
@@ -1568,6 +1571,17 @@ else:
                         dir_t = dati.get("direzione", "")
                         tf = dati.get("timeframe", "MINUTE_5")
                         sz = dati.get("size", 1)
+                        storico = dati.get("storico_wip", [])
+                        prezzo = prezzi_live.get(nome, "In aggiornamento...")
+                        
+                        posizioni_core = dati.get("posizioni_core", [])
+                        posizioni_incr = dati.get("posizioni_incr", [])
+                        
+                        core_count = len(posizioni_core)
+                        core_entry = posizioni_core[0].get("entry", 0) if core_count > 0 else 0
+                        
+                        incr_count = len(posizioni_incr)
+                        incr_avg = sum(p.get("entry", 0) for p in posizioni_incr) / incr_count if incr_count > 0 else 0
                         
                         c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
                         c1.markdown(f"**{nome}**")
@@ -1575,12 +1589,18 @@ else:
                         if is_attivo:
                             color = "#198754" if dir_t == "LONG" else "#dc3545"
                             if dir_t == "": color = "#FFD700"
-                            c2.markdown(f"<span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ ATTIVO ({dir_t})</span>", unsafe_allow_html=True)
+                            str_core = f"Core: {core_count} @ {core_entry:.2f}" if core_count > 0 else "Core: 0"
+                            str_incr = f" | Incr: {incr_count} @ {incr_avg:.2f}" if incr_count > 0 else " | Incr: 0"
+                            c2.markdown(f"<div style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;'>⚡ {dir_t} ({tf} | {sz})</div><div style='color:#ccc; font-size:0.8rem; margin-top:2px;'>{str_core}{str_incr}</div>", unsafe_allow_html=True)
                         else:
                             c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
                             
-                        c3.markdown(f"<span style='color:#ccc; font-size:0.9rem;'>{tf} | Size {sz}</span>", unsafe_allow_html=True)
-                        c4.write("")
+                        c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
+                        
+                        ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
+                        ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
+                        c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
             renderizza_sintesi_trend()
 
