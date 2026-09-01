@@ -588,8 +588,8 @@ st.markdown("""
         }
 
         /* CSS per Tabelle Portafoglio IG */
-        .ig-table { width: 90%; max-width: 1400px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.85rem; color: #d1d4dc; margin-bottom: 20px; }
-        .ig-table th { text-align: center; color: white; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+        .ig-table { width: 90%; max-width: 1400px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.77rem; color: #d1d4dc; margin-bottom: 20px; }
+        .ig-table th { text-align: center; color: white; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; font-size: 0.68rem; text-transform: uppercase; }
         .ig-table th:first-child { text-align: left; padding-left: 15px; color: #888; }
         
         /* Master Row in Grassetto e sottolineato */
@@ -603,7 +603,7 @@ st.markdown("""
         
         /* Sub Row NON in Grassetto e con P/L colorato preservato */
         .ig-subrow { background-color: rgba(0,0,0,0.2); font-weight: normal !important; }
-        .ig-subrow td { color: #aaa; font-size: 0.8rem; border-bottom: none; padding: 6px 8px; font-weight: normal !important; text-decoration: none !important; }
+        .ig-subrow td { color: #aaa; font-size: 0.72rem; border-bottom: none; padding: 6px 8px; font-weight: normal !important; text-decoration: none !important; }
         .ig-subrow td.pnl-pos { color: #3b82f6 !important; font-weight: bold !important; }
         .ig-subrow td.pnl-neg { color: #ef4444 !important; font-weight: bold !important; }
 
@@ -634,7 +634,7 @@ st.markdown("""
         /* --- REGOLE RESPONSIVE PER TABLET (fino a 1024px) --- */
         /* ========================================================= */
         @media (max-width: 1024px) {
-            .ig-table { width: 100% !important; font-size: 0.82rem !important; }
+            .ig-table { width: 100% !important; font-size: 0.74rem !important; }
             .ig-table th, .ig-table td { padding: 7px 5px !important; }
             .stat-table { font-size: 0.85rem !important; }
             .stat-table th, .stat-table td { padding: 7px 5px !important; }
@@ -667,12 +667,12 @@ st.markdown("""
             .ig-table {
                 min-width: 580px !important;
                 width: 100% !important;
-                font-size: 0.75rem !important;
+                font-size: 0.68rem !important;
                 margin-bottom: 10px !important;
             }
             .ig-table th, .ig-table td {
                 padding: 5px 3px !important;
-                font-size: 0.72rem !important;
+                font-size: 0.65rem !important;
             }
             .stat-table {
                 min-width: 520px !important;
