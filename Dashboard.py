@@ -1843,7 +1843,7 @@ else:
                                     pl = prezzi_live.get(nome, "")
                                     vecchio_wip = dati_salvati.get("storico_wip", [])
                                     vecchio_wip.append(f"[{datetime.now().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_man:
@@ -1976,7 +1976,7 @@ else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
                                 if st.button("⏹️ STOP (FLAT)", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT"}
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
