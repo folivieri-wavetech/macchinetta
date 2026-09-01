@@ -71,6 +71,21 @@ CONFIG_STRUMENTI = {
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1}
 }
 
+
+def invia_notifica(titolo, messaggio, tags="rotating_light"):
+    topic = config.get("NTFY_TOPIC")
+    if topic:
+        try:
+            orario = now_it().strftime("%H:%M:%S")
+            messaggio_con_orario = f"[{orario}] {messaggio}"
+            headers = {
+                "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
+                "Tags": tags
+            }
+            requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
+        except Exception as e:
+            print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
+
 def print_log(strumento, messaggio):
     ora = now_it().strftime("%H:%M:%S")
     riga = f"[{ora}] [{strumento}] {messaggio}"
@@ -332,6 +347,7 @@ def esegui_ciclo_trend():
         
         if prices == "QUOTA_ESAURITA":
             print_log(nome, "🛑 QUOTA IG ESAURITA! Arresto automatico del Trend per evitare chiamate a vuoto.")
+            invia_notifica(f"🛑 QUOTA IG ESAURITA: {nome}", f"[{nome}] Raggiunto limite dati storici IG. Arresto Trend in corso.", "no_entry")
             aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE"})
             if engine.is_running:
                 engine.stop()
@@ -419,6 +435,7 @@ def esegui_ciclo_trend():
                 pos.ticket = deal_id
                 aggiorna_memoria(nome, {"stato": direzione, "direzione": direzione, "posizioni_core": [pos.to_dict()], "posizioni_incr": [], "storico_wip_trend": [f"🚀 Apertura Core {direzione} a {pos.entry_price}"]})
                 print_log(nome, f"🚀 Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.")
+                invia_notifica(f"🚀 AVVIO TREND: {nome}", f"[{nome}] Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.", "rocket")
             else:
                 engine.reset()
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
@@ -442,6 +459,7 @@ def esegui_ciclo_trend():
                     pos.ticket = deal_id
                     msg = f"➕ Incremento Aperto {dir_incr} a {pos.entry_price}"
                     print_log(nome, msg)
+                    invia_notifica(f"➕ INCREMENTO TREND: {nome}", f"[{nome}] {msg}", "heavy_plus_sign")
                     storico.append(msg)
                     ha_fatto_eventi = True
                 else:
@@ -454,11 +472,13 @@ def esegui_ciclo_trend():
                     sz = ev.get('size', size_i)
                     chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=f"[{tipo.upper()}]")
                     msg = f"➖ Chiuso {tipo} ({sz}) PnL: {ev.get('pnl', 0):.2f}"
+                    invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                     storico.append(msg)
                     ha_fatto_eventi = True
             
             elif tipo == 'reversal':
                 print_log(nome, f"🛑 REVERSAL! Chiusura globale per incrocio KJ.")
+                invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] Incrocio KJ! Chiusura globale e stop motore (o inversione se attiva).", "warning")
                 if not auto_restart:
                     aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT"})
                     engine.reset()
