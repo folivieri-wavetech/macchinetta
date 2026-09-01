@@ -1577,6 +1577,7 @@ else:
                 def crea_riquadro_strumento(nome, tipo, tp_default, opp_default, dts_default, size_default=4):
                     with st.container(border=True):
                         dati_salvati = memoria_attuale.get(nome, {})
+                        tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
                         stato_attivo = dati_salvati.get("attivo", False)
                         direzione = dati_salvati.get("direzione", "")
@@ -1670,16 +1671,18 @@ else:
                                     memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
+                        elif tipo_strategia == "TREND" and stato_attivo:
+                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**. Spegnilo di là per poterlo avviare in Trading Range.")
                         elif not stato_attivo:
                             col_l, col_s = st.columns(2)
                             with col_l:
                                 if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+                                    memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with col_s:
                                 if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": ""}
+                                    memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True):
@@ -1765,16 +1768,7 @@ else:
                         auto_restart = dati_salvati.get("auto_restart", True)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         
-                        if tipo_strategia != "TREND":
-                            st.markdown(f"### {nome}")
-                            st.warning("Attualmente configurato in **Trading Range**.")
-                            if st.button("➡️ Passa a TREND", key=f"to_trend_{conto_selezionato}_{nome}"):
-                                memoria_attuale[nome] = {"tipo_strategia": "TREND", "attivo": False, "stato": "FLAT"}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                            return
-
-                        col_titolo, col_salva, col_range = st.columns([2, 1, 1], vertical_alignment="center")
+                        col_titolo, col_salva = st.columns([3, 1], vertical_alignment="center")
                         with col_titolo:
                             badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
                             titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
@@ -1792,11 +1786,6 @@ else:
                                 }
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
-                        with col_range:
-                            if st.button("⬅️ Passa a RANGE", key=f"to_range_{conto_selezionato}_{nome}"):
-                                memoria_attuale[nome] = {"tipo_strategia": "RANGE", "attivo": False, "stato": "IN_ATTESA"}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
 
                         c_in1, c_in2, c_in3, c_in4, c_in5 = st.columns(5)
                         with c_in1:
@@ -1811,11 +1800,13 @@ else:
                         with c_in5:
                             st.checkbox("Auto-Restart (A)", value=auto_restart, key=f"auto_{conto_selezionato}_{nome}")
                         
-                        if not stato_attivo:
+                        if tipo_strategia == "RANGE" and stato_attivo:
+                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**. Spegnilo di là per poterlo avviare in Trend.")
+                        elif not stato_attivo:
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
                                 if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "LONG", "stato": "FLAT"}
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "LONG", "stato": "FLAT", "tipo_strategia": "TREND"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_btn2:
