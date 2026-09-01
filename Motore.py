@@ -1031,10 +1031,9 @@ def esegui_motore():
                         pulisci_mercato(epic, h, nome, solo_pendenti=True)
                         aggiorna_memoria(nome, {
                             "comando_manuale": False, 
-                            "modalita_manuale": True, 
                             "attivo": False, 
                             "stato": "MANUALE"
-                        }, log_wip="👤 Passaggio a MANUALE richiesto. Ordini orfani cancellati.")
+                        }, log_wip="👤 Motore Sospeso richiesto. Ordini orfani cancellati.")
                         continue
                         
                     if param.get("comando_restore"):
@@ -1345,11 +1344,9 @@ def esegui_motore():
                                         invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Falliti 4 tentativi consecutivi di ripristino ordine. Passaggio forzato a MANUALE per sicurezza.", "rotating_light")
                                         aggiorna_memoria(nome, {
                                             "attivo": False, 
-                                            "stato": "MANUALE", 
-                                            "modalita_manuale": True, 
                                             "errore_ripristino": True, 
                                             "tentativi_ripristino": 0
-                                        }, log_wip="🛑 Spegnimento emergenza: falliti 4 tentativi di ripristino ordine. Passaggio a MANUALE.")
+                                        }, log_wip="🛑 Spegnimento emergenza: falliti 4 tentativi di ripristino ordine. Motore Sospeso.")
                                     else:
                                         aggiorna_memoria(nome, {"tentativi_ripristino": tentativi})
                                 time.sleep(3.0)
@@ -1377,11 +1374,9 @@ def esegui_motore():
                                         invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Falliti 4 tentativi consecutivi di ripristino ordine (Micro). Passaggio forzato a MANUALE.", "rotating_light")
                                         aggiorna_memoria(nome, {
                                             "attivo": False, 
-                                            "stato": "MANUALE", 
-                                            "modalita_manuale": True, 
                                             "errore_ripristino": True, 
                                             "tentativi_ripristino": 0
-                                        }, log_wip="🛑 Spegnimento emergenza: falliti 4 tentativi di ripristino ordine. Passaggio a MANUALE.")
+                                        }, log_wip="🛑 Spegnimento emergenza: falliti 4 tentativi di ripristino ordine. Motore Sospeso.")
                                     else:
                                         aggiorna_memoria(nome, {"tentativi_ripristino": tentativi})
                                 time.sleep(3.0)
@@ -1574,7 +1569,7 @@ def esegui_motore():
                         
                         if not core_long or not core_short:
                             print_log(nome, "⚠️ [STANDBY] Core mancanti. Ritorno in MANUALE.")
-                            aggiorna_memoria(nome, {"attivo": False, "modalita_manuale": True, "stato": "MANUALE", "msg_manuale": "❌ Core mancanti durante l'attesa. Passaggio a MANUALE."}, log_wip="✅ [EVENTO]: Attesa annullata. Core mancanti.")
+                            aggiorna_memoria(nome, {"attivo": False, "msg_manuale": "❌ Core mancanti durante l'attesa. Sospensione Motore."}, log_wip="✅ [EVENTO]: Attesa annullata. Core mancanti.")
                             continue
                             
                         lvl_long = float(core_long[0]['position']['level'])
@@ -1609,7 +1604,7 @@ def esegui_motore():
                                 }, log_wip=f"✅ [EVENTO]: Rientro nel canale riuscito a {formatta_numero(prezzo_attuale, dec)}. SAT1 OCO piazzati.")
                             else:
                                 pulisci_mercato(epic, h, nome, solo_pendenti=True)
-                                aggiorna_memoria(nome, {"attivo": False, "modalita_manuale": True, "stato": "MANUALE", "msg_manuale": "❌ IG ha rifiutato i SAT1 OCO dopo l'attesa. Il Motore passa in Manuale."}, log_wip="✅ [EVENTO]: IG ha rifiutato i SAT1 OCO. Passaggio in Manuale.")
+                                aggiorna_memoria(nome, {"attivo": False, "msg_manuale": "❌ IG ha rifiutato i SAT1 OCO dopo l'attesa. Il Motore passa in Manuale."}, log_wip="✅ [EVENTO]: IG ha rifiutato i SAT1 OCO. Sospensione Motore.")
 
                     elif stato == "FASE_2_TICKET1":
                         s_mezzo = max(1.0, s_core / 2)
@@ -1834,21 +1829,19 @@ def esegui_motore():
                                 if resp_ticket and resp_ticket.status_code == 200:
                                     pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == sat2_dir and float(p['position']['size']) == s_quarto]
                                     if not pos_t:
-                                        print_log(nome, f"⚠️ Posizione [SAT2] non trovata su IG. Passaggio a MANUALE.")
+                                        print_log(nome, f"⚠️ Posizione [SAT2] non trovata su IG. Motore Sospeso.")
                                         pulisci_mercato(epic, h, nome)
                                         invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] [SAT2] fantasma evitato (Rifiuto asincrono). Passaggio forzato a MANUALE.", "rotating_light")
                                         aggiorna_memoria(nome, {
                                             "attivo": False, 
-                                            "stato": "MANUALE", 
-                                            "modalita_manuale": True, 
-                                            "msg_manuale": f"❌ IG ha confermato [SAT2] ma non risulta a mercato. Rifiuto asincrono. Passaggio a MANUALE."
-                                        }, log_wip=f"✅ [EVENTO]: Spegnimento emergenza: [SAT2] fantasma evitato. Passaggio a MANUALE.")
+                                            "msg_manuale": f"❌ IG ha confermato [SAT2] ma non risulta a mercato. Rifiuto asincrono. Motore Sospeso."
+                                        }, log_wip=f"✅ [EVENTO]: Spegnimento emergenza: [SAT2] fantasma evitato. Motore Sospeso.")
                                         continue
                             else:
-                                print_log(nome, f"⚠️ Impossibile inserire [SAT2]. Passaggio a MANUALE.")
+                                print_log(nome, f"⚠️ Impossibile inserire [SAT2]. Motore Sospeso.")
                                 pulisci_mercato(epic, h, nome)
                                 invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento inserimento [SAT2] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
-                                aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione [SAT2] a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento [SAT2]. Macchina in MANUALE.")
+                                aggiorna_memoria(nome, {"attivo": False, "msg_manuale": f"❌ Fallita immissione [SAT2] a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento [SAT2]. Macchina Sospesa.")
                                 continue
                             
                             lvl_og_sell = round(sat_price + tp4_val, dec)
@@ -1870,10 +1863,10 @@ def esegui_motore():
                                 time.sleep(3.0)
                                 
                             if not succ_og or not succ_ol:
-                                print_log(nome, f"⚠️ Impossibile inserire [OVERGAIN]/[OVERLOSS]. Passaggio a MANUALE.")
+                                print_log(nome, f"⚠️ Impossibile inserire [OVERGAIN]/[OVERLOSS]. Motore Sospeso.")
                                 pulisci_mercato(epic, h, nome, solo_pendenti=True)
                                 invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento immissione ordini FASE 2 (OG/OL) (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
-                                aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione ordini FASE 2 (OG/OL) a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento ordini FASE 2 (OG/OL). Macchina in MANUALE.")
+                                aggiorna_memoria(nome, {"attivo": False, "msg_manuale": f"❌ Fallita immissione ordini FASE 2 (OG/OL) a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento ordini FASE 2 (OG/OL). Macchina Sospesa.")
                                 continue
                                 
                             lvl_og = round(sat_price + tp4_val, dec) if sat2_dir == "SELL" else round(sat_price - tp4_val, dec)
@@ -2112,7 +2105,7 @@ def esegui_motore():
                                             
                                         if fallito_f3:
                                             pulisci_mercato(epic, h, nome, solo_pendenti=True)
-                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": "❌ Fallito rimpiazzo ordini FASE 2 (OG/OL) (possibile gap). Passaggio a MANUALE."}, log_wip="🛑 Fallito rimpiazzo FASE 2 (OG/OL). Macchina in MANUALE.")
+                                            aggiorna_memoria(nome, {"attivo": False, "msg_manuale": "❌ Fallito rimpiazzo ordini FASE 2 (OG/OL) (possibile gap). Sospensione Motore."}, log_wip="🛑 Fallito rimpiazzo FASE 2 (OG/OL). Macchina Sospesa.")
                                             continue
                                     else:
                                         print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_buy} / [OVERLOSS] a {lvl_ol_buy} mancante...")
@@ -2128,7 +2121,7 @@ def esegui_motore():
                                             
                                         if fallito_f3:
                                             pulisci_mercato(epic, h, nome, solo_pendenti=True)
-                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": "❌ Fallito rimpiazzo ordini FASE 2 (OG/OL) (possibile gap). Passaggio a MANUALE."}, log_wip="🛑 Fallito rimpiazzo FASE 2 (OG/OL). Macchina in MANUALE.")
+                                            aggiorna_memoria(nome, {"attivo": False, "msg_manuale": "❌ Fallito rimpiazzo ordini FASE 2 (OG/OL) (possibile gap). Sospensione Motore."}, log_wip="🛑 Fallito rimpiazzo FASE 2 (OG/OL). Macchina Sospesa.")
                                             continue
 
                     elif stato == "FASE_3_INIT":
@@ -2184,7 +2177,7 @@ def esegui_motore():
                         if not succ_f3:
                             pulisci_mercato(epic, h, nome)
                             invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento immissione [ORDINE FASE 3] a mercato (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
-                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallita immissione [ORDINE FASE 3] a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento [ORDINE FASE 3]. Macchina in MANUALE.")
+                            aggiorna_memoria(nome, {"attivo": False, "msg_manuale": f"❌ Fallita immissione [ORDINE FASE 3] a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento [ORDINE FASE 3]. Macchina Sospesa.")
                             continue
                             
                         if lvl_f3 is not None:
@@ -2279,7 +2272,7 @@ def esegui_motore():
                                         succ_cut = chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
                                         if not succ_cut:
                                             invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento [TAGLIO CORE STEP {step}] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
-                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallito [TAGLIO CORE STEP {step}] dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [TAGLIO CORE STEP {step}]. Macchina in MANUALE.")
+                                            aggiorna_memoria(nome, {"attivo": False, "msg_manuale": f"❌ Fallito [TAGLIO CORE STEP {step}] dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [TAGLIO CORE STEP {step}]. Macchina Sospesa.")
                                             continue
                                         time.sleep(3.0) 
                                         new_step = 2
@@ -2288,7 +2281,7 @@ def esegui_motore():
                                         succ_cut = chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
                                         if not succ_cut:
                                             invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento [TAGLIO CORE STEP {step}] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
-                                            aggiorna_memoria(nome, {"attivo": False, "stato": "MANUALE", "modalita_manuale": True, "msg_manuale": f"❌ Fallito [TAGLIO CORE STEP {step}] dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [TAGLIO CORE STEP {step}]. Macchina in MANUALE.")
+                                            aggiorna_memoria(nome, {"attivo": False, "msg_manuale": f"❌ Fallito [TAGLIO CORE STEP {step}] dopo 4 tentativi."}, log_wip=f"🛑 Emergenza: fallimento [TAGLIO CORE STEP {step}]. Macchina Sospesa.")
                                             continue
                                         time.sleep(3.0) 
                                         new_step = 3
