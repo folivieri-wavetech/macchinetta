@@ -111,7 +111,7 @@ def formatta_mercato_con_bandiere(nome, color="#FFD700"):
         nome_clean = nome.replace("/", "")
         return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'><u style='color: {color}; font-size: 1.15em; font-weight: bold;'>{nome_clean}</u></div>"
     
-    return f"<u style='color: {color}; margin-left: 10px; font-weight: bold;'>{nome}</u>"
+    return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'><u style='color: {color}; font-size: 1.15em; font-weight: bold;'>{nome}</u></div>"
 
 def formatta_titolo_con_bandiere_orizzontale(nome, badge):
     flags = {
