@@ -996,12 +996,22 @@ else:
     ruolo = st.session_state.get("ruolo", "VIEWER")
     is_regista = (ruolo == "REGISTA")
 
+    st.markdown("""
+        <style>
+        div[data-testid="stTabs"] button {
+            padding-left: 0.4rem !important;
+            padding-right: 0.4rem !important;
+            font-size: 0.85rem !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     if is_regista:
-        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "🛡️ Trading Range", "📈 Trend", "🛑 Recovery", "📊 Statistiche", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
-        tab_portafoglio, tab_sintesi, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Trading Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "📊 Grafici", "💻 Console", "🔐 Autorizzazioni"])
+        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_grafici, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Portafoglio IG", "📈 Sintesi", "📄 Report", "📊 Grafici"])
-        tab_portafoglio, tab_sintesi, tab_report, tab_grafici = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report", "📊 Grafici"])
+        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_report, tab_grafici = tabs
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     with tab_portafoglio:
@@ -1518,6 +1528,56 @@ else:
                     
         renderizza_sintesi()
 
+    if tab_sintesi_trend is not None:
+        with tab_sintesi_trend:
+            @st.fragment(run_every=15)
+            def renderizza_sintesi_trend():
+                memoria = carica_memoria(conto_selezionato)
+                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
+                strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "TREND"]
+
+                if not strumenti_ordinati:
+                    st.info("Nessuno strumento sta attualmente operando in modalità Trend.")
+                    return
+                
+                st.html("""
+                <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
+                    <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Trend</h3></div>
+                </div>
+                """)
+                
+                with st.container(border=True):
+                    c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
+                    c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento</div>", unsafe_allow_html=True)
+                    c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Stato Trend</div>", unsafe_allow_html=True)
+                    c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Parametri</div>", unsafe_allow_html=True)
+                    c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
+                    
+                    for nome in strumenti_ordinati:
+                        dati = memoria.get(nome, {})
+                        stato = dati.get("stato", "FLAT")
+                        is_attivo = dati.get("attivo", False)
+                        dir_t = dati.get("direzione", "")
+                        tf = dati.get("timeframe", "MINUTE_5")
+                        sz = dati.get("size", 1)
+                        
+                        c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
+                        c1.markdown(f"**{nome}**")
+                        
+                        if is_attivo:
+                            color = "#198754" if dir_t == "LONG" else "#dc3545"
+                            if dir_t == "": color = "#FFD700"
+                            c2.markdown(f"<span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ ATTIVO ({dir_t})</span>", unsafe_allow_html=True)
+                        else:
+                            c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
+                            
+                        c3.markdown(f"<span style='color:#ccc; font-size:0.9rem;'>{tf} | Size {sz}</span>", unsafe_allow_html=True)
+                        c4.write("")
+
+            renderizza_sintesi_trend()
+
     if tab_operativa is not None:
         with tab_operativa:
 
@@ -1754,52 +1814,9 @@ else:
 
                 st.markdown("---")
 
-                def renderizza_sintesi_trend():
-                    memoria = carica_memoria(conto_selezionato)
-                    tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-                    strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
-                    strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "TREND"]
 
-                    if not strumenti_ordinati:
-                        return
-                    
-                    st.html("""
-                    <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-bottom: 20px;'>
-                        <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Trend</h3></div>
-                    </div>
-                    """)
-                    
-                    with st.container(border=True):
-                        c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
-                        c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento</div>", unsafe_allow_html=True)
-                        c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Stato Trend</div>", unsafe_allow_html=True)
-                        c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Parametri</div>", unsafe_allow_html=True)
-                        c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'></div>", unsafe_allow_html=True)
-                        st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
-                        
-                        for nome in strumenti_ordinati:
-                            dati = memoria.get(nome, {})
-                            stato = dati.get("stato", "FLAT")
-                            is_attivo = dati.get("attivo", False)
-                            dir_t = dati.get("direzione", "")
-                            tf = dati.get("timeframe", "MINUTE_5")
-                            sz = dati.get("size", 1)
-                            
-                            c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
-                            c1.markdown(f"**{nome}**")
-                            
-                            if is_attivo:
-                                color = "#198754" if dir_t == "LONG" else "#dc3545"
-                                if dir_t == "": color = "#FFD700"
-                                c2.markdown(f"<span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ ATTIVO ({dir_t})</span>", unsafe_allow_html=True)
-                            else:
-                                c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
-                                
-                            c3.markdown(f"<span style='color:#ccc; font-size:0.9rem;'>{tf} | Size {sz}</span>", unsafe_allow_html=True)
-                            c4.write("")
 
-                renderizza_sintesi_trend()
-                st.markdown("---")
+
 
                 def crea_riquadro_trend(nome, def_body=10, def_size=1, def_size_max=3):
                     with st.container(border=True):
