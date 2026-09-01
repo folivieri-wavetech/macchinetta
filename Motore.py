@@ -1158,7 +1158,7 @@ def esegui_motore():
                         if is_rollover_time and not is_sosp_rollover:
                             print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:45): Sgancio SL e cancello Pendenti...")
                             snap_pos = [{"dealId": p['position']['dealId'], "stopLevel": p['position'].get('stopLevel')} for p in posizioni if p['position'].get('stopLevel')]
-                            snap_ord = [{"dealId": o['workingOrderData']['dealId'], "direction": o['workingOrderData']['direction'], "level": o['workingOrderData']['orderLevel'], "size": o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0)), "type": o['workingOrderData'].get('orderType', 'LIMIT'), "lim": o['workingOrderData'].get('limitDistance'), "stop": o['workingOrderData'].get('stopDistance')} for o in pendenti]
+                            snap_ord = [{"dealId": o['workingOrderData']['dealId'], "direction": o['workingOrderData']['direction'], "level": o['workingOrderData']['orderLevel'], "size": o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0)), "type": o['workingOrderData'].get('orderType', 'LIMIT'), "lim": o['workingOrderData'].get('limitLevel'), "stop": o['workingOrderData'].get('stopLevel')} for o in pendenti]
                             
                             for p in posizioni:
                                 if p['position'].get('stopLevel'):

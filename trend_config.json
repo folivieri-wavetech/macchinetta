@@ -1,0 +1,11 @@
+{
+    "size_i": 3,
+    "size_f": 10,
+    "pip_value": 1.0,
+    "min_body": 5.0,
+    "tk_periods": 21,
+    "kj_periods": 55,
+    "max_kj_distance": 10.0,
+    "max_entry_delay": 3,
+    "start_price": 158.0
+}
