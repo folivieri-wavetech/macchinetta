@@ -300,7 +300,7 @@ def esegui_ciclo_trend(is_candle_close=True):
             continue
             
         # 1. Recupera candele da IG per calcolo Donchian e close
-        prices = scarica_candele(epic, tf, limit=100, headers=headers)
+        prices = scarica_candele(epic, tf, limit=300, headers=headers)
         if not prices: continue
         
         # Seed dello storico
@@ -362,6 +362,9 @@ def esegui_ciclo_trend(is_candle_close=True):
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
                 continue
                 
+        # Salva SEMPRE tk e kj ad ogni ciclo, anche se non chiude la candela
+        aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
+                
         if not is_candle_close:
             continue
             
@@ -413,9 +416,7 @@ def esegui_ciclo_trend(is_candle_close=True):
             incr_dict = [p.to_dict() for p in engine.pm.increments]
             update_data = {
                 "posizioni_core": core_dict, 
-                "posizioni_incr": incr_dict,
-                "current_tk": tk_val,
-                "current_kj": kj_val
+                "posizioni_incr": incr_dict
             }
             if ha_fatto_eventi:
                 if len(storico) > 20: storico = storico[-20:]
@@ -423,14 +424,11 @@ def esegui_ciclo_trend(is_candle_close=True):
             aggiorna_memoria(nome, update_data)
         elif events and not auto_restart:
             # Se si è spento e ha svuotato le posizioni
-            update_data_off = {"posizioni_core": [], "posizioni_incr": [], "current_tk": tk_val, "current_kj": kj_val}
+            update_data_off = {"posizioni_core": [], "posizioni_incr": []}
             if ha_fatto_eventi:
                 if len(storico) > 20: storico = storico[-20:]
                 update_data_off["storico_wip_trend"] = storico
             aggiorna_memoria(nome, update_data_off)
-        elif is_candle_close or needs_start:
-            # Aggiorna TK e KJ anche se non c'erano eventi e il motore è FLAT
-            aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
 
 def calcola_attesa(min_tf=5):
     ora_attuale = now_it()
