@@ -202,12 +202,13 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
     st.markdown("---")
     if storico:
         totale = 0.0
-        righe_eventi = []
         for riga in storico:
             match = re.search(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", riga)
             if match:
                 totale += float(match.group(1))
-            
+        
+        righe_eventi = []
+        for riga in reversed(storico):
             riga_colorata = re.sub(r"(\[Parziale:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
             righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
@@ -2414,7 +2415,9 @@ else:
                 try:
                     path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
                     with open(path_log, "r", encoding="utf-8") as f:
-                        logs = f.read()
+                        lines = [l for l in f.readlines() if l.strip()]
+                    # Mostra prima le righe più recenti in alto
+                    logs = "\n".join(reversed(lines))
                 except FileNotFoundError:
                     logs = f"> In attesa di connessione col Motore per {conto_selezionato}..."
                 

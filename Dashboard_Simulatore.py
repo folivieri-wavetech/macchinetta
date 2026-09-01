@@ -108,12 +108,13 @@ def mostra_diario_wip(nome_strumento, storico):
     st.markdown("---")
     if storico:
         totale = 0.0
-        righe_eventi = []
         for riga in storico:
             match = re.search(r"\[Parziale:\s*([+-]?\d+(?:\.\d+)?)\s*€\]", riga)
             if match:
                 totale += float(match.group(1))
-            
+        
+        righe_eventi = []
+        for riga in reversed(storico):
             riga_colorata = re.sub(r"(\[Parziale:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
             righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
