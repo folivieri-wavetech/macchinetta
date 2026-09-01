@@ -876,6 +876,22 @@ else:
                 else:
                     return "🔴 Offline"
 
+            def get_stato_salute(acc):
+                path_memoria = os.path.join(acc, FILE_MEMORIA)
+                if not os.path.exists(path_memoria): return "🟢"
+                try:
+                    with open(path_memoria, "r", encoding="utf-8") as f:
+                        memoria = json.load(f)
+                    has_yellow = False
+                    for strum, dati in memoria.items():
+                        stato = dati.get("stato", "")
+                        emergenza = (stato == "MANUALE" and (dati.get("errore_ripristino") or dati.get("errore_avvio")))
+                        if emergenza: return "🔴"
+                        if dati.get("alert_falso_allarme"): has_yellow = True
+                    return "🟡" if has_yellow else "🟢"
+                except:
+                    return "🟢"
+
             if conti_reali:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
                 for cr in conti_reali:
@@ -884,7 +900,8 @@ else:
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                     is_sel = (cr == conto_attivo)
                     tempo_conn = get_tempo_connessione(cr, st_cr)
-                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn}"
+                    salute = get_stato_salute(cr)
+                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cr
@@ -899,7 +916,8 @@ else:
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                     is_sel = (cd == conto_attivo)
                     tempo_conn = get_tempo_connessione(cd, st_cd)
-                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn}"
+                    salute = get_stato_salute(cd)
+                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} {salute}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         if not is_sel:
                             st.session_state.conto_selezionato = cd
@@ -1475,6 +1493,23 @@ else:
                             mostra_diario_wip(nome, storico, conto=conto_selezionato)
                     
                     c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
+                    
+                    if dati.get("alert_falso_allarme"):
+                        if c2.button("👁️ Visto Anomalia", key=f"ack_anomalia_{conto_selezionato}_{nome}"):
+                            p = carica_memoria(conto_selezionato)
+                            if "alert_falso_allarme" in p[nome]:
+                                del p[nome]["alert_falso_allarme"]
+                                salva_memoria(conto_selezionato, p)
+                                st.rerun()
+                                
+                    if stato == "MANUALE" and (dati.get("errore_ripristino") or dati.get("errore_avvio")):
+                        if c2.button("🚨 Visto Emergenza", key=f"ack_emerg_{conto_selezionato}_{nome}"):
+                            p = carica_memoria(conto_selezionato)
+                            p[nome]["errore_ripristino"] = False
+                            p[nome]["errore_avvio"] = False
+                            salva_memoria(conto_selezionato, p)
+                            st.rerun()
+                            
                     c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
                     ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
                     ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
