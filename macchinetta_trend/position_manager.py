@@ -12,6 +12,16 @@ class Position:
         self.is_closed = False
         self.pnl = 0.0
         self.close_price = None
+        self.ticket = None
+        
+    def to_dict(self):
+        return {
+            "entry": self.entry_price,
+            "size": self.size,
+            "type": self.position_type,
+            "direction": self.direction,
+            "ticket": self.ticket
+        }
 
     def close(self, current_price):
         """Chiude forzatamente la posizione al prezzo corrente."""
@@ -35,10 +45,12 @@ class PositionManager:
 
     def open_core(self, price, size, direction="LONG"):
         self.core_position = Position(price, size, "core", direction)
+        return self.core_position
 
     def open_increment(self, price, size=1, direction="LONG"):
         pos = Position(price, size, "increment", direction)
         self.increments.append(pos)
+        return pos
 
     def total_active_size(self):
         core_size = self.core_position.size if self.core_position else 0
@@ -63,7 +75,7 @@ class PositionManager:
         for inc in self.increments:
             inc.close(current_price)
             self.closed_positions.append(inc)
-            events.append({"type": "increment_closed", "pnl": inc.pnl, "price": current_price, "direction": inc.direction})
+            events.append({"type": "increment_closed", "pnl": inc.pnl, "price": current_price, "direction": inc.direction, "ticket": inc.ticket, "size": inc.size})
         self.increments = []
         return events
         
@@ -73,6 +85,6 @@ class PositionManager:
         if self.core_position:
             self.core_position.close(current_price)
             self.closed_positions.append(self.core_position)
-            event = {"type": "core_closed", "pnl": self.core_position.pnl, "price": current_price, "direction": self.core_position.direction}
+            event = {"type": "core_closed", "pnl": self.core_position.pnl, "price": current_price, "direction": self.core_position.direction, "ticket": self.core_position.ticket, "size": self.core_position.size}
             self.core_position = None
         return event

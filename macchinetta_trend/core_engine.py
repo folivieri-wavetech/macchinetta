@@ -52,8 +52,9 @@ class CoreEngine:
         self.is_running = True
         self.current_direction = direction
         self.retracement_start_price = None
-        self.pm.open_core(current_price, self.config.get("size_i"), direction)
+        pos = self.pm.open_core(current_price, self.config.get("size_i"), direction)
         print(f"START: Eseguita Core a Mercato {direction} a Prezzo={current_price}")
+        return pos
 
     def _calculate_donchian(self, periods):
         """Calcola la mediana (Max+Min)/2 degli ultimi N periodi (candele)."""
@@ -130,9 +131,9 @@ class CoreEngine:
                             if self.pm.total_active_size() >= self.config.get("size_f"):
                                 oldest = self.pm.force_close_oldest_increment(entry_price)
                                 if oldest:
-                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
-                            self.pm.open_increment(entry_price, size=1, direction="LONG")
-                            events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG"})
+                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price, "ticket": oldest.ticket, "size": oldest.size})
+                            pos = self.pm.open_increment(entry_price, size=1, direction="LONG")
+                            events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
                             
                             self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
                     else:
@@ -176,9 +177,9 @@ class CoreEngine:
                             if self.pm.total_active_size() >= self.config.get("size_f"):
                                 oldest = self.pm.force_close_oldest_increment(entry_price)
                                 if oldest:
-                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
-                            self.pm.open_increment(entry_price, size=1, direction="SHORT")
-                            events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT"})
+                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price, "ticket": oldest.ticket, "size": oldest.size})
+                            pos = self.pm.open_increment(entry_price, size=1, direction="SHORT")
+                            events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
                             
                             self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
                     else:
