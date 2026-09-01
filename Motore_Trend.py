@@ -347,7 +347,7 @@ def esegui_ciclo_trend():
             if ok:
                 pos.entry_price = real_lvl if real_lvl else closed_candle.close
                 pos.ticket = deal_id
-                aggiorna_memoria(nome, {"stato": stato_corrente, "direzione": stato_corrente, "posizioni_core": [pos.to_dict()], "posizioni_incr": [], "storico_wip": [f"🚀 Apertura Core {stato_corrente} a {pos.entry_price}"]})
+                aggiorna_memoria(nome, {"stato": stato_corrente, "direzione": stato_corrente, "posizioni_core": [pos.to_dict()], "posizioni_incr": [], "storico_wip_trend": [f"🚀 Apertura Core {stato_corrente} a {pos.entry_price}"]})
                 print_log(nome, f"🚀 Motore Partito in {stato_corrente}. Core piazzata a {pos.entry_price}.")
             else:
                 engine.reset()
@@ -357,7 +357,7 @@ def esegui_ciclo_trend():
         # Alimenta la candela all'Engine
         events = engine.on_candle_close(closed_candle, next_open_price=closed_candle.close)
         
-        storico = dati.get("storico_wip", [])
+        storico = dati.get("storico_wip_trend", [])
         ha_fatto_eventi = False
         
         for ev in events:
@@ -403,14 +403,14 @@ def esegui_ciclo_trend():
             update_data = {"posizioni_core": core_dict, "posizioni_incr": incr_dict}
             if ha_fatto_eventi:
                 if len(storico) > 20: storico = storico[-20:]
-                update_data["storico_wip"] = storico
+                update_data["storico_wip_trend"] = storico
             aggiorna_memoria(nome, update_data)
         elif events and not auto_restart:
             # Se si è spento e ha svuotato le posizioni
             aggiorna_memoria(nome, {"posizioni_core": [], "posizioni_incr": []})
             if ha_fatto_eventi:
                 if len(storico) > 20: storico = storico[-20:]
-                aggiorna_memoria(nome, {"storico_wip": storico})
+                aggiorna_memoria(nome, {"storico_wip_trend": storico})
 
 def calcola_attesa(min_tf=5):
     ora_attuale = now_it()

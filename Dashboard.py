@@ -1562,8 +1562,8 @@ else:
                     c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
                     c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento</div>", unsafe_allow_html=True)
                     c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Stato Trend</div>", unsafe_allow_html=True)
-                    c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Parametri</div>", unsafe_allow_html=True)
-                    c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'></div>", unsafe_allow_html=True)
+                    c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>LIVE</div>", unsafe_allow_html=True)
+                    c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                     
                     for nome in strumenti_ordinati:
@@ -1573,7 +1573,7 @@ else:
                         dir_t = dati.get("direzione", "")
                         tf = dati.get("timeframe", "MINUTE_5")
                         sz = dati.get("size", 1)
-                        storico = dati.get("storico_wip", [])
+                        storico = dati.get("storico_wip_trend", [])
                         prezzo = prezzi_live.get(nome, "In aggiornamento...")
                         
                         posizioni_core = dati.get("posizioni_core", [])
