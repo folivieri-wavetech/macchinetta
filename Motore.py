@@ -782,6 +782,12 @@ def pulisci_mercato(epic, headers_auth, nome_strumento, solo_pendenti=False, man
 
 # --- FUNZIONE CENTRALIZZATA DI SICUREZZA API ---
 def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target_dir, etichetta, pos_attese=0, no_stop=False):
+    tracker = falsi_allarmi_tracker.get(nome_strumento, {"count": 0, "last_time": 0, "ignored": {}})
+    
+    # Se abbiamo già superato i 5 tentativi di recente, ignoriamo silenziosamente per non bloccare il motore
+    if tracker.get("ignored", {}).get(etichetta, 0) > time.time():
+        return True
+
     print_log(nome_strumento, f"⏳ Ordine {etichetta} non rilevato. Pausa di 6s per assestamento server IG...")
     time.sleep(6.0)
     
@@ -809,7 +815,6 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
     
     if falso_allarme_pos or falso_allarme_ord:
         ora = time.time()
-        tracker = falsi_allarmi_tracker.get(nome_strumento, {"count": 0, "last_time": 0})
         
         # Reset se è passato più di 1 minuto dall'ultimo falso allarme
         if ora - tracker["last_time"] > 60:
@@ -820,9 +825,13 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
         falsi_allarmi_tracker[nome_strumento] = tracker
         
         if tracker["count"] >= 5:
-            testo_alert = f"Attenzione, mancato posizionamento su [{nome_strumento}] Ordine {etichetta}. Procedi con il Recovery."
-            print_log(nome_strumento, "🛑 Troppi falsi allarmi consecutivi (5). Genero Alert sulla Dashboard (Rimango in Automatico).")
+            testo_alert = f"Anomalia su {etichetta}: ordine non rilevato, ma possibili tracce trovate. Attesa verifica manuale."
+            print_log(nome_strumento, f"🛑 Anomalia confermata ({etichetta}). Segnalo in Sintesi e interrompo i controlli attivi per 1 ora (Rimango in Automatico).")
             aggiorna_memoria(nome_strumento, {"alert_falso_allarme": testo_alert})
+            
+            if "ignored" not in tracker:
+                tracker["ignored"] = {}
+            tracker["ignored"][etichetta] = ora + 3600 # ignora per 1 ora
             tracker["count"] = 0
             return True
 
@@ -1347,7 +1356,7 @@ def esegui_motore():
                             micro_gia_a_mercato = len([p for p in posizioni if float(p['position']['size']) == s_ass]) >= 2 
                             
                             if not pendenti_micro and not micro_gia_a_mercato and param.get("stato") == "FASE_1":
-                                if verifica_falso_allarme_ig(nome, epic, h, s_ass, None, "[MICRO]"):
+                                if verifica_falso_allarme_ig(nome, epic, h, s_ass, None, "[MICRO]", pos_attese=1):
                                     continue
                                     
                                 if dir_core == "LONG":

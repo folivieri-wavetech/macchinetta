@@ -1,178 +1,353 @@
 import streamlit as st
 import pandas as pd
 import time
-import random
 from config import Config
-from core_engine import CoreEngine
+from core_engine import CoreEngine, Candle
+from history_generator import generate_history, load_history
+import os
 
 # Configurazione Pagina
-st.set_page_config(page_title="Macchinetta Trend - Simulatore", layout="wide")
-
-st.title("📈 Macchinetta Trend - Dashboard di Simulazione Locale")
+st.set_page_config(page_title="Macchinetta Trend V2.1 - Backtester", layout="wide")
+st.title("🧪 Macchinetta Trend V2.1 - Laboratorio di Backtest")
 
 # Inizializza session state
 if 'config' not in st.session_state:
     st.session_state.config = Config()
 if 'engine' not in st.session_state:
     st.session_state.engine = CoreEngine(st.session_state.config)
-if 'price_history' not in st.session_state:
-    st.session_state.price_history = []
-if 'current_price' not in st.session_state:
-    st.session_state.current_price = 5000.0
 if 'logs' not in st.session_state:
     st.session_state.logs = []
+if 'backtest_data' not in st.session_state:
+    st.session_state.backtest_data = [] # Tutte le candele caricate
+if 'current_step' not in st.session_state:
+    st.session_state.current_step = 0 # Indice della candela a cui siamo arrivati
 
 # --- SIDEBAR: PARAMETRI ---
-st.sidebar.header("⚙️ Parametri Macchinetta")
+st.sidebar.header("⚙️ Parametri Strategia V2")
 cfg = st.session_state.config
 
-# Costruisci input fields dai config
+# 1. Selettore Timeframe per autoconfigurare il min_body
+tf_options = {"M5 / M10": 5.0, "H1 / H4": 10.0, "Daily": 20.0}
+selected_tf = st.sidebar.selectbox("Seleziona Timeframe (Imposta Min Body)", list(tf_options.keys()))
+auto_min_body = tf_options[selected_tf]
+
 new_size_i = st.sidebar.number_input("Size Iniziale (Core)", value=cfg.get("size_i"))
 new_size_f = st.sidebar.number_input("Size Finale (Max)", value=cfg.get("size_f"))
-new_griglia = st.sidebar.number_input("Griglia Breakout", value=cfg.get("griglia"))
-st.sidebar.markdown(f"*(TS Distanza: {new_griglia} | Passo: {new_griglia/4})*")
-st.sidebar.markdown("---")
-new_inc_tp = st.sidebar.number_input("Incremento Take Profit", value=cfg.get("inc_tp"))
-st.sidebar.markdown("---")
-st.sidebar.subheader("Logica Uncino")
-new_step = st.sidebar.number_input("Step Correzione (Drop)", value=cfg.get("step_correzione"))
-new_rimbalzo = st.sidebar.number_input("Rimbalzo (Conferma Uncino)", value=cfg.get("rimbalzo_uncino"))
+new_pip_value = st.sidebar.number_input("Valore di 1 Pip/Punto", value=float(cfg.get("pip_value")), format="%0.4f")
 
-if st.sidebar.button("💾 Salva Parametri"):
+st.sidebar.markdown("---")
+st.sidebar.subheader("Donchian Channels")
+new_tk = st.sidebar.number_input("Periodi Tenkan (TK)", value=cfg.get("tk_periods"))
+new_kj = st.sidebar.number_input("Periodi Kijun (KJ)", value=cfg.get("kj_periods"))
+
+st.sidebar.markdown("---")
+new_body = st.sidebar.number_input("Body Minimo (Sovrascrivibile)", value=auto_min_body)
+
+if st.sidebar.button("💾 Salva Parametri", width="stretch"):
     cfg.set("size_i", new_size_i)
     cfg.set("size_f", new_size_f)
-    cfg.set("griglia", new_griglia)
-    cfg.set("inc_tp", new_inc_tp)
-    cfg.set("step_correzione", new_step)
-    cfg.set("rimbalzo_uncino", new_rimbalzo)
+    cfg.set("pip_value", new_pip_value)
+    cfg.set("tk_periods", new_tk)
+    cfg.set("kj_periods", new_kj)
+    cfg.set("min_body", new_body)
     st.sidebar.success("Parametri salvati!")
 
-# --- MAIN AREA ---
-col1, col2, col3 = st.columns(3)
+# --- GESTIONE DATI STORICI ---
+st.markdown("### 📊 Dataset di Mercato")
+col_d1, col_d2 = st.columns([1, 2])
 
-# Controlli Simulatore
-with col1:
-    st.subheader("🕹️ Controlli Simulazione")
-    manual_price = st.number_input("Prezzo Mercato Reale", value=st.session_state.current_price, step=1.0)
-    
-    colA, colB = st.columns(2)
-    with colA:
-        if st.button("▶️ START Macchinetta", width="stretch"):
-            if not st.session_state.engine.is_running:
-                st.session_state.engine.start(manual_price)
-                st.session_state.logs.insert(0, f"Avvio Macchinetta. Prezzo: {manual_price}")
-                st.rerun()
-            else:
-                st.warning("Macchinetta già in esecuzione!")
-                
-    with colB:
-        if st.button("⏹️ STOP", width="stretch"):
+with col_d1:
+    if st.button("🎲 Genera Nuovo Storico Random (Gold 5M)", width="stretch"):
+        filepath, raw_data = generate_history(filename="storico_5m.csv", num_candles=300, start_price=4500.0, pip_value=cfg.get("pip_value"))
+        st.session_state.backtest_data = raw_data
+        st.session_state.current_step = 0
+        st.session_state.engine.reset()
+        st.session_state.logs = []
+        st.rerun()
+
+with col_d2:
+    if st.button("📂 Carica Storico Esistente", width="stretch"):
+        raw_data = load_history("storico_5m.csv")
+        if raw_data:
+            st.session_state.backtest_data = raw_data
+            st.session_state.current_step = 0
             st.session_state.engine.reset()
-            st.session_state.logs.insert(0, "Macchinetta fermata manualmente.")
+            st.session_state.logs = []
             st.rerun()
+        else:
+            st.error("Nessun file 'storico_5m.csv' trovato. Generane uno primo!")
 
-    # Simulatore di movimento (Tick manuale)
-    st.markdown("---")
-    st.write("Spingi il prezzo a mano:")
+st.markdown("---")
+
+if not st.session_state.backtest_data:
+    st.info("Nessun dato di mercato caricato. Genera o carica uno storico per iniziare il backtest.")
+    st.stop()
+
+# Estraiamo i dati utili per il backtest (le prime 55 candele servono solo per il seed di TK e KJ)
+kj_p = cfg.get("kj_periods")
+if len(st.session_state.backtest_data) <= kj_p:
+    st.error("Lo storico è troppo breve per calcolare gli indicatori!")
+    st.stop()
+
+# Le prime N candele le diamo in pasto subito al motore come storico passato
+seed_data = st.session_state.backtest_data[:kj_p]
+future_data = st.session_state.backtest_data[kj_p:]
+tot_future = len(future_data)
+
+def get_current_portfolio_str(pm, current_price):
+    """Genera una stringa riassuntiva del portafoglio attuale per il log"""
+    if not pm.core_position and not pm.increments:
+        return "Piatto (0)", "0.0"
+        
+    parts = []
+    tot_pnl = 0.0
+    if pm.core_position:
+        pnl = pm.core_position.close(current_price)
+        pm.core_position.is_closed = False # Solo per simulare il pnl
+        tot_pnl += pnl
+        sign_c = "+" if pm.core_position.direction == "LONG" else "-"
+        parts.append(f"Core {sign_c}{pm.core_position.size}@{pm.core_position.entry_price:.0f}")
+        
+    for i, inc in enumerate(pm.increments):
+        pnl = inc.close(current_price)
+        inc.is_closed = False
+        tot_pnl += pnl
+        sign_i = "+" if inc.direction == "LONG" else "-"
+        parts.append(f"Inc {sign_i}{inc.size}@{inc.entry_price:.0f}")
+        
+    return " | ".join(parts), f"{tot_pnl:.0f} €"
+
+# --- INIZIO BACKTEST ---
+if st.session_state.current_step == 0:
+    st.info(f"Storico caricato. {kj_p} candele usate per il setup iniziale. {tot_future} candele pronte da tradare.")
     
-    col_up, col_dw = st.columns(2)
-    with col_up:
-        if st.button("📈 TICK SU (+1pt)"):
-            st.session_state.current_price += 1.0
-            manual_price = st.session_state.current_price
-            st.session_state.price_history.append(manual_price)
-            st.session_state.logs.insert(0, f"--- Inviato Tick SU: {manual_price} ---")
-            events = st.session_state.engine.on_tick(manual_price)
-            for ev in events:
-                st.session_state.logs.insert(0, str(ev))
-            st.rerun()
+    if st.button("▶️ AVVIA BACKTEST (Entra a Mercato)", width="stretch"):
+        # Inizializziamo il motore con le prime 55 candele reali
+        storico_candele = []
+        for d in seed_data:
+            storico_candele.append(Candle(d['open'], d['high'], d['low'], d['close']))
+        
+        st.session_state.engine.seed_history(storico_candele)
+        
+        # Facciamo entrare il bot a mercato sull'ultima candela del seed
+        last_c = seed_data[-1]
+        entry_price = last_c['close']
+        
+        # Determinazione direzione iniziale intelligente basata sulla Kijun
+        kj_iniziale = st.session_state.engine._calculate_donchian(cfg.get('kj_periods'))
+        tk_iniziale = st.session_state.engine._calculate_donchian(cfg.get('tk_periods'))
+        dir_iniziale = "LONG" if entry_price > kj_iniziale else "SHORT"
+        sign_start = "+" if dir_iniziale == "LONG" else "-"
+        
+        st.session_state.engine.start(entry_price, dir_iniziale)
+        
+        # Inizializza il diario di bordo con la candela di innesco
+        st.session_state.logs = []
+        portf, latente = get_current_portfolio_str(st.session_state.engine.pm, entry_price)
+        
+        st.session_state.logs.append({
+            "#": kj_p,
+            "OHLC": f"{last_c['open']}-{last_c['high']}-{last_c['low']}-{last_c['close']}",
+            "TK/KJ": f"{tk_iniziale:.0f}/{kj_iniziale:.0f}",
+            "Azione": f"START {sign_start}{cfg.get('size_i')}{dir_iniziale[0]}@{entry_price}",
+            "Chiusure": "",
+            "P/L Rea": "",
+            "Portafoglio": portf,
+            "P/L Lat": latente
+        })
+        
+        st.session_state.current_step = 1 # pronti a leggere la prima candela "nuova"
+        st.rerun()
+    st.stop() # Fermiamoci qui finché non preme avvia
+
+
+# --- CONTROLLI RIPRODUZIONE ---
+
+def elabora_candela_step(indice_relativo):
+    d = future_data[indice_relativo]
+    c = Candle(d['open'], d['high'], d['low'], d['close'])
+    evs = st.session_state.engine.on_candle_close(c)
+    azione_txt = ""
+    chiusure_txt = ""
+    pnl_real_txt = ""
+    
+    # Decodifichiamo gli eventi in azioni testuali super compatte
+    if evs:
+        azioni = []
+        chiusure = []
+        pnl_real_tot = 0.0
+        
+        for e in evs:
+            if e['type'] == 'increment_opened':
+                sign_inc = "+1" if e['direction'] == 'LONG' else "-1"
+                azioni.append(f"{sign_inc}{e['direction'][0]}@{e['price']}")
+            elif e['type'] == 'increments_cleared':
+                azioni.append("TkCross")
+            elif e['type'] == 'reversal':
+                sign_rev = "+" if e['new_direction'] == 'LONG' else "-"
+                azioni.append(f"Rev->{sign_rev}{cfg.get('size_i')}{e['new_direction'][0]}")
+            elif e['type'] == 'fifo_close':
+                azioni.append("FIFO")
             
-    with col_dw:
-        if st.button("📉 TICK GIÙ (-1pt)"):
-            st.session_state.current_price -= 1.0
-            manual_price = st.session_state.current_price
-            st.session_state.price_history.append(manual_price)
-            st.session_state.logs.insert(0, f"--- Inviato Tick GIU': {manual_price} ---")
-            events = st.session_state.engine.on_tick(manual_price)
-            for ev in events:
-                st.session_state.logs.insert(0, str(ev))
-            st.rerun()
+            # Tracciamo le chiusure
+            if e['type'] in ['increment_closed', 'core_closed', 'fifo_close']:
+                chiusure.append(f"{e['type'].split('_')[0][:3]}@{e['price']}({e['pnl']:.0f}€)")
+                pnl_real_tot += e.get('pnl', 0.0)
+                
+        if azioni:
+            azione_txt = " ".join(azioni)
+        if chiusure:
+            chiusure_txt = " ".join(chiusure)
+            pnl_real_txt = f"{pnl_real_tot:.0f}"
+            
+    tk_val = st.session_state.engine.current_tk
+    kj_val = st.session_state.engine.current_kj
+    portf, latente = get_current_portfolio_str(st.session_state.engine.pm, d['close'])
+            
+    st.session_state.logs.append({
+        "#": kj_p + indice_relativo + 1,
+        "OHLC": f"{d['open']}-{d['high']}-{d['low']}-{d['close']}",
+        "TK/KJ": f"{tk_val:.0f}/{kj_val:.0f}" if tk_val else "-",
+        "Azione": azione_txt,
+        "Chiusure": chiusure_txt,
+        "P/L Rea": pnl_real_txt,
+        "Portafoglio": portf,
+        "P/L Lat": latente
+    })
 
-    st.markdown("---")
-    if st.button("Invia Prezzo Personalizzato 📩", width="stretch"):
-        st.session_state.current_price = manual_price
-        st.session_state.price_history.append(manual_price)
-        st.session_state.logs.insert(0, f"--- Inviato Salto Prezzo a: {manual_price} ---")
-        events = st.session_state.engine.on_tick(manual_price)
-        for ev in events:
-            st.session_state.logs.insert(0, str(ev))
-        st.rerun()
 
-    # Generatore Randomico
-    st.markdown("---")
-    if st.button("Simula 10 Tick Random 🎲"):
-        for _ in range(10):
-            # Movimento randomico +/- 10 punti
-            move = random.uniform(-10, 10)
-            st.session_state.current_price += move
-            p = round(st.session_state.current_price, 2)
-            st.session_state.price_history.append(p)
-            events = st.session_state.engine.on_tick(p)
-            for ev in events:
-                st.session_state.logs.insert(0, f"Prezzo {p}: {str(ev)}")
-        st.rerun()
 
-# Info Stato Motore
-with col2:
-    st.subheader("⚙️ Stato Motore")
-    engine = st.session_state.engine
+# --- PANNELLO GRAFICO E INFO ---
+st.markdown("---")
+st.subheader("📈 Grafico di Mercato")
+
+import plotly.graph_objects as go
+
+if st.session_state.backtest_data:
+    df_chart = pd.DataFrame(st.session_state.backtest_data)
+    df_chart['TK'] = (df_chart['high'].rolling(cfg.get('tk_periods')).max() + df_chart['low'].rolling(cfg.get('tk_periods')).min()) / 2
+    df_chart['KJ'] = (df_chart['high'].rolling(cfg.get('kj_periods')).max() + df_chart['low'].rolling(cfg.get('kj_periods')).min()) / 2
     
-    st.metric("Status", "🟢 RUNNING" if engine.is_running else "🔴 STOPPED")
-    if engine.is_running:
-        st.write(f"**Massimo Assoluto:** {engine.absolute_high}")
-        if engine.buy_stop_level:
-            st.write(f"**Attesa Buy Stop:** {engine.buy_stop_level}")
-        st.write(f"**In Correzione:** {'Sì' if engine.is_in_correction else 'No'} (Low: {engine.correction_low})")
+    current_idx = kj_p + max(0, st.session_state.current_step - 1)
+    df_vis = df_chart.iloc[:current_idx+1]
+    
+    fig = go.Figure()
+    fig.add_trace(go.Candlestick(x=df_vis.index,
+                    open=df_vis['open'], high=df_vis['high'],
+                    low=df_vis['low'], close=df_vis['close'],
+                    name='Prezzo'))
+    fig.add_trace(go.Scatter(x=df_vis.index, y=df_vis['TK'], line=dict(color='blue', width=1), name='Tenkan (TK)'))
+    fig.add_trace(go.Scatter(x=df_vis.index, y=df_vis['KJ'], line=dict(color='red', width=2), name='Kijun (KJ)'))
+    
+    fig.update_layout(height=400, margin=dict(l=20, r=20, t=20, b=20), xaxis_rangeslider_visible=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-# Posizioni Attive
-with col3:
+
+col_info1, col_info2 = st.columns([1, 1.5])
+
+with col_info1:
+    st.subheader("⚙️ Stato & Indicatori")
+    engine = st.session_state.engine
+    st.metric("Motore Macchinetta", "🟢 RUNNING" if engine.is_running else "🔴 STOPPED")
+    
+    if engine.current_tk is not None and engine.current_kj is not None:
+        last_price = engine.candles[-1].close
+        st.markdown(f"**Ultimo Prezzo:** {last_price:.2f}")
+        st.write(f"🔵 **Tenkan (TK):** {engine.current_tk:.2f}")
+        st.write(f"🔴 **Kijun (KJ):** {engine.current_kj:.2f}")
+        
+        if last_price > engine.current_kj:
+            st.success(f"Tendenza: Rialzista (Prezzo > KJ) | Posizione: {engine.current_direction}")
+        else:
+            st.error(f"Tendenza: Ribassista (Prezzo < KJ) | Posizione: {engine.current_direction}")
+
+with col_info2:
     st.subheader("💼 Posizioni Attive")
-    pm = st.session_state.engine.pm
-    curr_p = st.session_state.current_price
+    pm = engine.pm
+    curr_p = engine.candles[-1].close if engine.candles else 0.0
     
     active_data = []
     tot_pnl = 0.0
     
     if pm.core_position:
-        pnl = (curr_p - pm.core_position.entry_price) * pm.core_position.size
+        if pm.core_position.direction == "LONG":
+            pnl = (curr_p - pm.core_position.entry_price) * pm.core_position.size
+        else:
+            pnl = (pm.core_position.entry_price - curr_p) * pm.core_position.size
         tot_pnl += pnl
         active_data.append({
-            "Tipo": "Core",
-            "Entry": pm.core_position.entry_price,
+            "Tipo": f"Core ({pm.core_position.direction})",
+            "Entry": f"{pm.core_position.entry_price:.2f}",
             "Size": pm.core_position.size,
-            "TS": pm.core_position.trailing_stop_level,
             "P&L €": round(pnl, 2)
         })
         
     for i, inc in enumerate(pm.increments):
-        pnl = (curr_p - inc.entry_price) * inc.size
+        if inc.direction == "LONG":
+            pnl = (curr_p - inc.entry_price) * inc.size
+        else:
+            pnl = (inc.entry_price - curr_p) * inc.size
         tot_pnl += pnl
         active_data.append({
-            "Tipo": f"Inc {i+1}",
-            "Entry": inc.entry_price,
+            "Tipo": f"Inc {i+1} ({inc.direction})",
+            "Entry": f"{inc.entry_price:.2f}",
             "Size": inc.size,
-            "TS": inc.trailing_stop_level,
             "P&L €": round(pnl, 2)
         })
         
     if active_data:
         st.dataframe(pd.DataFrame(active_data), hide_index=True)
-        st.success(f"**P&L Totale Aperto: {round(tot_pnl, 2)} €**")
+        st.success(f"**P&L Corrente Latente: {round(tot_pnl, 2)} €**")
     else:
-        st.info("Nessuna posizione aperta.")
+        st.info("Nessuna posizione a mercato in questo istante.")
 
-# Log Eventi
+# Log Unico
 st.markdown("---")
-st.subheader("📜 Log Eventi")
-log_df = pd.DataFrame({"Eventi Recenti": st.session_state.logs[:50]})
-st.dataframe(log_df, use_container_width=True, hide_index=True)
+
+col_ctrl1, col_ctrl2 = st.columns(2)
+
+with col_ctrl1:
+    if st.button("⏯️ PROSSIMA CANDELA", width="stretch"):
+        if st.session_state.current_step <= tot_future:
+            elabora_candela_step(st.session_state.current_step - 1)
+            st.session_state.current_step += 1
+            st.rerun()
+
+with col_ctrl2:
+    if st.button("⏩ ESEGUI TUTTO", width="stretch"):
+        for i in range(st.session_state.current_step - 1, tot_future):
+            elabora_candela_step(i)
+        st.session_state.current_step = tot_future + 1
+        st.rerun()
+
+st.progress(min(st.session_state.current_step / tot_future, 1.0), text=f"Step: {min(st.session_state.current_step-1, tot_future)}/{tot_future}")
+
+if st.session_state.current_step > tot_future:
+    if st.button("🔄 Reset Simulazione", width="stretch"):
+        st.session_state.current_step = 0
+        st.session_state.engine.reset()
+        st.session_state.logs = []
+        st.rerun()
+
+st.subheader("📜 Diario Operativo Dettagliato")
+if st.session_state.logs:
+    df_logs = pd.DataFrame(st.session_state.logs)
+    
+    def color_ohlc(val):
+        """Colora la cella OHLC di verde o rosso in base a open e close."""
+        if not isinstance(val, str) or '-' not in val:
+            return ''
+        try:
+            parts = val.split('-')
+            o = float(parts[0])
+            c = float(parts[3])
+            if c > o:
+                return 'background-color: #7CFC00; color: black; font-weight: bold' # Verde erba (LawnGreen)
+            elif c < o:
+                return 'background-color: #FA8072; color: black; font-weight: bold' # Rosso salmone
+        except:
+            pass
+        return ''
+        
+    styled_df = df_logs.style.map(color_ohlc, subset=['OHLC'])
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)

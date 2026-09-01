@@ -4,20 +4,22 @@ import os
 class Config:
     def __init__(self, filename="trend_config.json"):
         self.filename = filename
-        # Valori di default definiti nel piano
+        
+        # Valori di default per la logica V2 a Candele e Donchian
         self.params = {
             "size_i": 3,
             "size_f": 10,
-            "griglia": 20,
             
-            # Motore di Chiusura
-            "core_ts": 100,
-            "inc_ts": 40,
-            "inc_tp": 20,
+            # Parametri Strumento (Simulazione Gold: 1 punto = 1 pip = 1€)
+            "pip_value": 1.0,
             
-            # Logica ad uncino per gli incrementi (Opzione B)
-            "step_correzione": 20, # Il drop per formare il corpo rosso virtuale
-            "rimbalzo_uncino": 5   # L'uncino per confermare l'inversione
+            # Parametri Candele e Indicatori
+            "min_body": 5.0,        # Pips minimi per considerare valida una candela (rossa o verde)
+            "tk_periods": 21,       # Periodi Tenkan-sen (Donchian Veloce)
+            "kj_periods": 55,       # Periodi Kijun-sen (Donchian Lento)
+            
+            # Costanti di backtest
+            "start_price": 158.00   # Prezzo di partenza generico per il simulatore
         }
         self.load()
 

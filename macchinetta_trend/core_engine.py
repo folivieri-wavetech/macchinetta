@@ -1,5 +1,22 @@
 from position_manager import PositionManager
 
+class Candle:
+    def __init__(self, open_p, high_p, low_p, close_p):
+        self.open = open_p
+        self.high = high_p
+        self.low = low_p
+        self.close = close_p
+        
+    def is_red(self):
+        return self.close < self.open
+        
+    def is_green(self):
+        return self.close > self.open
+        
+    def body_size(self):
+        return abs(self.open - self.close)
+
+
 class CoreEngine:
     def __init__(self, config):
         self.config = config
@@ -7,121 +24,130 @@ class CoreEngine:
         
         # Stato del motore
         self.is_running = False
-        self.start_price = None
+        self.current_direction = None # "LONG" o "SHORT"
+        self.candles = []  # Storico delle candele
         
-        # Livelli OCO iniziali
-        self.buy_stop_level = None
-        self.sell_stop_level = None
-        
-        # Tracking per logica Uncino
-        self.absolute_high = None
-        self.current_drawdown = 0.0 # Quanti punti è sceso dal massimo
-        self.is_in_correction = False # True se è sceso di 'step_correzione'
-        self.correction_low = None # Il minimo toccato durante la correzione
-
-    def start(self, current_price):
-        """Inizializza la macchinetta piazzando gli ordini pendenti virtuali."""
-        self.is_running = True
-        self.start_price = current_price
-        griglia = self.config.get("griglia")
-        
-        self.buy_stop_level = current_price + griglia
-        self.sell_stop_level = current_price - griglia
-        
-        print(f"START: Prezzo={current_price} | BuyStop={self.buy_stop_level} | SellStop={self.sell_stop_level}")
+        # Stato Indicatori calcolati all'ultima candela chiusa
+        self.current_tk = None
+        self.current_kj = None
         
     def reset(self):
-        """Resetta lo stato della macchinetta al termine della sessione."""
+        """Resetta lo stato della macchinetta."""
         self.is_running = False
-        self.start_price = None
-        self.buy_stop_level = None
-        self.sell_stop_level = None
-        self.absolute_high = None
-        self.is_in_correction = False
-        self.correction_low = None
         self.pm = PositionManager() # Reset completo della memoria trade
-        
-    def on_tick(self, current_price):
-        """Metodo principale da chiamare ad ogni aggiornamento di prezzo."""
-        if not self.is_running:
-            return [] # Ritorna lista eventi
+        # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
+
+    def seed_history(self, candles_list):
+        """Popola lo storico iniziale prima dell'avvio."""
+        self.candles = candles_list
+
+    def start(self, current_price, direction="LONG"):
+        """Inizializza la macchinetta entrando a mercato con la Core nella direzione specificata."""
+        self.is_running = True
+        self.current_direction = direction
+        self.pm.open_core(current_price, self.config.get("size_i"), direction)
+        print(f"START: Eseguita Core a Mercato {direction} a Prezzo={current_price}")
+
+    def _calculate_donchian(self, periods):
+        """Calcola la mediana (Max+Min)/2 degli ultimi N periodi (candele)."""
+        if len(self.candles) < periods:
+            return None
+        recent_candles = self.candles[-periods:]
+        highest = max(c.high for c in recent_candles)
+        lowest = min(c.low for c in recent_candles)
+        return (highest + lowest) / 2.0
+
+    def on_candle_close(self, closed_candle):
+        """
+        Metodo da chiamare OGNI VOLTA che si chiude una candela sul TF stabilito.
+        """
+        self.candles.append(closed_candle)
+        if len(self.candles) > 100:
+            self.candles.pop(0)
             
         events = []
         
-        # 1. Fase Innesco (Se non abbiamo ancora la Core)
-        if self.pm.core_position is None and self.absolute_high is None:
-            # Check Buy Stop
-            if current_price >= self.buy_stop_level:
-                # Eseguito Long OCO
-                self.pm.open_core(self.buy_stop_level, self.config.get("size_i"))
-                self.absolute_high = self.buy_stop_level
-                self.sell_stop_level = None # Cancella ordine opposto
-                events.append({"type": "core_opened", "price": self.buy_stop_level})
-                
-            # Logica speculare per lo Short non è implementata in questo snippet 
-            # (assumiamo che il bot sia long-only come da esempio, ma si può specchiare)
-
-
-        # 2. Aggiornamento Posizioni Esistenti (TS e TP)
-        chiusure = self.pm.update_all_positions(current_price, self.config)
-        events.extend(chiusure)
+        self.current_tk = self._calculate_donchian(self.config.get("tk_periods"))
+        self.current_kj = self._calculate_donchian(self.config.get("kj_periods"))
         
-        # Check se la Core è stata chiusa (Fine Trend)
-        if self.pm.core_position is None and self.absolute_high is not None:
-            # La Core è caduta! Breakout al ribasso confermato dal TS
-            # Chiudiamo tutto e resettiamo
-            if self.pm.increments:
-                for inc in self.pm.increments:
-                    inc.is_closed = True
-                    inc.close_price = current_price
-                    inc.pnl = (inc.close_price - inc.entry_price) * inc.size
-                    self.pm.closed_positions.append(inc)
-                    events.append({"type": "increment_force_closed_on_end", "pnl": inc.pnl})
-                self.pm.increments = []
-            
-            events.append({"type": "session_ended", "reason": "core_stopped"})
-            self.reset()
+        if not self.is_running:
             return events
+            
+        if self.current_tk is None or self.current_kj is None:
+            return events
+            
+        c_close = closed_candle.close
+        tk = self.current_tk
+        kj = self.current_kj
+        pip_val = self.config.get("pip_value")
+        min_body_price = self.config.get("min_body") * pip_val
+        
+        # ==========================================
+        # LOGICA BI-DIREZIONALE (STOP & REVERSE)
+        # ==========================================
+        
+        if self.current_direction == "LONG":
+            # --- USCITE E REVERSAL LONG ---
+            if c_close < kj:
+                # Sotto la Kijun: Chiude tutto e REVERSA in SHORT
+                events.extend(self.pm.close_all_increments(c_close))
+                ev = self.pm.close_core(c_close)
+                if ev: events.append(ev)
+                events.append({"type": "reversal", "reason": "close_below_kj", "new_direction": "SHORT"})
+                
+                # Apre SHORT
+                self.start(c_close, "SHORT")
+                return events
+                
+            elif c_close < tk:
+                # Sotto Tenkan: Chiude solo gli incrementi
+                chiusure_inc = self.pm.close_all_increments(c_close)
+                if chiusure_inc:
+                    events.extend(chiusure_inc)
+                    events.append({"type": "increments_cleared", "reason": "close_below_tk"})
 
-        # 3. Aggiornamento Massimo e Logica Uncino (Se siamo a mercato)
-        if self.absolute_high is not None:
-            if current_price > self.absolute_high:
-                self.absolute_high = current_price
-                self.is_in_correction = False # Nuovo massimo resetta le correzioni
-                self.correction_low = None
+            # --- INGRESSI LONG ---
+            # Paletto: TK > KJ e la candela deve aver APERTO SOPRA la TK (close precedente > TK)
+            if tk > kj and closed_candle.open > tk and c_close >= tk:
+                if closed_candle.is_red() and closed_candle.body_size() >= min_body_price:
+                    entry_price = c_close 
+                    if self.pm.total_active_size() >= self.config.get("size_f"):
+                        oldest = self.pm.force_close_oldest_increment(entry_price)
+                        if oldest:
+                            events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
+                    self.pm.open_increment(entry_price, size=1, direction="LONG")
+                    events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG"})
+
+        elif self.current_direction == "SHORT":
+            # --- USCITE E REVERSAL SHORT ---
+            if c_close > kj:
+                # Sopra la Kijun: Chiude tutto e REVERSA in LONG
+                events.extend(self.pm.close_all_increments(c_close))
+                ev = self.pm.close_core(c_close)
+                if ev: events.append(ev)
+                events.append({"type": "reversal", "reason": "close_above_kj", "new_direction": "LONG"})
                 
-            else:
-                # Siamo sotto il massimo assoluto, misuriamo il drawdown
-                self.current_drawdown = self.absolute_high - current_price
-                step = self.config.get("step_correzione")
+                # Apre LONG
+                self.start(c_close, "LONG")
+                return events
                 
-                if self.current_drawdown >= step:
-                    # Si è formata la "Candela Rossa" virtuale (il drop è confermato)
-                    self.is_in_correction = True
-                    
-                    # Tracciamo il minimo di questa correzione
-                    if self.correction_low is None or current_price < self.correction_low:
-                        self.correction_low = current_price
-                
-                # Se siamo in correzione, cerchiamo l'Uncino
-                if self.is_in_correction and self.correction_low is not None:
-                    rimbalzo = self.config.get("rimbalzo_uncino")
-                    if current_price >= self.correction_low + rimbalzo:
-                        # UNCINO CONFERMATO! Il prezzo è sceso di >20pt e ha rimbalzato di >5pt
-                        # Proviamo ad aprire un incremento
-                        
-                        # Controllo Size_F (FIFO)
-                        if self.pm.total_active_size() >= self.config.get("size_f"):
-                            oldest = self.pm.force_close_oldest_increment(current_price)
-                            if oldest:
-                                events.append({"type": "fifo_close", "pnl": oldest.pnl})
-                                
-                        # Apriamo il nuovo incremento
-                        self.pm.open_increment(current_price, size=1)
-                        events.append({"type": "increment_opened", "price": current_price})
-                        
-                        # Resettiamo lo stato della correzione in attesa del prossimo setup
-                        self.is_in_correction = False
-                        self.correction_low = None
+            elif c_close > tk:
+                # Sopra Tenkan: Chiude solo gli incrementi
+                chiusure_inc = self.pm.close_all_increments(c_close)
+                if chiusure_inc:
+                    events.extend(chiusure_inc)
+                    events.append({"type": "increments_cleared", "reason": "close_above_tk"})
+
+            # --- INGRESSI SHORT ---
+            # Paletto: TK < KJ e la candela deve aver APERTO SOTTO la TK (close precedente < TK)
+            if tk < kj and closed_candle.open < tk and c_close <= tk:
+                if closed_candle.is_green() and closed_candle.body_size() >= min_body_price:
+                    entry_price = c_close 
+                    if self.pm.total_active_size() >= self.config.get("size_f"):
+                        oldest = self.pm.force_close_oldest_increment(entry_price)
+                        if oldest:
+                            events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price})
+                    self.pm.open_increment(entry_price, size=1, direction="SHORT")
+                    events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT"})
 
         return events
