@@ -430,7 +430,7 @@ def calcola_attesa(min_tf=5):
 
 if __name__ == "__main__":
     try:
-        lock_socket = socket.socket(socket.AF_INET, socket.socket.SOCK_STREAM)
+        lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         porta_unica = 15000 + int(hashlib.md5(f"{NOME_CONTO}_TREND".encode()).hexdigest(), 16) % 40000
         lock_socket.bind(("127.0.0.1", porta_unica))
     except socket.error:
