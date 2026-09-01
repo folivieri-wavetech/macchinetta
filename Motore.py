@@ -1767,8 +1767,14 @@ def esegui_motore():
                                     if hit_tp:
                                         print_log(nome, f"🎯 [TICKET2] chiuso in profitto. Reinserisco ordine pendente a {formatta_numero(t2_entry, dec)}...")
                                         lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
-                                        invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
+                                        succ_t2 = invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
                                         
+                                        if not succ_t2:
+                                            print_log(nome, "🛑 [ORDINE TICKET2] Impossibile ripristinare. Arresto forzato per evitare loop infiniti.")
+                                            aggiorna_memoria(nome, {"attivo": False, "errore_ripristino": True, "msg_manuale": "⚠️ Rifiuto persistente di IG al ripristino dell'Ordine TICKET2. Sospeso."}, log_wip=f"⚠️ Emergenza: IG rifiuta ripristino TICKET2.")
+                                            invia_notifica(f"🚨 ERRORE CRITICO: {nome}", f"[{nome}] Fallito ripristino Ordine TICKET2 (dopo 4 tentativi). Sospeso.", "warning")
+                                            continue
+                                            
                                         pnl_t2_win_eur = (param.get("tp") / 4) * s_mezzo * valore_punto * rate
                                         pnl_str = formatta_pnl(pnl_t2_win_eur)
                                         registra_operazione(nome, "Take Profit TICKET2", pnl_t2_win_eur)
