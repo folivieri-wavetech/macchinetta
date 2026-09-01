@@ -230,7 +230,7 @@ def scarica_candele(epic, timeframe, limit=100, headers=None):
     h = headers.copy()
     h["Version"] = "3"
     try:
-        url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}"
+        url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
         r = requests.get(url, headers=h, timeout=10)
         if r.status_code == 200:
             return r.json().get('prices', [])
@@ -295,9 +295,7 @@ def esegui_ciclo_trend(is_candle_close=True):
         
         engine = stato_motore.motori[nome]
         
-        needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
-        if not is_candle_close and not needs_start:
-            continue
+        # Procediamo al recupero candele per calcolo Donchian
             
         # 1. Recupera candele da IG per calcolo Donchian e close
         prices = scarica_candele(epic, tf, limit=300, headers=headers)
@@ -323,6 +321,13 @@ def esegui_ciclo_trend(is_candle_close=True):
         
         tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
         kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
+        
+        # Salva SEMPRE tk e kj ad ogni ciclo, anche se non chiude la candela
+        aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
+        
+        needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
+        if not is_candle_close and not needs_start:
+            continue
         
         # --- RIPRISTINO STATO DA MEMORIA ---
         pos_core = dati.get("posizioni_core", [])
@@ -366,12 +371,6 @@ def esegui_ciclo_trend(is_candle_close=True):
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
                 continue
                 
-        # Salva SEMPRE tk e kj ad ogni ciclo, anche se non chiude la candela
-        aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
-                
-        if not is_candle_close:
-            continue
-            
         # Alimenta la candela all'Engine
         events = engine.on_candle_close(closed_candle, next_open_price=closed_candle.close)
         
