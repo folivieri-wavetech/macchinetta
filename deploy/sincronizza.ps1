@@ -60,6 +60,7 @@ try {
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "4. ROLLOUT RESTART DEI DEPLOYMENT" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
+& $KUBECTL --kubeconfig=$KUBECONFIG apply -f deploy/motore.yaml -n macchinetta
 & $KUBECTL --kubeconfig=$KUBECONFIG rollout restart deploy/macchinetta-dashboard -n macchinetta
 & $KUBECTL --kubeconfig=$KUBECONFIG rollout restart deploy/macchinetta-motore-bongiolo deploy/macchinetta-motore-dany deploy/macchinetta-motore-fiordok -n macchinetta
 & $KUBECTL --kubeconfig=$KUBECONFIG rollout status deploy/macchinetta-dashboard -n macchinetta --timeout=120s
