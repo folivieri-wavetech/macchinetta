@@ -249,7 +249,7 @@ def aggiorna_memoria(nome, update_dict):
     except Exception as e:
         pass
 
-def esegui_ciclo_trend():
+def esegui_ciclo_trend(is_candle_close=True):
     headers = ottieni_headers_ig()
     if not headers:
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
@@ -280,10 +280,6 @@ def esegui_ciclo_trend():
         direzione = dati.get("direzione", "LONG")
         stato_corrente = dati.get("stato", "FLAT") # "FLAT", "LONG", "SHORT"
         
-        # 1. Recupera candele da IG per calcolo Donchian e close
-        prices = scarica_candele(epic, tf, limit=100, headers=headers)
-        if not prices: continue
-        
         # Inizializza/Recupera Engine
         if nome not in stato_motore.motori:
             cfg = {
@@ -297,6 +293,14 @@ def esegui_ciclo_trend():
             stato_motore.motori[nome] = CoreEngine(cfg)
         
         engine = stato_motore.motori[nome]
+        
+        needs_start = not engine.is_running and stato_corrente in ("LONG", "SHORT")
+        if not is_candle_close and not needs_start:
+            continue
+            
+        # 1. Recupera candele da IG per calcolo Donchian e close
+        prices = scarica_candele(epic, tf, limit=100, headers=headers)
+        if not prices: continue
         
         # Seed dello storico
         storic_candles = []
@@ -341,7 +345,7 @@ def esegui_ciclo_trend():
         dec = CONFIG_STRUMENTI[nome]["decimali"]
         
         # Se lo stato su dashboard è FLAT ma l'utente ha premuto AVVIA LONG/SHORT, forziamo l'engine
-        if not engine.is_running and stato_corrente in ("LONG", "SHORT"):
+        if needs_start:
             pos = engine.start(closed_candle.close, stato_corrente)
             ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, stato_corrente, size_i, headers, dec, etichetta="[CORE]")
             if ok:
@@ -353,6 +357,9 @@ def esegui_ciclo_trend():
                 engine.reset()
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
                 continue
+                
+        if not is_candle_close:
+            continue
             
         # Alimenta la candela all'Engine
         events = engine.on_candle_close(closed_candle, next_open_price=closed_candle.close)
@@ -432,14 +439,19 @@ if __name__ == "__main__":
 
     print(f"🚀 Avvio Motore Trend per il conto {NOME_CONTO}...")
     while True:
-        # Trova TF min. Per ora hardcodato a 5 minuti per il loop principale. 
-        # IG API accetta timestamp precisi. Il loop si sveglierà ai 5 minuti e valuterà le candele.
-        attesa = calcola_attesa(5)
-        print(f"Zzz... Attesa prossima chiusura candela: {attesa:.0f} secondi.")
-        time.sleep(attesa)
-        
         try:
-            esegui_ciclo_trend()
+            esegui_ciclo_trend(is_candle_close=False)
         except Exception as e:
-            print(f"Errore ciclo Trend: {e}")
-            traceback.print_exc()
+            pass
+
+        attesa = calcola_attesa(5)
+        if attesa < 2.5:
+            print(f"Candela in chiusura... attesa {attesa:.1f} secondi.")
+            time.sleep(attesa + 1)
+            try:
+                esegui_ciclo_trend(is_candle_close=True)
+            except Exception as e:
+                print(f"Errore ciclo Trend (Candle Close): {e}")
+                traceback.print_exc()
+        else:
+            time.sleep(2)
