@@ -1382,7 +1382,7 @@ else:
             st.html(f"""
             <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
                 <div>
-                    <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Strumenti</h3>
+                    <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Trading Range</h3>
                     {ultima_operazione_testo}
                 </div>
                 <div style='font-size: 1.05rem; font-weight: 500; display: flex; gap: 20px; align-items: center;'>
@@ -1401,8 +1401,8 @@ else:
                 st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-                # Mostra tutti gli strumenti, ordina mettendo prima quelli attivi, poi in ordine alfabetico
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
+                strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "RANGE"]
                 
                 for nome in strumenti_ordinati:
                     dati = memoria.get(nome, {})
@@ -1672,7 +1672,7 @@ else:
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                         elif tipo_strategia == "TREND" and stato_attivo:
-                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**. Spegnilo di là per poterlo avviare in Trading Range.")
+                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**.")
                         elif not stato_attivo:
                             col_l, col_s = st.columns(2)
                             with col_l:
@@ -1748,10 +1748,57 @@ else:
             
                 col_titolo_main, col_btn_restart = st.columns([5, 1])
                 with col_titolo_main:
-                    st.markdown("<h1 style='color: #00BFFF; margin-top: -15px; white-space: nowrap;'>📈 Dashboard Trend (Kijun/Tenkan)</h1>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='color: #00BFFF; margin-top: -15px; white-space: nowrap;'>📈 Dashboard Trend (KJ55 / TK21)</h1>", unsafe_allow_html=True)
                 with col_btn_restart:
                     st.write("") 
 
+                st.markdown("---")
+
+                def renderizza_sintesi_trend():
+                    memoria = carica_memoria(conto_selezionato)
+                    tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                    strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
+                    strumenti_ordinati = [x for x in strumenti_ordinati if memoria.get(x, {}).get("tipo_strategia", "RANGE") == "TREND"]
+
+                    if not strumenti_ordinati:
+                        return
+                    
+                    st.html("""
+                    <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-bottom: 20px;'>
+                        <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Trend</h3></div>
+                    </div>
+                    """)
+                    
+                    with st.container(border=True):
+                        c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
+                        c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento</div>", unsafe_allow_html=True)
+                        c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Stato Trend</div>", unsafe_allow_html=True)
+                        c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Parametri</div>", unsafe_allow_html=True)
+                        c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'></div>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
+                        
+                        for nome in strumenti_ordinati:
+                            dati = memoria.get(nome, {})
+                            stato = dati.get("stato", "FLAT")
+                            is_attivo = dati.get("attivo", False)
+                            dir_t = dati.get("direzione", "")
+                            tf = dati.get("timeframe", "MINUTE_5")
+                            sz = dati.get("size", 1)
+                            
+                            c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
+                            c1.markdown(f"**{nome}**")
+                            
+                            if is_attivo:
+                                color = "#198754" if dir_t == "LONG" else "#dc3545"
+                                if dir_t == "": color = "#FFD700"
+                                c2.markdown(f"<span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ ATTIVO ({dir_t})</span>", unsafe_allow_html=True)
+                            else:
+                                c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
+                                
+                            c3.markdown(f"<span style='color:#ccc; font-size:0.9rem;'>{tf} | Size {sz}</span>", unsafe_allow_html=True)
+                            c4.write("")
+
+                renderizza_sintesi_trend()
                 st.markdown("---")
 
                 def crea_riquadro_trend(nome, def_body=10, def_size=1, def_size_max=3):
@@ -1768,11 +1815,14 @@ else:
                         auto_restart = dati_salvati.get("auto_restart", True)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         
-                        col_titolo, col_salva = st.columns([3, 1], vertical_alignment="center")
+                        col_titolo, col_auto, col_salva = st.columns([2, 1, 1], vertical_alignment="center")
                         with col_titolo:
                             badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
                             titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
                             st.markdown(titolo_html, unsafe_allow_html=True)
+                            
+                        with col_auto:
+                            auto_restart = st.checkbox("Auto-Restart (A)", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
@@ -1782,12 +1832,12 @@ else:
                                     "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
                                     "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
                                     "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
-                                    "auto_restart": st.session_state.get(f"auto_{conto_selezionato}_{nome}", auto_restart)
+                                    "auto_restart": auto_restart
                                 }
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
 
-                        c_in1, c_in2, c_in3, c_in4, c_in5 = st.columns(5)
+                        c_in1, c_in2, c_in3, c_in4 = st.columns(4)
                         with c_in1:
                             opts_tf = ["MINUTE_5", "MINUTE_10", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
                             st.selectbox("Timeframe", opts_tf, index=opts_tf.index(tf_val) if tf_val in opts_tf else 0, key=f"tf_{conto_selezionato}_{nome}")
@@ -1797,11 +1847,9 @@ else:
                             st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
                         with c_in4:
                             st.number_input("Body Min", value=int(body_val), min_value=1, step=1, key=f"bd_{conto_selezionato}_{nome}")
-                        with c_in5:
-                            st.checkbox("Auto-Restart (A)", value=auto_restart, key=f"auto_{conto_selezionato}_{nome}")
                         
                         if tipo_strategia == "RANGE" and stato_attivo:
-                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**. Spegnilo di là per poterlo avviare in Trend.")
+                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
                         elif not stato_attivo:
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
