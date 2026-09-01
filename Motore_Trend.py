@@ -295,7 +295,9 @@ def esegui_ciclo_trend(is_candle_close=True):
         
         engine = stato_motore.motori[nome]
         
-        # Procediamo al recupero candele per calcolo Donchian
+        needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
+        if not is_candle_close and not needs_start:
+            continue
             
         # 1. Recupera candele da IG per calcolo Donchian e close
         prices = scarica_candele(epic, tf, limit=300, headers=headers)
@@ -322,12 +324,8 @@ def esegui_ciclo_trend(is_candle_close=True):
         tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
         kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
         
-        # Salva SEMPRE tk e kj ad ogni ciclo, anche se non chiude la candela
+        # Salva SEMPRE tk e kj al termine della candela
         aggiorna_memoria(nome, {"current_tk": tk_val, "current_kj": kj_val})
-        
-        needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
-        if not is_candle_close and not needs_start:
-            continue
         
         # --- RIPRISTINO STATO DA MEMORIA ---
         pos_core = dati.get("posizioni_core", [])
