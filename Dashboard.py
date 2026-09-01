@@ -998,10 +998,16 @@ else:
 
     st.markdown("""
         <style>
+        div[data-testid="stTabs"] > div[role="tablist"] {
+            gap: 2px !important;
+        }
         div[data-testid="stTabs"] button {
-            padding-left: 0.4rem !important;
-            padding-right: 0.4rem !important;
-            font-size: 0.85rem !important;
+            padding-left: 0.2rem !important;
+            padding-right: 0.2rem !important;
+            padding-top: 0.2rem !important;
+            padding-bottom: 0.2rem !important;
+            font-size: 0.75rem !important;
+            min-width: 0 !important;
         }
         </style>
     """, unsafe_allow_html=True)
