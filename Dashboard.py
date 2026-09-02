@@ -1296,9 +1296,11 @@ else:
                 if is_trend:
                     kj_val = memoria_attuale.get(nome, {}).get("current_kj")
                     tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                    pip_val = c.get("moltiplicatore", 0.0001)
                     
                     if kj_val is not None:
-                        stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>"
+                        sl_core = (kj_val - (5 * pip_val)) if dir == 'BUY' else (kj_val + (5 * pip_val))
+                        stop_str = f"<span style='color: #FFD700;' title='Stop Core (KJ +- 5 pip)'>{formatta_numero(sl_core, dec)}</span>"
                     else:
                         stop_str = "-"
                         
@@ -1386,7 +1388,13 @@ else:
                             l_str = "-"
                             is_core_subrow = (p in core_positions)
                             if is_core_subrow:
-                                s_str = "-"
+                                kj_val = memoria_attuale.get(nome, {}).get("current_kj")
+                                pip_val = c.get("moltiplicatore", 0.0001)
+                                if kj_val is not None:
+                                    sl_core = (kj_val - (5 * pip_val)) if dir == 'BUY' else (kj_val + (5 * pip_val))
+                                    s_str = f"<span style='color: #FFD700;' title='Stop Core (KJ +- 5 pip)'>{formatta_numero(sl_core, dec)}</span>"
+                                else:
+                                    s_str = "-"
                                 tf_val = memoria_attuale.get(nome, {}).get("timeframe", "MINUTE_5")
                                 tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                                 tf_str = tf_map.get(tf_val, tf_val)

@@ -110,20 +110,21 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            if c_close < kj:
-                # Sotto la Kijun: Chiude tutto e passa in FLAT
+            sl_core_long = kj - (5 * pip_val)
+            if c_close < sl_core_long:
+                # Sotto la Kijun - 5 pip: Chiude tutto e passa in FLAT
                 self.bancomat_sl = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_below_kj", "new_direction": "FLAT"})
+                events.append({"type": "reversal", "reason": "close_below_kj_buffer", "new_direction": "FLAT"})
                 
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
             elif c_close < (tk - (5 * pip_val)):
-                # Sotto Tenkan - 5 pip: Chiude solo gli incrementi (SL base a TK + 5 pip)
+                # Sotto Tenkan - 5 pip: Chiude solo gli incrementi (SL base a TK - 5 pip)
                 self.bancomat_sl = None
                 chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
@@ -189,13 +190,14 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            if c_close > kj:
-                # Sopra la Kijun: Chiude tutto e passa in FLAT
+            sl_core_short = kj + (5 * pip_val)
+            if c_close > sl_core_short:
+                # Sopra la Kijun + 5 pip: Chiude tutto e passa in FLAT
                 self.bancomat_sl = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_above_kj", "new_direction": "FLAT"})
+                events.append({"type": "reversal", "reason": "close_above_kj_buffer", "new_direction": "FLAT"})
                 
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
@@ -312,5 +314,98 @@ class CoreEngine:
                 self.signal_candles_elapsed = 0
 
         return events
-                
 
+    def check_live_stops(self, current_price):
+        """
+        Valuta Stop Loss in tempo reale (intracandela):
+        - Core: KJ +- 5 pip
+        - Bancomat: per l'incremento più anziano (se attivo)
+        - Incrementi base: TK +- 5 pip
+        """
+        events = []
+        if not self.is_running or self.current_direction == "FLAT":
+            return events
+        if self.current_tk is None or self.current_kj is None or current_price is None:
+            return events
+            
+        tk = self.current_tk
+        kj = self.current_kj
+        pip_val = self.config.get("pip_value") or 0.0001
+        
+        if self.current_direction == "LONG":
+            # 1. Stop Loss Core: KJ - 5 pip
+            sl_core = kj - (5 * pip_val)
+            if current_price <= sl_core:
+                self.bancomat_sl = None
+                events.extend(self.pm.close_all_increments(current_price))
+                ev = self.pm.close_core(current_price)
+                if ev: events.append(ev)
+                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
+                self.current_direction = "FLAT"
+                self.retracement_start_price = None
+                return events
+
+            # 2. Bancomat SL su incremento più anziano
+            if len(self.pm.increments) > 0 and self.bancomat_sl is not None and current_price <= self.bancomat_sl:
+                oldest = self.pm.force_close_oldest_increment(current_price)
+                if oldest:
+                    events.append({
+                        "type": "increment_closed",
+                        "reason": "bancomat",
+                        "direction": "LONG",
+                        "ticket": oldest.ticket,
+                        "size": oldest.size,
+                        "pnl": oldest.pnl,
+                        "price": current_price
+                    })
+                self.bancomat_sl = None
+
+            # 3. Stop Loss Incrementi: TK - 5 pip
+            sl_tk = tk - (5 * pip_val)
+            if len(self.pm.increments) > 0 and current_price <= sl_tk:
+                self.bancomat_sl = None
+                chiusure_inc = self.pm.close_all_increments(current_price)
+                if chiusure_inc:
+                    events.extend(chiusure_inc)
+                    events.append({"type": "increments_cleared", "reason": "live_stop_tk", "price": current_price})
+                self.retracement_start_price = None
+
+        elif self.current_direction == "SHORT":
+            # 1. Stop Loss Core: KJ + 5 pip
+            sl_core = kj + (5 * pip_val)
+            if current_price >= sl_core:
+                self.bancomat_sl = None
+                events.extend(self.pm.close_all_increments(current_price))
+                ev = self.pm.close_core(current_price)
+                if ev: events.append(ev)
+                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
+                self.current_direction = "FLAT"
+                self.retracement_start_price = None
+                return events
+
+            # 2. Bancomat SL su incremento più anziano
+            if len(self.pm.increments) > 0 and self.bancomat_sl is not None and current_price >= self.bancomat_sl:
+                oldest = self.pm.force_close_oldest_increment(current_price)
+                if oldest:
+                    events.append({
+                        "type": "increment_closed",
+                        "reason": "bancomat",
+                        "direction": "SHORT",
+                        "ticket": oldest.ticket,
+                        "size": oldest.size,
+                        "pnl": oldest.pnl,
+                        "price": current_price
+                    })
+                self.bancomat_sl = None
+
+            # 3. Stop Loss Incrementi: TK + 5 pip
+            sl_tk = tk + (5 * pip_val)
+            if len(self.pm.increments) > 0 and current_price >= sl_tk:
+                self.bancomat_sl = None
+                chiusure_inc = self.pm.close_all_increments(current_price)
+                if chiusure_inc:
+                    events.extend(chiusure_inc)
+                    events.append({"type": "increments_cleared", "reason": "live_stop_tk", "price": current_price})
+                self.retracement_start_price = None
+
+        return events

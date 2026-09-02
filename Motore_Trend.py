@@ -150,16 +150,59 @@ def ottieni_headers_ig():
         }
     except Exception: return None
 
-# --- FUNZIONI API IG (MUTUATE DAL RANGE) ---
+# --- FUNZIONI API IG E RATE LIMITER ---
+from collections import deque
+import threading
+
+class IGRateLimiter:
+    """
+    Gatekeeper centralizzato per prevenire rate-limiting / ingolfamento su IG API.
+    - Spaziatura minima di 1.2s tra chiamate consecutive.
+    - Tetto massimo a finestra mobile: max 25 richieste ogni 60 secondi.
+    """
+    def __init__(self, min_interval=1.2, max_per_minute=25):
+        self.min_interval = min_interval
+        self.max_per_minute = max_per_minute
+        self.last_call_time = 0.0
+        self.call_history = deque()
+        self.lock = threading.Lock()
+        
+    def acquire(self):
+        with self.lock:
+            now = time.time()
+            
+            # 1. Pulizia chiamate più vecchie di 60 secondi
+            while self.call_history and (now - self.call_history[0]) > 60.0:
+                self.call_history.popleft()
+                
+            # 2. Controllo tetto massimo al minuto
+            if len(self.call_history) >= self.max_per_minute:
+                attesa_quota = 60.0 - (now - self.call_history[0]) + 0.1
+                if attesa_quota > 0:
+                    time.sleep(attesa_quota)
+                    now = time.time()
+                    
+            # 3. Spaziatura minima di respiro
+            diff = now - self.last_call_time
+            if diff < self.min_interval:
+                time.sleep(self.min_interval - diff)
+                now = time.time()
+                
+            self.last_call_time = now
+            self.call_history.append(now)
+
+ig_rate_limiter = IGRateLimiter(min_interval=1.2, max_per_minute=25)
+
 def formatta_numero(valore, dec):
     if valore is None: return None
     r = round(float(valore), dec)
     return f"{r:.{dec}f}"
 
-def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=6):
+def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=4):
     headers_req = headers.copy()
     headers_req["Version"] = "2"
     for _ in range(max_retries):
+        ig_rate_limiter.acquire()
         try:
             if metodo.upper() == 'GET':
                 r = requests.get(url, headers=headers_req, timeout=10)
@@ -169,19 +212,19 @@ def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=6):
                 r = requests.post(url, headers=headers_req, json=payload, timeout=10)
             
             if r.status_code == 403 and "exceeded-api-key" in r.text:
-                time.sleep(30)
+                time.sleep(15)
                 continue
             return r
         except Exception:
-            time.sleep(1.5)
+            time.sleep(1.0)
     return None
 
 def verifica_conferma_deal(deal_ref, headers):
     h_conf = headers.copy()
     h_conf["Version"] = "1"
-    for _ in range(5): 
+    for _ in range(3): 
         try:
-            time.sleep(2) 
+            ig_rate_limiter.acquire()
             r = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=h_conf, timeout=10)
             if r.status_code == 200:
                 data = r.json()
@@ -191,6 +234,7 @@ def verifica_conferma_deal(deal_ref, headers):
                     return False, data.get("reason", "Unknown")
         except Exception:
             pass
+        time.sleep(0.5)
     return True, {}
 
 def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers, dec, limit_lvl=None, stop_lvl=None, etichetta="[ORDINE]"):
@@ -204,7 +248,9 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
     if limit_lvl is not None: p["limitLevel"] = formatta_numero(limit_lvl, dec)
     if stop_lvl is not None: p["stopLevel"] = formatta_numero(stop_lvl, dec)
     
-    for tentativo in range(4): 
+    backoffs = [1.0, 2.0, 3.0]
+    for tentativo in range(len(backoffs) + 1): 
+        ig_rate_limiter.acquire()
         try:
             r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=p, timeout=10)
             if r.status_code == 200:
@@ -215,7 +261,8 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                     accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
                     if not accettato:
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {direzione}: {confirm_data}")
-                        time.sleep(20)
+                        if tentativo < len(backoffs):
+                            time.sleep(backoffs[tentativo])
                         continue
                     if isinstance(confirm_data, dict):
                         if confirm_data.get("level") is not None: real_level = float(confirm_data.get("level"))
@@ -223,10 +270,11 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
 
                 if real_level is None:
                     try:
-                        time.sleep(1.0)
-                        resp_p = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers)
+                        time.sleep(0.5)
+                        ig_rate_limiter.acquire()
+                        resp_p = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
                         if resp_p and resp_p.status_code == 200:
-                            p_list = [pos for pos in resp_p.json().get('positions', []) if pos['market']['epic'] == epic and pos['position']['direction'] == direzione and abs(float(pos['position']['size']) - float(size)) < 0.001]
+                            p_list = [pos for pos in resp_p.json().get('positions', []) if pos['market']['epic'] == epic and pos['position']['direction'] == dir_ig and abs(float(pos['position']['size']) - float(size)) < 0.001]
                             if p_list:
                                 real_level = float(p_list[0]['position']['level'])
                                 deal_id = p_list[0]['position']['dealId']
@@ -237,14 +285,18 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                 print_log(nome_strumento, f"✅ {etichetta} eseguito con successo{livello_log}.")
                 return True, real_level, deal_id
             else:
-                if r.status_code == 403 and "exceeded-api-key" in r.text:
-                    time.sleep(30)
+                resp_txt = r.text
+                if r.status_code == 403 and "exceeded-api-key" in resp_txt:
+                    print_log(nome_strumento, f"🛑 Rate limit IG superato, attesa salvavita 15s...")
+                    time.sleep(15)
                 else:
-                    print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {r.text}")
-                    time.sleep(20)
+                    print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {resp_txt}")
         except Exception as e:
             print_log(nome_strumento, f"⚠️ Eccezione Rete su {etichetta} {direzione}: {e}")
-            time.sleep(20)
+            
+        if tentativo < len(backoffs):
+            time.sleep(backoffs[tentativo])
+            
     return False, None, None
 
 def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichetta="[POSIZIONE]"):
@@ -253,32 +305,69 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
     h["_method"] = "DELETE"
     size_str = str(int(size)) if float(size).is_integer() else str(size)
     p = {"dealId": dealId, "direction": dir_chiusura, "size": size_str, "orderType": "MARKET"}
-    for tentativo in range(4):
+    
+    backoffs = [1.0, 2.0, 3.0]
+    for tentativo in range(len(backoffs) + 1):
+        ig_rate_limiter.acquire()
         try:
             r = requests.post(f"{BASE_URL}/positions/otc", headers=h, json=p, timeout=10)
-            if r.status_code == 200: 
-                print_log(nome_strumento, f"✅ Chiusura {etichetta} eseguita con successo.")
-                return True
-            else:
-                if r.status_code == 403 and "exceeded-api-key" in r.text:
-                    time.sleep(30)
+            if r.status_code == 200:
+                deal_ref = r.json().get("dealReference")
+                if deal_ref:
+                    accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
+                    if not accettato:
+                        reason = str(confirm_data)
+                        if "POSITION_NOT_FOUND" in reason or "deal-not-found" in reason:
+                            print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): posizione già chiusa su IG.")
+                            return True
+                        print_log(nome_strumento, f"⚠️ [IG REJECT] Chiusura {etichetta}: {confirm_data}")
+                    else:
+                        print_log(nome_strumento, f"✅ Chiusura {etichetta} eseguita con successo.")
+                        return True
                 else:
-                    print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {r.text}")
-                    time.sleep(20)
+                    print_log(nome_strumento, f"✅ Chiusura {etichetta} inviata.")
+                    return True
+            else:
+                resp_txt = r.text
+                if r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt):
+                    print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): già liquidata su IG.")
+                    return True
+                if r.status_code == 403 and "exceeded-api-key" in resp_txt:
+                    print_log(nome_strumento, f"🛑 Rate limit IG superato, attesa salvavita 15s...")
+                    time.sleep(15)
+                else:
+                    print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {resp_txt}")
         except Exception as e:
             print_log(nome_strumento, f"⚠️ Eccezione su Chiusura {etichetta}: {e}")
-            time.sleep(20)
+            
+        if tentativo < len(backoffs):
+            time.sleep(backoffs[tentativo])
+            
     return False
 
-def pulisci_posizioni_epic(nome, epic, headers):
+def conta_posizioni_aperte_epic(epic, headers):
+    """Conta quante posizioni reali sono attualmente aperte su IG per questo epic."""
     try:
-        r = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers)
+        ig_rate_limiter.acquire()
+        r = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
         if r and r.status_code == 200:
-            for p in r.json().get('positions', []):
-                if p['market']['epic'] == epic:
-                    dir_c = "SELL" if p['position']['direction'] == "BUY" else "BUY"
-                    chiudi_parziale(nome, p['position']['dealId'], dir_c, p['position']['size'], headers, etichetta="[REVERSAL CLEANUP]")
-                    time.sleep(1.0)
+            pos = [p for p in r.json().get('positions', []) if p['market']['epic'] == epic]
+            return len(pos)
+    except Exception as e:
+        print_log("SISTEMA", f"Errore verifica posizioni IG: {e}")
+    return 0
+
+def pulisci_posizioni_epic(nome, epic, headers):
+    """Chiude tutte le posizioni aperte per quell'epic su IG con pacing anti-ingolfamento."""
+    try:
+        ig_rate_limiter.acquire()
+        r = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
+        if r and r.status_code == 200:
+            pos_list = [p for p in r.json().get('positions', []) if p['market']['epic'] == epic]
+            for p in pos_list:
+                dir_c = "SELL" if p['position']['direction'] == "BUY" else "BUY"
+                chiudi_parziale(nome, p['position']['dealId'], dir_c, p['position']['size'], headers, etichetta="[CLEANUP]")
+                time.sleep(0.5) # micro-respiro tra le posizioni
     except Exception as e:
         print_log(nome, f"Errore pulizia reversal: {e}")
 
@@ -348,6 +437,7 @@ def scarica_candele(epic, timeframe, limit=2, headers=None):
     h = headers.copy()
     h["Version"] = "3"
     try:
+        ig_rate_limiter.acquire()
         url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
         r = requests.get(url, headers=h, timeout=10)
         if r.status_code == 200:
@@ -370,12 +460,152 @@ def aggiorna_memoria(nome, update_dict):
     except Exception:
         pass
 
+def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, dec, auto_restart, dati):
+    if not events:
+        return
+    storico = dati.get("storico_wip_trend", [])
+    ha_fatto_eventi = False
+    
+    for ev in events:
+        tipo = ev['type']
+        ora_str = now_it().strftime("%d/%m %H:%M:%S")
+        
+        if tipo == 'auto_start':
+            dir_auto = ev['direction']
+            
+            # --- SIGILLO DI SICUREZZA: ZERO POSIZIONI RESIDUE PRIMA DELLA NUOVA CORE ---
+            pos_residue = conta_posizioni_aperte_epic(epic, headers)
+            if pos_residue > 0:
+                print_log(nome, f"🛑 [BLOCCO AUTO-RESTART] Rilevate {pos_residue} posizioni ancora aperte su IG! Pulizia obbligatoria prima della nuova Core...")
+                pulisci_posizioni_epic(nome, epic, headers)
+                time.sleep(1.0)
+                pos_residue_2 = conta_posizioni_aperte_epic(epic, headers)
+                if pos_residue_2 > 0:
+                    print_log(nome, f"🚨 [BLOCCO REVERSAL] Core {dir_auto} annullata: {pos_residue_2} posizioni ancora bloccate su IG!")
+                    invia_notifica(f"🚨 BLOCCO REVERSAL: {nome}", f"[{nome}] Trovate {pos_residue_2} posizioni residue non chiuse su IG. Auto-Restart bloccato per sicurezza.", "sos")
+                    engine.reset()
+                    aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None})
+                    continue
+
+            ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_auto, size_i, headers, dec, etichetta="[CORE AUTO-RESTART]")
+            if ok:
+                entry_px = real_lvl if real_lvl else ev['price']
+                if engine.pm.core_position:
+                    engine.pm.core_position.entry_price = entry_px
+                    engine.pm.core_position.ticket = deal_id
+                msg = f"🚀 Auto-Restart: Apertura Core {dir_auto} a {entry_px}"
+                print_log(nome, msg)
+                invia_notifica(f"🚀 AUTO-RESTART TREND: {nome}", f"[{nome}] {msg}", "rocket")
+                storico.append(f"[{ora_str}] {msg}")
+                ha_fatto_eventi = True
+                aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
+            else:
+                engine.reset()
+                print_log(nome, "⚠️ Fallito inserimento a mercato Core Auto-Restart.")
+        
+        elif tipo == 'increment_opened':
+            dir_incr = ev['direction']
+            pos = ev['position']
+            ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_incr, pos.size, headers, dec, etichetta="[INCREMENTO]")
+            if ok:
+                pos.entry_price = real_lvl if real_lvl else ev['price']
+                pos.ticket = deal_id
+                msg = f"➕ Incremento Aperto {dir_incr} a {pos.entry_price}"
+                print_log(nome, msg)
+                invia_notifica(f"➕ INCREMENTO TREND: {nome}", f"[{nome}] {msg}", "heavy_plus_sign")
+                storico.append(f"[{ora_str}] {msg}")
+                ha_fatto_eventi = True
+            else:
+                engine.pm.increments.remove(pos)
+                
+        elif tipo in ('core_closed', 'increment_closed', 'fifo_close', 'increments_cleared'):
+            deal_id = ev.get('ticket')
+            if deal_id:
+                dir_chiusura = "SELL" if ev['direction'] == "LONG" else "BUY"
+                sz = ev.get('size', size_i)
+                is_bancomat = (ev.get('reason') == 'bancomat')
+                etichetta_tag = "[BANCOMAT]" if is_bancomat else f"[{tipo.upper()}]"
+                chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
+                
+                raw_diff = ev.get('pnl', 0)
+                c_cfg = CONFIG_STRUMENTI.get(nome, {})
+                mult = c_cfg.get("moltiplicatore", 1)
+                valore_punto = c_cfg.get("valore_punto", 1)
+                valuta_c = c_cfg.get("valuta", "USD")
+                
+                prezzi_live = {}
+                try:
+                    if os.path.exists(STATO_SISTEMA):
+                        with open(STATO_SISTEMA, "r") as f_st:
+                            prezzi_live = json.load(f_st).get("prezzi_live", {})
+                except Exception:
+                    pass
+                
+                rate = get_eur_rate(valuta_c, prezzi_live)
+                pnl_eur = (raw_diff / mult) * valore_punto * rate
+                pnl_str = f" [PnL: {pnl_eur:+.2f} €]" if pnl_eur != 0 else ""
+                
+                if is_bancomat:
+                    msg = f"💰 BANCOMAT Incassato! Chiuso Incremento ({sz}){pnl_str}"
+                    invia_notifica(f"💰 BANCOMAT TREND: {nome}", f"[{nome}] {msg}", "moneybag")
+                else:
+                    msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
+                    invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
+                storico.append(f"[{ora_str}] {msg}")
+                ha_fatto_eventi = True
+        
+        elif tipo == 'reversal':
+            new_d = ev.get("new_direction", "FLAT")
+            reason_str = ev.get("reason", "")
+            tag_motivo = " (Live Stop KJ)" if "live_stop" in reason_str else ""
+            msg = f"🛑 Reversal Kijun{tag_motivo}: chiusura globale e passaggio a {new_d}"
+            print_log(nome, msg)
+            invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
+            storico.append(f"[{ora_str}] {msg}")
+            ha_fatto_eventi = True
+            pulisci_posizioni_epic(nome, epic, headers)
+            if not auto_restart:
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None})
+                engine.reset()
+                print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
+            else:
+                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None})
+            
+    # Salvataggio posizioni aggiornate
+    if engine.is_running:
+        core_dict = [engine.pm.core_position.to_dict()] if engine.pm.core_position else []
+        incr_dict = [p.to_dict() for p in engine.pm.increments]
+        update_data = {
+            "posizioni_core": core_dict, 
+            "posizioni_incr": incr_dict,
+            "bancomat_sl": engine.bancomat_sl
+        }
+        if ha_fatto_eventi:
+            if len(storico) > 30: storico = storico[-30:]
+            update_data["storico_wip_trend"] = storico
+        aggiorna_memoria(nome, update_data)
+    elif events and not auto_restart:
+        update_data_off = {"posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None}
+        if ha_fatto_eventi:
+            if len(storico) > 30: storico = storico[-30:]
+            update_data_off["storico_wip_trend"] = storico
+        aggiorna_memoria(nome, update_data_off)
+
 def esegui_ciclo_trend():
     headers = ottieni_headers_ig()
     if not headers:
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
         return
         
+    # Lettura prezzi live locali (a 0 chiamate API a IG)
+    prezzi_live = {}
+    if os.path.exists(STATO_SISTEMA):
+        try:
+            with open(STATO_SISTEMA, "r") as f_st:
+                prezzi_live = json.load(f_st).get("prezzi_live", {})
+        except Exception:
+            pass
+
     try:
         with open(FILE_MEMORIA, "r") as f: parametri = json.load(f)
     except Exception:
@@ -400,6 +630,8 @@ def esegui_ciclo_trend():
         auto_restart = dati.get("auto_restart", True)
         direzione = dati.get("direzione", "LONG")
         stato_corrente = dati.get("stato", "FLAT") # "FLAT", "LONG", "SHORT"
+        valuta = CONFIG_STRUMENTI[nome]["valuta"]
+        dec = CONFIG_STRUMENTI[nome]["decimali"]
         
         # Inizializza/Recupera Engine
         if nome not in stato_motore.motori:
@@ -424,18 +656,43 @@ def esegui_ciclo_trend():
         
         engine = stato_motore.motori[nome]
         
+        # Sincronizza posizioni da memoria se engine è vuoto ma in memoria ci sono posizioni
+        if not engine.is_running and stato_corrente in ("LONG", "SHORT"):
+            pos_core = dati.get("posizioni_core", [])
+            pos_incr = dati.get("posizioni_incr", [])
+            if pos_core:
+                engine.is_running = True
+                engine.current_direction = stato_corrente
+                c_p = pos_core[0]
+                p_c = engine.pm.open_core(c_p.get("entry", 0), c_p.get("size", size_i), stato_corrente)
+                p_c.ticket = c_p.get("ticket")
+                for ip in pos_incr:
+                    p_i = engine.pm.open_increment(ip.get("entry", 0), ip.get("size", 1), stato_corrente)
+                    p_i.ticket = ip.get("ticket")
+                engine.bancomat_sl = dati.get("bancomat_sl")
+                engine.current_tk = dati.get("current_tk")
+                engine.current_kj = dati.get("current_kj")
+
+        # -------------------------------------------------------------
+        # FASE 1: CONTROLLO STOP LOSS LIVE INTRACANDELA (0 Chiamate API)
+        # -------------------------------------------------------------
+        live_px = prezzi_live.get(nome)
+        if live_px and isinstance(live_px, (int, float)) and engine.is_running and engine.current_direction != "FLAT":
+            live_events = engine.check_live_stops(live_px)
+            if live_events:
+                processa_eventi_engine(nome, engine, live_events, epic, valuta, size_i, headers, dec, auto_restart, dati)
+
+        # -------------------------------------------------------------
+        # FASE 2: TIMING FINE CANDELA O AVVIO MANUALE
+        # -------------------------------------------------------------
         needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
         
-        # TIMING RIGOROSO:
-        # H4: 01:00, 05:00, 09:00, 13:00, 17:00, 21:00 (offset = 60)
-        # Daily: 01:00 (offset = 60)
-        # M5/M15/M30/H1: scatti standard sincronizzati all'1:00
         now_t = now_it()
         min_tf = TF_MAP.get(tf, 5)
         min_tot = now_t.hour * 60 + now_t.minute
         offset = 60 if min_tf in (60, 240, 1440) else 0
         is_candle_boundary = (min_tot - offset) % min_tf == 0
-        is_just_closed = is_candle_boundary and now_t.second < 20
+        is_just_closed = is_candle_boundary and now_t.second < 25
         
         if not is_just_closed and not needs_start:
             continue
@@ -588,152 +845,7 @@ def esegui_ciclo_trend():
                 
         # Alimenta la candela all'Engine
         events = engine.on_candle_close(closed_candle, next_open_price=closed_candle.close)
-        
-        storico = dati.get("storico_wip_trend", [])
-        ha_fatto_eventi = False
-        
-        for ev in events:
-            tipo = ev['type']
-            ora_str = now_it().strftime("%d/%m %H:%M:%S")
-            
-            if tipo == 'auto_start':
-                dir_auto = ev['direction']
-                ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_auto, size_i, headers, dec, etichetta="[CORE AUTO-RESTART]")
-                if ok:
-                    entry_px = real_lvl if real_lvl else ev['price']
-                    if engine.pm.core_position:
-                        engine.pm.core_position.entry_price = entry_px
-                        engine.pm.core_position.ticket = deal_id
-                    msg = f"🚀 Auto-Restart: Apertura Core {dir_auto} a {entry_px}"
-                    print_log(nome, msg)
-                    invia_notifica(f"🚀 AUTO-RESTART TREND: {nome}", f"[{nome}] {msg}", "rocket")
-                    storico.append(f"[{ora_str}] {msg}")
-                    ha_fatto_eventi = True
-                    aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
-                else:
-                    engine.reset()
-                    print_log(nome, "⚠️ Fallito inserimento a mercato Core Auto-Restart.")
-            
-            elif tipo == 'increment_opened':
-                dir_incr = ev['direction']
-                pos = ev['position']
-                ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_incr, pos.size, headers, dec, etichetta="[INCREMENTO]")
-                if ok:
-                    pos.entry_price = real_lvl if real_lvl else ev['price']
-                    pos.ticket = deal_id
-                    msg = f"➕ Incremento Aperto {dir_incr} a {pos.entry_price}"
-                    print_log(nome, msg)
-                    invia_notifica(f"➕ INCREMENTO TREND: {nome}", f"[{nome}] {msg}", "heavy_plus_sign")
-                    storico.append(f"[{ora_str}] {msg}")
-                    ha_fatto_eventi = True
-                else:
-                    engine.pm.increments.remove(pos)
-                    
-            elif tipo in ('core_closed', 'increment_closed', 'fifo_close', 'increments_cleared'):
-                deal_id = ev.get('ticket')
-                if deal_id:
-                    dir_chiusura = "SELL" if ev['direction'] == "LONG" else "BUY"
-                    sz = ev.get('size', size_i)
-                    is_bancomat = (ev.get('reason') == 'bancomat')
-                    etichetta_tag = "[BANCOMAT]" if is_bancomat else f"[{tipo.upper()}]"
-                    chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
-                    
-                    raw_diff = ev.get('pnl', 0)
-                    c_cfg = CONFIG_STRUMENTI.get(nome, {})
-                    mult = c_cfg.get("moltiplicatore", 1)
-                    valore_punto = c_cfg.get("valore_punto", 1)
-                    valuta_c = c_cfg.get("valuta", "USD")
-                    
-                    prezzi_live = {}
-                    try:
-                        if os.path.exists("stato_sistema.json"):
-                            with open("stato_sistema.json", "r") as f_st:
-                                prezzi_live = json.load(f_st).get("prezzi_live", {})
-                    except Exception:
-                        pass
-                    
-                    rate = get_eur_rate(valuta_c, prezzi_live)
-                    pnl_eur = (raw_diff / mult) * valore_punto * rate
-                    pnl_str = f" [PnL: {pnl_eur:+.2f} €]" if pnl_eur != 0 else ""
-                    
-                    if is_bancomat:
-                        msg = f"💰 BANCOMAT Incassato! Chiuso Incremento ({sz}){pnl_str}"
-                        invia_notifica(f"💰 BANCOMAT TREND: {nome}", f"[{nome}] {msg}", "moneybag")
-                    else:
-                        msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
-                        invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
-                    storico.append(f"[{ora_str}] {msg}")
-                    ha_fatto_eventi = True
-            
-            elif tipo == 'reversal':
-                new_d = ev.get("new_direction", "FLAT")
-                msg = f"🛑 Reversal Kijun: chiusura globale e passaggio a {new_d}"
-                print_log(nome, msg)
-                invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
-                storico.append(f"[{ora_str}] {msg}")
-                ha_fatto_eventi = True
-                pulisci_posizioni_epic(nome, epic, headers)
-                if not auto_restart:
-                    aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": ""})
-                    engine.reset()
-                    print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
-                else:
-                    aggiorna_memoria(nome, {"stato": "FLAT", "direzione": ""})
-                
-        # Alla fine salvo sempre lo stato delle posizioni
-        if engine.is_running:
-            core_dict = [engine.pm.core_position.to_dict()] if engine.pm.core_position else []
-            incr_dict = [p.to_dict() for p in engine.pm.increments]
-            update_data = {
-                "posizioni_core": core_dict, 
-                "posizioni_incr": incr_dict,
-                "bancomat_sl": engine.bancomat_sl
-            }
-            if ha_fatto_eventi:
-                if len(storico) > 30: storico = storico[-30:]
-                update_data["storico_wip_trend"] = storico
-            aggiorna_memoria(nome, update_data)
-        elif events and not auto_restart:
-            # Se si è spento e ha svuotato le posizioni
-            update_data_off = {"posizioni_core": [], "posizioni_incr": []}
-            if ha_fatto_eventi:
-                if len(storico) > 30: storico = storico[-30:]
-                update_data_off["storico_wip_trend"] = storico
-            aggiorna_memoria(nome, update_data_off)
-
-def calcola_attesa_dinamica(parametri):
-    now = now_it()
-    next_wake = now + datetime.timedelta(days=1)
-    has_active = False
-    
-    for nome, dati in parametri.items():
-        if dati.get("tipo_strategia", "RANGE") != "TREND": continue
-        if not dati.get("attivo", False): continue
-        
-        tf = dati.get("timeframe", "MINUTE_5")
-        min_tf = TF_MAP.get(tf, 5)
-        
-        min_tot = now.hour * 60 + now.minute
-        
-        # Offset di 60 minuti per H4 (240) e DAY (1440) per centrare 1:00 italiana
-        offset = 60 if min_tf in (240, 1440) else 0
-        
-        minuti_mancanti = min_tf - ((min_tot - offset) % min_tf)
-        if minuti_mancanti == 0:
-            minuti_mancanti = min_tf
-            
-        prossima = now + datetime.timedelta(minutes=minuti_mancanti)
-        prossima = prossima.replace(second=1, microsecond=0)
-        
-        if prossima < next_wake:
-            next_wake = prossima
-        has_active = True
-        
-    if not has_active:
-        return 10.0 # Se non c'è nulla, svegliati ogni 10 secondi
-        
-    attesa = (next_wake - now_it()).total_seconds()
-    return max(1.0, attesa)
+        processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, dec, auto_restart, dati)
 
 if __name__ == "__main__":
     try:
@@ -755,24 +867,8 @@ if __name__ == "__main__":
 
     while True:
         try:
-            with open(FILE_MEMORIA, "r") as f: parametri = json.load(f)
-        except:
-            parametri = {}
-            
-        attesa = calcola_attesa_dinamica(parametri)
-        
-        if attesa < 2.5:
-            print(f"Candela in chiusura... attesa {attesa:.1f} secondi.")
-            time.sleep(attesa + 1)
-            try:
-                esegui_ciclo_trend()
-            except Exception as e:
-                print(f"Errore ciclo Trend (Candle Close): {e}")
-                traceback.print_exc()
-        else:
-            time.sleep(10) # Risveglio parziale ogni 10s per leggere eventuali nuovi avvii (needs_start)
-            try:
-                esegui_ciclo_trend()
-            except Exception as e:
-                print(f"Errore ciclo Trend (Wakeup): {e}")
-                traceback.print_exc()
+            esegui_ciclo_trend()
+        except Exception as e:
+            print(f"Errore ciclo Trend: {e}")
+            traceback.print_exc()
+        time.sleep(2.0)
