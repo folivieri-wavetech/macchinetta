@@ -686,7 +686,8 @@ def esegui_ciclo_trend():
             incr_dict = [p.to_dict() for p in engine.pm.increments]
             update_data = {
                 "posizioni_core": core_dict, 
-                "posizioni_incr": incr_dict
+                "posizioni_incr": incr_dict,
+                "bancomat_sl": engine.bancomat_sl
             }
             if ha_fatto_eventi:
                 if len(storico) > 30: storico = storico[-30:]

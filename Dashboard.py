@@ -1360,7 +1360,19 @@ else:
                 html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{tot_size:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td>{td_tipo_master}<td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
-                    for idx, p in enumerate(posizioni):
+                    if is_trend:
+                        mem_strum = memoria_attuale.get(nome, {})
+                        s_core = float(mem_strum.get("size", 3))
+                        core_positions = [p for p in posizioni if abs(float(p['position']['size']) - s_core) < 0.001 or any(c.get("ticket") == p['position'].get("dealId") for c in mem_strum.get("posizioni_core", []))]
+                        other_positions = [p for p in posizioni if p not in core_positions]
+                        other_positions.sort(key=lambda x: x['position'].get('createdDateUTC', ''))
+                        posizioni_render = core_positions + other_positions
+                    else:
+                        core_positions = []
+                        other_positions = []
+                        posizioni_render = posizioni
+
+                    for idx, p in enumerate(posizioni_render):
                         sz = float(p['position']['size'])
                         lvl = float(p['position']['level'])
                         
@@ -1371,14 +1383,45 @@ else:
                         l_str = ""
                         
                         if is_trend:
-                            s_str = "-"
                             l_str = "-"
+                            is_core_subrow = (p in core_positions)
+                            if is_core_subrow:
+                                s_str = "-"
+                                tf_val = memoria_attuale.get(nome, {}).get("timeframe", "MINUTE_5")
+                                tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                                tf_str = tf_map.get(tf_val, tf_val)
+                                dir_str = 'LONG' if dir == 'BUY' else 'SHORT'
+                                ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+                            else:
+                                incr_idx = other_positions.index(p) + 1
+                                ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
+                                
+                                bancomat_sl = memoria_attuale.get(nome, {}).get("bancomat_sl")
+                                if incr_idx == 1 and bancomat_sl is not None:
+                                    sl_display = bancomat_sl
+                                    title_info = "Bancomat SL"
+                                else:
+                                    tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                                    pip_val = c.get("moltiplicatore", 0.0001)
+                                    if tk_val is not None:
+                                        sl_display = (tk_val - (5 * pip_val)) if dir == 'BUY' else (tk_val + (5 * pip_val))
+                                        title_info = "SL (TK +- 5 pip)"
+                                    else:
+                                        sl_display = None
+                                
+                                if sl_display is not None:
+                                    s_str = f"<span style='color: #b0b0b0;' title='{title_info}'>{formatta_numero(sl_display, dec)}</span>"
+                                else:
+                                    s_str = "-"
                         else:
                             if p['position'].get('stopLevel'): s_str = formatta_numero(p['position']['stopLevel'], dec)
                             elif p['position'].get('stopDistance'): s_str = "Stop" 
                             
                             if p['position'].get('limitLevel'): l_str = formatta_numero(p['position']['limitLevel'], dec)
                             elif p['position'].get('limitDistance'): l_str = "Limite"
+                            
+                            raw_ruolo = get_role_pos(nome, dir, sz, memoria_attuale.get(nome, {}), p['position'])
+                            ruolo_child = raw_ruolo.replace("Add-On 1", "+1").replace("Add-On 2", "+2")
                         
                         pnl_child_eur = 0.0
                         if prezzo_attuale:
@@ -1386,10 +1429,8 @@ else:
                             pnl_child_eur = pts * sz * valore_punto * rate
                             
                         pnl_c_class = "pnl-pos" if pnl_child_eur >= 0 else "pnl-neg"
-                        raw_ruolo = get_role_pos(nome, dir, sz, memoria_attuale.get(nome, {}), p['position'])
-                        ruolo_child = raw_ruolo.replace("Add-On 1", "+1").replace("Add-On 2", "+2")
                         
-                        is_last_subrow = (idx == len(posizioni) - 1)
+                        is_last_subrow = (idx == len(posizioni_render) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
                         td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span></td>" if is_regista else ""
