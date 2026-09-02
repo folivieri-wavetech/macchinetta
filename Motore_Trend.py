@@ -265,9 +265,26 @@ def carica_candele_locali(nome, tf):
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if len(data) >= 55:
+                    return data
         except Exception:
             pass
+            
+    # Fallback incrociato: cerca nei file degli altri conti nella PVC /data
+    clean = nome.replace("/", "_").replace(" ", "_")
+    fname = f"candele_{clean}_{tf}.json"
+    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
+        alt_path = os.path.join("..", altro, fname)
+        if os.path.exists(alt_path):
+            try:
+                with open(alt_path, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if len(d) >= 55:
+                        salva_candele_locali(nome, tf, d)
+                        return d
+            except Exception:
+                pass
     return []
 
 def salva_candele_locali(nome, tf, candele_list):
