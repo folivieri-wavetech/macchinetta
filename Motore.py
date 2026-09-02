@@ -1846,18 +1846,17 @@ def esegui_motore():
                                         lim_lvl_t2 = round(t2_entry + (param.get("tp") / 4) * mult, dec) if t2_dir == "BUY" else round(t2_entry - (param.get("tp") / 4) * mult, dec)
                                         succ_t2 = invia_ordine_pendente(nome, epic, valuta, t2_dir, s_mezzo, t2_entry, "LIMIT", lim_lvl_t2, None, h, dec, etichetta="[ORDINE TICKET2]")
                                         
-                                        if not succ_t2:
-                                            print_log(nome, "🛑 [ORDINE TICKET2] Impossibile ripristinare. Arresto forzato per evitare loop infiniti.")
-                                            aggiorna_memoria(nome, {"attivo": False, "errore_ripristino": True, "msg_manuale": "⚠️ Rifiuto persistente di IG al ripristino dell'Ordine TICKET2. Sospeso."}, log_wip=f"⚠️ Emergenza: IG rifiuta ripristino TICKET2.")
-                                            invia_notifica(f"🚨 ERRORE CRITICO: {nome}", f"[{nome}] Fallito ripristino Ordine TICKET2 (dopo 4 tentativi). Sospeso.", "warning")
-                                            continue
-                                            
                                         pnl_t2_win_eur = (param.get("tp") / 4) * s_mezzo * valore_punto * rate
                                         pnl_str = formatta_pnl(pnl_t2_win_eur)
                                         registra_operazione(nome, "Take Profit TICKET2", pnl_t2_win_eur)
                                         
-                                        invia_notifica(f"🎫 TICKET2 PROFIT: {nome}", f"[{nome}] Ticket2 a target a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Ordine TICKET2 [{to_market_dir(t2_dir)}] a {formatta_numero(t2_entry, dec)}", "ticket")
-                                        aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: TP colpito su TICKET2 a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Re-inserisco Ordine ({t2_dir}) a {formatta_numero(t2_entry, dec)}")
+                                        if not succ_t2:
+                                            print_log(nome, "⚠️ [ORDINE TICKET2] Impossibile ripristinare. Il Motore prosegue senza Ticket2.")
+                                            invia_notifica(f"⚠️ ATTENZIONE: {nome}", f"[{nome}] Ticket2 a target ma impossibile ripristinare ordine pendente TICKET2. Proseguo senza Ticket2 (gestibile via Recovery).", "warning")
+                                            aggiorna_memoria(nome, {"ticket2_active": False, "alert_falso_allarme": "⚠️ Ordine Ticket2 mancante. Proseguo in automatico."}, log_wip=f"✅ [EVENTO]: TP colpito su TICKET2 a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} [⚠️ Ticket2 non ripristinato]")
+                                        else:
+                                            invia_notifica(f"🎫 TICKET2 PROFIT: {nome}", f"[{nome}] Ticket2 a target a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Ordine TICKET2 [{to_market_dir(t2_dir)}] a {formatta_numero(t2_entry, dec)}", "ticket")
+                                            aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: TP colpito su TICKET2 a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Re-inserisco Ordine ({t2_dir}) a {formatta_numero(t2_entry, dec)}")
                                         time.sleep(2.0)
                                     else:
                                         print_log(nome, f"📉 [TICKET2] chiuso in STOP LOSS.")
