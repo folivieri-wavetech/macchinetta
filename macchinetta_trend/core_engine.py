@@ -124,7 +124,7 @@ class CoreEngine:
                         if self.retracement_start_price is None:
                             self.retracement_start_price = closed_candle.open
                             
-                        distanza_percorsa = self.retracement_start_price - c_close
+                        distanza_percorsa = self.retracement_start_price - closed_candle.low
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
@@ -170,7 +170,7 @@ class CoreEngine:
                         if self.retracement_start_price is None:
                             self.retracement_start_price = closed_candle.open
                             
-                        distanza_percorsa = c_close - self.retracement_start_price
+                        distanza_percorsa = closed_candle.high - self.retracement_start_price
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
