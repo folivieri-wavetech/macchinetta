@@ -1629,21 +1629,17 @@ else:
                     
                     c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
                     
-                    if dati.get("alert_falso_allarme"):
-                        if c2.button("👁️ Visto Anomalia", key=f"ack_anomalia_{conto_selezionato}_{nome}"):
+                    if has_anomalia:
+                        btn_label = "🚨 Visto Emergenza" if (dati.get("errore_avvio") or dati.get("errore_ripristino") or (dati.get("msg_manuale") and ("Fallit" in str(dati.get("msg_manuale")) or "Emergenza" in str(dati.get("msg_manuale")) or "Rifiuto" in str(dati.get("msg_manuale"))))) else "👁️ Visto Anomalia"
+                        if c2.button(btn_label, key=f"ack_all_{conto_selezionato}_{nome}"):
                             p = carica_memoria(conto_selezionato)
-                            if "alert_falso_allarme" in p[nome]:
-                                del p[nome]["alert_falso_allarme"]
+                            if nome in p:
+                                p[nome].pop("alert_falso_allarme", None)
+                                p[nome]["errore_ripristino"] = False
+                                p[nome]["errore_avvio"] = False
+                                p[nome]["msg_manuale"] = ""
                                 salva_memoria(conto_selezionato, p)
                                 st.rerun()
-                                
-                    if stato == "MANUALE" and (dati.get("errore_ripristino") or dati.get("errore_avvio")):
-                        if c2.button("🚨 Visto Emergenza", key=f"ack_emerg_{conto_selezionato}_{nome}"):
-                            p = carica_memoria(conto_selezionato)
-                            p[nome]["errore_ripristino"] = False
-                            p[nome]["errore_avvio"] = False
-                            salva_memoria(conto_selezionato, p)
-                            st.rerun()
                             
                     c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
                     ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
@@ -1923,6 +1919,13 @@ else:
                         elif tipo_strategia == "TREND" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**.")
                         elif not stato_attivo:
+                            msg_err = dati_salvati.get("msg_manuale") or ("Errore avvio" if dati_salvati.get("errore_avvio") else ("Errore ripristino" if dati_salvati.get("errore_ripristino") else ""))
+                            if msg_err:
+                                st.error(f"🛑 **Allarme/Sospensione Rilevata:** {msg_err}")
+                                if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False, "errore_ripristino": False, "alert_falso_allarme": False}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
                             col_l, col_s = st.columns(2)
                             with col_l:
                                 if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch"):
