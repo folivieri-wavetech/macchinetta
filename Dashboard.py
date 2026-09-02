@@ -1297,11 +1297,9 @@ else:
                 if is_trend:
                     kj_val = memoria_attuale.get(nome, {}).get("current_kj")
                     tk_val = memoria_attuale.get(nome, {}).get("current_tk")
-                    pip_val = c.get("moltiplicatore", 0.0001)
                     
                     if kj_val is not None:
-                        sl_core = (kj_val - (5 * pip_val)) if dir == 'BUY' else (kj_val + (5 * pip_val))
-                        stop_str = f"<span style='color: #FFD700;' title='Stop Core (KJ +- 5 pip)'>{formatta_numero(sl_core, dec)}</span>"
+                        stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>"
                     else:
                         stop_str = "-"
                         
