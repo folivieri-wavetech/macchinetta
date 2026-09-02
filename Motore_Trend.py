@@ -468,10 +468,12 @@ def esegui_ciclo_trend():
             engine.is_running = True
             engine.current_direction = stato_corrente if stato_corrente in ("LONG", "SHORT") else direzione
             for c_d in pos_core:
-                pos = engine.pm.open_core(c_d.get("entry", 0), c_d.get("size", 1), c_d.get("direction", "LONG"))
+                dir_pos = c_d.get("direction", engine.current_direction)
+                pos = engine.pm.open_core(c_d.get("entry", 0), c_d.get("size", 1), dir_pos)
                 pos.ticket = c_d.get("ticket")
             for i_d in pos_incr:
-                pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), i_d.get("direction", "LONG"))
+                dir_pos = i_d.get("direction", engine.current_direction)
+                pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), dir_pos)
                 pos.ticket = i_d.get("ticket")
 
         # Estrai candela chiusa (l'ultima nel buffer locale)
