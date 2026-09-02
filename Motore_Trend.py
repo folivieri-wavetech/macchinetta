@@ -436,18 +436,24 @@ def salva_candele_locali(nome, tf, candele_list):
 def scarica_candele(epic, timeframe, limit=2, headers=None):
     h = headers.copy()
     h["Version"] = "3"
-    try:
-        ig_rate_limiter.acquire()
-        url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
-        r = requests.get(url, headers=h, timeout=10)
-        if r.status_code == 200:
-            return r.json().get('prices', [])
-        else:
-            print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
-            if r.status_code == 403 and "historical-data-allowance" in r.text:
-                return "QUOTA_ESAURITA"
-    except Exception as e:
-        print_log("SISTEMA", f"Errore fetching prezzi {epic}: {e}")
+    for _ in range(3):
+        try:
+            ig_rate_limiter.acquire()
+            url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
+            r = requests.get(url, headers=h, timeout=10)
+            if r.status_code == 200:
+                return r.json().get('prices', [])
+            elif r.status_code == 403 and "exceeded-api-key" in r.text:
+                time.sleep(2.5)
+                continue
+            else:
+                if r.status_code == 403 and "historical-data-allowance" in r.text:
+                    return "QUOTA_ESAURITA"
+                print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
+                return []
+        except Exception as e:
+            print_log("SISTEMA", f"Errore fetching prezzi {epic}: {e}")
+            time.sleep(1.0)
     return []
 
 def aggiorna_memoria(nome, update_dict):
