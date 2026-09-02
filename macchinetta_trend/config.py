@@ -44,8 +44,8 @@ class Config:
         except Exception as e:
             print(f"Errore salvataggio config: {e}")
 
-    def get(self, key):
-        return self.params.get(key)
+    def get(self, key, default=None):
+        return self.params.get(key, default)
 
     def set(self, key, value):
         self.params[key] = value

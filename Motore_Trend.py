@@ -634,7 +634,9 @@ def esegui_ciclo_trend():
                 if deal_id:
                     dir_chiusura = "SELL" if ev['direction'] == "LONG" else "BUY"
                     sz = ev.get('size', size_i)
-                    chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=f"[{tipo.upper()}]")
+                    is_bancomat = (ev.get('reason') == 'bancomat')
+                    etichetta_tag = "[BANCOMAT]" if is_bancomat else f"[{tipo.upper()}]"
+                    chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
                     
                     raw_diff = ev.get('pnl', 0)
                     c_cfg = CONFIG_STRUMENTI.get(nome, {})
@@ -653,8 +655,13 @@ def esegui_ciclo_trend():
                     rate = get_eur_rate(valuta_c, prezzi_live)
                     pnl_eur = (raw_diff / mult) * valore_punto * rate
                     pnl_str = f" [PnL: {pnl_eur:+.2f} €]" if pnl_eur != 0 else ""
-                    msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
-                    invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    
+                    if is_bancomat:
+                        msg = f"💰 BANCOMAT Incassato! Chiuso Incremento ({sz}){pnl_str}"
+                        invia_notifica(f"💰 BANCOMAT TREND: {nome}", f"[{nome}] {msg}", "moneybag")
+                    else:
+                        msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
+                        invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                     storico.append(f"[{ora_str}] {msg}")
                     ha_fatto_eventi = True
             

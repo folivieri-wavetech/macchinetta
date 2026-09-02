@@ -40,6 +40,7 @@ class CoreEngine:
         # Stato Indicatori calcolati all'ultima candela chiusa
         self.current_tk = None
         self.current_kj = None
+        self.bancomat_sl = None # SL variabile per il Bancomat sull'incremento più anziano
         
     def reset(self):
         """Resetta lo stato della macchinetta."""
@@ -48,6 +49,7 @@ class CoreEngine:
         self.retracement_start_price = None
         self.active_signal = None
         self.signal_candles_elapsed = 0
+        self.bancomat_sl = None
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -110,6 +112,7 @@ class CoreEngine:
             # --- USCITE E REVERSAL LONG ---
             if c_close < kj:
                 # Sotto la Kijun: Chiude tutto e passa in FLAT
+                self.bancomat_sl = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
@@ -121,13 +124,45 @@ class CoreEngine:
                 
             elif c_close < tk:
                 # Sotto Tenkan: Chiude solo gli incrementi
+                self.bancomat_sl = None
                 chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
                     events.append({"type": "increments_cleared", "reason": "close_below_tk"})
                 self.retracement_start_price = None
 
-            if self.current_direction == "LONG":
+            else:
+                # Sopra Tenkan: Gestione Bancomat (SL variabile sull'incremento più anziano)
+                bancomat_triggered = False
+                if len(self.pm.increments) > 0:
+                    if self.bancomat_sl is not None and c_close <= self.bancomat_sl:
+                        oldest = self.pm.force_close_oldest_increment(exec_price)
+                        if oldest:
+                            events.append({
+                                "type": "increment_closed",
+                                "reason": "bancomat",
+                                "direction": "LONG",
+                                "ticket": oldest.ticket,
+                                "size": oldest.size,
+                                "pnl": oldest.pnl,
+                                "price": exec_price
+                            })
+                            bancomat_triggered = True
+                            self.retracement_start_price = None
+                        self.bancomat_sl = None
+                        
+                    if len(self.pm.increments) > 0:
+                        dist_tk = c_close - tk
+                        if dist_tk >= (10 * pip_val):
+                            nuovo_sl = c_close - (10 * pip_val)
+                            if self.bancomat_sl is None:
+                                self.bancomat_sl = nuovo_sl
+                            else:
+                                self.bancomat_sl = max(self.bancomat_sl, nuovo_sl)
+                else:
+                    self.bancomat_sl = None
+
+            if self.current_direction == "LONG" and not bancomat_triggered:
                 # --- INGRESSI INCREMENTO LONG ---
                 # Paletto: TK > KJ (o tollerato) e la candela deve aver APERTO SOPRA la TK (close precedente > TK)
                 if (tk > kj or abs(tk - kj) <= min_body_price) and closed_candle.open > tk and c_close >= tk:
@@ -156,6 +191,7 @@ class CoreEngine:
             # --- USCITE E REVERSAL SHORT ---
             if c_close > kj:
                 # Sopra la Kijun: Chiude tutto e passa in FLAT
+                self.bancomat_sl = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
@@ -167,13 +203,45 @@ class CoreEngine:
                 
             elif c_close > tk:
                 # Sopra Tenkan: Chiude solo gli incrementi
+                self.bancomat_sl = None
                 chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
                     events.append({"type": "increments_cleared", "reason": "close_above_tk"})
                 self.retracement_start_price = None
 
-            if self.current_direction == "SHORT":
+            else:
+                # Sotto Tenkan: Gestione Bancomat (SL variabile sull'incremento più anziano)
+                bancomat_triggered = False
+                if len(self.pm.increments) > 0:
+                    if self.bancomat_sl is not None and c_close >= self.bancomat_sl:
+                        oldest = self.pm.force_close_oldest_increment(exec_price)
+                        if oldest:
+                            events.append({
+                                "type": "increment_closed",
+                                "reason": "bancomat",
+                                "direction": "SHORT",
+                                "ticket": oldest.ticket,
+                                "size": oldest.size,
+                                "pnl": oldest.pnl,
+                                "price": exec_price
+                            })
+                            bancomat_triggered = True
+                            self.retracement_start_price = None
+                        self.bancomat_sl = None
+                        
+                    if len(self.pm.increments) > 0:
+                        dist_tk = tk - c_close
+                        if dist_tk >= (10 * pip_val):
+                            nuovo_sl = c_close + (10 * pip_val)
+                            if self.bancomat_sl is None:
+                                self.bancomat_sl = nuovo_sl
+                            else:
+                                self.bancomat_sl = min(self.bancomat_sl, nuovo_sl)
+                else:
+                    self.bancomat_sl = None
+
+            if self.current_direction == "SHORT" and not bancomat_triggered:
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Paletto: TK < KJ (o tollerato) e la candela deve aver APERTO SOTTO la TK (close precedente < TK)
                 if (tk < kj or abs(tk - kj) <= min_body_price) and closed_candle.open < tk and c_close <= tk:
