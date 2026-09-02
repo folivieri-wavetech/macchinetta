@@ -368,7 +368,8 @@ def esegui_ciclo_trend():
                 "min_body": min_body,
                 "pip_value": CONFIG_STRUMENTI[nome]["moltiplicatore"],
                 "max_kj_distance": 50.0,
-                "max_entry_delay": 5
+                "max_entry_delay": 5,
+                "auto_restart": auto_restart
             }
             stato_motore.motori[nome] = CoreEngine(cfg)
         else:
@@ -376,6 +377,7 @@ def esegui_ciclo_trend():
             stato_motore.motori[nome].config["size_max"] = size_max
             stato_motore.motori[nome].config["min_body"] = min_body
             stato_motore.motori[nome].config["pip_value"] = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+            stato_motore.motori[nome].config["auto_restart"] = auto_restart
         
         engine = stato_motore.motori[nome]
         
@@ -465,9 +467,9 @@ def esegui_ciclo_trend():
         pos_core = dati.get("posizioni_core", [])
         pos_incr = dati.get("posizioni_incr", [])
         
-        if not engine.is_running and (pos_core or pos_incr or (stato_corrente != "FLAT" and stato_corrente != "IN_ATTESA")):
+        if not engine.is_running and (pos_core or pos_incr or (stato_corrente != "FLAT" and stato_corrente != "IN_ATTESA") or auto_restart):
             engine.is_running = True
-            engine.current_direction = stato_corrente if stato_corrente in ("LONG", "SHORT") else direzione
+            engine.current_direction = stato_corrente if stato_corrente in ("LONG", "SHORT") else ("FLAT" if auto_restart else direzione)
             for c_d in pos_core:
                 dir_pos = c_d.get("direction", engine.current_direction)
                 pos = engine.pm.open_core(c_d.get("entry", 0), c_d.get("size", 1), dir_pos)

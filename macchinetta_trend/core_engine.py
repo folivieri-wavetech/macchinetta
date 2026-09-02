@@ -195,14 +195,17 @@ class CoreEngine:
                 else:
                     self.retracement_start_price = None # Fuori dai paletti
 
-        # --- VALUTAZIONE INGRESSO DA STATO FLAT ---
+        # --- VALUTAZIONE INGRESSO DA STATO FLAT (AUTO-RESTART) ---
         if self.current_direction == "FLAT":
+            if not self.config.get("auto_restart", False):
+                return events
+
             is_long_cond = c_close > tk and (tk > kj or abs(tk - kj) <= min_body_price)
             is_short_cond = c_close < tk and (tk < kj or abs(tk - kj) <= min_body_price)
             
-            pip_val = self.config.get("pip_value", 1.0)
-            max_dist = self.config.get("max_kj_distance", 50.0) * pip_val
-            max_delay = self.config.get("max_entry_delay", 5)
+            pip_val = self.config.get("pip_value") or 0.0001
+            max_dist = (self.config.get("max_kj_distance") or 50.0) * pip_val
+            max_delay = self.config.get("max_entry_delay") or 5
             
             if is_long_cond:
                 if self.active_signal != "LONG":
