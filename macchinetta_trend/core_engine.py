@@ -1,11 +1,18 @@
-from position_manager import PositionManager
+try:
+    from position_manager import PositionManager
+except ImportError:
+    try:
+        from macchinetta_trend.position_manager import PositionManager
+    except ImportError:
+        from .position_manager import PositionManager
+from collections import deque
 
 class Candle:
     def __init__(self, open_p, high_p, low_p, close_p):
-        self.open = open_p
-        self.high = high_p
-        self.low = low_p
-        self.close = close_p
+        self.open = float(open_p)
+        self.high = float(high_p)
+        self.low = float(low_p)
+        self.close = float(close_p)
         
     def is_red(self):
         return self.close < self.open
@@ -18,8 +25,8 @@ class Candle:
 
 
 class CoreEngine:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, config=None):
+        self.config = config or {}
         self.pm = PositionManager()
         
         # Stato del motore
@@ -83,13 +90,14 @@ class CoreEngine:
             
         if self.current_tk is None or self.current_kj is None:
             return events
-            
         c_close = closed_candle.close
         exec_price = next_open_price if next_open_price is not None else c_close
         tk = self.current_tk
         kj = self.current_kj
-        pip_val = self.config.get("pip_value")
-        min_body_price = self.config.get("min_body") * pip_val
+        pip_val = self.config.get("pip_value") or 0.0001
+        min_body = self.config.get("min_body", 5) or 5
+        min_body_price = min_body * pip_val
+        size_max = self.config.get("size_max") or self.config.get("size_f", 10)
         
         # ==========================================
         # LOGICA BI-DIREZIONALE (STOP & REVERSE)
@@ -128,7 +136,7 @@ class CoreEngine:
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
-                            if self.pm.total_active_size() >= self.config.get("size_f"):
+                            if self.pm.total_active_size() >= size_max:
                                 oldest = self.pm.force_close_oldest_increment(entry_price)
                                 if oldest:
                                     events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price, "ticket": oldest.ticket, "size": oldest.size})
@@ -141,7 +149,7 @@ class CoreEngine:
                 else:
                     self.retracement_start_price = None # Fuori dai paletti
 
-        if self.current_direction == "SHORT":
+        elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
             if c_close > kj:
                 # Sopra la Kijun: Chiude tutto e passa in FLAT
@@ -174,7 +182,7 @@ class CoreEngine:
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
-                            if self.pm.total_active_size() >= self.config.get("size_f"):
+                            if self.pm.total_active_size() >= size_max:
                                 oldest = self.pm.force_close_oldest_increment(entry_price)
                                 if oldest:
                                     events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price, "ticket": oldest.ticket, "size": oldest.size})

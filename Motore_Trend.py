@@ -474,8 +474,8 @@ def esegui_ciclo_trend():
                 pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), i_d.get("direction", "LONG"))
                 pos.ticket = i_d.get("ticket")
 
-        # Estrai candela chiusa
-        last = prices[-1]
+        # Estrai candela chiusa (l'ultima nel buffer locale)
+        last = candele_locali[-1]
         try:
             bid_o, ask_o = last['openPrice']['bid'], last['openPrice']['ask']
             bid_h, ask_h = last['highPrice']['bid'], last['highPrice']['ask']
