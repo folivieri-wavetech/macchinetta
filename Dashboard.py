@@ -339,6 +339,36 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
             st.html(tabella_html)
     st.markdown("---")
 
+@st.dialog("📈 Cronologia Trend WIP")
+def mostra_diario_wip_trend(nome_strumento, storico):
+    st.markdown(f"### 📈 Cronologia Trend WIP: {nome_strumento}")
+    st.markdown("---")
+    if storico:
+        totale = 0.0
+        for riga in storico:
+            match = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
+            if match:
+                totale += float(match.group(1).replace(",", "."))
+        
+        righe_eventi = []
+        for riga in reversed(storico):
+            riga_colorata = re.sub(r"(\[PnL:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
+            righe_eventi.append(f"&bull; {riga_colorata}<br>")
+        
+        segno = "+" if totale > 0 else ""
+        col_tot = "#09ab3b" if totale > 0 else ("#ff4b4b" if totale < 0 else "#FFD700")
+        
+        html_str = f"<div style='margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
+        html_str += f"<span style='color: #FFD700;'><b>Totale PnL Chiusure:</b> <span style='color: {col_tot}; font-weight: bold;'>{segno}{totale:.2f} €</span></span></div>"
+        html_str += "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
+        html_str += "".join(righe_eventi)
+        html_str += "</div>"
+        
+        st.html(html_str)
+    else:
+        st.info("Nessun evento Trend registrato in questo ciclo.")
+    st.markdown("---")
+
 def get_ig_headers(conto_selezionato):
     if DEV_MODE: return None
     token_path = os.path.join(conto_selezionato, FILE_TOKEN)
@@ -1662,10 +1692,52 @@ else:
                         incr_count = len(posizioni_incr)
                         incr_avg = sum(p.get("entry", 0) for p in posizioni_incr) / incr_count if incr_count > 0 else 0
                         
-                        c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
-                        c1.markdown(f"**{nome}**")
-                        
                         tipo_strat = dati.get("tipo_strategia", "RANGE")
+                        
+                        # Colore e stile del pulsante Strumento WIP
+                        if is_attivo and tipo_strat == "TREND":
+                            if dir_t == "LONG":
+                                bg_color_t = "#198754" # Verde
+                            elif dir_t == "SHORT":
+                                bg_color_t = "#dc3545" # Rosso
+                            else:
+                                bg_color_t = "#00BFFF" # Azzurro
+                            text_color_t = "white"
+                        elif is_attivo and tipo_strat == "RANGE":
+                            bg_color_t = "#17a2b8"
+                            text_color_t = "white"
+                        else:
+                            bg_color_t = "#495057"
+                            text_color_t = "white"
+                            
+                        totale_wip_t = 0.0
+                        if storico:
+                            for riga in storico:
+                                match = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
+                                if match:
+                                    totale_wip_t += float(match.group(1).replace(",", "."))
+                        
+                        segno_t = "+" if totale_wip_t > 0 else ""
+                        col_tot_t = "#4ade80" if totale_wip_t > 0 else ("#ff6b6b" if totale_wip_t < 0 else "#aaa")
+                        valore_tot_t_str = f"{segno_t}{totale_wip_t:.2f} €".replace(".", ",")
+                        html_tot_wip_t = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Trend: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>"
+
+                        marker_class_t = f"btn-trend-{nome.replace('/', '').replace(' ', '')}"
+                        css_marker_t = f"""<style>
+                        div[data-testid="stHorizontalBlock"]:has(.{marker_class_t}) {{
+                            margin-bottom: -15px !important;
+                        }}
+                        div[data-testid="stColumn"]:has(.{marker_class_t}) div[data-testid="stButton"] > button {{
+                            background-color: {bg_color_t} !important; border-color: {bg_color_t} !important; color: {text_color_t} !important;
+                        }}
+                        </style>"""
+
+                        c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
+                        with c1:
+                            st.markdown(f"<span class='{marker_class_t}'></span>{css_marker_t}", unsafe_allow_html=True)
+                            st.markdown(html_tot_wip_t, unsafe_allow_html=True)
+                            if st.button(nome, key=f"wip_trend_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
+                                mostra_diario_wip_trend(nome, storico)
                         
                         if is_attivo and tipo_strat == "TREND":
                             tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
@@ -2008,6 +2080,17 @@ else:
                             with c_info:
                                 tf_display = tf_map.get(tf_val, tf_val)
                                 st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
+                        
+                        storico_t = dati_salvati.get("storico_wip_trend", [])
+                        with st.expander(f"📋 Cronologia Trend WIP ({len(storico_t)} eventi)", expanded=False):
+                            if storico_t:
+                                righe_html = "<div style='font-size: 0.82rem; line-height: 1.6; max-height: 180px; overflow-y: auto;'>"
+                                for r in reversed(storico_t):
+                                    righe_html += f"&bull; {r}<br>"
+                                righe_html += "</div>"
+                                st.html(righe_html)
+                            else:
+                                st.caption("Nessun evento Trend registrato in questo ciclo.")
 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):

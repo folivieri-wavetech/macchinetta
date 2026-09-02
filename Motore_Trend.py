@@ -322,9 +322,16 @@ def esegui_ciclo_trend():
                 "tk_periods": 21,
                 "kj_periods": 55,
                 "min_body": min_body,
-                "pip_value": CONFIG_STRUMENTI[nome]["moltiplicatore"]
+                "pip_value": CONFIG_STRUMENTI[nome]["moltiplicatore"],
+                "max_kj_distance": 50.0,
+                "max_entry_delay": 5
             }
             stato_motore.motori[nome] = CoreEngine(cfg)
+        else:
+            stato_motore.motori[nome].config["size_i"] = size_i
+            stato_motore.motori[nome].config["size_max"] = size_max
+            stato_motore.motori[nome].config["min_body"] = min_body
+            stato_motore.motori[nome].config["pip_value"] = CONFIG_STRUMENTI[nome]["moltiplicatore"]
         
         engine = stato_motore.motori[nome]
         
@@ -433,7 +440,15 @@ def esegui_ciclo_trend():
             if ok:
                 pos.entry_price = real_lvl if real_lvl else closed_candle.close
                 pos.ticket = deal_id
-                aggiorna_memoria(nome, {"stato": direzione, "direzione": direzione, "posizioni_core": [pos.to_dict()], "posizioni_incr": [], "storico_wip_trend": [f"🚀 Apertura Core {direzione} a {pos.entry_price}"]})
+                ora_str = now_it().strftime("%d/%m %H:%M:%S")
+                msg = f"🚀 Apertura Core {direzione} a {pos.entry_price}"
+                aggiorna_memoria(nome, {
+                    "stato": direzione, 
+                    "direzione": direzione, 
+                    "posizioni_core": [pos.to_dict()], 
+                    "posizioni_incr": [], 
+                    "storico_wip_trend": [f"[{ora_str}] {msg}"]
+                })
                 print_log(nome, f"🚀 Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.")
                 invia_notifica(f"🚀 AVVIO TREND: {nome}", f"[{nome}] Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.", "rocket")
             else:
@@ -449,8 +464,27 @@ def esegui_ciclo_trend():
         
         for ev in events:
             tipo = ev['type']
+            ora_str = now_it().strftime("%d/%m %H:%M:%S")
             
-            if tipo == 'increment_opened':
+            if tipo == 'auto_start':
+                dir_auto = ev['direction']
+                ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_auto, size_i, headers, dec, etichetta="[CORE AUTO-RESTART]")
+                if ok:
+                    entry_px = real_lvl if real_lvl else ev['price']
+                    if engine.pm.core_position:
+                        engine.pm.core_position.entry_price = entry_px
+                        engine.pm.core_position.ticket = deal_id
+                    msg = f"🚀 Auto-Restart: Apertura Core {dir_auto} a {entry_px}"
+                    print_log(nome, msg)
+                    invia_notifica(f"🚀 AUTO-RESTART TREND: {nome}", f"[{nome}] {msg}", "rocket")
+                    storico.append(f"[{ora_str}] {msg}")
+                    ha_fatto_eventi = True
+                    aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
+                else:
+                    engine.reset()
+                    print_log(nome, "⚠️ Fallito inserimento a mercato Core Auto-Restart.")
+            
+            elif tipo == 'increment_opened':
                 dir_incr = ev['direction']
                 pos = ev['position']
                 ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_incr, size_i, headers, dec, etichetta="[INCREMENTO]")
@@ -460,7 +494,7 @@ def esegui_ciclo_trend():
                     msg = f"➕ Incremento Aperto {dir_incr} a {pos.entry_price}"
                     print_log(nome, msg)
                     invia_notifica(f"➕ INCREMENTO TREND: {nome}", f"[{nome}] {msg}", "heavy_plus_sign")
-                    storico.append(msg)
+                    storico.append(f"[{ora_str}] {msg}")
                     ha_fatto_eventi = True
                 else:
                     engine.pm.increments.remove(pos)
@@ -471,16 +505,22 @@ def esegui_ciclo_trend():
                     dir_chiusura = "SELL" if ev['direction'] == "LONG" else "BUY"
                     sz = ev.get('size', size_i)
                     chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=f"[{tipo.upper()}]")
-                    msg = f"➖ Chiuso {tipo} ({sz}) PnL: {ev.get('pnl', 0):.2f}"
+                    pnl_val = ev.get('pnl', 0)
+                    pnl_str = f" [PnL: {pnl_val:+.2f} €]" if pnl_val != 0 else ""
+                    msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
                     invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
-                    storico.append(msg)
+                    storico.append(f"[{ora_str}] {msg}")
                     ha_fatto_eventi = True
             
             elif tipo == 'reversal':
-                print_log(nome, f"🛑 REVERSAL! Chiusura globale per incrocio KJ.")
-                invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] Incrocio KJ! Chiusura globale e stop motore (o inversione se attiva).", "warning")
+                new_d = ev.get("new_direction", "FLAT")
+                msg = f"🛑 Reversal Kijun: chiusura globale e passaggio a {new_d}"
+                print_log(nome, msg)
+                invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
+                storico.append(f"[{ora_str}] {msg}")
+                ha_fatto_eventi = True
                 if not auto_restart:
-                    aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT"})
+                    aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": ""})
                     engine.reset()
                     print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
                 else:
@@ -495,14 +535,14 @@ def esegui_ciclo_trend():
                 "posizioni_incr": incr_dict
             }
             if ha_fatto_eventi:
-                if len(storico) > 20: storico = storico[-20:]
+                if len(storico) > 30: storico = storico[-30:]
                 update_data["storico_wip_trend"] = storico
             aggiorna_memoria(nome, update_data)
         elif events and not auto_restart:
             # Se si è spento e ha svuotato le posizioni
             update_data_off = {"posizioni_core": [], "posizioni_incr": []}
             if ha_fatto_eventi:
-                if len(storico) > 20: storico = storico[-20:]
+                if len(storico) > 30: storico = storico[-30:]
                 update_data_off["storico_wip_trend"] = storico
             aggiorna_memoria(nome, update_data_off)
 

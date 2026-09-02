@@ -192,20 +192,21 @@ class CoreEngine:
             is_long_cond = c_close > tk and (tk > kj or abs(tk - kj) <= min_body_price)
             is_short_cond = c_close < tk and (tk < kj or abs(tk - kj) <= min_body_price)
             
+            pip_val = self.config.get("pip_value", 1.0)
+            max_dist = self.config.get("max_kj_distance", 50.0) * pip_val
+            max_delay = self.config.get("max_entry_delay", 5)
+            
             if is_long_cond:
                 if self.active_signal != "LONG":
                     self.active_signal = "LONG"
                     self.signal_candles_elapsed = 0
                 self.signal_candles_elapsed += 1
                 
-                max_dist = self.config.get("max_kj_distance") * pip_val
-                max_delay = self.config.get("max_entry_delay")
-                
                 if abs(exec_price - kj) <= max_dist:
                     if self.signal_candles_elapsed <= max_delay:
                         self.start(exec_price, "LONG")
                         reason = "condizioni_long_allineate" if tk > kj else "condizioni_long_tollerate"
-                        events.append({"type": "reversal", "reason": reason, "new_direction": "LONG"})
+                        events.append({"type": "auto_start", "direction": "LONG", "price": exec_price, "reason": reason})
                         self.active_signal = None
                         self.signal_candles_elapsed = 0
             
@@ -215,14 +216,11 @@ class CoreEngine:
                     self.signal_candles_elapsed = 0
                 self.signal_candles_elapsed += 1
                 
-                max_dist = self.config.get("max_kj_distance") * pip_val
-                max_delay = self.config.get("max_entry_delay")
-                
                 if abs(kj - exec_price) <= max_dist:
                     if self.signal_candles_elapsed <= max_delay:
                         self.start(exec_price, "SHORT")
                         reason = "condizioni_short_allineate" if tk < kj else "condizioni_short_tollerate"
-                        events.append({"type": "reversal", "reason": reason, "new_direction": "SHORT"})
+                        events.append({"type": "auto_start", "direction": "SHORT", "price": exec_price, "reason": reason})
                         self.active_signal = None
                         self.signal_candles_elapsed = 0
             
