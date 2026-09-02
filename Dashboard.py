@@ -813,6 +813,23 @@ def salva_preferenze(conto_selezionato, prefs):
         with open(path, "w") as f: json.dump(prefs, f, indent=4)
     except: pass
 
+def carica_ultimo_utente():
+    path = "ultimo_utente.json"
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f).get("ultimo_utente", "Fiordok")
+        except Exception:
+            return "Fiordok"
+    return "Fiordok"
+
+def salva_ultimo_utente(username):
+    try:
+        with open("ultimo_utente.json", "w", encoding="utf-8") as f:
+            json.dump({"ultimo_utente": username}, f)
+    except Exception:
+        pass
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.ruolo = "VIEWER"
@@ -832,6 +849,7 @@ if not st.session_state.logged_in:
                     st.session_state.must_change_password = False
                     st.session_state.logged_in = True
                     st.session_state.user = st.session_state.temp_user
+                    salva_ultimo_utente(st.session_state.user)
                     res = auth_manager.verifica_login(st.session_state.user, new_pw)
                     st.session_state.ruolo = res.get("ruolo", "VIEWER")
                     st.session_state.conti_autorizzati = res.get("conti_autorizzati", [])
@@ -844,8 +862,9 @@ if not st.session_state.logged_in:
     else:
         st.title("🔐 Fiordok Trading")
         st.subheader("Accedi al pannello di controllo")
+        ultimo_acc = carica_ultimo_utente()
         with st.form("login_form"):
-            user = st.text_input("Account")
+            user = st.text_input("Account", value=ultimo_acc)
             pw = st.text_input("Password", type="password")
             if st.form_submit_button("Accedi"):
                 res = auth_manager.verifica_login(user, pw)
@@ -857,6 +876,7 @@ if not st.session_state.logged_in:
                     else:
                         st.session_state.logged_in = True
                         st.session_state.user = user
+                        salva_ultimo_utente(user)
                         st.session_state.ruolo = res.get("ruolo", "VIEWER")
                         st.session_state.conti_autorizzati = res.get("conti_autorizzati", [])
                         st.session_state.tutti_i_conti = res.get("tutti_i_conti", False)
