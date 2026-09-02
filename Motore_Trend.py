@@ -107,6 +107,37 @@ def print_log(strumento, messaggio):
     except Exception:
         pass
 
+def get_eur_rate(valuta, prezzi):
+    if valuta == "EUR":
+        return 1.0
+    eur_gbp = prezzi.get("EUR/GBP")
+    gbp_usd = prezzi.get("GBP/USD")
+    if not eur_gbp or not gbp_usd:
+        return 1.0
+    eur_usd = eur_gbp * gbp_usd
+    if valuta == "USD":
+        return 1.0 / eur_usd
+    if valuta == "GBP":
+        return 1.0 / eur_gbp
+    if valuta == "CAD":
+        usd_cad = prezzi.get("USD/CAD")
+        if usd_cad: return 1.0 / (eur_usd * usd_cad)
+    if valuta == "CHF":
+        usd_chf = prezzi.get("USD/CHF")
+        if usd_chf: return 1.0 / (eur_usd * usd_chf)
+    if valuta == "JPY":
+        usd_jpy = prezzi.get("USD/JPY")
+        if usd_jpy: return 1.0 / (eur_usd * usd_jpy)
+    if valuta == "NZD":
+        aud_nzd = prezzi.get("AUD/NZD")
+        aud_cad = prezzi.get("AUD/CAD")
+        usd_cad = prezzi.get("USD/CAD")
+        if aud_nzd and aud_cad and usd_cad:
+            eur_cad = eur_usd * usd_cad
+            eur_nzd = (eur_cad / aud_cad) * aud_nzd
+            return 1.0 / eur_nzd
+    return 1.0
+
 def ottieni_headers_ig():
     if not os.path.exists(FILE_TOKEN): return None
     try:
@@ -592,8 +623,24 @@ def esegui_ciclo_trend():
                     dir_chiusura = "SELL" if ev['direction'] == "LONG" else "BUY"
                     sz = ev.get('size', size_i)
                     chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=f"[{tipo.upper()}]")
-                    pnl_val = ev.get('pnl', 0)
-                    pnl_str = f" [PnL: {pnl_val:+.2f} €]" if pnl_val != 0 else ""
+                    
+                    raw_diff = ev.get('pnl', 0)
+                    c_cfg = CONFIG_STRUMENTI.get(nome, {})
+                    mult = c_cfg.get("moltiplicatore", 1)
+                    valore_punto = c_cfg.get("valore_punto", 1)
+                    valuta_c = c_cfg.get("valuta", "USD")
+                    
+                    prezzi_live = {}
+                    try:
+                        if os.path.exists("stato_sistema.json"):
+                            with open("stato_sistema.json", "r") as f_st:
+                                prezzi_live = json.load(f_st).get("prezzi_live", {})
+                    except Exception:
+                        pass
+                    
+                    rate = get_eur_rate(valuta_c, prezzi_live)
+                    pnl_eur = (raw_diff / mult) * valore_punto * rate
+                    pnl_str = f" [PnL: {pnl_eur:+.2f} €]" if pnl_eur != 0 else ""
                     msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
                     invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                     storico.append(f"[{ora_str}] {msg}")
