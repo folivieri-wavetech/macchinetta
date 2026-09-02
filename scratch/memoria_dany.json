@@ -1,0 +1,955 @@
+{
+    "Spot Gold": {
+        "attivo": false,
+        "direzione": "",
+        "tp": 80,
+        "opp": 20,
+        "dts": 10,
+        "size": 4,
+        "stato": "IN_ATTESA",
+        "storico_wip": [
+            "[19/08 20:58:02] \u2705 [EVENTO]: Core [SHORT] [-4.0] a 4522.2",
+            "[20/08 01:01:54] \u26a1 [MICRO LONG] innescata a mercato a 4502.2",
+            "[20/08 05:30:12] \u2705 [EVENTO]: Stop MICRO colpito a 4481.9. Chiusura posizioni *** FLIP. [Parziale: +41 \u20ac] (Core: +164\u20ac | Ass: -83\u20ac | Micro: -41\u20ac) \n Reinserisco Core [LONG] [-4.0] a 4481.9",
+            "[20/08 05:30:59] \u2705 [EVENTO]: Core [LONG] [+4.0] a 4484.5",
+            "[20/08 12:00:57] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +39 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] LONG eseguito a 4463.7.",
+            "[20/08 13:35:54] \u2705 [EVENTO]: TICKET1 a target a 4485.5! Ping-Pong: Rigirato in SHORT. [Parziale: +40 \u20ac]",
+            "[20/08 14:46:44] \u2705 [EVENTO]: Stop TICKET1 colpito a 4503.9. PIAZZATI: SAT1 OCO (LONG: 4524.7 | SHORT: 4424.5). [Parziale: -40 \u20ac]",
+            "[20/08 14:46:46] \u2795 [TICKET2] SHORT a mercato (4503.9).",
+            "[20/08 15:01:32] \u2705 [EVENTO]: SL colpito su TICKET2 a 4524.5. [Parziale: -39 \u20ac]",
+            "[20/08 15:01:50] \u2705 [EVENTO]: SAT1 innescato a mercato a 4524.5. \u2795 [SAT2] SHORT eseguito a mercato. \u23f3 Ordini pendenti piazzati: OG a 4544.5, OL a 4504.5.",
+            "[20/08 16:32:06] \u26a1 [OVERLOSS] innescato a mercato a 4504.5",
+            "[20/08 18:51:45] \u2705 [EVENTO]: SL colpito su OVERLOSS. [Parziale: -20 \u20ac] Reinserisco OG e OL (SHORT) a 4544.5 e 4504.5",
+            "[21/08 04:21:35] \u26a1 [OVERGAIN] innescato a mercato a 4544.5",
+            "[21/08 06:36:05] \u2705 [EVENTO]: TP Core [LONG] raggiunto a 4565.8. Avvio FASE 3. Taglio effettuato 50%. [Parziale: +116 \u20ac] (Good: +324\u20ac | 1/2 Bad: -203\u20ac | Sotto: -5\u20ac) Inserita nuova Core [LONG] [+4.0] e Ordine ULTIMA (SHORT) [-2.0] a 4585.6",
+            "[21/08 09:01:48] \u2705 [EVENTO]: ULTIMA innescata a mercato a 4585.6",
+            "[21/08 12:39:57] \ud83d\udcb0 [ULTIMA] chiusa in profitto. [Parziale: +40 \u20ac]",
+            "[21/08 17:25:18] \u2705 [EVENTO]: Taglio 35% effettuato. [Parziale: -199 \u20ac] Reinserisco Core [LONG] [+4.0] a 4606.8 e Ordine ULTIMA (SHORT) [-0.6] a 4626.8",
+            "[21/08 18:53:56] \u2705 [EVENTO]: ULTIMA innescata a mercato a 4626.8",
+            "[21/08 16:54:59] \ud83d\uded1 Tasto STOP premuto. Macchinetta spenta.",
+            "[21/08 18:55:06] \u2705 [EVENTO]: Tutte le posizioni chiuse da Tasto STOP. [Parziale: -16 \u20ac]"
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 4484.5,
+        "pausa_mercato": false,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 40.63999999999942,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 0.0,
+                "totale": 2,
+                "profit": 1,
+                "loss": 1
+            },
+            "Ticket2": {
+                "pnl": -39.47999999999956,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": -20.0,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "Ultima": {
+                "pnl": 40.0,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 37.8600000000024,
+                "totale": 3,
+                "profit": 2,
+                "loss": 1
+            },
+            "Assicurazione": {
+                "pnl": 39.31999999999971,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket2_active": false,
+        "ticket1_dir": "SELL",
+        "ticket1_base": 4484.5,
+        "ticket1_entry": 4484.98,
+        "ticket1_deal_id": "DIAAAAYBYZ5C3AA",
+        "tentativi_sat": 0,
+        "ticket2_entry": 4503.9,
+        "ticket2_dir": "SELL",
+        "sat_dir": "BUY",
+        "sat_price": 4524.5,
+        "fase3_dir": "BUY",
+        "fase3_base": 4524.5,
+        "temp_fase3_log": "\u2705 [EVENTO]: TP Core [BUY] raggiunto a 4565.8. Avvio FASE 3. Taglio effettuato 50%. [Parziale: +116 \u20ac] (Good: +324\u20ac | 1/2 Bad: -203\u20ac | Sotto: -5\u20ac)",
+        "fase3_step": 2,
+        "fase3_current_base": 4606.8,
+        "alert_falso_allarme": "",
+        "kill_switch": false,
+        "sospeso_weekend": false,
+        "allarme_distanza": false
+    },
+    "US 500 Cash": {
+        "attivo": false,
+        "direzione": "",
+        "tp": 80,
+        "opp": 20,
+        "dts": 10,
+        "size": 4,
+        "stato": "IN_ATTESA",
+        "storico_wip": [
+            "[19/08 22:16:03] \u2705 [EVENTO]: Core [LONG] [+4.0] a 7720.02",
+            "[20/08 08:31:08] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +37 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] LONG eseguito a 7701.33.",
+            "[20/08 12:01:15] \u2705 [EVENTO]: Stop TICKET1 colpito a 7680.75. PIAZZATI: SAT1 OCO (LONG: 7760.02 | SHORT: 7660.02). [Parziale: -40 \u20ac]",
+            "[20/08 12:01:17] \u2795 [TICKET2] LONG a mercato (7680.75).",
+            "[20/08 12:36:32] \u2705 [EVENTO]: SL colpito su TICKET2 a 7660.02. [Parziale: -44 \u20ac]",
+            "[20/08 12:36:51] \u2705 [EVENTO]: SAT1 innescato a mercato a 7660.02. \u2795 [SAT2] LONG eseguito a mercato. \u23f3 Ordini pendenti piazzati: OG a 7640.02, OL a 7680.02.",
+            "[20/08 13:02:49] \u26a1 [OVERLOSS] innescato a mercato a 7680.02",
+            "[20/08 15:01:55] \u2705 [EVENTO]: Stop SAT1 colpito a 7697.39. Reinserisco ENTRAMBI gli Ordini SAT1 (OCO) a 7660.02 e 7760.02. [Parziale: -28 \u20ac] (SAT1: -80\u20ac | OL: +52\u20ac)",
+            "[20/08 18:03:12] \u2705 [EVENTO]: SAT1 innescato a mercato a 7660.02. \u2795 [SAT2] LONG eseguito a mercato. \u23f3 Ordini pendenti piazzati: OG a 7640.02, OL a 7680.02.",
+            "[20/08 19:59:50] \u26a1 [OVERGAIN] innescato a mercato a 7640.02",
+            "[21/08 07:24:14] \u2705 [EVENTO]: TP colpito su OVERGAIN. [Parziale: +40 \u20ac] Reinserisco OG e OL (LONG) a 7640.02 e 7680.02",
+            "[21/08 11:25:49] \u26a1 [OVERLOSS] innescato a mercato a 7680.02",
+            "[21/08 13:54:21] \u2705 [EVENTO]: SL colpito su OVERLOSS. [Parziale: -20 \u20ac] Reinserisco OG e OL (LONG) a 7640.02 e 7680.02",
+            "[21/08 17:03:51] \u26a1 [OVERLOSS] innescato a mercato a 7680.02",
+            "[23/08 22:07:31] \ud83d\uded1 Tasto STOP premuto. Macchinetta spenta.",
+            "[24/08 00:07:43] \u2705 [EVENTO]: Tutte le posizioni chiuse da Tasto STOP. [Parziale: -100 \u20ac]"
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 7720.02,
+        "pausa_mercato": false,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": -40.0,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "Ticket2": {
+                "pnl": -43.51999999999862,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "OverGain": {
+                "pnl": 40.0,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": -20.0,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 37.13999999999942,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket1_dir": "BUY",
+        "ticket1_base": 7700.02,
+        "ticket1_entry": 7701.33,
+        "ticket1_deal_id": "DIAAAAYBX9LPNAZ",
+        "tentativi_sat": 0,
+        "ticket2_active": false,
+        "ticket2_entry": 7680.75,
+        "ticket2_dir": "BUY",
+        "sat_dir": "SELL",
+        "sat_price": 7660.02,
+        "kill_switch": false,
+        "sospeso_weekend": false,
+        "allarme_distanza": false
+    },
+    "AUD/CAD": {
+        "attivo": true,
+        "direzione": "LONG",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 6,
+        "stato": "FASE_1 + Micro",
+        "storico_wip": [
+            "[31/08 00:17:22] \u2705 [EVENTO]: Core [SHORT] [-6.0] a 0.99546",
+            "[31/08 03:32:42] \u2705 [EVENTO]: Avvio o prosecuzione sospesa. IG esige 15.0pt di distanza minima. Il tuo parametro pi\u00f9 stretto \u00e8 15pt.",
+            "[31/08 03:47:51] \u2705 [EVENTO]: Volatilit\u00e0 rientrata. Il limite di IG (5.0pt) permette ai tuoi parametri (15pt) di operare.",
+            "[31/08 14:47:06] \u26a1 [MICRO LONG] innescata a mercato a 0.99346",
+            "[31/08 22:45:06] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:30:12] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 03:30:35] \u2705 [EVENTO]: Avvio o prosecuzione sospesa. IG esige 15.0pt di distanza minima. Il tuo parametro pi\u00f9 stretto \u00e8 15pt.",
+            "[01/09 03:45:46] \u2705 [EVENTO]: Volatilit\u00e0 rientrata. Il limite di IG (5.0pt) permette ai tuoi parametri (15pt) di operare.",
+            "[01/09 10:33:23] \u2705 [EVENTO]: Stop MICRO colpito a 0.99152. Chiusura posizioni *** FLIP. [Parziale: +30 \u20ac] (Core: +147\u20ac | Ass: -81\u20ac | Micro: -36\u20ac) \n Reinserisco Core [LONG] [-6.0] a 0.99152",
+            "[01/09 10:33:42] \u2705 [EVENTO]: Core [LONG] [+6.0] a 0.99168",
+            "[01/09 16:00:10] \u26a1 [MICRO SHORT] innescata a mercato a 0.99368",
+            "[01/09 22:45:04] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:10] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[02/09 03:27:48] \u2705 [EVENTO]: Avvio o prosecuzione sospesa. IG esige 15.0pt di distanza minima. Il tuo parametro pi\u00f9 stretto \u00e8 15pt.",
+            "[02/09 03:39:01] \u2705 [EVENTO]: Volatilit\u00e0 rientrata. Il limite di IG (5.0pt) permette ai tuoi parametri (15pt) di operare."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 0.99168,
+        "allarme_distanza": false,
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 29.845030379812684,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket2": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            }
+        },
+        "ticket2_active": false,
+        "pausa_mercato": false
+    },
+    "AUD/NZD": {
+        "attivo": true,
+        "direzione": "SHORT",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 8,
+        "stato": "FASE_2_TICKET1",
+        "storico_wip": [
+            "[31/08 00:18:40] \u2705 [EVENTO]: Core [SHORT] [-8.0] a 1.21098",
+            "[31/08 03:18:24] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +33 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] SHORT eseguito a 1.21277.",
+            "[31/08 03:28:04] \u2705 [EVENTO]: Avvio o prosecuzione sospesa. IG esige 18.0pt di distanza minima. Il tuo parametro pi\u00f9 stretto \u00e8 15pt.",
+            "[31/08 03:43:14] \u2705 [EVENTO]: Volatilit\u00e0 rientrata. Il limite di IG (6.0pt) permette ai tuoi parametri (15pt) di operare.",
+            "[31/08 04:45:02] \u2705 [EVENTO]: TICKET1 a target a 1.21087! Ping-Pong: Rigirato in LONG. [Parziale: +41 \u20ac]",
+            "[31/08 22:45:08] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:30:15] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 03:25:32] \u2705 [EVENTO]: Avvio o prosecuzione sospesa. IG esige 18.0pt di distanza minima. Il tuo parametro pi\u00f9 stretto \u00e8 15pt.",
+            "[01/09 03:40:42] \u2705 [EVENTO]: Volatilit\u00e0 rientrata. Il limite di IG (6.0pt) permette ai tuoi parametri (15pt) di operare.",
+            "[01/09 22:45:05] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:13] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[02/09 03:27:48] \u2705 [EVENTO]: Avvio o prosecuzione sospesa. IG esige 18.0pt di distanza minima. Il tuo parametro pi\u00f9 stretto \u00e8 15pt.",
+            "[02/09 03:43:56] \u2705 [EVENTO]: Volatilit\u00e0 rientrata. Il limite di IG (6.0pt) permette ai tuoi parametri (15pt) di operare."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 1.21098,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 40.82430521159455,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Ticket2": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 33.21694432242231,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket1_dir": "BUY",
+        "ticket1_base": 1.21098,
+        "ticket1_entry": 1.21099,
+        "ticket1_deal_id": "DIAAAAYDFKD43A9",
+        "allarme_distanza": false,
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "pausa_mercato": false
+    },
+    "CAD/JPY": {
+        "attivo": true,
+        "direzione": "SHORT",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 6,
+        "stato": "FASE_2_TICKET1",
+        "storico_wip": [
+            "[31/08 00:19:12] \u2705 [EVENTO]: Core [SHORT] [-6.0] a 115.140",
+            "[31/08 09:13:08] \u26a1 [MICRO LONG] innescata a mercato a 114.940",
+            "[31/08 14:49:26] \u2705 [EVENTO]: MICRO a target a 115.145. Reinserisco Ordine MICRO (LONG) a 114.940. [Parziale: +32 \u20ac]",
+            "[31/08 20:49:08] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +25 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] SHORT eseguito a 115.322.",
+            "[31/08 22:45:09] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:30:18] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 22:45:06] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:16] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 115.14,
+        "stats": {
+            "Micro": {
+                "pnl": 32.37883596981378,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket2": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 24.568488541029808,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket1_dir": "SELL",
+        "ticket1_base": 115.34,
+        "ticket1_entry": 115.322,
+        "ticket1_deal_id": "DIAAAAYDKPA59BW",
+        "sospeso_rollover": false,
+        "rollover_snapshot": {}
+    },
+    "EUR/GBP": {
+        "attivo": true,
+        "direzione": "SHORT",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 4,
+        "stato": "FASE_2_TICKET1",
+        "storico_wip": [
+            "[31/08 00:19:35] \u2705 [EVENTO]: Core [SHORT] [-4.0] a 0.85581",
+            "[31/08 22:45:12] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:31:57] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 20:39:44] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +42 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] SHORT eseguito a 0.85775.",
+            "[01/09 22:45:07] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:19] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 0.85581,
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "tentativi_ripristino": 0,
+        "pausa_mercato": false,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket2": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 42.202947211340664,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket1_dir": "SELL",
+        "ticket1_base": 0.85781,
+        "ticket1_entry": 0.85775,
+        "ticket1_deal_id": "DIAAAAYDRR2YQBS"
+    },
+    "GBP/USD": {
+        "attivo": true,
+        "direzione": "SHORT",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 4,
+        "stato": "FASE_2_TICKET1",
+        "storico_wip": [
+            "[31/08 00:20:03] \u2705 [EVENTO]: Core [SHORT] [-4.0] a 1.35321",
+            "[31/08 10:01:33] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +32 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] SHORT eseguito a 1.35518.",
+            "[31/08 22:45:13] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:32:00] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 22:45:09] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:22] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 1.35321,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket2": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 32.22739360500824,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket1_dir": "SELL",
+        "ticket1_base": 1.35521,
+        "ticket1_entry": 1.35518,
+        "ticket1_deal_id": "DIAAAAYDH7S9PBA",
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "pausa_mercato": false
+    },
+    "USD/CAD": {
+        "attivo": true,
+        "direzione": "LONG",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 6,
+        "stato": "FASE_2_SATELLITE_(OG-OL)",
+        "storico_wip": [
+            "[31/08 00:20:30] \u2705 [EVENTO]: Core [SHORT] [-6.0] a 1.39060",
+            "[31/08 13:25:57] \u26a1 [MICRO LONG] innescata a mercato a 1.38860",
+            "[31/08 16:21:07] \u2705 [EVENTO]: Stop MICRO colpito a 1.38667. Chiusura posizioni *** FLIP. [Parziale: +34 \u20ac] (Core: +147\u20ac | Ass: -77\u20ac | Micro: -36\u20ac) \n Reinserisco Core [LONG] [-6.0] a 1.38667",
+            "[31/08 16:21:26] \u2705 [EVENTO]: Core [LONG] [+6.0] a 1.38672",
+            "[31/08 22:45:16] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:33:38] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 02:05:06] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +31 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] LONG eseguito a 1.38505.",
+            "[01/09 05:59:34] \u2705 [EVENTO]: TICKET1 a target a 1.38681! Ping-Pong: Rigirato in SHORT a 1.38675. [Parziale: +37 \u20ac]",
+            "[01/09 14:08:42] \u2705 [EVENTO]: Stop TICKET1 colpito a 1.38870. [Parziale: -37 \u20ac] PIAZZATI: SAT1 OCO (SHORT: 1.38076 | LONG: 1.39072) + Ticket2 [SHORT] a 1.38861",
+            "[01/09 17:16:46] \u2705 [EVENTO]: SL colpito su TICKET2 a 1.39072. [Parziale: -39 \u20ac]",
+            "[01/09 17:17:04] SAT1 [LONG] a 1.39072. SAT2 [SHORT] a mercato. Ordini: OG 1.39272, OL 1.38872",
+            "[01/09 22:45:13] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:38] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 1.38672,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 34.12083809664219,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": -0.002627940788940464,
+                "totale": 2,
+                "profit": 1,
+                "loss": 1
+            },
+            "Ticket2": {
+                "pnl": -39.25928572792597,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 31.327823767457684,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket2_active": false,
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "ticket1_dir": "SELL",
+        "ticket1_base": 1.38676,
+        "ticket1_entry": 1.38675,
+        "ticket1_deal_id": "DIAAAAYDLGTDEBG",
+        "pausa_mercato": false,
+        "ticket2_entry": 1.38861,
+        "ticket2_dir": "SELL",
+        "ticket2_deal_id": "DIAAAAYDPLQB9BW",
+        "tentativi_sat": 0,
+        "sat_dir": "BUY",
+        "sat_price": 1.39072
+    },
+    "USD/CHF": {
+        "attivo": false,
+        "direzione": "SHORT",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 4,
+        "stato": "IN_ATTESA",
+        "storico_wip": [
+            "[31/08 00:20:58] \u2705 [EVENTO]: Core [SHORT] [-4.0] a 0.80910",
+            "[31/08 16:54:10] \u26a1 [MICRO LONG] innescata a mercato a 0.80710",
+            "[31/08 22:45:19] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:33:48] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 16:44:13] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +37 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] SHORT eseguito a 0.81098.",
+            "[01/09 22:45:15] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:44] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[02/09 03:36:57] \u2705 [EVENTO]: Stop TICKET1 colpito a 0.81298. [Parziale: -42 \u20ac] PIAZZATI: SAT1 OCO (SHORT: 0.80510 | LONG: 0.81510) + Ticket2 [SHORT] a 0.81300",
+            "[02/09 03:37:01] \u2705 [EVENTO]: SL colpito su TICKET2 a 0.80710. [Parziale: +125 \u20ac]",
+            "[02/09 03:38:46] \u2705 [EVENTO]: Emergenza: fallimento ordini FASE 2 (OG/OL). Macchina Sospesa.",
+            "[02/09 04:23:49] \ud83d\udee0\ufe0f Eseguito comando RECOVERY manuale: [RECOVERY SAT1 OCO]."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "\u274c Fallita immissione ordini FASE 2 (OG/OL) a mercato dopo 4 tentativi.",
+        "prezzo_base": 0.8091,
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": -42.495275905682924,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "Ticket2": {
+                "pnl": 125.34232393764206,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 36.56152484849744,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket1_dir": "SELL",
+        "ticket1_base": 0.8111,
+        "ticket1_entry": 0.81098,
+        "ticket1_deal_id": "DIAAAAYDP9RSLBT",
+        "ticket2_active": false,
+        "ticket2_entry": 0.813,
+        "ticket2_dir": "SELL",
+        "ticket2_deal_id": "DIAAAAYDT9DD2A9",
+        "tentativi_sat": 0,
+        "pausa_mercato": false,
+        "allarme_distanza": false,
+        "comando_restore": null,
+        "alert_falso_allarme": ""
+    },
+    "USD/JPY": {
+        "attivo": true,
+        "direzione": "LONG",
+        "tp": 80,
+        "opp": 20,
+        "dts": 15,
+        "size": 6,
+        "stato": "FASE_2_SATELLITE_OL",
+        "storico_wip": [
+            "[31/08 00:21:21] \u2705 [EVENTO]: Core [SHORT] [-6.0] a 160.138",
+            "[31/08 03:04:09] \u26a1 [MICRO LONG] innescata a mercato a 159.938",
+            "[31/08 04:25:20] \u2705 [EVENTO]: Stop MICRO colpito a 159.752. Chiusura posizioni *** FLIP. [Parziale: +31 \u20ac] (Core: +124\u20ac | Ass: -64\u20ac | Micro: -30\u20ac) \n Reinserisco Core [LONG] [-6.0] a 159.752",
+            "[31/08 04:25:39] \u2705 [EVENTO]: Core [LONG] [+6.0] a 159.758",
+            "[31/08 09:25:19] \u2705 [EVENTO]: ASSICURAZIONE chiusa [Parziale: +32 \u20ac]. \u27a1\ufe0f Entrata in Fase 2 - [TICKET1] LONG eseguito a 159.569.",
+            "[31/08 11:40:07] \u2705 [EVENTO]: TICKET1 a target a 159.770! Ping-Pong: Rigirato in SHORT a 159.765. [Parziale: +32 \u20ac]",
+            "[31/08 22:45:20] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[01/09 00:33:51] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati.",
+            "[01/09 08:30:50] \u2705 [EVENTO]: Stop TICKET1 colpito a 159.954. [Parziale: -32 \u20ac] PIAZZATI: SAT1 OCO (SHORT: 159.158 | LONG: 160.158) + Ticket2 [SHORT] a 159.956",
+            "[01/09 13:18:18] \u2705 [EVENTO]: SL colpito su TICKET2 a 160.158. [Parziale: -33 \u20ac]",
+            "[01/09 13:18:37] SAT1 [LONG] a 160.158. SAT2 [SHORT] a mercato. Ordini: OG 160.358, OL 159.958",
+            "[01/09 16:00:03] \u26a1 [OVERLOSS] innescato a mercato a 159.958",
+            "[01/09 22:45:16] \ud83c\udf19 [EVENTO]: Inizio Pausa Rollover. Pendenti rimossi e SL sganciati per protezione spread.",
+            "[02/09 00:30:47] \u2600\ufe0f [EVENTO]: Fine Pausa Rollover. SL e Pendenti ripristinati."
+        ],
+        "errore_avvio": false,
+        "errore_ripristino": false,
+        "comando_manuale": false,
+        "msg_manuale": "",
+        "prezzo_base": 159.758,
+        "stats": {
+            "Micro": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Flip": {
+                "pnl": 30.618214310269725,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            },
+            "Ticket1": {
+                "pnl": 0.056802176606723265,
+                "totale": 2,
+                "profit": 1,
+                "loss": 1
+            },
+            "Ticket2": {
+                "pnl": -32.6415291376203,
+                "totale": 1,
+                "profit": 0,
+                "loss": 1
+            },
+            "OverGain": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "OverLoss": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Ultima": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Fase3": {
+                "pnl": 0.0,
+                "totale": 0,
+                "profit": 0,
+                "loss": 0
+            },
+            "Assicurazione": {
+                "pnl": 31.942053986543677,
+                "totale": 1,
+                "profit": 1,
+                "loss": 0
+            }
+        },
+        "ticket2_active": false,
+        "ticket1_dir": "SELL",
+        "ticket1_base": 159.758,
+        "ticket1_entry": 159.765,
+        "ticket1_deal_id": "DIAAAAYDJFT3HB2",
+        "sospeso_rollover": false,
+        "rollover_snapshot": {},
+        "ticket2_entry": 159.956,
+        "ticket2_dir": "SELL",
+        "ticket2_deal_id": "DIAAAAYDNPHXSBV",
+        "tentativi_sat": 0,
+        "pausa_mercato": false,
+        "sat_dir": "BUY",
+        "sat_price": 160.158
+    }
+}

@@ -1051,6 +1051,10 @@ else:
             r_ord = requests.get(f"{base_url}/workingorders", headers=h)
             ord_data = r_ord.json().get('workingOrders', []) if r_ord.status_code == 200 else []
 
+            # Salvataggio in sessione per validazioni incrociate
+            st.session_state.live_pos_data = pos_data
+            st.session_state.live_ord_data = ord_data
+
             epic_to_name = {v['epic']: k for k, v in CONFIG_STRUMENTI.items()}
             stato = leggi_stato_sistema(conto_selezionato)
             prezzi_live = stato.get("prezzi_live", {})
@@ -2063,7 +2067,34 @@ else:
             
                 cmd_data = None
             
-                if "MICRO" in r_anom:
+                # --- VALIDAZIONE LIVE ---
+                t_epic = c.get("epic")
+                pos_live = st.session_state.get("live_pos_data", [])
+                ord_live = st.session_state.get("live_ord_data", [])
+                
+                core_ids = [p['position']['dealId'] for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_core]
+                has_core = len(core_ids) > 0
+                
+                ord_mezzo_count = len([o for o in ord_live if o['marketData']['epic'] == t_epic and float(o['workingOrderData']['orderSize']) == s_mezzo])
+                pos_mezzo_count = len([p for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids])
+                
+                recovery_error = None
+                if not has_core and r_anom not in ["Posizione TAGLIO CORE (A Mercato)", "Ordine ULTIMA (Pendente)"]:
+                    recovery_error = "Nessuna posizione Core rilevata a mercato. Apri prima la posizione principale da IG."
+                elif "MICRO" in r_anom and ord_mezzo_count > 0:
+                    recovery_error = f"Esiste già un ordine pendente della stessa size ({s_mezzo})."
+                elif "TICKET1" in r_anom and pos_mezzo_count > 0:
+                    recovery_error = f"Esiste già una posizione a mercato della stessa size ({s_mezzo})."
+                elif "SAT1 OCO" in r_anom and ord_mezzo_count >= 2:
+                    recovery_error = f"Sono già presenti {ord_mezzo_count} ordini pendenti di size {s_mezzo}."
+                elif "SAT2" in r_anom:
+                    pos_quarto_count = len([p for p in pos_live if p['market']['epic'] == t_epic and float(p['position']['size']) == s_quarto])
+                    if pos_quarto_count > 0:
+                        recovery_error = f"Esiste già una posizione a mercato della size di SAT2 ({s_quarto})."
+
+                if recovery_error:
+                    st.error(f"🚫 **Recovery Bloccato:** {recovery_error}")
+                elif "MICRO" in r_anom:
                     p_base = dati.get("prezzo_base")
                     if not p_base:
                         p_base = st.number_input("Prezzo Base Core mancante in memoria. Inseriscilo manualmente per calcolare la Micro:", value=0.0, format="%.5f", step=0.5, key=f"rec_pb_micro_{conto_selezionato}_{r_nome}")
@@ -2180,8 +2211,8 @@ else:
                         # Wait, s_taglio is handled correctly if we just provide the command
                         st.info("Il Taglio Core è un ORDINE A MERCATO per chiudere parte (o tutta) la posizione. Il motore eseguirà la chiusura parziale.")
                         cmd_data = {"azione": "MERCATO", "dir": d_contro, "size": s_taglio, "lim": None, "stop": None, "etichetta": f"[RECOVERY TAGLIO CORE STEP {f3_step}]"}
-
-                if cmd_data:
+            
+                if cmd_data and not recovery_error:
                     with st.container(border=True):
                         if cmd_data["azione"] == "PENDENTE":
                             oltrepassato = is_oltrepassato(cmd_data["tipo"], cmd_data["dir"], cmd_data["livello"], prezzo_live)

@@ -5,7 +5,7 @@ param (
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "1. VERIFICA SINTASSI PYTHON" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
-python -m py_compile Dashboard.py Dashboard_Simulatore.py Motore.py
+python -m py_compile Dashboard.py Motore.py Motore_Trend.py
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Errore di sintassi Python. Sincronizzazione interrotta." -ForegroundColor Red
     exit 1
@@ -47,7 +47,6 @@ Write-Host "Trovato pod Dashboard: $POD_DASH" -ForegroundColor Yellow
 Push-Location $ROOT
 try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard.py "macchinetta/${POD_DASH}:/data/Dashboard.py"
-    & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard_Simulatore.py "macchinetta/${POD_DASH}:/data/Dashboard_Simulatore.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore_Trend.py "macchinetta/${POD_DASH}:/data/Motore_Trend.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp macchinetta_trend "macchinetta/${POD_DASH}:/data/macchinetta_trend"
