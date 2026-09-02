@@ -2363,7 +2363,7 @@ def esegui_motore():
                                 if core_contro_pos:
                                     c = core_contro_pos[0]
                                     if step == 1:
-                                        s_cut_effettivo = s_core * 0.35 
+                                        s_cut_effettivo = max(1.0, float(round(s_core * 0.35))) if s_core >= 1.0 else round(s_core * 0.35, 1)
                                         succ_cut = chiudi_parziale(nome, c['position']['dealId'], epic, sat_dir, s_cut_effettivo, valuta, h, etichetta=f"[TAGLIO CORE STEP {step}]")
                                         if not succ_cut:
                                             invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento [TAGLIO CORE STEP {step}] (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
