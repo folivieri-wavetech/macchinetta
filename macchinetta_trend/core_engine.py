@@ -1,9 +1,9 @@
 try:
-    from position_manager import PositionManager
-except ImportError:
+    from macchinetta_trend.position_manager import PositionManager
+except (ImportError, ModuleNotFoundError):
     try:
-        from macchinetta_trend.position_manager import PositionManager
-    except ImportError:
+        from position_manager import PositionManager
+    except (ImportError, ModuleNotFoundError):
         from .position_manager import PositionManager
 from collections import deque
 
