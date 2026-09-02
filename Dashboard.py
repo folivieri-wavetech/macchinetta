@@ -2037,8 +2037,10 @@ else:
                             dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                             kj_str = f"{current_kj:.{dec}f}" if current_kj is not None else "-"
                             tk_str = f"{current_tk:.{dec}f}" if current_tk is not None else "-"
+                            tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                            tf_badge = tf_map.get(tf_val, tf_val)
                             st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 2px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 6px;'><b style='color: #FFD700;'>🟡 Kijun:</b> <span style='color: #FFD700;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan:</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 6px;'><b style='color: #FFD700;'>🟡 Kijun ({tf_badge}):</b> <span style='color: #FFD700;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan ({tf_badge}):</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
