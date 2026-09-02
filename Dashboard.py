@@ -2026,7 +2026,13 @@ else:
                             
                             bid = prezzi_bid_ask.get(nome, {}).get("bid", "-")
                             ask = prezzi_bid_ask.get(nome, {}).get("ask", "-")
-                            st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 5px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
+                            current_kj = dati_salvati.get("current_kj")
+                            current_tk = dati_salvati.get("current_tk")
+                            dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
+                            kj_str = f"{current_kj:.{dec}f}" if current_kj is not None else "-"
+                            tk_str = f"{current_tk:.{dec}f}" if current_tk is not None else "-"
+                            st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 2px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.82rem; color: #00BFFF; margin-bottom: 6px;'><b>🔵 Kijun:</b> {kj_str} &nbsp;|&nbsp; <b>🟠 Tenkan:</b> {tk_str}</div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
@@ -2056,25 +2062,47 @@ else:
                         with c_r2_2:
                             st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
                         
+                        err_key = f"err_trend_{conto_selezionato}_{nome}"
+                        if err_key in st.session_state and st.session_state[err_key]:
+                            st.error(st.session_state[err_key])
+
+                        px_live = None
+                        try:
+                            if bid != "-" and ask != "-":
+                                px_live = (float(bid) + float(ask)) / 2.0
+                        except Exception:
+                            pass
+
                         if tipo_strategia == "RANGE" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
                         elif not stato_attivo:
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
                                 if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "LONG", "stato": "FLAT", "tipo_strategia": "TREND"}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
+                                    if current_kj is not None and px_live is not None and px_live < current_kj:
+                                        st.session_state[err_key] = f"❌ BLOCCO DI SICUREZZA: Prezzo ({px_live:.{dec}f}) SOTTO la Kijun ({current_kj:.{dec}f}). Impossibile avviare LONG."
+                                        st.rerun()
+                                    else:
+                                        st.session_state[err_key] = ""
+                                        memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "LONG", "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": ""}
+                                        salva_memoria(conto_selezionato, memoria_attuale)
+                                        st.rerun()
                             with c_btn2:
                                 if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "SHORT", "stato": "FLAT", "tipo_strategia": "TREND"}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
+                                    if current_kj is not None and px_live is not None and px_live > current_kj:
+                                        st.session_state[err_key] = f"❌ BLOCCO DI SICUREZZA: Prezzo ({px_live:.{dec}f}) SOPRA la Kijun ({current_kj:.{dec}f}). Impossibile avviare SHORT."
+                                        st.rerun()
+                                    else:
+                                        st.session_state[err_key] = ""
+                                        memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "SHORT", "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": ""}
+                                        salva_memoria(conto_selezionato, memoria_attuale)
+                                        st.rerun()
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT", "tipo_strategia": "RANGE"}
+                                    st.session_state[err_key] = ""
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT", "tipo_strategia": "RANGE", "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
