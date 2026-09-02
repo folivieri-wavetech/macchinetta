@@ -256,8 +256,31 @@ class StatoMotoreTrend:
 
 stato_motore = StatoMotoreTrend()
 
+def get_file_candele(nome, tf):
+    clean = nome.replace("/", "_").replace(" ", "_")
+    return f"candele_{clean}_{tf}.json"
+
+def carica_candele_locali(nome, tf):
+    fpath = get_file_candele(nome, tf)
+    if os.path.exists(fpath):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def salva_candele_locali(nome, tf, candele_list):
+    fpath = get_file_candele(nome, tf)
+    try:
+        buffer_100 = candele_list[-100:]
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(buffer_100, f, indent=2)
+    except Exception as e:
+        print_log(nome, f"Errore salvataggio candele locali: {e}")
+
 # --- FUNZIONI CORE ---
-def scarica_candele(epic, timeframe, limit=100, headers=None):
+def scarica_candele(epic, timeframe, limit=2, headers=None):
     h = headers.copy()
     h["Version"] = "3"
     try:
@@ -337,50 +360,65 @@ def esegui_ciclo_trend():
         
         needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
         
-        # OTTIMIZZAZIONE API IG: Scarichiamo le candele storiche SOLO nei primi 20 secondi del nuovo blocco
-        # o se l'utente ha esplicitamente richiesto l'avvio della macchina.
+        # TIMING RIGOROSO:
+        # H4: 01:00, 05:00, 09:00, 13:00, 17:00, 21:00 (offset = 60)
+        # Daily: 01:00 (offset = 60)
+        # M5/M15/M30/H1: scatti standard sincronizzati all'1:00
         now_t = now_it()
         min_tf = TF_MAP.get(tf, 5)
         min_tot = now_t.hour * 60 + now_t.minute
-        offset = 60 if min_tf in (240, 1440) else 0
+        offset = 60 if min_tf in (60, 240, 1440) else 0
         is_candle_boundary = (min_tot - offset) % min_tf == 0
         is_just_closed = is_candle_boundary and now_t.second < 20
         
         if not is_just_closed and not needs_start:
             continue
         
-        # 1. Recupera candele da IG per calcolo Donchian e chiusura
-        prices = scarica_candele(epic, tf, limit=300, headers=headers)
+        candele_locali = carica_candele_locali(nome, tf)
+        
+        # 1. Recupero candele: se abbiamo già 55+ candele locali, scarichiamo solo le ultime 2 da IG
+        limite_download = 100 if len(candele_locali) < 55 else 2
+        prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
         if prices == "QUOTA_ESAURITA":
-            print_log(nome, "🛑 QUOTA IG ESAURITA! Arresto automatico del Trend per evitare chiamate a vuoto.")
-            invia_notifica(f"🛑 QUOTA IG ESAURITA: {nome}", f"[{nome}] Raggiunto limite dati storici IG. Arresto Trend in corso.", "no_entry")
-            aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE"})
-            if engine.is_running:
-                engine.stop()
-            continue
+            if len(candele_locali) >= 55:
+                print_log(nome, "⚠️ Quota IG in 403, ma proseguo utilizzando il buffer locale di 100 candele.")
+                prices = []
+            else:
+                print_log(nome, "🛑 Quota IG esaurita e candele locali insufficienti (<55).")
+                invia_notifica(f"🛑 QUOTA IG ESAURITA: {nome}", f"[{nome}] Raggiunto limite dati storici IG. Attesa sblocco settimanale.", "no_entry")
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE"})
+                if engine.is_running:
+                    engine.stop()
+                continue
+                
+        # Unione e aggiornamento del buffer locale di 100 candele
+        if prices and isinstance(prices, list) and len(prices) >= 2:
+            snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
+            for pr in prices[:-1]: # tutte le chiuse tranne l'ancora aperta
+                st = pr.get("snapshotTime")
+                if st and st not in snap_esistenti:
+                    candele_locali.append(pr)
+                    snap_esistenti.add(st)
+            salva_candele_locali(nome, tf, candele_locali)
             
-        if not prices: 
-            print_log(nome, "⚠️ Nessuna candela restituita da IG!")
-            continue
-            
-        if len(prices) < 2:
+        if len(candele_locali) < 2:
+            print_log(nome, "⚠️ Dati candele non ancora sufficienti.")
             continue
             
         # 2. Controllo Timestamp Lock
-        last_closed_candle = prices[-2]
+        last_closed_candle = candele_locali[-1]
         snapshot_time = last_closed_candle.get("snapshotTime", "")
         saved_candle_time = dati.get("last_candle_time", "")
         
-        # Se il timestamp è identico e non abbiamo un avvio manuale pendente, ignoriamo
         if snapshot_time == saved_candle_time and not needs_start:
             continue
             
-        print_log(nome, f"DEBUG: Nuova candela chiusa rilevata. Snapshot: {snapshot_time}")
+        print_log(nome, f"DEBUG: Nuova candela chiusa rilevata ({tf}). Snapshot: {snapshot_time}")
         
         # Seed dello storico (tutte le candele chiuse TRANNE l'ultima, che verrà aggiunta da on_candle_close)
         storic_candles = []
-        for pr in prices[:-2]: 
+        for pr in candele_locali[:-1]: 
             try:
                 bid_o, ask_o = pr['openPrice']['bid'], pr['openPrice']['ask']
                 bid_h, ask_h = pr['highPrice']['bid'], pr['highPrice']['ask']
