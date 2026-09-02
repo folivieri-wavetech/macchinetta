@@ -1782,7 +1782,59 @@ else:
                         segno_t = "+" if totale_wip_t > 0 else ""
                         col_tot_t = "#4ade80" if totale_wip_t > 0 else ("#ff6b6b" if totale_wip_t < 0 else "#aaa")
                         valore_tot_t_str = f"{segno_t}{totale_wip_t:.2f} €".replace(".", ",")
-                        html_tot_wip_t = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Trend: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>"
+                        
+                        # Calcolo PnL Live Core + Incrementi (derivante da Pfoglio)
+                        c_conf = CONFIG_STRUMENTI.get(nome, {})
+                        c_mult = c_conf.get("moltiplicatore", 1)
+                        c_valore_punto = c_conf.get("valore_punto", 1)
+                        c_valuta = c_conf.get("valuta", "USD")
+                        c_rate = get_eur_rate(c_valuta, prezzi_live)
+                        c_epic = c_conf.get("epic")
+                        
+                        pnl_live_trend = 0.0
+                        has_live_pos = False
+                        
+                        pos_live_all = st.session_state.get("live_pos_data", [])
+                        if pos_live_all and c_epic:
+                            for p in pos_live_all:
+                                if p.get('market', {}).get('epic') == c_epic:
+                                    sz_p = float(p.get('position', {}).get('size', 0))
+                                    lvl_p = float(p.get('position', {}).get('level', 0))
+                                    dir_p = p.get('position', {}).get('direction')
+                                    if isinstance(prezzo, (int, float)):
+                                        pts = (prezzo - lvl_p)/c_mult if dir_p == 'BUY' else (lvl_p - prezzo)/c_mult
+                                        pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
+                                        has_live_pos = True
+                                        
+                        if not has_live_pos and isinstance(prezzo, (int, float)):
+                            for cp in posizioni_core:
+                                sz_p = float(cp.get("size", 0))
+                                lvl_p = float(cp.get("entry", 0))
+                                dir_p = cp.get("direction", dir_t)
+                                pts = (prezzo - lvl_p)/c_mult if dir_p == 'LONG' else (lvl_p - prezzo)/c_mult
+                                pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
+                                has_live_pos = True
+                            for ip in posizioni_incr:
+                                sz_p = float(ip.get("size", 0))
+                                lvl_p = float(ip.get("entry", 0))
+                                dir_p = ip.get("direction", dir_t)
+                                pts = (prezzo - lvl_p)/c_mult if dir_p == 'LONG' else (lvl_p - prezzo)/c_mult
+                                pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
+                                has_live_pos = True
+                                
+                        if has_live_pos:
+                            segno_live = "+" if pnl_live_trend > 0 else ""
+                            # Verde erba (#00E676) o Rosso salmone (#FA8072)
+                            col_live = "#00E676" if pnl_live_trend >= 0 else "#FA8072"
+                            valore_live_str = f"{segno_live}{pnl_live_trend:.0f} €"
+                        else:
+                            col_live = "#888888"
+                            valore_live_str = "0 €"
+                        
+                        html_tot_wip_t = f"""<div style='font-size: 0.70rem; color: #bbb; margin-top: -3px; margin-bottom: 2px; padding-left: 2px; line-height: 1.15; white-space: nowrap;'>
+<div>Trend: <b style='color: {col_live};'>{valore_live_str}</b></div>
+<div>Totale: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>
+</div>"""
 
                         marker_class_t = f"btn-trend-{nome.replace('/', '').replace(' ', '')}"
                         css_marker_t = f"""<style>
