@@ -75,6 +75,7 @@ FILE_TOKEN = "token_ig.json"
 CONSOLE_LOG_FILE = "console_live.log"
 config = dotenv_values(".env")
 DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
+ULTIMI_PREZZI_MERCATO = {}
 
 # --- GESTIONE NOTIFICHE PUSH (NTFY) ---
 def to_market_dir(d):
@@ -605,7 +606,14 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                     accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
                     if not accettato:
                         motivo = confirm_data if isinstance(confirm_data, str) else "Unknown"
+                        motivo_str = str(motivo).upper()
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {direzione}: {motivo}")
+                        if ("ATTACHED" in motivo_str or "LEVEL_ERROR" in motivo_str or "DISTANCE" in motivo_str) and ("limitLevel" in p or "stopLevel" in p):
+                            print_log(nome_strumento, f"🔄 Rimozione TP/SL agganciati da mercato per superare vincolo IG e ri-tentativo...")
+                            p.pop("limitLevel", None)
+                            p.pop("stopLevel", None)
+                            time.sleep(2)
+                            continue
                         print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
                         time.sleep(20)
                         continue
@@ -651,15 +659,23 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
     return False, None, None
 
 def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello, tipo, lim, stop, headers, dec, etichetta="[ORDINE]", prezzo_ref=None):
+    global ULTIMI_PREZZI_MERCATO
     size_str = str(int(size)) if float(size).is_integer() else str(size)
     
-    # Adattamento dinamico del tipo ordine (LIMIT vs STOP) in base al prezzo di mercato se fornito
+    # 1. Recupero prezzo di riferimento (se passato o da cache live globale)
+    p_ref = prezzo_ref
+    if p_ref is None or float(p_ref) <= 0:
+        p_ref = ULTIMI_PREZZI_MERCATO.get(nome_strumento)
+        
+    # 2. Adattamento dinamico del tipo ordine (LIMIT vs STOP) in base al prezzo di mercato
     tipo_effettivo = tipo
-    if prezzo_ref is not None and float(prezzo_ref) > 0:
+    if p_ref is not None and float(p_ref) > 0:
+        liv_f = float(livello)
+        pref_f = float(p_ref)
         if direzione == "BUY":
-            tipo_effettivo = "STOP" if float(livello) > float(prezzo_ref) else "LIMIT"
+            tipo_effettivo = "STOP" if liv_f > pref_f else "LIMIT"
         elif direzione == "SELL":
-            tipo_effettivo = "STOP" if float(livello) < float(prezzo_ref) else "LIMIT"
+            tipo_effettivo = "STOP" if liv_f < pref_f else "LIMIT"
             
     p = {
         "epic": epic, 
@@ -707,9 +723,11 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
                 if deal_ref:
                     accettato, motivo = verifica_conferma_deal(deal_ref, headers_req)
                     if not accettato:
+                        motivo_str = str(motivo).upper()
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {p['type']} {direzione}: {motivo}")
-                        # Se il rifiuto è legato a TP/SL agganciati (ATTACHED_ORDER_LEVEL_ERROR), rimuoviamoli per consentire l'ingresso dell'ordine
-                        if "ATTACHED_ORDER_LEVEL_ERROR" in str(motivo) and ("limitLevel" in p or "stopLevel" in p or "limitDistance" in p or "stopDistance" in p):
+                        
+                        # Fallback 1: Rimuove TP/SL agganciati (se presenti) per superare vincoli di spread/distanza IG
+                        if ("ATTACHED" in motivo_str or "LEVEL_ERROR" in motivo_str or "DISTANCE" in motivo_str or "LIMIT_ORDER" in motivo_str or "STOP_ORDER" in motivo_str) and ("limitLevel" in p or "stopLevel" in p or "limitDistance" in p or "stopDistance" in p):
                             print_log(nome_strumento, f"🔄 Rimozione TP/SL agganciati per superare vincolo IG e ri-tentativo {etichetta} pulito...")
                             p.pop("limitLevel", None)
                             p.pop("stopLevel", None)
@@ -717,6 +735,14 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
                             p.pop("stopDistance", None)
                             time.sleep(2)
                             continue
+                            
+                        # Fallback 2: Inversione tipo ordine (LIMIT <-> STOP) se rifiutato per tipo livello non corrispondente
+                        if "LEVEL_ERROR" in motivo_str or "TYPE" in motivo_str:
+                            p["type"] = "STOP" if p["type"] == "LIMIT" else "LIMIT"
+                            print_log(nome_strumento, f"🔄 Switch tipo ordine a {p['type']} per conformità prezzo IG e ri-tentativo...")
+                            time.sleep(2)
+                            continue
+                            
                         print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
                         time.sleep(20)
                         continue
@@ -728,6 +754,14 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
                     time.sleep(30)
                 else:
                     print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {r.text}")
+                    err_txt = r.text.upper()
+                    if ("ATTACHED" in err_txt or "LEVEL" in err_txt) and ("limitLevel" in p or "stopLevel" in p):
+                        p.pop("limitLevel", None)
+                        p.pop("stopLevel", None)
+                        p.pop("limitDistance", None)
+                        p.pop("stopDistance", None)
+                        time.sleep(2)
+                        continue
                     print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
                     time.sleep(20)
         except Exception as e:
@@ -995,7 +1029,9 @@ def esegui_motore():
             prezzi_bid_ask = {}
             
             for n, v in dati_mercati.items():
-                prezzi_live[n] = round(float((v["bid"]+v["ask"])/2), CONFIG_STRUMENTI[n]["decimali"])
+                px = round(float((v["bid"]+v["ask"])/2), CONFIG_STRUMENTI[n]["decimali"])
+                prezzi_live[n] = px
+                ULTIMI_PREZZI_MERCATO[n] = px
                 distanze_minime[n] = v["min_dist"]
                 prezzi_bid_ask[n] = {"bid": v["bid"], "ask": v["ask"]}
             
