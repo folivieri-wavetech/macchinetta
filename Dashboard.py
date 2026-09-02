@@ -1110,13 +1110,13 @@ else:
                     if deal_id:
                         for idx, i_d in enumerate(pos_incr):
                             if i_d.get("ticket") == deal_id:
-                                return f"<span style='color: #FF8C00; font-weight: bold;'>+{idx+1} <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+                                return f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {idx+1}</span>"
                     
                     # Fallback per size
                     s_c = float(param_memoria.get("size", 1))
                     if abs(sz_pos - s_c) < 0.001:
                         return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
-                    return f"<span style='color: #FF8C00; font-weight: bold;'>+ (Incr) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+                    return f"<span style='color: #FF8C00; font-weight: bold;'>Incremento</span>"
                     
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
