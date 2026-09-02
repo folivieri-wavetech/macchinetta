@@ -421,8 +421,17 @@ def esegui_ciclo_trend():
             for pr in prices[:-1]: # tutte le chiuse tranne l'ancora aperta
                 st = pr.get("snapshotTime")
                 if st and st not in snap_esistenti:
-                    candele_locali.append(pr)
-                    snap_esistenti.add(st)
+                    # Verifica che i prezzi non siano nulli o negativi (glitch API IG)
+                    try:
+                        b_o, a_o = pr['openPrice']['bid'], pr['openPrice']['ask']
+                        b_h, a_h = pr['highPrice']['bid'], pr['highPrice']['ask']
+                        b_l, a_l = pr['lowPrice']['bid'], pr['lowPrice']['ask']
+                        b_c, a_c = pr['closePrice']['bid'], pr['closePrice']['ask']
+                        if all(v is not None and 0 < v < 1e8 for v in [b_o, a_o, b_h, a_h, b_l, a_l, b_c, a_c]):
+                            candele_locali.append(pr)
+                            snap_esistenti.add(st)
+                    except Exception:
+                        pass
             salva_candele_locali(nome, tf, candele_locali)
             
         if len(candele_locali) < 2:
@@ -447,8 +456,9 @@ def esegui_ciclo_trend():
                 bid_h, ask_h = pr['highPrice']['bid'], pr['highPrice']['ask']
                 bid_l, ask_l = pr['lowPrice']['bid'], pr['lowPrice']['ask']
                 bid_c, ask_c = pr['closePrice']['bid'], pr['closePrice']['ask']
-                c = Candle((bid_o+ask_o)/2, (bid_h+ask_h)/2, (bid_l+ask_l)/2, (bid_c+ask_c)/2)
-                storic_candles.append(c)
+                if all(v is not None and 0 < v < 1e8 for v in [bid_o, ask_o, bid_h, ask_h, bid_l, ask_l, bid_c, ask_c]):
+                    c = Candle((bid_o+ask_o)/2, (bid_h+ask_h)/2, (bid_l+ask_l)/2, (bid_c+ask_c)/2)
+                    storic_candles.append(c)
             except Exception: pass
             
         engine.seed_history(storic_candles)

@@ -68,8 +68,11 @@ class CoreEngine:
         if len(self.candles) < periods:
             return None
         recent_candles = self.candles[-periods:]
-        highest = max(c.high for c in recent_candles)
-        lowest = min(c.low for c in recent_candles)
+        valid_candles = [c for c in recent_candles if 0 < c.high < 1e8 and 0 < c.low < 1e8]
+        if not valid_candles:
+            return None
+        highest = max(c.high for c in valid_candles)
+        lowest = min(c.low for c in valid_candles)
         return (highest + lowest) / 2.0
 
     def on_candle_close(self, closed_candle, next_open_price=None):
