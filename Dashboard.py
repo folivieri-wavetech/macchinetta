@@ -191,9 +191,9 @@ def piazza_restore(conto, nome, cmd_dict):
     mem = carica_memoria(conto)
     if nome in mem:
         mem[nome]["comando_restore"] = cmd_dict
+        mem[nome]["alert_falso_allarme"] = ""
         salva_memoria(conto, mem)
-        st.success(f"Comando di RECOVERY inviato al Motore per {nome}! In attesa di esecuzione...")
-        time.sleep(2)
+        st.toast(f"Comando di RECOVERY inviato per {nome}! In attesa di esecuzione...", icon="✅")
         st.rerun()
 
 @st.dialog("Diario di Bordo (WIP)")
@@ -1134,7 +1134,6 @@ else:
                     if "FASE_1" in stato_sys: return "Micro"
                     if param_memoria.get("ticket2_active") and dir_pos == param_memoria.get("ticket2_dir") and not ord_dict.get('stopDistance') and not ord_dict.get('stopLevel'):
                         return "Ticket2"
-                    if "TICKET1" in stato_sys: return "Ticket1"
                     if "SATELLIT" in stato_sys or "STANDBY" in stato_sys:
                         if "OG" in stato_sys or "OL" in stato_sys or "(OG-OL)" in stato_sys:
                             return "OverGain"
