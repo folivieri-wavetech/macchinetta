@@ -1668,11 +1668,13 @@ else:
                         tipo_strat = dati.get("tipo_strategia", "RANGE")
                         
                         if is_attivo and tipo_strat == "TREND":
+                            tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                            tf_display = tf_map.get(tf, tf)
                             color = "#198754" if dir_t == "LONG" else "#dc3545"
                             if dir_t == "": color = "#FFD700"
                             str_core = f"Core: {core_count} @ {core_entry:.2f}" if core_count > 0 else "Core: 0"
                             str_incr = f" | Incr: {incr_count} @ {incr_avg:.2f}" if incr_count > 0 else " | Incr: 0"
-                            c2.markdown(f"<div style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;'>⚡ {dir_t} ({tf} | {sz})</div><div style='color:#ccc; font-size:0.8rem; margin-top:2px;'>{str_core}{str_incr}</div>", unsafe_allow_html=True)
+                            c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display} | {sz})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
                             c2.markdown("<span style='background-color: rgba(23,162,184,0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
