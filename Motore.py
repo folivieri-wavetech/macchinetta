@@ -1807,7 +1807,7 @@ def esegui_motore():
                                         pnl_str = formatta_pnl(pnl_t2_win_eur)
                                         registra_operazione(nome, "Take Profit TICKET2", pnl_t2_win_eur)
                                         
-                                        invia_notifica(f"🎫 TICKET2 PROFIT: {nome}", f"[{nome}] Ticket2 a target a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Ordine [{to_market_dir(t2_dir)}] a {formatta_numero(t2_entry, dec)}", "ticket")
+                                        invia_notifica(f"🎫 TICKET2 PROFIT: {nome}", f"[{nome}] Ticket2 a target a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Ordine TICKET2 [{to_market_dir(t2_dir)}] a {formatta_numero(t2_entry, dec)}", "ticket")
                                         aggiorna_memoria(nome, {}, log_wip=f"✅ [EVENTO]: TP colpito su TICKET2 a {formatta_numero(lim_lvl_t2, dec)}.{pnl_str} Re-inserisco Ordine ({t2_dir}) a {formatta_numero(t2_entry, dec)}")
                                         time.sleep(2.0)
                                     else:
