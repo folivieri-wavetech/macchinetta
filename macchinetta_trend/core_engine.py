@@ -122,13 +122,13 @@ class CoreEngine:
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
-            elif c_close < tk:
-                # Sotto Tenkan: Chiude solo gli incrementi
+            elif c_close < (tk - (5 * pip_val)):
+                # Sotto Tenkan - 5 pip: Chiude solo gli incrementi (SL base a TK + 5 pip)
                 self.bancomat_sl = None
                 chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
-                    events.append({"type": "increments_cleared", "reason": "close_below_tk"})
+                    events.append({"type": "increments_cleared", "reason": "close_below_tk_buffer"})
                 self.retracement_start_price = None
 
             else:
@@ -201,13 +201,13 @@ class CoreEngine:
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
                 
-            elif c_close > tk:
-                # Sopra Tenkan: Chiude solo gli incrementi
+            elif c_close > (tk + (5 * pip_val)):
+                # Sopra Tenkan + 5 pip: Chiude solo gli incrementi (SL base a TK + 5 pip)
                 self.bancomat_sl = None
                 chiusure_inc = self.pm.close_all_increments(exec_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
-                    events.append({"type": "increments_cleared", "reason": "close_above_tk"})
+                    events.append({"type": "increments_cleared", "reason": "close_above_tk_buffer"})
                 self.retracement_start_price = None
 
             else:
