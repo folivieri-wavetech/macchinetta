@@ -2004,7 +2004,8 @@ else:
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
-                                st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_val})")
+                                tf_display = tf_map.get(tf_val, tf_val)
+                                st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
