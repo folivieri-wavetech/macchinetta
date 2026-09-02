@@ -694,23 +694,19 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
         try:
             lim_val = float(lim)
             liv_val = float(livello)
-            if liv_val > 0 and abs(lim_val - liv_val) / liv_val < 0.3:
+            if liv_val > 0 and abs(lim_val - liv_val) / liv_val < 0.2:
                 p["limitLevel"] = formatta_numero(lim_val, dec)
-            else:
-                p["limitDistance"] = str(int(round(lim_val)))
-        except:
-            p["limitLevel"] = formatta_numero(lim, dec)
+        except Exception:
+            pass
             
     if stop is not None:
         try:
             stop_val = float(stop)
             liv_val = float(livello)
-            if liv_val > 0 and abs(stop_val - liv_val) / liv_val < 0.3:
+            if liv_val > 0 and abs(stop_val - liv_val) / liv_val < 0.2:
                 p["stopLevel"] = formatta_numero(stop_val, dec)
-            else:
-                p["stopDistance"] = str(int(round(stop_val)))
-        except:
-            p["stopLevel"] = formatta_numero(stop, dec)
+        except Exception:
+            pass
         
     headers_req = headers.copy()
     headers_req["Version"] = "2"
