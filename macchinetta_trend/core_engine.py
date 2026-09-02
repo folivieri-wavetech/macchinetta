@@ -110,6 +110,7 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
+            bancomat_triggered = False
             sl_core_long = kj - (5 * pip_val)
             if c_close < sl_core_long:
                 # Sotto la Kijun - 5 pip: Chiude tutto e passa in FLAT
@@ -190,6 +191,7 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
+            bancomat_triggered = False
             sl_core_short = kj + (5 * pip_val)
             if c_close > sl_core_short:
                 # Sopra la Kijun + 5 pip: Chiude tutto e passa in FLAT
