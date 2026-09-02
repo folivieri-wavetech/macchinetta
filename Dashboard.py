@@ -1846,7 +1846,7 @@ else:
                             valore_live_str = "0 €"
                         
                         html_tot_wip_t = f"""<div style='font-size: 0.70rem; color: #bbb; margin-top: 0px; margin-bottom: 3px; padding-left: 2px; line-height: 1.15; white-space: nowrap;'>
-<div>Trend: <b style='color: {col_live};'>{valore_live_str}</b></div>
+<div>Live: <b style='color: {col_live};'>{valore_live_str}</b></div>
 <div>Totale: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>
 </div>"""
 
@@ -1856,7 +1856,7 @@ else:
                             margin-bottom: -15px !important;
                         }}
                         div[data-testid="stColumn"]:has(.{marker_class_t}) {{
-                            margin-top: -18px !important;
+                            margin-top: -22px !important;
                         }}
                         div[data-testid="stColumn"]:has(.{marker_class_t}) div[data-testid="stButton"] > button {{
                             background-color: {bg_color_t} !important; border-color: {bg_color_t} !important; color: {text_color_t} !important;
@@ -1876,9 +1876,10 @@ else:
                             color = "#198754" if dir_t == "LONG" else "#dc3545"
                             if dir_t == "": color = "#FFD700"
                             dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
-                            str_core = f"Core: {core_count} @ {core_entry:.{dec}f}" if core_count > 0 else "Core: 0"
+                            core_sz_val = posizioni_core[0].get("size", sz) if core_count > 0 else sz
+                            str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}" if core_count > 0 else "Core: 0"
                             str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
-                            c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display} | {sz})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
+                            c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
                             c2.markdown("<span style='background-color: rgba(23,162,184,0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
