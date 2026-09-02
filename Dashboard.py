@@ -1391,7 +1391,7 @@ else:
                                 pip_val = c.get("moltiplicatore", 0.0001)
                                 if kj_val is not None:
                                     sl_core = (kj_val - (5 * pip_val)) if dir == 'BUY' else (kj_val + (5 * pip_val))
-                                    s_str = f"<span style='color: #FFD700;' title='Stop Core (KJ +- 5 pip)'>{formatta_numero(sl_core, dec)}</span>"
+                                    s_str = f"<span style='color: #b0b0b0;' title='Stop Core (KJ +- 5 pip)'>{formatta_numero(sl_core, dec)}</span>"
                                 else:
                                     s_str = "-"
                                 tf_val = memoria_attuale.get(nome, {}).get("timeframe", "MINUTE_5")
@@ -1845,7 +1845,7 @@ else:
                             col_live = "#888888"
                             valore_live_str = "0 €"
                         
-                        html_tot_wip_t = f"""<div style='font-size: 0.70rem; color: #bbb; margin-top: -3px; margin-bottom: 2px; padding-left: 2px; line-height: 1.15; white-space: nowrap;'>
+                        html_tot_wip_t = f"""<div style='font-size: 0.70rem; color: #bbb; margin-top: -6px; margin-bottom: -10px; padding-left: 2px; line-height: 1.15; white-space: nowrap;'>
 <div>Trend: <b style='color: {col_live};'>{valore_live_str}</b></div>
 <div>Totale: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>
 </div>"""
@@ -1854,6 +1854,9 @@ else:
                         css_marker_t = f"""<style>
                         div[data-testid="stHorizontalBlock"]:has(.{marker_class_t}) {{
                             margin-bottom: -15px !important;
+                        }}
+                        div[data-testid="stColumn"]:has(.{marker_class_t}) div[data-testid="stButton"] {{
+                            margin-top: -8px !important;
                         }}
                         div[data-testid="stColumn"]:has(.{marker_class_t}) div[data-testid="stButton"] > button {{
                             background-color: {bg_color_t} !important; border-color: {bg_color_t} !important; color: {text_color_t} !important;
