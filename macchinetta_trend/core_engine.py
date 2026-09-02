@@ -203,8 +203,8 @@ class CoreEngine:
             if not self.config.get("auto_restart", False):
                 return events
 
-            is_long_cond = c_close > tk and c_close > kj and (tk > kj or abs(tk - kj) <= min_body_price)
-            is_short_cond = c_close < tk and c_close < kj and (tk < kj or abs(tk - kj) <= min_body_price)
+            is_long_cond = c_close > kj and closed_candle.is_green()
+            is_short_cond = c_close < kj and closed_candle.is_red()
             
             pip_val = self.config.get("pip_value") or 0.0001
             max_dist = (self.config.get("max_kj_distance") or 50.0) * pip_val
@@ -219,7 +219,7 @@ class CoreEngine:
                 if abs(exec_price - kj) <= max_dist:
                     if self.signal_candles_elapsed <= max_delay:
                         self.start(exec_price, "LONG")
-                        reason = "condizioni_long_allineate" if tk > kj else "condizioni_long_tollerate"
+                        reason = "rottura_kj_candela_verde"
                         events.append({"type": "auto_start", "direction": "LONG", "price": exec_price, "reason": reason})
                         self.active_signal = None
                         self.signal_candles_elapsed = 0
@@ -233,7 +233,7 @@ class CoreEngine:
                 if abs(kj - exec_price) <= max_dist:
                     if self.signal_candles_elapsed <= max_delay:
                         self.start(exec_price, "SHORT")
-                        reason = "condizioni_short_allineate" if tk < kj else "condizioni_short_tollerate"
+                        reason = "rottura_kj_candela_rossa"
                         events.append({"type": "auto_start", "direction": "SHORT", "price": exec_price, "reason": reason})
                         self.active_signal = None
                         self.signal_candles_elapsed = 0

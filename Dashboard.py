@@ -351,7 +351,7 @@ def mostra_diario_wip_trend(nome_strumento, storico):
                 totale += float(match.group(1).replace(",", "."))
         
         righe_eventi = []
-        for riga in reversed(storico):
+        for riga in storico:
             riga_colorata = re.sub(r"(\[PnL:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
             righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
@@ -2121,7 +2121,7 @@ else:
                         with st.expander(f"📋 Cronologia Trend WIP ({len(storico_t)} eventi)", expanded=False):
                             if storico_t:
                                 righe_html = "<div style='font-size: 0.82rem; line-height: 1.6; max-height: 180px; overflow-y: auto;'>"
-                                for r in reversed(storico_t):
+                                for r in storico_t:
                                     righe_html += f"&bull; {r}<br>"
                                 righe_html += "</div>"
                                 st.html(righe_html)
