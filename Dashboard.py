@@ -2033,7 +2033,7 @@ else:
                             kj_str = f"{current_kj:.{dec}f}" if current_kj is not None else "-"
                             tk_str = f"{current_tk:.{dec}f}" if current_tk is not None else "-"
                             st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 2px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div style='font-size: 0.82rem; color: #00BFFF; margin-bottom: 6px;'><b>🔵 Kijun:</b> {kj_str} &nbsp;|&nbsp; <b>🟠 Tenkan:</b> {tk_str}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 6px;'><b style='color: #FFD700;'>🟡 Kijun:</b> <span style='color: #FFD700;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan:</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):

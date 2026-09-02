@@ -458,9 +458,6 @@ def esegui_ciclo_trend():
             "last_candle_time": snapshot_time
         })
         
-        # Se eravamo FLAT e non c'è needs_start, abbiamo solo aggiornato le linee, possiamo saltare il calcolo trading
-        if not engine.is_running and not needs_start:
-            continue
         pos_core = dati.get("posizioni_core", [])
         pos_incr = dati.get("posizioni_incr", [])
         
@@ -475,6 +472,10 @@ def esegui_ciclo_trend():
                 dir_pos = i_d.get("direction", engine.current_direction)
                 pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), dir_pos)
                 pos.ticket = i_d.get("ticket")
+
+        # Se eravamo FLAT e non c'è needs_start e non c'è auto_restart, abbiamo solo aggiornato le linee, possiamo saltare il calcolo trading
+        if not engine.is_running and not needs_start and not auto_restart:
+            continue
 
         # Estrai candela chiusa (l'ultima nel buffer locale)
         last = candele_locali[-1]
