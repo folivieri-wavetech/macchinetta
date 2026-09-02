@@ -352,14 +352,15 @@ def mostra_diario_wip_trend(nome_strumento, storico):
         
         righe_eventi = []
         for riga in storico:
-            riga_colorata = re.sub(r"(\[PnL:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga)
+            riga_arr = re.sub(r"\[PnL:\s*([+-]?\d+)(?:[\.,]\d+)?\s*€\]", r"[PnL: \1 €]", riga)
+            riga_colorata = re.sub(r"(\[PnL:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga_arr)
             righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
         segno = "+" if totale > 0 else ""
         col_tot = "#09ab3b" if totale > 0 else ("#ff4b4b" if totale < 0 else "#FFD700")
         
         html_str = f"<div style='margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
-        html_str += f"<span style='color: #FFD700;'><b>Totale PnL Chiusure:</b> <span style='color: {col_tot}; font-weight: bold;'>{segno}{totale:.2f} €</span></span></div>"
+        html_str += f"<span style='color: #FFD700;'><b>Totale PnL Chiusure:</b> <span style='color: {col_tot}; font-weight: bold;'>{segno}{totale:.0f} €</span></span></div>"
         html_str += "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
         html_str += "".join(righe_eventi)
         html_str += "</div>"
@@ -1796,7 +1797,7 @@ else:
                         
                         segno_t = "+" if totale_wip_t > 0 else ""
                         col_tot_t = "#4ade80" if totale_wip_t > 0 else ("#ff6b6b" if totale_wip_t < 0 else "#aaa")
-                        valore_tot_t_str = f"{segno_t}{totale_wip_t:.2f} €".replace(".", ",")
+                        valore_tot_t_str = f"{segno_t}{totale_wip_t:.0f} €"
                         
                         # Calcolo PnL Live Core + Incrementi (derivante da Pfoglio)
                         c_conf = CONFIG_STRUMENTI.get(nome, {})

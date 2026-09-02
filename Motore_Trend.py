@@ -549,7 +549,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 
                 rate = get_eur_rate(valuta_c, prezzi_live)
                 pnl_eur = (raw_diff / mult) * valore_punto * rate
-                pnl_str = f" [PnL: {pnl_eur:+.2f} €]" if pnl_eur != 0 else ""
+                pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
                 
                 if is_bancomat:
                     msg = f"💰 BANCOMAT Incassato! Chiuso Incremento ({sz}){pnl_str}"
