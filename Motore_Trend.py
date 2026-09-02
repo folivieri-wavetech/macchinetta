@@ -363,11 +363,15 @@ def pulisci_posizioni_epic(nome, epic, headers):
         ig_rate_limiter.acquire()
         r = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
         if r and r.status_code == 200:
-            pos_list = [p for p in r.json().get('positions', []) if p['market']['epic'] == epic]
+            pos_list = [p for p in r.json().get('positions', []) if p.get('market', {}).get('epic') == epic]
             for p in pos_list:
-                dir_c = "SELL" if p['position']['direction'] == "BUY" else "BUY"
-                chiudi_parziale(nome, p['position']['dealId'], dir_c, p['position']['size'], headers, etichetta="[CLEANUP]")
-                time.sleep(0.5) # micro-respiro tra le posizioni
+                pos_info = p.get('position', {})
+                dir_c = "SELL" if pos_info.get('direction') == "BUY" else "BUY"
+                deal_id = pos_info.get('dealId')
+                sz = pos_info.get('dealSize', pos_info.get('size', 1))
+                if deal_id:
+                    chiudi_parziale(nome, deal_id, dir_c, sz, headers, etichetta="[CLEANUP]")
+                    time.sleep(1.0)
     except Exception as e:
         print_log(nome, f"Errore pulizia reversal: {e}")
 
@@ -597,6 +601,21 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             update_data_off["storico_wip_trend"] = storico
         aggiorna_memoria(nome, update_data_off)
 
+def is_rollover_active():
+    """
+    Ritorna True se siamo nella finestra di Rollover notturno:
+    Lun-Gio 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
+    Mar-Ven 00:00 - 00:29:59 (weekday 1, 2, 3, 4)
+    """
+    ora = now_it()
+    t = ora.time()
+    wd = ora.weekday()
+    if wd in (0, 1, 2, 3) and (datetime.time(22, 45) <= t <= datetime.time(23, 59, 59)):
+        return True
+    if wd in (1, 2, 3, 4) and (datetime.time(0, 0) <= t <= datetime.time(0, 29, 59)):
+        return True
+    return False
+
 def esegui_ciclo_trend():
     headers = ottieni_headers_ig()
     if not headers:
@@ -680,17 +699,34 @@ def esegui_ciclo_trend():
                 engine.current_kj = dati.get("current_kj")
 
         # -------------------------------------------------------------
+        # GESTIONE AUTOMATICA PAUSA ROLLOVER (22:45 - 00:29)
+        # -------------------------------------------------------------
+        in_rollover = is_rollover_active()
+        is_sosp_rollover = dati.get("sospeso_rollover", False)
+        if in_rollover and not is_sosp_rollover:
+            print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:45): Stop live congelati e ingressi sospesi per protezione spread.")
+            aggiorna_memoria(nome, {"sospeso_rollover": True})
+            dati["sospeso_rollover"] = True
+        elif not in_rollover and is_sosp_rollover:
+            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:30): Ripristino controlli attivi.")
+            aggiorna_memoria(nome, {"sospeso_rollover": False})
+            dati["sospeso_rollover"] = False
+
+        # -------------------------------------------------------------
         # FASE 1: CONTROLLO STOP LOSS LIVE INTRACANDELA (0 Chiamate API)
         # -------------------------------------------------------------
-        live_px = prezzi_live.get(nome)
-        if live_px and isinstance(live_px, (int, float)) and engine.is_running and engine.current_direction != "FLAT":
-            live_events = engine.check_live_stops(live_px)
-            if live_events:
-                processa_eventi_engine(nome, engine, live_events, epic, valuta, size_i, headers, dec, auto_restart, dati)
+        if not in_rollover:
+            live_px = prezzi_live.get(nome)
+            if live_px and isinstance(live_px, (int, float)) and engine.is_running and engine.current_direction != "FLAT":
+                live_events = engine.check_live_stops(live_px)
+                if live_events:
+                    processa_eventi_engine(nome, engine, live_events, epic, valuta, size_i, headers, dec, auto_restart, dati)
 
         # -------------------------------------------------------------
         # FASE 2: TIMING FINE CANDELA O AVVIO MANUALE
         # -------------------------------------------------------------
+        if in_rollover:
+            continue
         needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
         
         now_t = now_it()
