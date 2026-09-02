@@ -50,7 +50,8 @@ try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore_Trend.py "macchinetta/${POD_DASH}:/data/Motore_Trend.py"
     Get-ChildItem -Path "macchinetta_trend" -File | ForEach-Object {
-        & $KUBECTL --kubeconfig=$KUBECONFIG cp $_.FullName "macchinetta/${POD_DASH}:/data/macchinetta_trend/$($_.Name)"
+        $fname = $_.Name
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp "macchinetta_trend/$fname" "macchinetta/${POD_DASH}:/data/macchinetta_trend/$fname"
     }
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Sistema/auth_manager.py "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
     Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
