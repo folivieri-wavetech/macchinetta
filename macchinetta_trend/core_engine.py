@@ -133,19 +133,19 @@ class CoreEngine:
                 self.retracement_start_price = None
 
             else:
-                # Sopra Tenkan: Gestione Bancomat (SL variabile sull'incremento più anziano)
+                # Sopra Tenkan: Gestione Bancomat (SL variabile sull'incremento più redditizio)
                 bancomat_triggered = False
                 if len(self.pm.increments) > 0:
                     if self.bancomat_sl is not None and c_close <= self.bancomat_sl:
-                        oldest = self.pm.force_close_oldest_increment(exec_price)
-                        if oldest:
+                        best = self.pm.force_close_best_increment(exec_price)
+                        if best:
                             events.append({
                                 "type": "increment_closed",
                                 "reason": "bancomat",
                                 "direction": "LONG",
-                                "ticket": oldest.ticket,
-                                "size": oldest.size,
-                                "pnl": oldest.pnl,
+                                "ticket": best.ticket,
+                                "size": best.size,
+                                "pnl": best.pnl,
                                 "price": exec_price
                             })
                             bancomat_triggered = True
@@ -176,9 +176,9 @@ class CoreEngine:
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
                             if self.pm.total_active_size() >= size_max:
-                                oldest = self.pm.force_close_oldest_increment(entry_price)
-                                if oldest:
-                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price, "ticket": oldest.ticket, "size": oldest.size})
+                                best = self.pm.force_close_best_increment(entry_price)
+                                if best:
+                                    events.append({"type": "fifo_close", "pnl": best.pnl, "price": entry_price, "ticket": best.ticket, "size": best.size})
                             pos = self.pm.open_increment(entry_price, size=1, direction="LONG")
                             events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
                             
@@ -213,19 +213,19 @@ class CoreEngine:
                 self.retracement_start_price = None
 
             else:
-                # Sotto Tenkan: Gestione Bancomat (SL variabile sull'incremento più anziano)
+                # Sotto Tenkan: Gestione Bancomat (SL variabile sull'incremento più redditizio)
                 bancomat_triggered = False
                 if len(self.pm.increments) > 0:
                     if self.bancomat_sl is not None and c_close >= self.bancomat_sl:
-                        oldest = self.pm.force_close_oldest_increment(exec_price)
-                        if oldest:
+                        best = self.pm.force_close_best_increment(exec_price)
+                        if best:
                             events.append({
                                 "type": "increment_closed",
                                 "reason": "bancomat",
                                 "direction": "SHORT",
-                                "ticket": oldest.ticket,
-                                "size": oldest.size,
-                                "pnl": oldest.pnl,
+                                "ticket": best.ticket,
+                                "size": best.size,
+                                "pnl": best.pnl,
                                 "price": exec_price
                             })
                             bancomat_triggered = True
@@ -256,9 +256,9 @@ class CoreEngine:
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
                             if self.pm.total_active_size() >= size_max:
-                                oldest = self.pm.force_close_oldest_increment(entry_price)
-                                if oldest:
-                                    events.append({"type": "fifo_close", "pnl": oldest.pnl, "price": entry_price, "ticket": oldest.ticket, "size": oldest.size})
+                                best = self.pm.force_close_best_increment(entry_price)
+                                if best:
+                                    events.append({"type": "fifo_close", "pnl": best.pnl, "price": entry_price, "ticket": best.ticket, "size": best.size})
                             pos = self.pm.open_increment(entry_price, size=1, direction="SHORT")
                             events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
                             
@@ -345,17 +345,17 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Bancomat SL su incremento più anziano
+            # 2. Bancomat SL su incremento più redditizio
             if len(self.pm.increments) > 0 and self.bancomat_sl is not None and current_price <= self.bancomat_sl:
-                oldest = self.pm.force_close_oldest_increment(current_price)
-                if oldest:
+                best = self.pm.force_close_best_increment(current_price)
+                if best:
                     events.append({
                         "type": "increment_closed",
                         "reason": "bancomat",
                         "direction": "LONG",
-                        "ticket": oldest.ticket,
-                        "size": oldest.size,
-                        "pnl": oldest.pnl,
+                        "ticket": best.ticket,
+                        "size": best.size,
+                        "pnl": best.pnl,
                         "price": current_price
                     })
                 self.bancomat_sl = None
@@ -383,17 +383,17 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Bancomat SL su incremento più anziano
+            # 2. Bancomat SL su incremento più redditizio
             if len(self.pm.increments) > 0 and self.bancomat_sl is not None and current_price >= self.bancomat_sl:
-                oldest = self.pm.force_close_oldest_increment(current_price)
-                if oldest:
+                best = self.pm.force_close_best_increment(current_price)
+                if best:
                     events.append({
                         "type": "increment_closed",
                         "reason": "bancomat",
                         "direction": "SHORT",
-                        "ticket": oldest.ticket,
-                        "size": oldest.size,
-                        "pnl": oldest.pnl,
+                        "ticket": best.ticket,
+                        "size": best.size,
+                        "pnl": best.pnl,
                         "price": current_price
                     })
                 self.bancomat_sl = None

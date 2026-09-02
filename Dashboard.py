@@ -1404,10 +1404,17 @@ else:
                                 incr_idx = other_positions.index(p) + 1
                                 ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
                                 
+                                # Identifica l'incremento più redditizio
+                                if dir == 'BUY':
+                                    best_p = min(other_positions, key=lambda x: float(x['position']['level'])) if other_positions else None
+                                else:
+                                    best_p = max(other_positions, key=lambda x: float(x['position']['level'])) if other_positions else None
+
                                 bancomat_sl = memoria_attuale.get(nome, {}).get("bancomat_sl")
-                                if incr_idx == 1 and bancomat_sl is not None:
+                                is_best_increment = (p == best_p)
+                                if is_best_increment and bancomat_sl is not None:
                                     sl_display = bancomat_sl
-                                    title_info = "Bancomat SL"
+                                    title_info = "Bancomat SL (Miglior Incremento)"
                                 else:
                                     tk_val = memoria_attuale.get(nome, {}).get("current_tk")
                                     pip_val = c.get("moltiplicatore", 0.0001)

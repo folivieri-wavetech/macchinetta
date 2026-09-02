@@ -57,17 +57,37 @@ class PositionManager:
         inc_size = sum(p.size for p in self.increments)
         return core_size + inc_size
 
-    def force_close_oldest_increment(self, current_price):
+    def get_best_increment(self, current_price):
         """
-        Logica FIFO: chiude l'incremento più vecchio se raggiungiamo Size_F.
-        Essendo il più vecchio in un trend a salire, è quello al prezzo più basso.
+        Restituisce l'incremento attualmente più redditizio (con maggior profitto latente).
+        - LONG: gain = current_price - entry_price
+        - SHORT: gain = entry_price - current_price
         """
-        if self.increments:
-            oldest = self.increments.pop(0)
-            oldest.close(current_price)
-            self.closed_positions.append(oldest)
-            return oldest
+        if not self.increments:
+            return None
+        def calc_gain(p):
+            if p.direction == "LONG":
+                return current_price - p.entry_price
+            else:
+                return p.entry_price - current_price
+        return max(self.increments, key=calc_gain)
+
+    def force_close_best_increment(self, current_price):
+        """
+        Chiude e rimuove l'incremento più redditizio (massimo gain latente).
+        Utilizzato sia per il Bancomat che per la rotazione dell'11° incremento (Take Profit rotativo).
+        """
+        best = self.get_best_increment(current_price)
+        if best:
+            self.increments.remove(best)
+            best.close(current_price)
+            self.closed_positions.append(best)
+            return best
         return None
+
+    def force_close_oldest_increment(self, current_price):
+        """Mantiene retrocompatibilità reindirizzando alla chiusura del migliore."""
+        return self.force_close_best_increment(current_price)
         
     def close_all_increments(self, current_price):
         """Chiude tutti gli incrementi aperti."""
