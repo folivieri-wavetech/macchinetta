@@ -508,15 +508,28 @@ def ottieni_dati_mercati_batch(h):
                     min_dist = m.get("dealingRules", {}).get("minNormalStopOrLimitDistance", {}).get("value", 0)
                     
                     if epic_resp and bid is not None and ask is not None:
-                        nome = next((n for n, c in CONFIG_STRUMENTI.items() if c["epic"] == epic_resp), None)
-                        if nome:
-                            dec = CONFIG_STRUMENTI[nome]["decimali"]
-                            risultato[nome] = {
-                                "bid": round(float(bid), dec),
-                                "ask": round(float(ask), dec),
-                                "status": status,
-                                "min_dist": min_dist
-                            }
+                        try:
+                            f_bid = float(bid)
+                            f_ask = float(ask)
+                            if f_bid <= 0 or f_ask <= 0 or f_bid > 1_000_000 or f_ask > 1_000_000:
+                                continue
+                            nome = next((n for n, c in CONFIG_STRUMENTI.items() if c["epic"] == epic_resp), None)
+                            if nome:
+                                dec = CONFIG_STRUMENTI[nome]["decimali"]
+                                cur_px = round((f_bid + f_ask) / 2, dec)
+                                prev_px = ULTIMI_PREZZI_MERCATO.get(nome)
+                                if prev_px is not None and prev_px > 0:
+                                    if abs(cur_px - prev_px) / prev_px > 0.20:
+                                        print_log("SISTEMA", f"⚠️ Tick anomalo rifiutato su {nome}: {cur_px} vs prec {prev_px}")
+                                        continue
+                                risultato[nome] = {
+                                    "bid": round(f_bid, dec),
+                                    "ask": round(f_ask, dec),
+                                    "status": status,
+                                    "min_dist": min_dist
+                                }
+                        except Exception:
+                            continue
                 return risultato
         except Exception:
             time.sleep(1.5)
