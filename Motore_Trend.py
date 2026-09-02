@@ -19,8 +19,12 @@ def now_it():
 from dotenv import dotenv_values
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'macchinetta_trend'))
-from core_engine import CoreEngine, Candle
-from position_manager import PositionManager
+try:
+    from macchinetta_trend.core_engine import CoreEngine, Candle
+    from macchinetta_trend.position_manager import PositionManager
+except ImportError:
+    from core_engine import CoreEngine, Candle
+    from position_manager import PositionManager
 
 # --- MAPPA TIMEFRAMES (IN MINUTI) ---
 TF_MAP = {
