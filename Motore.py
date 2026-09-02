@@ -650,16 +650,24 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
             
     return False, None, None
 
-def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello, tipo, lim, stop, headers, dec, etichetta="[ORDINE]"):
+def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello, tipo, lim, stop, headers, dec, etichetta="[ORDINE]", prezzo_ref=None):
     size_str = str(int(size)) if float(size).is_integer() else str(size)
     
+    # Adattamento dinamico del tipo ordine (LIMIT vs STOP) in base al prezzo di mercato se fornito
+    tipo_effettivo = tipo
+    if prezzo_ref is not None and float(prezzo_ref) > 0:
+        if direzione == "BUY":
+            tipo_effettivo = "STOP" if float(livello) > float(prezzo_ref) else "LIMIT"
+        elif direzione == "SELL":
+            tipo_effettivo = "STOP" if float(livello) < float(prezzo_ref) else "LIMIT"
+            
     p = {
         "epic": epic, 
         "expiry": "-", 
         "direction": direzione, 
         "size": size_str, 
         "level": formatta_numero(livello, dec), 
-        "type": tipo, 
+        "type": tipo_effettivo, 
         "timeInForce": "GOOD_TILL_CANCELLED", 
         "forceOpen": True, 
         "guaranteedStop": False, 
@@ -699,7 +707,16 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
                 if deal_ref:
                     accettato, motivo = verifica_conferma_deal(deal_ref, headers_req)
                     if not accettato:
-                        print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {tipo} {direzione}: {motivo}")
+                        print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {p['type']} {direzione}: {motivo}")
+                        # Se il rifiuto è legato a TP/SL agganciati (ATTACHED_ORDER_LEVEL_ERROR), rimuoviamoli per consentire l'ingresso dell'ordine
+                        if "ATTACHED_ORDER_LEVEL_ERROR" in str(motivo) and ("limitLevel" in p or "stopLevel" in p or "limitDistance" in p or "stopDistance" in p):
+                            print_log(nome_strumento, f"🔄 Rimozione TP/SL agganciati per superare vincolo IG e ri-tentativo {etichetta} pulito...")
+                            p.pop("limitLevel", None)
+                            p.pop("stopLevel", None)
+                            p.pop("limitDistance", None)
+                            p.pop("stopDistance", None)
+                            time.sleep(2)
+                            continue
                         print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
                         time.sleep(20)
                         continue
@@ -1885,22 +1902,22 @@ def esegui_motore():
                             
                             if sat2_dir == "SELL":
                                 print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_sell} e [OVERLOSS] a {lvl_ol_sell}...")
-                                succ_og = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                succ_og = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]", prezzo_ref=prezzo_attuale)
                                 time.sleep(3.0) 
-                                succ_ol = invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]")
+                                succ_ol = invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]", prezzo_ref=prezzo_attuale)
                                 time.sleep(3.0)
                             else:
                                 print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_buy} e [OVERLOSS] a {lvl_ol_buy}...")
-                                succ_og = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                succ_og = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]", prezzo_ref=prezzo_attuale)
                                 time.sleep(3.0) 
-                                succ_ol = invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]")
+                                succ_ol = invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]", prezzo_ref=prezzo_attuale)
                                 time.sleep(3.0)
                                 
                             if not succ_og or not succ_ol:
                                 print_log(nome, f"⚠️ Impossibile inserire [OVERGAIN]/[OVERLOSS]. Il Motore prosegue in automatico senza OCO.")
                                 pulisci_mercato(epic, h, nome, solo_pendenti=True)
                                 invia_notifica(f"⚠️ ATTENZIONE MOTORE: {nome}", f"[{nome}] Fallimento immissione ordini FASE 2 (OG/OL) (dopo 4 tentativi). Il Motore prosegue senza OCO.", "warning")
-                                aggiorna_memoria(nome, {"alert_falso_allarme": f"⚠️ OCO mancanti (OG/OL). Il Motore prosegue in automatico."}, log_wip=f"📌 [EVENTO]: Fallimento ordini FASE 2 (OG/OL). Macchina prosegue.")
+                                aggiorna_memoria(nome, {"stato": "FASE_2_SATELLITE_(OG-OL)", "sat_dir": sat_dir, "sat_price": sat_price, "tentativi_sat": 0, "ticket2_active": False, "alert_falso_allarme": f"⚠️ OCO mancanti (OG/OL). Il Motore prosegue in automatico."}, log_wip=f"📌 [EVENTO]: Fallimento ordini FASE 2 (OG/OL). Macchina prosegue.")
                                 continue
                                 
                             lvl_og = round(sat_price + tp4_val, dec) if sat2_dir == "SELL" else round(sat_price - tp4_val, dec)
@@ -2129,11 +2146,11 @@ def esegui_motore():
                                         print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_sell} / [OVERLOSS] a {lvl_ol_sell} mancante...")
                                         fallito_f3 = False
                                         if not pend_og:
-                                            succ_og = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                            succ_og = invia_ordine_pendente(nome, epic, valuta, "SELL", s_mezzo, lvl_og_sell, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]", prezzo_ref=prezzo_attuale)
                                             if not succ_og: fallito_f3 = True
                                             else: time.sleep(3.0) 
                                         if not pend_ol and not fallito_f3:
-                                            succ_ol = invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]")
+                                            succ_ol = invia_ordine_pendente(nome, epic, valuta, "SELL", s_quarto, lvl_ol_sell, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]", prezzo_ref=prezzo_attuale)
                                             if not succ_ol: fallito_f3 = True
                                             else: time.sleep(3.0)
                                             
@@ -2145,11 +2162,11 @@ def esegui_motore():
                                         print_log(nome, f"➡️ Inserisco Ordine [OVERGAIN] a {lvl_og_buy} / [OVERLOSS] a {lvl_ol_buy} mancante...")
                                         fallito_f3 = False
                                         if not pend_og:
-                                            succ_og = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]")
+                                            succ_og = invia_ordine_pendente(nome, epic, valuta, "BUY", s_mezzo, lvl_og_buy, "LIMIT", round(sat_price, dec), None, h, dec, etichetta="[ORDINE OVERGAIN]", prezzo_ref=prezzo_attuale)
                                             if not succ_og: fallito_f3 = True
                                             else: time.sleep(3.0) 
                                         if not pend_ol and not fallito_f3:
-                                            succ_ol = invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]")
+                                            succ_ol = invia_ordine_pendente(nome, epic, valuta, "BUY", s_quarto, lvl_ol_buy, "STOP", None, None, h, dec, etichetta="[ORDINE OVERLOSS]", prezzo_ref=prezzo_attuale)
                                             if not succ_ol: fallito_f3 = True
                                             else: time.sleep(3.0)
                                             
