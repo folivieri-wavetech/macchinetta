@@ -1356,14 +1356,14 @@ def esegui_motore():
                                 else:
                                     tentativi = param.get("tentativi_ripristino", 0) + 1
                                     if tentativi >= 4:
-                                        print_log(nome, "🛑 4 tentativi falliti. Sgancio Pilota Automatico e pulizia ordini orfani.")
+                                        print_log(nome, "⚠️ 4 tentativi falliti. Sgancio Pilota Automatico e pulizia ordini orfani.")
                                         pulisci_mercato(epic, h, nome, solo_pendenti=True)
-                                        invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Falliti 4 tentativi consecutivi di ripristino ordine. Passaggio forzato a MANUALE per sicurezza.", "rotating_light")
+                                        invia_notifica(f"⚠️ ATTENZIONE MOTORE: {nome}", f"[{nome}] Falliti 4 tentativi consecutivi di ripristino ordine. Il Motore prosegue senza OCO.", "warning")
                                         aggiorna_memoria(nome, {
-                                            "attivo": False, 
-                                            "errore_ripristino": True, 
+                                            "alert_falso_allarme": "⚠️ OCO mancanti. Il Motore prosegue in automatico senza OCO.",
                                             "tentativi_ripristino": 0
-                                        }, log_wip="🛑 Spegnimento emergenza: falliti 4 tentativi di ripristino ordine. Motore Sospeso.")
+                                        }, log_wip="📌 Spegnimento evitato: falliti 4 tentativi di ripristino ordine. Motore prosegue.")
+                                        continue
                                     else:
                                         aggiorna_memoria(nome, {"tentativi_ripristino": tentativi})
                                 time.sleep(3.0)
@@ -1386,14 +1386,14 @@ def esegui_motore():
                                 else:
                                     tentativi = param.get("tentativi_ripristino", 0) + 1
                                     if tentativi >= 4:
-                                        print_log(nome, "🛑 4 tentativi falliti. Sgancio Pilota Automatico e pulizia ordini orfani.")
+                                        print_log(nome, "⚠️ 4 tentativi falliti. Sgancio Pilota Automatico e pulizia ordini orfani.")
                                         pulisci_mercato(epic, h, nome, solo_pendenti=True)
-                                        invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Falliti 4 tentativi consecutivi di ripristino ordine (Micro). Passaggio forzato a MANUALE.", "rotating_light")
+                                        invia_notifica(f"⚠️ ATTENZIONE MOTORE: {nome}", f"[{nome}] Falliti 4 tentativi consecutivi di ripristino ordine (Micro). Il Motore prosegue senza OCO.", "warning")
                                         aggiorna_memoria(nome, {
-                                            "attivo": False, 
-                                            "errore_ripristino": True, 
+                                            "alert_falso_allarme": "⚠️ OCO mancanti (Micro). Il Motore prosegue in automatico.",
                                             "tentativi_ripristino": 0
-                                        }, log_wip="🛑 Spegnimento emergenza: falliti 4 tentativi di ripristino ordine. Motore Sospeso.")
+                                        }, log_wip="📌 Spegnimento evitato: falliti 4 tentativi di ripristino ordine. Motore prosegue.")
+                                        continue
                                     else:
                                         aggiorna_memoria(nome, {"tentativi_ripristino": tentativi})
                                 time.sleep(3.0)
@@ -1758,7 +1758,18 @@ def esegui_motore():
                         tp4_val = round((param.get("tp") / 4) * mult, dec)
                         
                         core_ids = [p['position']['dealId'] for p in posizioni if float(p['position']['size']) == s_core]
-                        is_ticket2 = lambda p: param.get("ticket2_active") and p['position']['direction'] == param.get("ticket2_dir") and p['position'].get('limitLevel') is not None
+                        
+                        def is_ticket2(p):
+                            if not param.get("ticket2_active"): return False
+                            if p['position']['direction'] != param.get("ticket2_dir"): return False
+                            if p['position']['dealId'] == param.get("ticket2_deal_id"): return True
+                            # Fallback se il dealId è cambiato (es. ordine pendente eseguito) o API in ritardo
+                            t2_entry = param.get("ticket2_entry")
+                            if t2_entry is not None:
+                                t2_dist = abs(float(p['position']['level']) - t2_entry)
+                                if t2_dist < (tp2_val * 0.5):
+                                    return True
+                            return False
                         
                         sat1_attivi = [p for p in posizioni if float(p['position']['size']) == s_mezzo and p['position']['dealId'] not in core_ids and not is_ticket2(p)]
                         
@@ -1886,10 +1897,10 @@ def esegui_motore():
                                 time.sleep(3.0)
                                 
                             if not succ_og or not succ_ol:
-                                print_log(nome, f"⚠️ Impossibile inserire [OVERGAIN]/[OVERLOSS]. Motore Sospeso.")
+                                print_log(nome, f"⚠️ Impossibile inserire [OVERGAIN]/[OVERLOSS]. Il Motore prosegue in automatico senza OCO.")
                                 pulisci_mercato(epic, h, nome, solo_pendenti=True)
-                                invia_notifica(f"🚨 EMERGENZA MOTORE: {nome}", f"[{nome}] Fallimento immissione ordini FASE 2 (OG/OL) (dopo 4 tentativi). Passaggio forzato a MANUALE.", "rotating_light")
-                                aggiorna_memoria(nome, {"attivo": False, "msg_manuale": f"❌ Fallita immissione ordini FASE 2 (OG/OL) a mercato dopo 4 tentativi."}, log_wip=f"✅ [EVENTO]: Emergenza: fallimento ordini FASE 2 (OG/OL). Macchina Sospesa.")
+                                invia_notifica(f"⚠️ ATTENZIONE MOTORE: {nome}", f"[{nome}] Fallimento immissione ordini FASE 2 (OG/OL) (dopo 4 tentativi). Il Motore prosegue senza OCO.", "warning")
+                                aggiorna_memoria(nome, {"alert_falso_allarme": f"⚠️ OCO mancanti (OG/OL). Il Motore prosegue in automatico."}, log_wip=f"📌 [EVENTO]: Fallimento ordini FASE 2 (OG/OL). Macchina prosegue.")
                                 continue
                                 
                             lvl_og = round(sat_price + tp4_val, dec) if sat2_dir == "SELL" else round(sat_price - tp4_val, dec)

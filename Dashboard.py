@@ -881,14 +881,21 @@ else:
 
             def get_stato_salute(acc):
                 path_memoria = os.path.join(acc, FILE_MEMORIA)
-                if not os.path.exists(path_memoria): return "🟢"
+                if not os.path.exists(path_memoria): return "⚪"
                 try:
                     with open(path_memoria, "r", encoding="utf-8") as f:
                         memoria = json.load(f)
                     has_yellow = False
                     for strum, dati in memoria.items():
                         stato = dati.get("stato", "")
+                        # L'emergenza scatta se c'è un errore di avvio/ripristino esplicito
                         emergenza = (stato == "MANUALE" and (dati.get("errore_ripristino") or dati.get("errore_avvio")))
+                        
+                        # L'emergenza scatta anche se il motore si è autosospeso in corsa (attivo = False + msg_manuale di emergenza)
+                        msg = dati.get("msg_manuale", "")
+                        if dati.get("attivo") is False and msg and ("🆘" in msg or "Emergenza" in msg or "Fallita" in msg or "Rifiuto" in msg or "Fallito" in msg):
+                            emergenza = True
+                            
                         if emergenza: return "🔴"
                         if dati.get("alert_falso_allarme"): has_yellow = True
                     return "🟡" if has_yellow else "🟢"
