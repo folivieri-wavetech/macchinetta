@@ -270,6 +270,18 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
             time.sleep(20)
     return False
 
+def pulisci_posizioni_epic(nome, epic, headers):
+    try:
+        r = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers)
+        if r and r.status_code == 200:
+            for p in r.json().get('positions', []):
+                if p['market']['epic'] == epic:
+                    dir_c = "SELL" if p['position']['direction'] == "BUY" else "BUY"
+                    chiudi_parziale(nome, p['position']['dealId'], dir_c, p['position']['size'], headers, etichetta="[REVERSAL CLEANUP]")
+                    time.sleep(1.0)
+    except Exception as e:
+        print_log(nome, f"Errore pulizia reversal: {e}")
+
 # --- STATO MOTORE TREND ---
 class StatoMotoreTrend:
     def __init__(self):
@@ -605,7 +617,7 @@ def esegui_ciclo_trend():
             elif tipo == 'increment_opened':
                 dir_incr = ev['direction']
                 pos = ev['position']
-                ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_incr, size_i, headers, dec, etichetta="[INCREMENTO]")
+                ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, dir_incr, pos.size, headers, dec, etichetta="[INCREMENTO]")
                 if ok:
                     pos.entry_price = real_lvl if real_lvl else ev['price']
                     pos.ticket = deal_id
@@ -653,6 +665,7 @@ def esegui_ciclo_trend():
                 invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
+                pulisci_posizioni_epic(nome, epic, headers)
                 if not auto_restart:
                     aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": ""})
                     engine.reset()
