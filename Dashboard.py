@@ -1999,12 +1999,12 @@ else:
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
-                                if st.button("⏹️ STOP (FLAT)", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
+                                if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
                                     memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
-                                st.success(f"🟢 ATTIVO ({direzione}) | Trend Motore in esecuzione ({tf_val})")
+                                st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_val})")
 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
