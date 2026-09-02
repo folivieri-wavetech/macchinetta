@@ -203,8 +203,8 @@ class CoreEngine:
             if not self.config.get("auto_restart", False):
                 return events
 
-            is_long_cond = c_close > tk and (tk > kj or abs(tk - kj) <= min_body_price)
-            is_short_cond = c_close < tk and (tk < kj or abs(tk - kj) <= min_body_price)
+            is_long_cond = c_close > tk and c_close > kj and (tk > kj or abs(tk - kj) <= min_body_price)
+            is_short_cond = c_close < tk and c_close < kj and (tk < kj or abs(tk - kj) <= min_body_price)
             
             pip_val = self.config.get("pip_value") or 0.0001
             max_dist = (self.config.get("max_kj_distance") or 50.0) * pip_val
