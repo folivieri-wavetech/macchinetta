@@ -1993,7 +1993,7 @@ else:
                                     st.rerun()
                             with c_btn2:
                                 if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "SHORT", "stato": "FLAT"}
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "SHORT", "stato": "FLAT", "tipo_strategia": "TREND"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                         else:
