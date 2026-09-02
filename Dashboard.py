@@ -2681,28 +2681,54 @@ else:
                     if d.get('ruolo') != "REGISTA":
                         sel_conti = st.multiselect(f"Conti visibili per {u}", tutti_i_folders, default=[c for c in d.get("conti_autorizzati", []) if c in tutti_i_folders], key=f"conti_{u}")
                         
-                        col1, col2, col3 = st.columns([1, 1, 1])
+                        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
                         with col1:
-                            if st.button("💾 Salva Permessi", key=f"salva_{u}"):
+                            if st.button("💾 Salva Permessi", key=f"salva_{u}", use_container_width=True):
                                 auth_manager.aggiorna_conti_utente(u, sel_conti)
                                 st.success(f"Permessi aggiornati per {u}")
                         with col2:
-                            if st.button("🔑 Reset Password", key=f"reset_{u}"):
+                            with st.popover("✏️ Modifica Nick", use_container_width=True):
+                                new_nick = st.text_input("Nuovo Nickname", value=u, key=f"nick_input_{u}")
+                                if st.button("Conferma Nick", key=f"btn_nick_{u}", use_container_width=True):
+                                    if new_nick and new_nick.strip() != u:
+                                        ok, msg = auth_manager.rinomina_utente(u, new_nick.strip())
+                                        if ok:
+                                            if st.session_state.get("user") == u:
+                                                st.session_state.user = new_nick.strip()
+                                            st.success(msg)
+                                            st.rerun()
+                                        else:
+                                            st.error(msg)
+                        with col3:
+                            if st.button("🔑 Reset Password", key=f"reset_{u}", use_container_width=True):
                                 auth_manager.modifica_password(u, "init")
                                 st.success(f"Password per {u} resettata a 'init'.")
-                        with col3:
-                            if st.button("🗑️ Elimina", key=f"del_{u}"):
+                        with col4:
+                            if st.button("🗑️ Elimina", key=f"del_{u}", use_container_width=True):
                                 ok, msg = auth_manager.elimina_utente(u)
                                 if ok: st.success(msg)
                                 else: st.error(msg)
                     else:
-                        col1, col2 = st.columns([1, 1])
+                        col1, col2, col3 = st.columns([1, 1, 1])
                         with col1:
-                            if st.button("🔑 Reset Password", key=f"reset_reg_{u}"):
+                            with st.popover("✏️ Modifica Nick", use_container_width=True):
+                                new_nick = st.text_input("Nuovo Nickname", value=u, key=f"nick_input_reg_{u}")
+                                if st.button("Conferma Nick", key=f"btn_nick_reg_{u}", use_container_width=True):
+                                    if new_nick and new_nick.strip() != u:
+                                        ok, msg = auth_manager.rinomina_utente(u, new_nick.strip())
+                                        if ok:
+                                            if st.session_state.get("user") == u:
+                                                st.session_state.user = new_nick.strip()
+                                            st.success(msg)
+                                            st.rerun()
+                                        else:
+                                            st.error(msg)
+                        with col2:
+                            if st.button("🔑 Reset Password", key=f"reset_reg_{u}", use_container_width=True):
                                 auth_manager.modifica_password(u, "init")
                                 st.success(f"Password per {u} resettata a 'init'.")
-                        with col2:
-                            if st.button("🗑️ Elimina Regista", key=f"del_reg_{u}"):
+                        with col3:
+                            if st.button("🗑️ Elimina Regista", key=f"del_reg_{u}", use_container_width=True):
                                 ok, msg = auth_manager.elimina_utente(u)
                                 if ok: st.success(msg)
                                 else: st.error(msg)

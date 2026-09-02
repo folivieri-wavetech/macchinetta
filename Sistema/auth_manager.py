@@ -117,3 +117,24 @@ def elimina_utente(username):
     del db[username]
     _salva_db(db)
     return True, "Utente eliminato."
+
+def rinomina_utente(vecchio_username, nuovo_username):
+    db = _carica_db()
+    if vecchio_username not in db:
+        return False, "Utente non trovato."
+    if not nuovo_username or not nuovo_username.strip():
+        return False, "Il nuovo Nickname non può essere vuoto."
+    nuovo_username = nuovo_username.strip()
+    if nuovo_username == vecchio_username:
+        return True, "Nessuna modifica necessaria."
+    if nuovo_username in db:
+        return False, f"L'utente '{nuovo_username}' esiste già."
+    
+    nuovo_db = {}
+    for k, v in db.items():
+        if k == vecchio_username:
+            nuovo_db[nuovo_username] = v
+        else:
+            nuovo_db[k] = v
+    _salva_db(nuovo_db)
+    return True, f"Nickname aggiornato con successo a '{nuovo_username}'."
