@@ -692,6 +692,30 @@ def esegui_ciclo_trend():
                 engine.trailing_sl_incr = dati.get("trailing_sl_incr")
                 engine.current_tk = dati.get("current_tk")
                 engine.current_kj = dati.get("current_kj")
+                
+                # Se trailing_sl_incr è None ma ci sono incrementi e il prezzo è già a distanza >= 40 pip dalla TK,
+                # calcola subito lo stop dalla candela chiusa locale senza attendere la chiusura della candela oraria
+                if engine.trailing_sl_incr is None and len(pos_incr) > 0 and engine.current_tk is not None:
+                    c_loc = carica_candele_locali(nome, tf)
+                    if c_loc:
+                        try:
+                            last_c = c_loc[-1]
+                            c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
+                            pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+                            if stato_corrente == "SHORT":
+                                dist_tk = engine.current_tk - c_close
+                                if dist_tk >= (40 * pip_val):
+                                    engine.trailing_sl_incr = c_close + (20 * pip_val)
+                                    aggiorna_memoria(nome, {"trailing_sl_incr": engine.trailing_sl_incr})
+                                    print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
+                            elif stato_corrente == "LONG":
+                                dist_tk = c_close - engine.current_tk
+                                if dist_tk >= (40 * pip_val):
+                                    engine.trailing_sl_incr = c_close - (20 * pip_val)
+                                    aggiorna_memoria(nome, {"trailing_sl_incr": engine.trailing_sl_incr})
+                                    print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
+                        except Exception:
+                            pass
 
         # -------------------------------------------------------------
         # GESTIONE AUTOMATICA PAUSA ROLLOVER (22:45 - 00:29)

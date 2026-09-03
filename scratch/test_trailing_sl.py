@@ -64,6 +64,15 @@ def test_scenario_1():
     assert engine.trailing_sl_incr is None
     print("Passo 5 OK: chiusi tutti gli incrementi su Trailing SL, Core intatta.")
 
+    # 6. Verifica blocco nuovi incrementi se distanza da TK > 20 pip
+    # Prezzo a 157.30, TK a ~158.70 (distanza ~140 pip > 20 pip)
+    # Candela verde di ritracciamento:
+    c_green = Candle(157.25, 157.40, 157.20, 157.35)
+    evs_green = engine.on_candle_close(c_green)
+    assert len(engine.pm.increments) == 0, "Non devono essere aperti incrementi se dist da TK > 20 pip!"
+    assert not any(e.get("type") == "increment_opened" for e in evs_green)
+    print("Passo 6 OK: nessun nuovo incremento aperto perche' dist da TK > 20 pip.")
+
 if __name__ == "__main__":
     test_scenario_1()
     print("TUTTI I TEST DELLO SCENARIO 1 SUPERATI!")

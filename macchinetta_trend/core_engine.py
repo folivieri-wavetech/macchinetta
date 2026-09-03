@@ -152,8 +152,8 @@ class CoreEngine:
             has_cleared_increments_long = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "LONG" and not has_cleared_increments_long:
                 # --- INGRESSI INCREMENTO LONG ---
-                # Paletto: TK > KJ (o tollerato) e la candela deve aver APERTO SOPRA la TK (close precedente > TK)
-                if (tk > kj or abs(tk - kj) <= min_body_price) and closed_candle.open > tk and c_close >= tk:
+                # Paletto: TK > KJ (o tollerato), candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
+                if (tk > kj or abs(tk - kj) <= min_body_price) and closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
                     if closed_candle.is_red():
                         if self.retracement_start_price is None:
                             self.retracement_start_price = closed_candle.open
@@ -219,8 +219,8 @@ class CoreEngine:
             has_cleared_increments_short = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "SHORT" and not has_cleared_increments_short:
                 # --- INGRESSI INCREMENTO SHORT ---
-                # Paletto: TK < KJ (o tollerato) e la candela deve aver APERTO SOTTO la TK (close precedente < TK)
-                if (tk < kj or abs(tk - kj) <= min_body_price) and closed_candle.open < tk and c_close <= tk:
+                # Paletto: TK < KJ (o tollerato), candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
+                if (tk < kj or abs(tk - kj) <= min_body_price) and closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
                     if closed_candle.is_green():
                         if self.retracement_start_price is None:
                             self.retracement_start_price = closed_candle.open
