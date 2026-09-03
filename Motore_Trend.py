@@ -570,11 +570,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             ha_fatto_eventi = True
             pulisci_posizioni_epic(nome, epic, headers)
             if not auto_restart:
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None})
                 engine.reset()
                 print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
             else:
-                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None})
+                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None})
             
     # Salvataggio posizioni aggiornate
     if engine.is_running:
@@ -583,14 +583,14 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
         update_data = {
             "posizioni_core": core_dict, 
             "posizioni_incr": incr_dict,
-            "bancomat_sl": engine.bancomat_sl
+            "trailing_sl_incr": engine.trailing_sl_incr
         }
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
             update_data["storico_wip_trend"] = storico
         aggiorna_memoria(nome, update_data)
     elif events and not auto_restart:
-        update_data_off = {"posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None}
+        update_data_off = {"posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None}
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
             update_data_off["storico_wip_trend"] = storico
@@ -689,7 +689,7 @@ def esegui_ciclo_trend():
                 for ip in pos_incr:
                     p_i = engine.pm.open_increment(ip.get("entry", 0), ip.get("size", 1), stato_corrente)
                     p_i.ticket = ip.get("ticket")
-                engine.bancomat_sl = dati.get("bancomat_sl")
+                engine.trailing_sl_incr = dati.get("trailing_sl_incr")
                 engine.current_tk = dati.get("current_tk")
                 engine.current_kj = dati.get("current_kj")
 

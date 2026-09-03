@@ -1403,25 +1403,17 @@ else:
                                 incr_idx = other_positions.index(p) + 1
                                 ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
                                 
-                                # Identifica l'incremento più redditizio
-                                if dir == 'BUY':
-                                    best_p = min(other_positions, key=lambda x: float(x['position']['level'])) if other_positions else None
+                                trailing_sl_incr = memoria_attuale.get(nome, {}).get("trailing_sl_incr")
+                                tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                                pip_val = c.get("moltiplicatore", 0.0001)
+                                if trailing_sl_incr is not None:
+                                    sl_display = trailing_sl_incr
+                                    title_info = "Trailing SL (+-20 pip da Close)"
+                                elif tk_val is not None:
+                                    sl_display = (tk_val - (5 * pip_val)) if dir == 'BUY' else (tk_val + (5 * pip_val))
+                                    title_info = "Stop TK (+-5 pip)"
                                 else:
-                                    best_p = max(other_positions, key=lambda x: float(x['position']['level'])) if other_positions else None
-
-                                bancomat_sl = memoria_attuale.get(nome, {}).get("bancomat_sl")
-                                is_best_increment = (p == best_p)
-                                if is_best_increment and bancomat_sl is not None:
-                                    sl_display = bancomat_sl
-                                    title_info = "Bancomat SL (Miglior Incremento)"
-                                else:
-                                    tk_val = memoria_attuale.get(nome, {}).get("current_tk")
-                                    pip_val = c.get("moltiplicatore", 0.0001)
-                                    if tk_val is not None:
-                                        sl_display = (tk_val - (5 * pip_val)) if dir == 'BUY' else (tk_val + (5 * pip_val))
-                                        title_info = "SL (TK +- 5 pip)"
-                                    else:
-                                        sl_display = None
+                                    sl_display = None
                                 
                                 if sl_display is not None:
                                     s_str = f"<span style='color: #b0b0b0;' title='{title_info}'>{formatta_numero(sl_display, dec)}</span>"

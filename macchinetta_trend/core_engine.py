@@ -40,7 +40,7 @@ class CoreEngine:
         # Stato Indicatori calcolati all'ultima candela chiusa
         self.current_tk = None
         self.current_kj = None
-        self.bancomat_sl = None # SL variabile per il Bancomat sull'incremento più anziano
+        self.trailing_sl_incr = None # Trailing SL a 20 pip da Close per tutti gli incrementi
         
     def reset(self):
         """Resetta lo stato della macchinetta."""
@@ -49,7 +49,7 @@ class CoreEngine:
         self.retracement_start_price = None
         self.active_signal = None
         self.signal_candles_elapsed = 0
-        self.bancomat_sl = None
+        self.trailing_sl_incr = None
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -110,11 +110,10 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            bancomat_triggered = False
             sl_core_long = kj - (5 * pip_val)
             if c_close < sl_core_long:
                 # Sotto la Kijun - 5 pip: Chiude tutto e passa in FLAT
-                self.bancomat_sl = None
+                self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
@@ -124,47 +123,34 @@ class CoreEngine:
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
-            elif c_close < (tk - (5 * pip_val)):
-                # Sotto Tenkan - 5 pip: Chiude solo gli incrementi (SL base a TK - 5 pip)
-                self.bancomat_sl = None
-                chiusure_inc = self.pm.close_all_increments(exec_price)
-                if chiusure_inc:
-                    events.extend(chiusure_inc)
-                    events.append({"type": "increments_cleared", "reason": "close_below_tk_buffer"})
-                self.retracement_start_price = None
-
             else:
-                # Sopra Tenkan: Gestione Bancomat (SL variabile sull'incremento più redditizio)
-                bancomat_triggered = False
-                if len(self.pm.increments) > 0:
-                    if self.bancomat_sl is not None and c_close <= self.bancomat_sl:
-                        best = self.pm.force_close_best_increment(exec_price)
-                        if best:
-                            events.append({
-                                "type": "increment_closed",
-                                "reason": "bancomat",
-                                "direction": "LONG",
-                                "ticket": best.ticket,
-                                "size": best.size,
-                                "pnl": best.pnl,
-                                "price": exec_price
-                            })
-                            bancomat_triggered = True
-                            self.retracement_start_price = None
-                        self.bancomat_sl = None
-                        
+                # Gestione Stop Loss Incrementi: TK - 5 pip o Trailing SL (il più alto / restrittivo)
+                sl_incr_base = tk - (5 * pip_val)
+                effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
+                
+                if len(self.pm.increments) > 0 and c_close < effective_sl_incr:
+                    reason = "close_below_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_below_tk_buffer"
+                    self.trailing_sl_incr = None
+                    chiusure_inc = self.pm.close_all_increments(exec_price)
+                    if chiusure_inc:
+                        events.extend(chiusure_inc)
+                        events.append({"type": "increments_cleared", "reason": reason})
+                    self.retracement_start_price = None
+                else:
+                    # Aggiornamento Trailing SL dinamico a 20 pip da Close (cricchetto che può solo salire)
                     if len(self.pm.increments) > 0:
                         dist_tk = c_close - tk
-                        if dist_tk >= (10 * pip_val):
-                            nuovo_sl = c_close - (10 * pip_val)
-                            if self.bancomat_sl is None:
-                                self.bancomat_sl = nuovo_sl
+                        if dist_tk >= (20 * pip_val):
+                            nuovo_sl = c_close - (20 * pip_val)
+                            if self.trailing_sl_incr is None:
+                                self.trailing_sl_incr = nuovo_sl
                             else:
-                                self.bancomat_sl = max(self.bancomat_sl, nuovo_sl)
-                else:
-                    self.bancomat_sl = None
+                                self.trailing_sl_incr = max(self.trailing_sl_incr, nuovo_sl)
+                    else:
+                        self.trailing_sl_incr = None
 
-            if self.current_direction == "LONG" and not bancomat_triggered:
+            has_cleared_increments_long = any(e.get("type") == "increments_cleared" for e in events)
+            if self.current_direction == "LONG" and not has_cleared_increments_long:
                 # --- INGRESSI INCREMENTO LONG ---
                 # Paletto: TK > KJ (o tollerato) e la candela deve aver APERTO SOPRA la TK (close precedente > TK)
                 if (tk > kj or abs(tk - kj) <= min_body_price) and closed_candle.open > tk and c_close >= tk:
@@ -191,11 +177,10 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            bancomat_triggered = False
             sl_core_short = kj + (5 * pip_val)
             if c_close > sl_core_short:
                 # Sopra la Kijun + 5 pip: Chiude tutto e passa in FLAT
-                self.bancomat_sl = None
+                self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
@@ -205,47 +190,34 @@ class CoreEngine:
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
                 
-            elif c_close > (tk + (5 * pip_val)):
-                # Sopra Tenkan + 5 pip: Chiude solo gli incrementi (SL base a TK + 5 pip)
-                self.bancomat_sl = None
-                chiusure_inc = self.pm.close_all_increments(exec_price)
-                if chiusure_inc:
-                    events.extend(chiusure_inc)
-                    events.append({"type": "increments_cleared", "reason": "close_above_tk_buffer"})
-                self.retracement_start_price = None
-
             else:
-                # Sotto Tenkan: Gestione Bancomat (SL variabile sull'incremento più redditizio)
-                bancomat_triggered = False
-                if len(self.pm.increments) > 0:
-                    if self.bancomat_sl is not None and c_close >= self.bancomat_sl:
-                        best = self.pm.force_close_best_increment(exec_price)
-                        if best:
-                            events.append({
-                                "type": "increment_closed",
-                                "reason": "bancomat",
-                                "direction": "SHORT",
-                                "ticket": best.ticket,
-                                "size": best.size,
-                                "pnl": best.pnl,
-                                "price": exec_price
-                            })
-                            bancomat_triggered = True
-                            self.retracement_start_price = None
-                        self.bancomat_sl = None
-                        
+                # Gestione Stop Loss Incrementi: TK + 5 pip o Trailing SL (il più basso / restrittivo)
+                sl_incr_base = tk + (5 * pip_val)
+                effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
+                
+                if len(self.pm.increments) > 0 and c_close > effective_sl_incr:
+                    reason = "close_above_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_above_tk_buffer"
+                    self.trailing_sl_incr = None
+                    chiusure_inc = self.pm.close_all_increments(exec_price)
+                    if chiusure_inc:
+                        events.extend(chiusure_inc)
+                        events.append({"type": "increments_cleared", "reason": reason})
+                    self.retracement_start_price = None
+                else:
+                    # Aggiornamento Trailing SL dinamico a 20 pip da Close (cricchetto che può solo scendere)
                     if len(self.pm.increments) > 0:
                         dist_tk = tk - c_close
-                        if dist_tk >= (10 * pip_val):
-                            nuovo_sl = c_close + (10 * pip_val)
-                            if self.bancomat_sl is None:
-                                self.bancomat_sl = nuovo_sl
+                        if dist_tk >= (20 * pip_val):
+                            nuovo_sl = c_close + (20 * pip_val)
+                            if self.trailing_sl_incr is None:
+                                self.trailing_sl_incr = nuovo_sl
                             else:
-                                self.bancomat_sl = min(self.bancomat_sl, nuovo_sl)
-                else:
-                    self.bancomat_sl = None
+                                self.trailing_sl_incr = min(self.trailing_sl_incr, nuovo_sl)
+                    else:
+                        self.trailing_sl_incr = None
 
-            if self.current_direction == "SHORT" and not bancomat_triggered:
+            has_cleared_increments_short = any(e.get("type") == "increments_cleared" for e in events)
+            if self.current_direction == "SHORT" and not has_cleared_increments_short:
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Paletto: TK < KJ (o tollerato) e la candela deve aver APERTO SOTTO la TK (close precedente < TK)
                 if (tk < kj or abs(tk - kj) <= min_body_price) and closed_candle.open < tk and c_close <= tk:
@@ -338,7 +310,7 @@ class CoreEngine:
             # 1. Stop Loss Core: KJ - 5 pip
             sl_core = kj - (5 * pip_val)
             if current_price <= sl_core:
-                self.bancomat_sl = None
+                self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
@@ -347,36 +319,23 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Bancomat SL su incremento più redditizio
-            if len(self.pm.increments) > 0 and self.bancomat_sl is not None and current_price <= self.bancomat_sl:
-                best = self.pm.force_close_best_increment(current_price)
-                if best:
-                    events.append({
-                        "type": "increment_closed",
-                        "reason": "bancomat",
-                        "direction": "LONG",
-                        "ticket": best.ticket,
-                        "size": best.size,
-                        "pnl": best.pnl,
-                        "price": current_price
-                    })
-                self.bancomat_sl = None
-
-            # 3. Stop Loss Incrementi: TK - 5 pip
-            sl_tk = tk - (5 * pip_val)
-            if len(self.pm.increments) > 0 and current_price <= sl_tk:
-                self.bancomat_sl = None
+            # 2. Stop Loss Incrementi: TK - 5 pip o Trailing SL (il più alto / restrittivo)
+            sl_incr_base = tk - (5 * pip_val)
+            effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
+            if len(self.pm.increments) > 0 and current_price <= effective_sl_incr:
+                reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
+                self.trailing_sl_incr = None
                 chiusure_inc = self.pm.close_all_increments(current_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
-                    events.append({"type": "increments_cleared", "reason": "live_stop_tk", "price": current_price})
+                    events.append({"type": "increments_cleared", "reason": reason, "price": current_price})
                 self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
             # 1. Stop Loss Core: KJ + 5 pip
             sl_core = kj + (5 * pip_val)
             if current_price >= sl_core:
-                self.bancomat_sl = None
+                self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
@@ -385,29 +344,16 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Bancomat SL su incremento più redditizio
-            if len(self.pm.increments) > 0 and self.bancomat_sl is not None and current_price >= self.bancomat_sl:
-                best = self.pm.force_close_best_increment(current_price)
-                if best:
-                    events.append({
-                        "type": "increment_closed",
-                        "reason": "bancomat",
-                        "direction": "SHORT",
-                        "ticket": best.ticket,
-                        "size": best.size,
-                        "pnl": best.pnl,
-                        "price": current_price
-                    })
-                self.bancomat_sl = None
-
-            # 3. Stop Loss Incrementi: TK + 5 pip
-            sl_tk = tk + (5 * pip_val)
-            if len(self.pm.increments) > 0 and current_price >= sl_tk:
-                self.bancomat_sl = None
+            # 2. Stop Loss Incrementi: TK + 5 pip o Trailing SL (il più basso / restrittivo)
+            sl_incr_base = tk + (5 * pip_val)
+            effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
+            if len(self.pm.increments) > 0 and current_price >= effective_sl_incr:
+                reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
+                self.trailing_sl_incr = None
                 chiusure_inc = self.pm.close_all_increments(current_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
-                    events.append({"type": "increments_cleared", "reason": "live_stop_tk", "price": current_price})
+                    events.append({"type": "increments_cleared", "reason": reason, "price": current_price})
                 self.retracement_start_price = None
 
         return events
