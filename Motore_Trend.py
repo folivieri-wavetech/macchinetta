@@ -550,27 +550,30 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 pnl_eur = (raw_diff / mult) * valore_punto * rate
                 pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
                 
+                close_px = ev.get('price') or ev.get('exit_price') or prezzi_live.get(nome)
+                px_str = f" a {close_px:.{dec}f}" if (close_px is not None and isinstance(close_px, (int, float))) else ""
+                
                 # Se la Core viene chiusa per Reversal / Stop Kijun, unifica in un unico messaggio telegrafico
                 reversal_ev = next((e for e in events if e.get('type') == 'reversal'), None)
                 if tipo == 'core_closed' and reversal_ev:
                     r_reason = reversal_ev.get("reason", "")
                     tag_motivo = "Trailing Core" if "trailing" in r_reason else "Stop KJ"
-                    msg = f"🛑 {tag_motivo}: Close Core ({sz}){pnl_str} ➡️ FLAT"
+                    msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     invia_notifica(f"🛑 STOP KJ: {nome}", f"[{nome}] {msg}", "warning")
                 elif is_bancomat:
-                    msg = f"💰 Bancomat ({sz}){pnl_str}"
+                    msg = f"💰 Bancomat ({sz}){px_str}{pnl_str}"
                     invia_notifica(f"💰 BANCOMAT: {nome}", f"[{nome}] {msg}", "moneybag")
                 elif tipo == 'fifo_close':
-                    msg = f"➖ FIFO Incr ({sz}){pnl_str}"
+                    msg = f"➖ FIFO Incr ({sz}){px_str}{pnl_str}"
                     invia_notifica(f"➖ FIFO INCR: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increment_closed':
-                    msg = f"➖ Close Incr ({sz}){pnl_str}"
+                    msg = f"➖ Close Incr ({sz}){px_str}{pnl_str}"
                     invia_notifica(f"➖ CLOSE INCR: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increments_cleared':
-                    msg = f"🛑 Stop TK: Close Incr ({sz}){pnl_str}"
+                    msg = f"🛑 Stop TK: Close Incr ({sz}){px_str}{pnl_str}"
                     invia_notifica(f"🛑 STOP TK: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                 else:
-                    msg = f"➖ Close Core ({sz}){pnl_str}"
+                    msg = f"➖ Close Core ({sz}){px_str}{pnl_str}"
                     invia_notifica(f"➖ CLOSE CORE: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
