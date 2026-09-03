@@ -647,6 +647,7 @@ def esegui_ciclo_trend():
         tf = dati.get("timeframe", "MINUTE_5")
         size_i = dati.get("size", 1)
         size_max = dati.get("size_max", 3)
+        scala = int(dati.get("scala", 1) or 1)
         min_body = dati.get("min_body", 10)
         auto_restart = dati.get("auto_restart", True)
         direzione = dati.get("direzione", "LONG")
@@ -659,6 +660,7 @@ def esegui_ciclo_trend():
             cfg = {
                 "size_i": size_i,
                 "size_max": size_max,
+                "scala": scala,
                 "tk_periods": 21,
                 "kj_periods": 55,
                 "min_body": min_body,
@@ -671,6 +673,7 @@ def esegui_ciclo_trend():
         else:
             stato_motore.motori[nome].config["size_i"] = size_i
             stato_motore.motori[nome].config["size_max"] = size_max
+            stato_motore.motori[nome].config["scala"] = scala
             stato_motore.motori[nome].config["min_body"] = min_body
             stato_motore.motori[nome].config["pip_value"] = CONFIG_STRUMENTI[nome]["moltiplicatore"]
             stato_motore.motori[nome].config["auto_restart"] = auto_restart

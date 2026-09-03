@@ -176,11 +176,21 @@ class CoreEngine:
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
-                            if self.pm.total_active_size() >= size_max:
+                            scala = int(self.config.get("scala", 1) or 1)
+                            while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
                                 best = self.pm.force_close_best_increment(entry_price)
                                 if best:
-                                    events.append({"type": "fifo_close", "pnl": best.pnl, "price": entry_price, "ticket": best.ticket, "size": best.size})
-                            pos = self.pm.open_increment(entry_price, size=1, direction="LONG")
+                                    events.append({
+                                        "type": "fifo_close", 
+                                        "pnl": best.pnl, 
+                                        "price": entry_price, 
+                                        "ticket": best.ticket, 
+                                        "size": best.size,
+                                        "direction": "LONG"
+                                    })
+                                else:
+                                    break
+                            pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
                             events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
                             
                             self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
@@ -255,11 +265,21 @@ class CoreEngine:
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
-                            if self.pm.total_active_size() >= size_max:
+                            scala = int(self.config.get("scala", 1) or 1)
+                            while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
                                 best = self.pm.force_close_best_increment(entry_price)
                                 if best:
-                                    events.append({"type": "fifo_close", "pnl": best.pnl, "price": entry_price, "ticket": best.ticket, "size": best.size})
-                            pos = self.pm.open_increment(entry_price, size=1, direction="SHORT")
+                                    events.append({
+                                        "type": "fifo_close", 
+                                        "pnl": best.pnl, 
+                                        "price": entry_price, 
+                                        "ticket": best.ticket, 
+                                        "size": best.size,
+                                        "direction": "SHORT"
+                                    })
+                                else:
+                                    break
+                            pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
                             events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
                             
                             self.retracement_start_price = None # Resetta il conteggio dopo l'incremento

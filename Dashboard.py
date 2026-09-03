@@ -2143,7 +2143,7 @@ else:
 
 
 
-                def crea_riquadro_trend(nome, def_body=10, def_size=3, def_size_max=5):
+                def crea_riquadro_trend(nome, def_body=10, def_size=3, def_size_max=5, def_scala=1):
                     with st.container(border=True):
                         dati_salvati = memoria_attuale.get(nome, {})
                         stato_corrente = dati_salvati.get("stato", "FLAT")
@@ -2153,6 +2153,7 @@ else:
                         tf_val = dati_salvati.get("timeframe", "MINUTE_5")
                         size_val = dati_salvati.get("size", def_size)
                         size_max_val = dati_salvati.get("size_max", def_size_max)
+                        scala_val = dati_salvati.get("scala", def_scala)
                         body_val = dati_salvati.get("min_body", def_body)
                         auto_restart = dati_salvati.get("auto_restart", False)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
@@ -2184,6 +2185,7 @@ else:
                                     "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
                                     "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
                                     "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                    "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
                                     "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
                                     "auto_restart": auto_restart
                                 }
@@ -2199,11 +2201,13 @@ else:
                         with c_r1_2:
                             st.number_input("Body Min", value=int(body_val), min_value=1, step=1, key=f"bd_{conto_selezionato}_{nome}")
                         
-                        c_r2_1, c_r2_2 = st.columns(2)
+                        c_r2_1, c_r2_2, c_r2_3 = st.columns(3)
                         with c_r2_1:
                             st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
                         with c_r2_2:
                             st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
+                        with c_r2_3:
+                            st.number_input("Scala", value=int(scala_val), min_value=1, step=1, key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento")
                         
                         err_key = f"err_trend_{conto_selezionato}_{nome}"
                         if err_key in st.session_state and st.session_state[err_key]:
