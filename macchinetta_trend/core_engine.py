@@ -176,24 +176,37 @@ class CoreEngine:
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
-                            scala = int(self.config.get("scala", 1) or 1)
-                            while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
-                                best = self.pm.force_close_best_increment(entry_price)
-                                if best:
-                                    events.append({
-                                        "type": "fifo_close", 
-                                        "pnl": best.pnl, 
-                                        "price": entry_price, 
-                                        "ticket": best.ticket, 
-                                        "size": best.size,
-                                        "direction": "LONG"
-                                    })
-                                else:
-                                    break
-                            pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
-                            events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
                             
-                            self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
+                            # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
+                            tf_val = self.config.get("timeframe", "MINUTE_5")
+                            min_dist_pips = 10 if tf_val == "MINUTE_5" else 20
+                            min_dist_price = min_dist_pips * pip_val
+                            
+                            can_open = True
+                            if len(self.pm.increments) > 0:
+                                last_inc = self.pm.increments[-1]
+                                if abs(entry_price - last_inc.entry_price) < min_dist_price:
+                                    can_open = False
+                                    
+                            if can_open:
+                                scala = int(self.config.get("scala", 1) or 1)
+                                while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
+                                    best = self.pm.force_close_best_increment(entry_price)
+                                    if best:
+                                        events.append({
+                                            "type": "fifo_close", 
+                                            "pnl": best.pnl, 
+                                            "price": entry_price, 
+                                            "ticket": best.ticket, 
+                                            "size": best.size,
+                                            "direction": "LONG"
+                                        })
+                                    else:
+                                        break
+                                pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
+                                events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
+                            
+                            self.retracement_start_price = None # Resetta il conteggio dopo il tentativo di incremento
                     else:
                         self.retracement_start_price = None # Ritracciamento interrotto da candela verde
                 else:
@@ -265,24 +278,37 @@ class CoreEngine:
                         
                         if distanza_percorsa >= min_body_price:
                             entry_price = exec_price 
-                            scala = int(self.config.get("scala", 1) or 1)
-                            while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
-                                best = self.pm.force_close_best_increment(entry_price)
-                                if best:
-                                    events.append({
-                                        "type": "fifo_close", 
-                                        "pnl": best.pnl, 
-                                        "price": entry_price, 
-                                        "ticket": best.ticket, 
-                                        "size": best.size,
-                                        "direction": "SHORT"
-                                    })
-                                else:
-                                    break
-                            pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
-                            events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
                             
-                            self.retracement_start_price = None # Resetta il conteggio dopo l'incremento
+                            # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
+                            tf_val = self.config.get("timeframe", "MINUTE_5")
+                            min_dist_pips = 10 if tf_val == "MINUTE_5" else 20
+                            min_dist_price = min_dist_pips * pip_val
+                            
+                            can_open = True
+                            if len(self.pm.increments) > 0:
+                                last_inc = self.pm.increments[-1]
+                                if abs(entry_price - last_inc.entry_price) < min_dist_price:
+                                    can_open = False
+                                    
+                            if can_open:
+                                scala = int(self.config.get("scala", 1) or 1)
+                                while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
+                                    best = self.pm.force_close_best_increment(entry_price)
+                                    if best:
+                                        events.append({
+                                            "type": "fifo_close", 
+                                            "pnl": best.pnl, 
+                                            "price": entry_price, 
+                                            "ticket": best.ticket, 
+                                            "size": best.size,
+                                            "direction": "SHORT"
+                                        })
+                                    else:
+                                        break
+                                pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
+                                events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
+                            
+                            self.retracement_start_price = None # Resetta il conteggio dopo il tentativo di incremento
                     else:
                         self.retracement_start_price = None # Ritracciamento interrotto da candela rossa
                 else:
