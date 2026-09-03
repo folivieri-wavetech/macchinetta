@@ -2298,7 +2298,9 @@ else:
                                     st.rerun()
                             with c_info:
                                 tf_display = tf_map.get(tf_val, tf_val)
-                                if direzione in ("LONG", "SHORT") and (pos_core or pos_incr):
+                                pos_c = dati_salvati.get("posizioni_core", [])
+                                pos_i = dati_salvati.get("posizioni_incr", [])
+                                if direzione in ("LONG", "SHORT") and (pos_c or pos_i):
                                     st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
                                 else:
                                     st.warning(f"⏳ IN ATTESA CHIUSURA CANDELA (FLAT) | ({tf_display})")
