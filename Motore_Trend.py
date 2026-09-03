@@ -618,12 +618,17 @@ def esegui_ciclo_trend():
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
         return
         
-    # Lettura prezzi live locali (a 0 chiamate API a IG)
+    # Lettura prezzi live locali e posizioni aperte reali (a 0 chiamate API a IG)
     prezzi_live = {}
+    posizioni_live_ig = []
+    has_pos_live_data = False
     if os.path.exists(STATO_SISTEMA):
         try:
             with open(STATO_SISTEMA, "r") as f_st:
-                prezzi_live = json.load(f_st).get("prezzi_live", {})
+                d_st = json.load(f_st)
+                prezzi_live = d_st.get("prezzi_live", {})
+                posizioni_live_ig = d_st.get("posizioni", [])
+                has_pos_live_data = "posizioni" in d_st
         except Exception:
             pass
 
@@ -638,6 +643,24 @@ def esegui_ciclo_trend():
             
         is_attivo = dati.get("attivo", False)
         if not is_attivo:
+            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria, ripuliscile e registra su WIP
+            pos_core = dati.get("posizioni_core", [])
+            pos_incr = dati.get("posizioni_incr", [])
+            if pos_core or pos_incr:
+                storico = dati.get("storico_wip_trend", [])
+                ora_str = now_it().strftime("%d/%m %H:%M:%S")
+                storico.append(f"[{ora_str}] 🛑 Macchinetta spenta: rimosse posizioni dal live.")
+                aggiorna_memoria(nome, {
+                    "posizioni_core": [], 
+                    "posizioni_incr": [], 
+                    "trailing_sl_core": None, 
+                    "trailing_sl_incr": None, 
+                    "stato": "FLAT",
+                    "direzione": "",
+                    "storico_wip_trend": storico[-30:]
+                })
+                if nome in stato_motore.motori:
+                    stato_motore.motori[nome].reset()
             continue
             
         epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
@@ -737,6 +760,69 @@ def esegui_ciclo_trend():
                                     print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
                     except Exception:
                         pass
+
+        # -------------------------------------------------------------
+        # RICONCILIAZIONE AUTOMATICA CON POSIZIONI REALI SU IG
+        # -------------------------------------------------------------
+        if has_pos_live_data and engine.is_running:
+            ticket_aperti_epic = {p.get('position', {}).get('dealId') for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic}
+            storico_aggiornato = False
+            storico = dati.get("storico_wip_trend", [])
+            ora_str = now_it().strftime("%d/%m %H:%M:%S")
+            valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
+            mult = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+            px_live = prezzi_live.get(nome)
+            
+            # 1. Verifica se la Core è stata chiusa a mano su IG
+            if engine.pm.core_position and engine.pm.core_position.ticket:
+                if engine.pm.core_position.ticket not in ticket_aperti_epic:
+                    pnl_txt = ""
+                    if px_live and isinstance(px_live, (int, float)):
+                        pts = (engine.pm.core_position.entry_price - px_live)/mult if engine.pm.core_position.direction == "SHORT" else (px_live - engine.pm.core_position.entry_price)/mult
+                        rate = get_conversion_rate(valuta, prezzi_live)
+                        pnl_est = pts * engine.pm.core_position.size * valore_punto * rate
+                        pnl_txt = f" [PnL stimato: {pnl_est:+.0f} €]"
+                    msg = f"🛑 Chiusura manuale su IG: Core {engine.pm.core_position.direction} ({engine.pm.core_position.size}){pnl_txt}"
+                    storico.append(f"[{ora_str}] {msg}")
+                    print_log(nome, f"ℹ️ Rilevata chiusura manuale Core ({engine.pm.core_position.ticket}) su IG. Posizione rimossa dal live.")
+                    engine.pm.core_position = None
+                    engine.trailing_sl_core = None
+                    storico_aggiornato = True
+            
+            # 2. Verifica se qualche incremento è stato chiuso a mano su IG
+            for inc in list(engine.pm.increments):
+                if inc.ticket and inc.ticket not in ticket_aperti_epic:
+                    pnl_txt = ""
+                    if px_live and isinstance(px_live, (int, float)):
+                        pts = (inc.entry_price - px_live)/mult if inc.direction == "SHORT" else (px_live - inc.entry_price)/mult
+                        rate = get_conversion_rate(valuta, prezzi_live)
+                        pnl_est = pts * inc.size * valore_punto * rate
+                        pnl_txt = f" [PnL stimato: {pnl_est:+.0f} €]"
+                    msg = f"🛑 Chiusura manuale su IG: Incremento ({inc.size}){pnl_txt}"
+                    storico.append(f"[{ora_str}] {msg}")
+                    print_log(nome, f"ℹ️ Rilevata chiusura manuale Incremento ({inc.ticket}) su IG. Rimosso dal live.")
+                    engine.pm.increments.remove(inc)
+                    storico_aggiornato = True
+            
+            if storico_aggiornato:
+                core_dict = [engine.pm.core_position.to_dict()] if engine.pm.core_position else []
+                incr_dict = [p.to_dict() for p in engine.pm.increments]
+                up_dict = {
+                    "posizioni_core": core_dict,
+                    "posizioni_incr": incr_dict,
+                    "trailing_sl_core": engine.trailing_sl_core,
+                    "trailing_sl_incr": engine.trailing_sl_incr,
+                    "storico_wip_trend": storico[-30:]
+                }
+                if not engine.pm.core_position and not engine.pm.increments:
+                    engine.is_running = False
+                    engine.current_direction = "FLAT"
+                    engine.reset()
+                    up_dict["stato"] = "FLAT"
+                    up_dict["direzione"] = ""
+                    if not auto_restart:
+                        up_dict["attivo"] = False
+                aggiorna_memoria(nome, up_dict)
 
         # -------------------------------------------------------------
         # GESTIONE AUTOMATICA PAUSA ROLLOVER (22:45 - 00:29)

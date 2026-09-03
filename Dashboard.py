@@ -2249,7 +2249,22 @@ else:
                             with c_stop:
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
                                     st.session_state[err_key] = ""
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "FLAT", "tipo_strategia": "RANGE", "msg_manuale": ""}
+                                    ora_str = datetime.now().strftime("%d/%m %H:%M:%S")
+                                    storico = dati_salvati.get("storico_wip_trend", [])
+                                    storico.append(f"[{ora_str}] 🛑 STOP Trend: Macchinetta spenta e posizioni rimosse dal conteggio.")
+                                    memoria_attuale[nome] = {
+                                        **dati_salvati, 
+                                        "attivo": False, 
+                                        "direzione": "", 
+                                        "stato": "FLAT", 
+                                        "tipo_strategia": "RANGE", 
+                                        "posizioni_core": [], 
+                                        "posizioni_incr": [], 
+                                        "trailing_sl_core": None, 
+                                        "trailing_sl_incr": None, 
+                                        "storico_wip_trend": storico[-30:],
+                                        "msg_manuale": ""
+                                    }
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
