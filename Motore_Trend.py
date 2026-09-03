@@ -641,7 +641,62 @@ def esegui_ciclo_trend():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
             continue
             
+        epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
+        if not epic: continue
+        
+        # Recupera parametri
+        tf = dati.get("timeframe", "MINUTE_5")
+        size_i = dati.get("size", 1)
+        size_max = dati.get("size_max", 3)
+        scala = int(dati.get("scala", 1) or 1)
+        min_body = dati.get("min_body", 10)
+        auto_restart = dati.get("auto_restart", True)
+        direzione = dati.get("direzione", "LONG")
+        stato_corrente = dati.get("stato", "FLAT") # "FLAT", "LONG", "SHORT"
+        valuta = CONFIG_STRUMENTI[nome]["valuta"]
+        dec = CONFIG_STRUMENTI[nome]["decimali"]
+
         is_attivo = dati.get("attivo", False)
+        
+        # Aggiornamento candele e ricalcolo TK/KJ se mancanti o obsoleti (per mostrare sempre dati reali in Dashboard)
+        candele_locali = carica_candele_locali(nome, tf)
+        min_tf = TF_MAP.get(tf, 5)
+        now_dt = now_it()
+        needs_candele_refresh = (len(candele_locali) < 55) or (dati.get("current_tk") is None) or (dati.get("current_kj") is None)
+        if not needs_candele_refresh and candele_locali:
+            try:
+                last_time_str = candele_locali[-1].get("snapshotTime", "")
+                if last_time_str:
+                    last_c_dt = datetime.strptime(last_time_str, "%Y/%m/%d %H:%M:%S")
+                    if (now_dt - last_c_dt).total_seconds() > (min_tf * 60 * 2):
+                        needs_candele_refresh = True
+            except Exception:
+                needs_candele_refresh = True
+
+        if needs_candele_refresh:
+            fresh_prices = scarica_candele(epic, tf, limit=60, headers=headers)
+            if fresh_prices and isinstance(fresh_prices, list) and len(fresh_prices) >= 2:
+                salva_candele_locali(nome, tf, fresh_prices)
+                candele_locali = fresh_prices
+                storic_c = []
+                for pr in candele_locali:
+                    try:
+                        b_o, a_o = pr['openPrice']['bid'], pr['openPrice']['ask']
+                        b_h, a_h = pr['highPrice']['bid'], pr['highPrice']['ask']
+                        b_l, a_l = pr['lowPrice']['bid'], pr['lowPrice']['ask']
+                        b_c, a_c = pr['closePrice']['bid'], pr['closePrice']['ask']
+                        if all(v is not None and 0 < v < 1e8 for v in [b_o, a_o, b_h, a_h, b_l, a_l, b_c, a_c]):
+                            storic_c.append(Candle((b_o+a_o)/2, (b_h+a_h)/2, (b_l+a_l)/2, (b_c+a_c)/2))
+                    except Exception: pass
+                if len(storic_c) >= 55:
+                    sub_kj = storic_c[-55:]
+                    sub_tk = storic_c[-21:]
+                    calc_kj = (max(x.high for x in sub_kj) + min(x.low for x in sub_kj)) / 2
+                    calc_tk = (max(x.high for x in sub_tk) + min(x.low for x in sub_tk)) / 2
+                    aggiorna_memoria(nome, {"current_tk": calc_tk, "current_kj": calc_kj})
+                    dati["current_tk"] = calc_tk
+                    dati["current_kj"] = calc_kj
+
         if not is_attivo:
             # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria, ripuliscile e registra su WIP
             pos_core = dati.get("posizioni_core", [])
@@ -662,21 +717,6 @@ def esegui_ciclo_trend():
                 if nome in stato_motore.motori:
                     stato_motore.motori[nome].reset()
             continue
-            
-        epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
-        if not epic: continue
-        
-        # Recupera parametri
-        tf = dati.get("timeframe", "MINUTE_5")
-        size_i = dati.get("size", 1)
-        size_max = dati.get("size_max", 3)
-        scala = int(dati.get("scala", 1) or 1)
-        min_body = dati.get("min_body", 10)
-        auto_restart = dati.get("auto_restart", True)
-        direzione = dati.get("direzione", "LONG")
-        stato_corrente = dati.get("stato", "FLAT") # "FLAT", "LONG", "SHORT"
-        valuta = CONFIG_STRUMENTI[nome]["valuta"]
-        dec = CONFIG_STRUMENTI[nome]["decimali"]
         
         # Inizializza/Recupera Engine
         if nome not in stato_motore.motori:
