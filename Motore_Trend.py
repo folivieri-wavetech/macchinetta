@@ -885,7 +885,8 @@ def esegui_ciclo_trend():
         # -------------------------------------------------------------
         if in_rollover:
             continue
-        needs_start = dati.get("needs_manual_start", False) or (is_attivo and not dati.get("posizioni_core") and direzione in ("LONG", "SHORT") and stato_corrente == "FLAT" and not engine.is_running)
+        has_no_core = (engine.pm.core_position is None) if (engine and hasattr(engine, 'pm')) else True
+        needs_start = dati.get("needs_manual_start", False) or (is_attivo and has_no_core and not dati.get("posizioni_core") and direzione in ("LONG", "SHORT"))
         
         now_t = now_it()
         min_tf = TF_MAP.get(tf, 5)
