@@ -69,9 +69,9 @@ class CoreEngine:
 
     def _calculate_donchian(self, periods):
         """Calcola la mediana (Max+Min)/2 degli ultimi N periodi (candele)."""
-        if len(self.candles) < periods:
+        if not self.candles:
             return None
-        recent_candles = self.candles[-periods:]
+        recent_candles = self.candles[-periods:] if len(self.candles) >= periods else self.candles
         valid_candles = [c for c in recent_candles if 0 < c.high < 1e8 and 0 < c.low < 1e8]
         if not valid_candles:
             return None

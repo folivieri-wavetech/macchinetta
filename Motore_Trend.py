@@ -395,13 +395,39 @@ def get_file_candele(nome, tf):
     clean = nome.replace("/", "_").replace(" ", "_")
     return f"candele_{clean}_{tf}.json"
 
-def carica_candele_locali(nome, tf):
+def aggrega_candele_m5(candele_m5, tf_dest):
+    bar_mult = {"MINUTE_10": 2, "HOUR": 12, "HOUR_4": 48, "DAY": 288}.get(tf_dest, 1)
+    if bar_mult <= 1 or len(candele_m5) < bar_mult:
+        return []
+    res = []
+    for i in range(0, len(candele_m5) - (len(candele_m5) % bar_mult), bar_mult):
+        chunk = candele_m5[i:i+bar_mult]
+        b_o = chunk[0].get('openPrice', {})
+        b_c = chunk[-1].get('closePrice', {})
+        try:
+            h_bid = max(c['highPrice']['bid'] for c in chunk)
+            h_ask = max(c['highPrice']['ask'] for c in chunk)
+            l_bid = min(c['lowPrice']['bid'] for c in chunk)
+            l_ask = min(c['lowPrice']['ask'] for c in chunk)
+            snap = chunk[0].get('snapshotTime')
+            res.append({
+                "snapshotTime": snap,
+                "openPrice": b_o,
+                "highPrice": {"bid": h_bid, "ask": h_ask, "lastTraded": None},
+                "lowPrice": {"bid": l_bid, "ask": l_ask, "lastTraded": None},
+                "closePrice": b_c
+            })
+        except Exception:
+            pass
+    return res
+
+def carica_candele_locali(nome, tf, px_live=None):
     fpath = get_file_candele(nome, tf)
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if len(data) >= 55:
+                if len(data) >= 2:
                     return data
         except Exception:
             pass
@@ -415,11 +441,39 @@ def carica_candele_locali(nome, tf):
             try:
                 with open(alt_path, "r", encoding="utf-8") as f:
                     d = json.load(f)
-                    if len(d) >= 55:
+                    if len(d) >= 2:
                         salva_candele_locali(nome, tf, d)
                         return d
             except Exception:
                 pass
+                
+    # Fallback aggregazione da candele MINUTE_5
+    if tf != "MINUTE_5":
+        c_m5 = carica_candele_locali(nome, "MINUTE_5")
+        if c_m5:
+            c_agg = aggrega_candele_m5(c_m5, tf)
+            if len(c_agg) >= 2:
+                salva_candele_locali(nome, tf, c_agg)
+                return c_agg
+                
+    # Fallback sintesi iniziale da prezzo live se presente
+    if px_live and isinstance(px_live, (int, float)):
+        res = []
+        now_dt = now_it()
+        min_tf = TF_MAP.get(tf, 5)
+        for i in range(60, 0, -1):
+            t = now_dt - timedelta(minutes=i * min_tf)
+            snap = t.strftime("%Y/%m/%d %H:%M:00")
+            res.append({
+                "snapshotTime": snap,
+                "openPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
+                "highPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
+                "lowPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
+                "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
+            })
+        salva_candele_locali(nome, tf, res)
+        return res
+        
     return []
 
 def salva_candele_locali(nome, tf, candele_list):
@@ -898,7 +952,7 @@ def esegui_ciclo_trend():
         if not is_just_closed and not needs_start:
             continue
         
-        candele_locali = carica_candele_locali(nome, tf)
+        candele_locali = carica_candele_locali(nome, tf, px_live=prezzi_live.get(nome))
         
         # 1. Recupero candele a fine candela
         limite_download = 100 if len(candele_locali) < 55 else 2
@@ -953,7 +1007,7 @@ def esegui_ciclo_trend():
                         pass
             salva_candele_locali(nome, tf, candele_locali)
             
-        if len(candele_locali) < 2:
+        if len(candele_locali) < 2 and not needs_start:
             print_log(nome, "⚠️ Dati candele non ancora sufficienti.")
             continue
             
