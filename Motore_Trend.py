@@ -446,7 +446,7 @@ def scarica_candele(epic, timeframe, limit=2, headers=None):
                 time.sleep(2.5)
                 continue
             else:
-                if r.status_code == 403 and "historical-data-allowance" in r.text:
+                if r.status_code == 403 and ("historical-data-allowance" in r.text or "exceeded-account-allowance" in r.text or "exceeded-allowance" in r.text or "error.public-api.exceeded" in r.text):
                     return "QUOTA_ESAURITA"
                 print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
                 return []
@@ -657,45 +657,7 @@ def esegui_ciclo_trend():
         dec = CONFIG_STRUMENTI[nome]["decimali"]
 
         is_attivo = dati.get("attivo", False)
-        
-        # Aggiornamento candele e ricalcolo TK/KJ se mancanti o obsoleti (per mostrare sempre dati reali in Dashboard)
         candele_locali = carica_candele_locali(nome, tf)
-        min_tf = TF_MAP.get(tf, 5)
-        now_dt = now_it()
-        needs_candele_refresh = (len(candele_locali) < 55) or (dati.get("current_tk") is None) or (dati.get("current_kj") is None)
-        if not needs_candele_refresh and candele_locali:
-            try:
-                last_time_str = candele_locali[-1].get("snapshotTime", "")
-                if last_time_str:
-                    last_c_dt = datetime.strptime(last_time_str, "%Y/%m/%d %H:%M:%S")
-                    if (now_dt - last_c_dt).total_seconds() > (min_tf * 60 * 2):
-                        needs_candele_refresh = True
-            except Exception:
-                needs_candele_refresh = True
-
-        if needs_candele_refresh:
-            fresh_prices = scarica_candele(epic, tf, limit=60, headers=headers)
-            if fresh_prices and isinstance(fresh_prices, list) and len(fresh_prices) >= 2:
-                salva_candele_locali(nome, tf, fresh_prices)
-                candele_locali = fresh_prices
-                storic_c = []
-                for pr in candele_locali:
-                    try:
-                        b_o, a_o = pr['openPrice']['bid'], pr['openPrice']['ask']
-                        b_h, a_h = pr['highPrice']['bid'], pr['highPrice']['ask']
-                        b_l, a_l = pr['lowPrice']['bid'], pr['lowPrice']['ask']
-                        b_c, a_c = pr['closePrice']['bid'], pr['closePrice']['ask']
-                        if all(v is not None and 0 < v < 1e8 for v in [b_o, a_o, b_h, a_h, b_l, a_l, b_c, a_c]):
-                            storic_c.append(Candle((b_o+a_o)/2, (b_h+a_h)/2, (b_l+a_l)/2, (b_c+a_c)/2))
-                    except Exception: pass
-                if len(storic_c) >= 55:
-                    sub_kj = storic_c[-55:]
-                    sub_tk = storic_c[-21:]
-                    calc_kj = (max(x.high for x in sub_kj) + min(x.low for x in sub_kj)) / 2
-                    calc_tk = (max(x.high for x in sub_tk) + min(x.low for x in sub_tk)) / 2
-                    aggiorna_memoria(nome, {"current_tk": calc_tk, "current_kj": calc_kj})
-                    dati["current_tk"] = calc_tk
-                    dati["current_kj"] = calc_kj
 
         if not is_attivo:
             # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria, ripuliscile e registra su WIP
@@ -909,21 +871,34 @@ def esegui_ciclo_trend():
         
         candele_locali = carica_candele_locali(nome, tf)
         
-        # 1. Recupero candele: se abbiamo già 55+ candele locali, scarichiamo solo le ultime 2 da IG
+        # 1. Recupero candele a fine candela
         limite_download = 100 if len(candele_locali) < 55 else 2
         prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
-        if prices == "QUOTA_ESAURITA":
-            if len(candele_locali) >= 55:
-                print_log(nome, "⚠️ Quota IG in 403, ma proseguo utilizzando il buffer locale di 100 candele.")
-                prices = []
-            else:
-                print_log(nome, "🛑 Quota IG esaurita e candele locali insufficienti (<55).")
-                invia_notifica(f"🛑 QUOTA IG ESAURITA: {nome}", f"[{nome}] Raggiunto limite dati storici IG. Attesa sblocco settimanale.", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE"})
-                if engine.is_running:
-                    engine.stop()
-                continue
+        if prices == "QUOTA_ESAURITA" or not prices or not isinstance(prices, list) or len(prices) < 2:
+            # Fallback automatico su sintesi locale se la quota IG è esaurita o API in errore
+            if len(candele_locali) >= 55 and is_just_closed:
+                live_px = prezzi_live.get(nome)
+                if live_px and isinstance(live_px, (int, float)):
+                    boundary_min = (min_tot // min_tf) * min_tf
+                    b_h = boundary_min // 60
+                    b_m = boundary_min % 60
+                    snap_synth = now_t.replace(hour=b_h, minute=b_m, second=0).strftime("%Y/%m/%d %H:%M:00")
+                    snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
+                    if snap_synth not in snap_esistenti:
+                        last_c = candele_locali[-1]
+                        prev_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
+                        synth_candle = {
+                            "snapshotTime": snap_synth,
+                            "openPrice": {"bid": prev_close, "ask": prev_close, "lastTraded": None},
+                            "highPrice": {"bid": max(prev_close, live_px), "ask": max(prev_close, live_px), "lastTraded": None},
+                            "lowPrice": {"bid": min(prev_close, live_px), "ask": min(prev_close, live_px), "lastTraded": None},
+                            "closePrice": {"bid": live_px, "ask": live_px, "lastTraded": None}
+                        }
+                        candele_locali.append(synth_candle)
+                        salva_candele_locali(nome, tf, candele_locali)
+                        print_log(nome, f"🕯️ Candela ({tf}) sintetizzata localmente: {snap_synth} a {live_px:.5f}.")
+            prices = []
                 
         # Unione e aggiornamento del buffer locale di 100 candele
         if prices and isinstance(prices, list) and len(prices) >= 2:
