@@ -40,7 +40,8 @@ class CoreEngine:
         # Stato Indicatori calcolati all'ultima candela chiusa
         self.current_tk = None
         self.current_kj = None
-        self.trailing_sl_incr = None # Trailing SL a 20 pip da Close per tutti gli incrementi
+        self.trailing_sl_incr = None # Trailing SL a 20 pip da Close per tutti gli incrementi (dist TK >= 20 pip)
+        self.trailing_sl_core = None # Trailing SL a 40 pip da Close per la Core (dist KJ >= 40 pip)
         
     def reset(self):
         """Resetta lo stato della macchinetta."""
@@ -50,6 +51,7 @@ class CoreEngine:
         self.active_signal = None
         self.signal_candles_elapsed = 0
         self.trailing_sl_incr = None
+        self.trailing_sl_core = None
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -110,20 +112,32 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            sl_core_long = kj - (5 * pip_val)
-            if c_close < sl_core_long:
-                # Sotto la Kijun - 5 pip: Chiude tutto e passa in FLAT
+            sl_core_base = kj - (5 * pip_val)
+            effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
+            if c_close < effective_sl_core:
+                # Sotto lo Stop Core (KJ - 5 pip o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
+                self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_below_kj_buffer", "new_direction": "FLAT"})
+                reason = "close_below_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_below_kj_buffer"
+                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT"})
                 
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
             else:
+                # Aggiornamento Trailing SL Core a 40 pip da Close se distanza da KJ >= 40 pip (cricchetto che sale)
+                dist_kj = c_close - kj
+                if dist_kj >= (40 * pip_val):
+                    nuovo_sl_core = c_close - (40 * pip_val)
+                    if self.trailing_sl_core is None:
+                        self.trailing_sl_core = nuovo_sl_core
+                    else:
+                        self.trailing_sl_core = max(self.trailing_sl_core, nuovo_sl_core)
+
                 # Gestione Stop Loss Incrementi: TK - 5 pip o Trailing SL (il più alto / restrittivo)
                 sl_incr_base = tk - (5 * pip_val)
                 effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
@@ -137,10 +151,10 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": reason})
                     self.retracement_start_price = None
                 else:
-                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 40 pip (cricchetto che può solo salire)
+                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 20 pip (cricchetto che può solo salire)
                     if len(self.pm.increments) > 0:
                         dist_tk = c_close - tk
-                        if dist_tk >= (40 * pip_val):
+                        if dist_tk >= (20 * pip_val):
                             nuovo_sl = c_close - (20 * pip_val)
                             if self.trailing_sl_incr is None:
                                 self.trailing_sl_incr = nuovo_sl
@@ -177,20 +191,32 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            sl_core_short = kj + (5 * pip_val)
-            if c_close > sl_core_short:
-                # Sopra la Kijun + 5 pip: Chiude tutto e passa in FLAT
+            sl_core_base = kj + (5 * pip_val)
+            effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
+            if c_close > effective_sl_core:
+                # Sopra lo Stop Core (KJ + 5 pip o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
+                self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_above_kj_buffer", "new_direction": "FLAT"})
+                reason = "close_above_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_above_kj_buffer"
+                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT"})
                 
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
                 
             else:
+                # Aggiornamento Trailing SL Core a 40 pip da Close se distanza da KJ >= 40 pip (cricchetto che scende)
+                dist_kj = kj - c_close
+                if dist_kj >= (40 * pip_val):
+                    nuovo_sl_core = c_close + (40 * pip_val)
+                    if self.trailing_sl_core is None:
+                        self.trailing_sl_core = nuovo_sl_core
+                    else:
+                        self.trailing_sl_core = min(self.trailing_sl_core, nuovo_sl_core)
+
                 # Gestione Stop Loss Incrementi: TK + 5 pip o Trailing SL (il più basso / restrittivo)
                 sl_incr_base = tk + (5 * pip_val)
                 effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
@@ -204,10 +230,10 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": reason})
                     self.retracement_start_price = None
                 else:
-                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 40 pip (cricchetto che può solo scendere)
+                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 20 pip (cricchetto che può solo scendere)
                     if len(self.pm.increments) > 0:
                         dist_tk = tk - c_close
-                        if dist_tk >= (40 * pip_val):
+                        if dist_tk >= (20 * pip_val):
                             nuovo_sl = c_close + (20 * pip_val)
                             if self.trailing_sl_incr is None:
                                 self.trailing_sl_incr = nuovo_sl
@@ -307,19 +333,22 @@ class CoreEngine:
         pip_val = self.config.get("pip_value") or 0.0001
         
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core: KJ - 5 pip
-            sl_core = kj - (5 * pip_val)
-            if current_price <= sl_core:
+            # 1. Stop Loss Core: KJ - 5 pip o Trailing SL Core a 40 pip (il più alto / restrittivo)
+            sl_core_base = kj - (5 * pip_val)
+            effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
+            if current_price <= effective_sl_core:
+                reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
+                self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
+                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT", "price": current_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Loss Incrementi: TK - 5 pip o Trailing SL (il più alto / restrittivo)
+            # 2. Stop Loss Incrementi: TK - 5 pip o Trailing SL a 20 pip (il più alto / restrittivo)
             sl_incr_base = tk - (5 * pip_val)
             effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price <= effective_sl_incr:
@@ -332,19 +361,22 @@ class CoreEngine:
                 self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core: KJ + 5 pip
-            sl_core = kj + (5 * pip_val)
-            if current_price >= sl_core:
+            # 1. Stop Loss Core: KJ + 5 pip o Trailing SL Core a 40 pip (il più basso / restrittivo)
+            sl_core_base = kj + (5 * pip_val)
+            effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
+            if current_price >= effective_sl_core:
+                reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
+                self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
+                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT", "price": current_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Loss Incrementi: TK + 5 pip o Trailing SL (il più basso / restrittivo)
+            # 2. Stop Loss Incrementi: TK + 5 pip o Trailing SL a 20 pip (il più basso / restrittivo)
             sl_incr_base = tk + (5 * pip_val)
             effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price >= effective_sl_incr:

@@ -570,11 +570,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             ha_fatto_eventi = True
             pulisci_posizioni_epic(nome, epic, headers)
             if not auto_restart:
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None})
                 engine.reset()
                 print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
             else:
-                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None})
+                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None})
             
     # Salvataggio posizioni aggiornate
     if engine.is_running:
@@ -583,14 +583,15 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
         update_data = {
             "posizioni_core": core_dict, 
             "posizioni_incr": incr_dict,
-            "trailing_sl_incr": engine.trailing_sl_incr
+            "trailing_sl_incr": engine.trailing_sl_incr,
+            "trailing_sl_core": engine.trailing_sl_core
         }
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
             update_data["storico_wip_trend"] = storico
         aggiorna_memoria(nome, update_data)
     elif events and not auto_restart:
-        update_data_off = {"posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None}
+        update_data_off = {"posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None}
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
             update_data_off["storico_wip_trend"] = storico
@@ -690,32 +691,49 @@ def esegui_ciclo_trend():
                     p_i = engine.pm.open_increment(ip.get("entry", 0), ip.get("size", 1), stato_corrente)
                     p_i.ticket = ip.get("ticket")
                 engine.trailing_sl_incr = dati.get("trailing_sl_incr")
+                engine.trailing_sl_core = dati.get("trailing_sl_core")
                 engine.current_tk = dati.get("current_tk")
                 engine.current_kj = dati.get("current_kj")
                 
-                # Se trailing_sl_incr è None ma ci sono incrementi e il prezzo è già a distanza >= 40 pip dalla TK,
-                # calcola subito lo stop dalla candela chiusa locale senza attendere la chiusura della candela oraria
-                if engine.trailing_sl_incr is None and len(pos_incr) > 0 and engine.current_tk is not None:
-                    c_loc = carica_candele_locali(nome, tf)
-                    if c_loc:
-                        try:
-                            last_c = c_loc[-1]
-                            c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
-                            pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+                # Inizializzazione rapida al boot dall'ultima candela locale se i trailing non sono ancora in memoria
+                c_loc = carica_candele_locali(nome, tf)
+                if c_loc:
+                    try:
+                        last_c = c_loc[-1]
+                        c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
+                        pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+                        
+                        # Trailing SL Core: KJ 40 / 40 (distanza KJ >= 40 pip -> stop a 40 pip da Close)
+                        if engine.trailing_sl_core is None and engine.current_kj is not None:
+                            if stato_corrente == "SHORT":
+                                dist_kj = engine.current_kj - c_close
+                                if dist_kj >= (40 * pip_val):
+                                    engine.trailing_sl_core = c_close + (40 * pip_val)
+                                    aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
+                                    print_log(nome, f"🎯 Trailing SL Core inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
+                            elif stato_corrente == "LONG":
+                                dist_kj = c_close - engine.current_kj
+                                if dist_kj >= (40 * pip_val):
+                                    engine.trailing_sl_core = c_close - (40 * pip_val)
+                                    aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
+                                    print_log(nome, f"🎯 Trailing SL Core inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
+
+                        # Trailing SL Incrementi: TK 20 / 20 (distanza TK >= 20 pip -> stop a 20 pip da Close)
+                        if engine.trailing_sl_incr is None and len(pos_incr) > 0 and engine.current_tk is not None:
                             if stato_corrente == "SHORT":
                                 dist_tk = engine.current_tk - c_close
-                                if dist_tk >= (40 * pip_val):
+                                if dist_tk >= (20 * pip_val):
                                     engine.trailing_sl_incr = c_close + (20 * pip_val)
                                     aggiorna_memoria(nome, {"trailing_sl_incr": engine.trailing_sl_incr})
                                     print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
                             elif stato_corrente == "LONG":
                                 dist_tk = c_close - engine.current_tk
-                                if dist_tk >= (40 * pip_val):
+                                if dist_tk >= (20 * pip_val):
                                     engine.trailing_sl_incr = c_close - (20 * pip_val)
                                     aggiorna_memoria(nome, {"trailing_sl_incr": engine.trailing_sl_incr})
                                     print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
-                        except Exception:
-                            pass
+                    except Exception:
+                        pass
 
         # -------------------------------------------------------------
         # GESTIONE AUTOMATICA PAUSA ROLLOVER (22:45 - 00:29)

@@ -1387,11 +1387,20 @@ else:
                             l_str = "-"
                             is_core_subrow = (p in core_positions)
                             if is_core_subrow:
+                                trailing_sl_core = memoria_attuale.get(nome, {}).get("trailing_sl_core")
                                 kj_val = memoria_attuale.get(nome, {}).get("current_kj")
                                 pip_val = c.get("moltiplicatore", 0.0001)
-                                if kj_val is not None:
+                                if trailing_sl_core is not None:
+                                    sl_core = trailing_sl_core
+                                    title_core = "Trailing SL Core (+-40 pip da Close | dist KJ >= 40 pip)"
+                                elif kj_val is not None:
                                     sl_core = (kj_val - (5 * pip_val)) if dir == 'BUY' else (kj_val + (5 * pip_val))
-                                    s_str = f"<span style='color: #b0b0b0;' title='Stop Core (KJ +- 5 pip)'>{formatta_numero(sl_core, dec)}</span>"
+                                    title_core = "Stop Core (KJ +- 5 pip)"
+                                else:
+                                    sl_core = None
+                                
+                                if sl_core is not None:
+                                    s_str = f"<span style='color: #b0b0b0;' title='{title_core}'>{formatta_numero(sl_core, dec)}</span>"
                                 else:
                                     s_str = "-"
                                 tf_val = memoria_attuale.get(nome, {}).get("timeframe", "MINUTE_5")
@@ -1408,7 +1417,7 @@ else:
                                 pip_val = c.get("moltiplicatore", 0.0001)
                                 if trailing_sl_incr is not None:
                                     sl_display = trailing_sl_incr
-                                    title_info = "Trailing SL (+-20 pip da Close | dist TK >= 40 pip)"
+                                    title_info = "Trailing SL (+-20 pip da Close | dist TK >= 20 pip)"
                                 elif tk_val is not None:
                                     sl_display = (tk_val - (5 * pip_val)) if dir == 'BUY' else (tk_val + (5 * pip_val))
                                     title_info = "Stop TK (+-5 pip)"
