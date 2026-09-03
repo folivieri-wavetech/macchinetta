@@ -2191,6 +2191,8 @@ else:
                                 }
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
+                            if st.button("📋 WIP", key=f"WIP_T_{conto_selezionato}_{nome}", width="stretch"):
+                                mostra_diario_wip_trend(nome, dati_salvati.get("storico_wip_trend", []))
 
                         c_r1_1, c_r1_2 = st.columns(2)
                         with c_r1_1:
@@ -2271,16 +2273,7 @@ else:
                                 tf_display = tf_map.get(tf_val, tf_val)
                                 st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
                         
-                        storico_t = dati_salvati.get("storico_wip_trend", [])
-                        with st.expander(f"📋 Cronologia Trend WIP ({len(storico_t)} eventi)", expanded=False):
-                            if storico_t:
-                                righe_html = "<div style='font-size: 0.82rem; line-height: 1.6; max-height: 180px; overflow-y: auto;'>"
-                                for r in storico_t:
-                                    righe_html += f"&bull; {r}<br>"
-                                righe_html += "</div>"
-                                st.html(righe_html)
-                            else:
-                                st.caption("Nessun evento Trend registrato in questo ciclo.")
+
 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
