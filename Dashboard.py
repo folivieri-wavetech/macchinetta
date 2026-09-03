@@ -2277,13 +2277,13 @@ else:
                                     st.session_state[err_key] = ""
                                     ora_str = datetime.now().strftime("%d/%m %H:%M:%S")
                                     storico = dati_salvati.get("storico_wip_trend", [])
-                                    storico.append(f"[{ora_str}] 🛑 STOP Trend: Macchinetta spenta e posizioni rimosse dal conteggio.")
+                                    storico.append(f"[{ora_str}] 🛑 STOP: Spento")
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
                                         "attivo": False, 
                                         "direzione": "", 
                                         "stato": "FLAT", 
-                                        "tipo_strategia": "RANGE", 
+                                        "tipo_strategia": "TREND", 
                                         "posizioni_core": [], 
                                         "posizioni_incr": [], 
                                         "trailing_sl_core": None, 

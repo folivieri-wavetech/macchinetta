@@ -498,15 +498,15 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 if engine.pm.core_position:
                     engine.pm.core_position.entry_price = entry_px
                     engine.pm.core_position.ticket = deal_id
-                msg = f"🚀 Auto-Restart: Apertura Core {dir_auto} a {entry_px}"
+                msg = f"🚀 Restart {dir_auto} a {entry_px}"
                 print_log(nome, msg)
-                invia_notifica(f"🚀 AUTO-RESTART TREND: {nome}", f"[{nome}] {msg}", "rocket")
+                invia_notifica(f"🚀 RESTART: {nome}", f"[{nome}] {msg}", "rocket")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
             else:
                 engine.reset()
-                print_log(nome, "⚠️ Fallito inserimento a mercato Core Auto-Restart.")
+                print_log(nome, "⚠️ Fallito Restart Core.")
         
         elif tipo == 'increment_opened':
             dir_incr = ev['direction']
@@ -515,9 +515,9 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             if ok:
                 pos.entry_price = real_lvl if real_lvl else ev['price']
                 pos.ticket = deal_id
-                msg = f"➕ Incremento Aperto {dir_incr} a {pos.entry_price}"
+                msg = f"➕ Open Incr {dir_incr} a {pos.entry_price}"
                 print_log(nome, msg)
-                invia_notifica(f"➕ INCREMENTO TREND: {nome}", f"[{nome}] {msg}", "heavy_plus_sign")
+                invia_notifica(f"➕ OPEN INCR: {nome}", f"[{nome}] {msg}", "heavy_plus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
             else:
@@ -550,19 +550,28 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 pnl_eur = (raw_diff / mult) * valore_punto * rate
                 pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
                 
-                # Se la Core viene chiusa per Reversal / Stop Kijun, unifica in un unico messaggio pulito
+                # Se la Core viene chiusa per Reversal / Stop Kijun, unifica in un unico messaggio telegrafico
                 reversal_ev = next((e for e in events if e.get('type') == 'reversal'), None)
                 if tipo == 'core_closed' and reversal_ev:
                     r_reason = reversal_ev.get("reason", "")
-                    tag_motivo = "Trailing SL Core" if "trailing" in r_reason else "Stop Kijun"
-                    msg = f"🛑 {tag_motivo}: Chiusura Core ({sz}){pnl_str} ➡️ FLAT"
-                    invia_notifica(f"🛑 STOP TREND: {nome}", f"[{nome}] {msg}", "warning")
+                    tag_motivo = "Trailing Core" if "trailing" in r_reason else "Stop KJ"
+                    msg = f"🛑 {tag_motivo}: Close Core ({sz}){pnl_str} ➡️ FLAT"
+                    invia_notifica(f"🛑 STOP KJ: {nome}", f"[{nome}] {msg}", "warning")
                 elif is_bancomat:
-                    msg = f"💰 BANCOMAT Incassato! Chiuso Incremento ({sz}){pnl_str}"
-                    invia_notifica(f"💰 BANCOMAT TREND: {nome}", f"[{nome}] {msg}", "moneybag")
+                    msg = f"💰 Bancomat ({sz}){pnl_str}"
+                    invia_notifica(f"💰 BANCOMAT: {nome}", f"[{nome}] {msg}", "moneybag")
+                elif tipo == 'fifo_close':
+                    msg = f"➖ FIFO Incr ({sz}){pnl_str}"
+                    invia_notifica(f"➖ FIFO INCR: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
+                elif tipo == 'increment_closed':
+                    msg = f"➖ Close Incr ({sz}){pnl_str}"
+                    invia_notifica(f"➖ CLOSE INCR: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
+                elif tipo == 'increments_cleared':
+                    msg = f"🛑 Stop TK: Close Incr ({sz}){pnl_str}"
+                    invia_notifica(f"🛑 STOP TK: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                 else:
-                    msg = f"➖ Chiusura {tipo} ({sz}){pnl_str}"
-                    invia_notifica(f"➖ CHIUSURA TREND: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    msg = f"➖ Close Core ({sz}){pnl_str}"
+                    invia_notifica(f"➖ CLOSE CORE: {nome}", f"[{nome}] {msg}", "heavy_minus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
         
@@ -573,10 +582,10 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             
             # Se la Core è già stata registrata con il relativo motivo e passaggio a FLAT, evitiamo il doppio messaggio
             if not has_core_in_events:
-                tag_motivo = " (Live Stop KJ)" if "live_stop" in reason_str else ""
-                msg = f"🛑 Reversal Kijun{tag_motivo}: passaggio a {new_d}"
+                tag_motivo = "Stop KJ" if "live_stop" in reason_str else "Kijun"
+                msg = f"🛑 {tag_motivo} ➡️ {new_d}"
                 print_log(nome, msg)
-                invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
+                invia_notifica(f"🛑 REVERSAL: {nome}", f"[{nome}] {msg}", "warning")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 
@@ -680,7 +689,7 @@ def esegui_ciclo_trend():
             if pos_core or pos_incr:
                 storico = dati.get("storico_wip_trend", [])
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                storico.append(f"[{ora_str}] 🛑 Macchinetta spenta: rimosse posizioni dal live.")
+                storico.append(f"[{ora_str}] 🛑 STOP: Spento")
                 aggiorna_memoria(nome, {
                     "posizioni_core": [], 
                     "posizioni_incr": [], 
@@ -801,8 +810,8 @@ def esegui_ciclo_trend():
                         pts = (engine.pm.core_position.entry_price - px_live)/mult if engine.pm.core_position.direction == "SHORT" else (px_live - engine.pm.core_position.entry_price)/mult
                         rate = get_conversion_rate(valuta, prezzi_live)
                         pnl_est = pts * engine.pm.core_position.size * valore_punto * rate
-                        pnl_txt = f" [PnL stimato: {pnl_est:+.0f} €]"
-                    msg = f"🛑 Chiusura manuale su IG: Core {engine.pm.core_position.direction} ({engine.pm.core_position.size}){pnl_txt}"
+                        pnl_txt = f" [PnL: {pnl_est:+.0f} €]"
+                    msg = f"🛑 Manual IG: Close Core {engine.pm.core_position.direction} ({engine.pm.core_position.size}){pnl_txt}"
                     storico.append(f"[{ora_str}] {msg}")
                     print_log(nome, f"ℹ️ Rilevata chiusura manuale Core ({engine.pm.core_position.ticket}) su IG. Posizione rimossa dal live.")
                     engine.pm.core_position = None
@@ -817,8 +826,8 @@ def esegui_ciclo_trend():
                         pts = (inc.entry_price - px_live)/mult if inc.direction == "SHORT" else (px_live - inc.entry_price)/mult
                         rate = get_conversion_rate(valuta, prezzi_live)
                         pnl_est = pts * inc.size * valore_punto * rate
-                        pnl_txt = f" [PnL stimato: {pnl_est:+.0f} €]"
-                    msg = f"🛑 Chiusura manuale su IG: Incremento ({inc.size}){pnl_txt}"
+                        pnl_txt = f" [PnL: {pnl_est:+.0f} €]"
+                    msg = f"🛑 Manual IG: Close Incr ({inc.size}){pnl_txt}"
                     storico.append(f"[{ora_str}] {msg}")
                     print_log(nome, f"ℹ️ Rilevata chiusura manuale Incremento ({inc.ticket}) su IG. Rimosso dal live.")
                     engine.pm.increments.remove(inc)
@@ -1036,7 +1045,7 @@ def esegui_ciclo_trend():
                 pos.entry_price = real_lvl if real_lvl else closed_candle.close
                 pos.ticket = deal_id
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                msg = f"🚀 Apertura Core {direzione} a {pos.entry_price}"
+                msg = f"🚀 Open Core {direzione} a {pos.entry_price}"
                 aggiorna_memoria(nome, {
                     "stato": direzione, 
                     "direzione": direzione, 
@@ -1044,8 +1053,8 @@ def esegui_ciclo_trend():
                     "posizioni_incr": [], 
                     "storico_wip_trend": [f"[{ora_str}] {msg}"]
                 })
-                print_log(nome, f"🚀 Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.")
-                invia_notifica(f"🚀 AVVIO TREND: {nome}", f"[{nome}] Motore Partito in {direzione}. Core piazzata a {pos.entry_price}.", "rocket")
+                print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price}.")
+                invia_notifica(f"🚀 OPEN CORE: {nome}", f"[{nome}] {msg}", "rocket")
             else:
                 engine.reset()
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
