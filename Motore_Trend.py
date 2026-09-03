@@ -1019,20 +1019,22 @@ def esegui_ciclo_trend():
         
         # Se lo stato su dashboard è FLAT ma l'utente ha premuto AVVIA LONG/SHORT, forziamo l'engine
         if needs_start:
-            # Controllo preventivo di sicurezza Kijun
-            px_start = closed_candle.close
+            # Controllo preventivo di sicurezza Kijun con il prezzo live corrente
+            px_live = prezzi_live.get(nome)
+            px_start = px_live if (px_live and isinstance(px_live, (int, float))) else closed_candle.close
+            
             if direzione == "LONG" and kj_val is not None and px_start < kj_val:
-                print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale LONG bloccato: Prezzo ({px_start}) SOTTO la Kijun ({kj_val}).")
-                invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare LONG: Prezzo ({px_start}) < Kijun ({kj_val}).", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE", "msg_manuale": f"❌ Avvio LONG bloccato: Prezzo sotto Kijun ({kj_val})."})
+                print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale LONG bloccato: Prezzo ({px_start:.{dec}f}) SOTTO la Kijun ({kj_val:.{dec}f}).")
+                invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare LONG: Prezzo ({px_start:.{dec}f}) < Kijun ({kj_val:.{dec}f}).", "no_entry")
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": f"❌ Avvio LONG bloccato: Prezzo ({px_start:.{dec}f}) sotto Kijun ({kj_val:.{dec}f})."})
                 continue
             elif direzione == "SHORT" and kj_val is not None and px_start > kj_val:
-                print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale SHORT bloccato: Prezzo ({px_start}) SOPRA la Kijun ({kj_val}).")
-                invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare SHORT: Prezzo ({px_start}) > Kijun ({kj_val}).", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "RANGE", "msg_manuale": f"❌ Avvio SHORT bloccato: Prezzo sopra Kijun ({kj_val})."})
+                print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale SHORT bloccato: Prezzo ({px_start:.{dec}f}) SOPRA la Kijun ({kj_val:.{dec}f}).")
+                invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare SHORT: Prezzo ({px_start:.{dec}f}) > Kijun ({kj_val:.{dec}f}).", "no_entry")
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": f"❌ Avvio SHORT bloccato: Prezzo ({px_start:.{dec}f}) sopra Kijun ({kj_val:.{dec}f})."})
                 continue
 
-            pos = engine.start(closed_candle.close, direzione)
+            pos = engine.start(px_start, direzione)
             ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, direzione, size_i, headers, dec, etichetta="[CORE]")
             if ok:
                 pos.entry_price = real_lvl if real_lvl else closed_candle.close
