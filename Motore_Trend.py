@@ -885,7 +885,7 @@ def esegui_ciclo_trend():
         # -------------------------------------------------------------
         if in_rollover:
             continue
-        needs_start = not engine.is_running and stato_corrente == "FLAT" and direzione in ("LONG", "SHORT")
+        needs_start = dati.get("needs_manual_start", False) or (is_attivo and not dati.get("posizioni_core") and direzione in ("LONG", "SHORT") and stato_corrente == "FLAT" and not engine.is_running)
         
         now_t = now_it()
         min_tf = TF_MAP.get(tf, 5)
@@ -1034,12 +1034,12 @@ def esegui_ciclo_trend():
             if direzione == "LONG" and kj_val is not None and px_start < kj_val:
                 print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale LONG bloccato: Prezzo ({px_start:.{dec}f}) SOTTO la Kijun ({kj_val:.{dec}f}).")
                 invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare LONG: Prezzo ({px_start:.{dec}f}) < Kijun ({kj_val:.{dec}f}).", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": f"❌ Avvio LONG bloccato: Prezzo ({px_start:.{dec}f}) sotto Kijun ({kj_val:.{dec}f})."})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "needs_manual_start": False, "msg_manuale": f"❌ Avvio LONG bloccato: Prezzo ({px_start:.{dec}f}) sotto Kijun ({kj_val:.{dec}f})."})
                 continue
             elif direzione == "SHORT" and kj_val is not None and px_start > kj_val:
                 print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale SHORT bloccato: Prezzo ({px_start:.{dec}f}) SOPRA la Kijun ({kj_val:.{dec}f}).")
                 invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare SHORT: Prezzo ({px_start:.{dec}f}) > Kijun ({kj_val:.{dec}f}).", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": f"❌ Avvio SHORT bloccato: Prezzo ({px_start:.{dec}f}) sopra Kijun ({kj_val:.{dec}f})."})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "needs_manual_start": False, "msg_manuale": f"❌ Avvio SHORT bloccato: Prezzo ({px_start:.{dec}f}) sopra Kijun ({kj_val:.{dec}f})."})
                 continue
 
             pos = engine.start(px_start, direzione)
@@ -1054,13 +1054,14 @@ def esegui_ciclo_trend():
                     "direzione": direzione, 
                     "posizioni_core": [pos.to_dict()], 
                     "posizioni_incr": [], 
+                    "needs_manual_start": False,
                     "storico_wip_trend": [f"[{ora_str}] {msg}"]
                 })
                 print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price}.")
                 invia_notifica(f"🚀 OPEN CORE: {nome}", f"[{nome}] {msg}", "rocket")
             else:
                 engine.reset()
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True, "needs_manual_start": False})
             continue
                 
         # Alimenta la candela all'Engine
