@@ -1874,13 +1874,16 @@ else:
                         if is_attivo and tipo_strat == "TREND":
                             tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                             tf_display = tf_map.get(tf, tf)
-                            color = "#198754" if dir_t == "LONG" else "#dc3545"
-                            if dir_t == "": color = "#FFD700"
-                            dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
-                            core_sz_val = posizioni_core[0].get("size", sz) if core_count > 0 else sz
-                            str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}" if core_count > 0 else "Core: 0"
-                            str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
-                            c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(40,167,69,0.1); color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
+                            if dir_t in ("LONG", "SHORT") and core_count > 0:
+                                color = "#198754" if dir_t == "LONG" else "#dc3545"
+                                bg_c = "rgba(40,167,69,0.15)" if dir_t == "LONG" else "rgba(220,53,69,0.15)"
+                                dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
+                                core_sz_val = posizioni_core[0].get("size", sz) if core_count > 0 else sz
+                                str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}"
+                                str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
+                            else:
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>In attesa candela</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
                             c2.markdown("<span style='background-color: rgba(23,162,184,0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
@@ -2295,7 +2298,10 @@ else:
                                     st.rerun()
                             with c_info:
                                 tf_display = tf_map.get(tf_val, tf_val)
-                                st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
+                                if direzione in ("LONG", "SHORT") and (pos_core or pos_incr):
+                                    st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
+                                else:
+                                    st.warning(f"⏳ IN ATTESA CANDELA (FLAT) | ({tf_display})")
                         
 
 
