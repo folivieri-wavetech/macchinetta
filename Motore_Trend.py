@@ -612,6 +612,8 @@ def is_rollover_active():
         return True
     return False
 
+LAST_FETCH_BOUNDARY = {}
+
 def esegui_ciclo_trend():
     headers = ottieni_headers_ig()
     if not headers:
@@ -714,12 +716,14 @@ def esegui_ciclo_trend():
             if pos_core:
                 engine.is_running = True
                 engine.current_direction = stato_corrente
-                c_p = pos_core[0]
-                p_c = engine.pm.open_core(c_p.get("entry", 0), c_p.get("size", size_i), stato_corrente)
-                p_c.ticket = c_p.get("ticket")
-                for ip in pos_incr:
-                    p_i = engine.pm.open_increment(ip.get("entry", 0), ip.get("size", 1), stato_corrente)
-                    p_i.ticket = ip.get("ticket")
+                for c_d in pos_core:
+                    dir_pos = c_d.get("direction", stato_corrente)
+                    pos = engine.pm.open_core(c_d.get("entry", 0), c_d.get("size", 1), dir_pos)
+                    pos.ticket = c_d.get("ticket")
+                for i_d in pos_incr:
+                    dir_pos = i_d.get("direction", stato_corrente)
+                    pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), dir_pos)
+                    pos.ticket = i_d.get("ticket")
                 engine.trailing_sl_incr = dati.get("trailing_sl_incr")
                 engine.trailing_sl_core = dati.get("trailing_sl_core")
                 engine.current_tk = dati.get("current_tk")
@@ -873,7 +877,12 @@ def esegui_ciclo_trend():
         
         # 1. Recupero candele a fine candela
         limite_download = 100 if len(candele_locali) < 55 else 2
-        prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
+        boundary_id = f"{nome}_{tf}_{min_tot // min_tf}"
+        
+        prices = []
+        if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and (len(candele_locali) < 55 or is_just_closed):
+            LAST_FETCH_BOUNDARY[nome] = boundary_id
+            prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
         if prices == "QUOTA_ESAURITA" or not prices or not isinstance(prices, list) or len(prices) < 2:
             # Fallback automatico su sintesi locale se la quota IG è esaurita o API in errore
