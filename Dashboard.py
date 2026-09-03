@@ -2233,7 +2233,19 @@ else:
                                         st.rerun()
                                     else:
                                         st.session_state[err_key] = ""
-                                        memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "LONG", "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": ""}
+                                        memoria_attuale[nome] = {
+                                            **dati_salvati, 
+                                            "attivo": True, 
+                                            "direzione": "LONG", 
+                                            "stato": "FLAT", 
+                                            "tipo_strategia": "TREND", 
+                                            "msg_manuale": "",
+                                            "storico_wip_trend": [],
+                                            "posizioni_core": [],
+                                            "posizioni_incr": [],
+                                            "trailing_sl_core": None,
+                                            "trailing_sl_incr": None
+                                        }
                                         salva_memoria(conto_selezionato, memoria_attuale)
                                         st.rerun()
                             with c_btn2:
@@ -2243,7 +2255,19 @@ else:
                                         st.rerun()
                                     else:
                                         st.session_state[err_key] = ""
-                                        memoria_attuale[nome] = {**dati_salvati, "attivo": True, "direzione": "SHORT", "stato": "FLAT", "tipo_strategia": "TREND", "msg_manuale": ""}
+                                        memoria_attuale[nome] = {
+                                            **dati_salvati, 
+                                            "attivo": True, 
+                                            "direzione": "SHORT", 
+                                            "stato": "FLAT", 
+                                            "tipo_strategia": "TREND", 
+                                            "msg_manuale": "",
+                                            "storico_wip_trend": [],
+                                            "posizioni_core": [],
+                                            "posizioni_incr": [],
+                                            "trailing_sl_core": None,
+                                            "trailing_sl_incr": None
+                                        }
                                         salva_memoria(conto_selezionato, memoria_attuale)
                                         st.rerun()
                         else:
