@@ -1408,7 +1408,7 @@ else:
                                 pip_val = c.get("moltiplicatore", 0.0001)
                                 if trailing_sl_incr is not None:
                                     sl_display = trailing_sl_incr
-                                    title_info = "Trailing SL (+-20 pip da Close)"
+                                    title_info = "Trailing SL (+-20 pip da Close | dist TK >= 40 pip)"
                                 elif tk_val is not None:
                                     sl_display = (tk_val - (5 * pip_val)) if dir == 'BUY' else (tk_val + (5 * pip_val))
                                     title_info = "Stop TK (+-5 pip)"

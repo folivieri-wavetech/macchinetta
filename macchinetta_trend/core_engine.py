@@ -137,10 +137,10 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": reason})
                     self.retracement_start_price = None
                 else:
-                    # Aggiornamento Trailing SL dinamico a 20 pip da Close (cricchetto che può solo salire)
+                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 40 pip (cricchetto che può solo salire)
                     if len(self.pm.increments) > 0:
                         dist_tk = c_close - tk
-                        if dist_tk >= (20 * pip_val):
+                        if dist_tk >= (40 * pip_val):
                             nuovo_sl = c_close - (20 * pip_val)
                             if self.trailing_sl_incr is None:
                                 self.trailing_sl_incr = nuovo_sl
@@ -204,10 +204,10 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": reason})
                     self.retracement_start_price = None
                 else:
-                    # Aggiornamento Trailing SL dinamico a 20 pip da Close (cricchetto che può solo scendere)
+                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 40 pip (cricchetto che può solo scendere)
                     if len(self.pm.increments) > 0:
                         dist_tk = tk - c_close
-                        if dist_tk >= (20 * pip_val):
+                        if dist_tk >= (40 * pip_val):
                             nuovo_sl = c_close + (20 * pip_val)
                             if self.trailing_sl_incr is None:
                                 self.trailing_sl_incr = nuovo_sl
