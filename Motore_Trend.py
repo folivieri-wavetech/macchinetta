@@ -550,7 +550,14 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 pnl_eur = (raw_diff / mult) * valore_punto * rate
                 pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
                 
-                if is_bancomat:
+                # Se la Core viene chiusa per Reversal / Stop Kijun, unifica in un unico messaggio pulito
+                reversal_ev = next((e for e in events if e.get('type') == 'reversal'), None)
+                if tipo == 'core_closed' and reversal_ev:
+                    r_reason = reversal_ev.get("reason", "")
+                    tag_motivo = "Trailing SL Core" if "trailing" in r_reason else "Stop Kijun"
+                    msg = f"🛑 {tag_motivo}: Chiusura Core ({sz}){pnl_str} ➡️ FLAT"
+                    invia_notifica(f"🛑 STOP TREND: {nome}", f"[{nome}] {msg}", "warning")
+                elif is_bancomat:
                     msg = f"💰 BANCOMAT Incassato! Chiuso Incremento ({sz}){pnl_str}"
                     invia_notifica(f"💰 BANCOMAT TREND: {nome}", f"[{nome}] {msg}", "moneybag")
                 else:
@@ -562,12 +569,17 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
         elif tipo == 'reversal':
             new_d = ev.get("new_direction", "FLAT")
             reason_str = ev.get("reason", "")
-            tag_motivo = " (Live Stop KJ)" if "live_stop" in reason_str else ""
-            msg = f"🛑 Reversal Kijun{tag_motivo}: chiusura globale e passaggio a {new_d}"
-            print_log(nome, msg)
-            invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
-            storico.append(f"[{ora_str}] {msg}")
-            ha_fatto_eventi = True
+            has_core_in_events = any(e.get('type') == 'core_closed' for e in events)
+            
+            # Se la Core è già stata registrata con il relativo motivo e passaggio a FLAT, evitiamo il doppio messaggio
+            if not has_core_in_events:
+                tag_motivo = " (Live Stop KJ)" if "live_stop" in reason_str else ""
+                msg = f"🛑 Reversal Kijun{tag_motivo}: passaggio a {new_d}"
+                print_log(nome, msg)
+                invia_notifica(f"🛑 REVERSAL TREND: {nome}", f"[{nome}] {msg}", "warning")
+                storico.append(f"[{ora_str}] {msg}")
+                ha_fatto_eventi = True
+                
             pulisci_posizioni_epic(nome, epic, headers)
             if not auto_restart:
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None})
