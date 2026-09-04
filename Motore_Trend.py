@@ -1007,23 +1007,25 @@ def esegui_ciclo_trend():
                         pass
             salva_candele_locali(nome, tf, candele_locali)
             
-        if len(candele_locali) < 2 and not needs_start:
+        if not candele_locali and not needs_start:
             print_log(nome, "⚠️ Dati candele non ancora sufficienti.")
             continue
             
         # 2. Controllo Timestamp Lock
-        last_closed_candle = candele_locali[-1]
+        last_closed_candle = candele_locali[-1] if candele_locali else {}
         snapshot_time = last_closed_candle.get("snapshotTime", "")
         saved_candle_time = dati.get("last_candle_time", "")
         
-        if snapshot_time == saved_candle_time and not needs_start:
+        if snapshot_time and snapshot_time == saved_candle_time and not needs_start:
             continue
             
-        print_log(nome, f"DEBUG: Nuova candela chiusa rilevata ({tf}). Snapshot: {snapshot_time}")
+        if is_just_closed:
+            print_log(nome, f"DEBUG: Nuova candela chiusa rilevata ({tf}). Snapshot: {snapshot_time}")
         
-        # Seed dello storico (tutte le candele chiuse TRANNE l'ultima, che verrà aggiunta da on_candle_close)
+        # Seed dello storico (tutte le candele chiuse TRANNE l'ultima se è fine candela, o tutte se manual start)
         storic_candles = []
-        for pr in candele_locali[:-1]: 
+        subset = candele_locali[:-1] if (is_just_closed and len(candele_locali) > 1) else candele_locali
+        for pr in subset: 
             try:
                 bid_o, ask_o = pr['openPrice']['bid'], pr['openPrice']['ask']
                 bid_h, ask_h = pr['highPrice']['bid'], pr['highPrice']['ask']
@@ -1035,7 +1037,6 @@ def esegui_ciclo_trend():
             except Exception: pass
             
         engine.seed_history(storic_candles)
-        print_log(nome, f"DEBUG: engine.candles ha {len(engine.candles)} elementi. KJ periods: {engine.config.get('kj_periods', 26)}")
         
         tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
         kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
@@ -1062,11 +1063,51 @@ def esegui_ciclo_trend():
                 pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), dir_pos)
                 pos.ticket = i_d.get("ticket")
 
+        valuta = CONFIG_STRUMENTI[nome]["valuta"]
+        dec = CONFIG_STRUMENTI[nome]["decimali"]
+        
+        # Se l'utente ha premuto AVVIA LONG/SHORT (needs_start), avviamo l'engine e l'ordine SUBITO a mercato
+        if needs_start:
+            px_live = prezzi_live.get(nome)
+            closed_close = 0.0
+            if candele_locali:
+                try:
+                    c_last = candele_locali[-1]
+                    closed_close = (c_last['closePrice']['bid'] + c_last['closePrice']['ask']) / 2
+                except Exception:
+                    pass
+            px_start = px_live if (px_live and isinstance(px_live, (int, float))) else closed_close
+            
+            pos = engine.start(px_start, direzione)
+            ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, direzione, size_i, headers, dec, etichetta="[CORE]")
+            if ok:
+                pos.entry_price = real_lvl if real_lvl else px_start
+                pos.ticket = deal_id
+                ora_str = now_it().strftime("%d/%m %H:%M:%S")
+                msg = f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}"
+                aggiorna_memoria(nome, {
+                    "stato": direzione, 
+                    "direzione": direzione, 
+                    "posizioni_core": [pos.to_dict()], 
+                    "posizioni_incr": [], 
+                    "needs_manual_start": False,
+                    "msg_manuale": "",
+                    "storico_wip_trend": [f"[{ora_str}] {msg}"]
+                })
+                print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}.")
+                invia_notifica(f"🚀 OPEN CORE: {nome}", f"[{nome}] {msg}", "rocket")
+            else:
+                engine.reset()
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True, "needs_manual_start": False})
+            continue
+
         # Se eravamo FLAT e non c'è needs_start e non c'è auto_restart, abbiamo solo aggiornato le linee, possiamo saltare il calcolo trading
-        if not engine.is_running and not needs_start and not auto_restart:
+        if not engine.is_running and not auto_restart:
             continue
 
         # Estrai candela chiusa (l'ultima nel buffer locale)
+        if not candele_locali:
+            continue
         last = candele_locali[-1]
         try:
             bid_o, ask_o = last['openPrice']['bid'], last['openPrice']['ask']
@@ -1077,48 +1118,6 @@ def esegui_ciclo_trend():
         except Exception:
             continue
             
-        valuta = CONFIG_STRUMENTI[nome]["valuta"]
-        dec = CONFIG_STRUMENTI[nome]["decimali"]
-        
-        # Se lo stato su dashboard è FLAT ma l'utente ha premuto AVVIA LONG/SHORT, forziamo l'engine
-        if needs_start:
-            # Controllo preventivo di sicurezza Kijun con il prezzo live corrente
-            px_live = prezzi_live.get(nome)
-            px_start = px_live if (px_live and isinstance(px_live, (int, float))) else closed_candle.close
-            
-            if direzione == "LONG" and kj_val is not None and px_start < kj_val:
-                print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale LONG bloccato: Prezzo ({px_start:.{dec}f}) SOTTO la Kijun ({kj_val:.{dec}f}).")
-                invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare LONG: Prezzo ({px_start:.{dec}f}) < Kijun ({kj_val:.{dec}f}).", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "needs_manual_start": False, "msg_manuale": f"❌ Avvio LONG bloccato: Prezzo ({px_start:.{dec}f}) sotto Kijun ({kj_val:.{dec}f})."})
-                continue
-            elif direzione == "SHORT" and kj_val is not None and px_start > kj_val:
-                print_log(nome, f"🛑 [BLOCCO SICUREZZA] Avvio manuale SHORT bloccato: Prezzo ({px_start:.{dec}f}) SOPRA la Kijun ({kj_val:.{dec}f}).")
-                invia_notifica(f"🛑 AVVIO RIFIUTATO: {nome}", f"[{nome}] Impossibile avviare SHORT: Prezzo ({px_start:.{dec}f}) > Kijun ({kj_val:.{dec}f}).", "no_entry")
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "tipo_strategia": "TREND", "needs_manual_start": False, "msg_manuale": f"❌ Avvio SHORT bloccato: Prezzo ({px_start:.{dec}f}) sopra Kijun ({kj_val:.{dec}f})."})
-                continue
-
-            pos = engine.start(px_start, direzione)
-            ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, direzione, size_i, headers, dec, etichetta="[CORE]")
-            if ok:
-                pos.entry_price = real_lvl if real_lvl else closed_candle.close
-                pos.ticket = deal_id
-                ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                msg = f"🚀 Open Core {direzione} a {pos.entry_price}"
-                aggiorna_memoria(nome, {
-                    "stato": direzione, 
-                    "direzione": direzione, 
-                    "posizioni_core": [pos.to_dict()], 
-                    "posizioni_incr": [], 
-                    "needs_manual_start": False,
-                    "storico_wip_trend": [f"[{ora_str}] {msg}"]
-                })
-                print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price}.")
-                invia_notifica(f"🚀 OPEN CORE: {nome}", f"[{nome}] {msg}", "rocket")
-            else:
-                engine.reset()
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True, "needs_manual_start": False})
-            continue
-                
         # Alimenta la candela all'Engine
         events = engine.on_candle_close(closed_candle, next_open_price=closed_candle.close)
         processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, dec, auto_restart, dati)

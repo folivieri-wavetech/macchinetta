@@ -1882,6 +1882,8 @@ else:
                                 str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}"
                                 str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
+                            elif dati.get("needs_manual_start", False):
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(13,110,253,0.15); color: #0d6efd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🚀 AVVIO ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Esecuzione a mercato...</span></div>", unsafe_allow_html=True)
                             else:
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>In attesa chiusura candela</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
@@ -2231,50 +2233,42 @@ else:
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
                                 if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch"):
-                                    if current_kj is not None and px_live is not None and px_live < current_kj:
-                                        st.session_state[err_key] = f"❌ BLOCCO DI SICUREZZA: Prezzo ({px_live:.{dec}f}) SOTTO la Kijun ({current_kj:.{dec}f}). Impossibile avviare LONG."
-                                        st.rerun()
-                                    else:
-                                        st.session_state[err_key] = ""
-                                        memoria_attuale[nome] = {
-                                            **dati_salvati, 
-                                            "attivo": True, 
-                                            "direzione": "LONG", 
-                                            "stato": "FLAT", 
-                                            "tipo_strategia": "TREND", 
-                                            "needs_manual_start": True,
-                                            "msg_manuale": "",
-                                            "storico_wip_trend": [],
-                                            "posizioni_core": [],
-                                            "posizioni_incr": [],
-                                            "trailing_sl_core": None,
-                                            "trailing_sl_incr": None
-                                        }
-                                        salva_memoria(conto_selezionato, memoria_attuale)
-                                        st.rerun()
+                                    st.session_state[err_key] = ""
+                                    memoria_attuale[nome] = {
+                                        **dati_salvati, 
+                                        "attivo": True, 
+                                        "direzione": "LONG", 
+                                        "stato": "FLAT", 
+                                        "tipo_strategia": "TREND", 
+                                        "needs_manual_start": True,
+                                        "msg_manuale": "",
+                                        "storico_wip_trend": [],
+                                        "posizioni_core": [],
+                                        "posizioni_incr": [],
+                                        "trailing_sl_core": None,
+                                        "trailing_sl_incr": None
+                                    }
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
                             with c_btn2:
                                 if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch"):
-                                    if current_kj is not None and px_live is not None and px_live > current_kj:
-                                        st.session_state[err_key] = f"❌ BLOCCO DI SICUREZZA: Prezzo ({px_live:.{dec}f}) SOPRA la Kijun ({current_kj:.{dec}f}). Impossibile avviare SHORT."
-                                        st.rerun()
-                                    else:
-                                        st.session_state[err_key] = ""
-                                        memoria_attuale[nome] = {
-                                            **dati_salvati, 
-                                            "attivo": True, 
-                                            "direzione": "SHORT", 
-                                            "stato": "FLAT", 
-                                            "tipo_strategia": "TREND", 
-                                            "needs_manual_start": True,
-                                            "msg_manuale": "",
-                                            "storico_wip_trend": [],
-                                            "posizioni_core": [],
-                                            "posizioni_incr": [],
-                                            "trailing_sl_core": None,
-                                            "trailing_sl_incr": None
-                                        }
-                                        salva_memoria(conto_selezionato, memoria_attuale)
-                                        st.rerun()
+                                    st.session_state[err_key] = ""
+                                    memoria_attuale[nome] = {
+                                        **dati_salvati, 
+                                        "attivo": True, 
+                                        "direzione": "SHORT", 
+                                        "stato": "FLAT", 
+                                        "tipo_strategia": "TREND", 
+                                        "needs_manual_start": True,
+                                        "msg_manuale": "",
+                                        "storico_wip_trend": [],
+                                        "posizioni_core": [],
+                                        "posizioni_incr": [],
+                                        "trailing_sl_core": None,
+                                        "trailing_sl_incr": None
+                                    }
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
@@ -2304,6 +2298,8 @@ else:
                                 pos_i = dati_salvati.get("posizioni_incr", [])
                                 if direzione in ("LONG", "SHORT") and (pos_c or pos_i):
                                     st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
+                                elif dati_salvati.get("needs_manual_start", False):
+                                    st.info(f"🚀 AVVIO IN CORSO ({direzione})...")
                                 else:
                                     st.warning(f"⏳ IN ATTESA CHIUSURA CANDELA (FLAT) | ({tf_display})")
                         
