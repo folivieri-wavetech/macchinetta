@@ -112,16 +112,16 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            sl_core_base = kj - (5 * pip_val)
+            sl_core_base = kj # A fine candela: Stop Core a rottura Kijun (0 buffer)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if c_close < effective_sl_core:
-                # Sotto lo Stop Core (KJ - 5 pip o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
+                # Sotto lo Stop Core (KJ a fine candela o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                reason = "close_below_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_below_kj_buffer"
+                reason = "close_below_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_below_kj"
                 events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT"})
                 
                 self.current_direction = "FLAT"
@@ -138,12 +138,12 @@ class CoreEngine:
                     else:
                         self.trailing_sl_core = max(self.trailing_sl_core, nuovo_sl_core)
 
-                # Gestione Stop Loss Incrementi: TK - 5 pip o Trailing SL (il più alto / restrittivo)
-                sl_incr_base = tk - (5 * pip_val)
+                # Gestione Stop Loss Incrementi: TK a fine candela o Trailing SL (il più alto / restrittivo)
+                sl_incr_base = tk # A fine candela: Stop Incrementi a rottura Tenkan (0 buffer)
                 effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
                 
                 if len(self.pm.increments) > 0 and c_close < effective_sl_incr:
-                    reason = "close_below_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_below_tk_buffer"
+                    reason = "close_below_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_below_tk"
                     self.trailing_sl_incr = None
                     chiusure_inc = self.pm.close_all_increments(exec_price)
                     if chiusure_inc:
@@ -214,16 +214,16 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            sl_core_base = kj + (5 * pip_val)
+            sl_core_base = kj # A fine candela: Stop Core a rottura Kijun (0 buffer)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if c_close > effective_sl_core:
-                # Sopra lo Stop Core (KJ + 5 pip o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
+                # Sopra lo Stop Core (KJ a fine candela o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                reason = "close_above_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_above_kj_buffer"
+                reason = "close_above_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_above_kj"
                 events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT"})
                 
                 self.current_direction = "FLAT"
@@ -240,12 +240,12 @@ class CoreEngine:
                     else:
                         self.trailing_sl_core = min(self.trailing_sl_core, nuovo_sl_core)
 
-                # Gestione Stop Loss Incrementi: TK + 5 pip o Trailing SL (il più basso / restrittivo)
-                sl_incr_base = tk + (5 * pip_val)
+                # Gestione Stop Loss Incrementi: TK a fine candela o Trailing SL (il più basso / restrittivo)
+                sl_incr_base = tk # A fine candela: Stop Incrementi a rottura Tenkan (0 buffer)
                 effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
                 
                 if len(self.pm.increments) > 0 and c_close > effective_sl_incr:
-                    reason = "close_above_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_above_tk_buffer"
+                    reason = "close_above_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_above_tk"
                     self.trailing_sl_incr = None
                     chiusure_inc = self.pm.close_all_increments(exec_price)
                     if chiusure_inc:
