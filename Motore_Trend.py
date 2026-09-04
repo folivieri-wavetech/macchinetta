@@ -677,16 +677,20 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
 
 def is_rollover_active():
     """
-    Ritorna True se siamo nella finestra di Rollover notturno:
-    Lun-Gio 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
-    Mar-Ven 00:00 - 00:29:59 (weekday 1, 2, 3, 4)
+    Ritorna True se siamo nella finestra di Rollover notturno / apertura domenica:
+    - Domenica sera: 21:45 - 23:59:59 (weekday 6)
+    - Lun-Gio sera: 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
+    - Lun-Ven notte: 00:00 - 00:29:59 (weekday 0, 1, 2, 3, 4)
+    Venerdì sera e sabato: nessun rollover.
     """
     ora = now_it()
     t = ora.time()
     wd = ora.weekday()
+    if wd == 6 and (datetime.time(21, 45) <= t <= datetime.time(23, 59, 59)):
+        return True
     if wd in (0, 1, 2, 3) and (datetime.time(22, 45) <= t <= datetime.time(23, 59, 59)):
         return True
-    if wd in (1, 2, 3, 4) and (datetime.time(0, 0) <= t <= datetime.time(0, 29, 59)):
+    if wd in (0, 1, 2, 3, 4) and (datetime.time(0, 0) <= t <= datetime.time(0, 29, 59)):
         return True
     return False
 
@@ -911,12 +915,13 @@ def esegui_ciclo_trend():
                 aggiorna_memoria(nome, up_dict)
 
         # -------------------------------------------------------------
-        # GESTIONE AUTOMATICA PAUSA ROLLOVER (22:45 - 00:29)
+        # GESTIONE AUTOMATICA PAUSA ROLLOVER
         # -------------------------------------------------------------
         in_rollover = is_rollover_active()
         is_sosp_rollover = dati.get("sospeso_rollover", False)
         if in_rollover and not is_sosp_rollover:
-            print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:45): Stop live congelati e ingressi sospesi per protezione spread.")
+            msg_ora = "21:45" if now_it().weekday() == 6 else "22:45"
+            print_log(nome, f"🌙 INIZIO PAUSA ROLLOVER ({msg_ora}): Stop live congelati e ingressi sospesi per protezione spread.")
             aggiorna_memoria(nome, {"sospeso_rollover": True})
             dati["sospeso_rollover"] = True
         elif not in_rollover and is_sosp_rollover:

@@ -1222,20 +1222,25 @@ def esegui_motore():
                     # --- GESTIONE AUTOMATICA PAUSA ROLLOVER ---
                     ora_it = now_it()
                     is_rollover_time = False
-                    # Dal lunedì sera al venerdì mattina presto:
-                    # Lun-Gio 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
-                    # Mar-Ven 00:00 - 00:29:59 (weekday 1, 2, 3, 4)
+                    # Domenica sera: 21:45 - 23:59:59 (weekday 6)
+                    # Lun-Gio sera: 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
+                    # Lun-Ven notte: 00:00 - 00:29:59 (weekday 0, 1, 2, 3, 4)
+                    # Venerdì sera e sabato: nessun rollover.
                     t_curr = ora_it.time()
-                    if ora_it.weekday() in (0, 1, 2, 3) and (datetime.time(22, 45) <= t_curr <= datetime.time(23, 59, 59)):
+                    wd_curr = ora_it.weekday()
+                    if wd_curr == 6 and (datetime.time(21, 45) <= t_curr <= datetime.time(23, 59, 59)):
                         is_rollover_time = True
-                    elif ora_it.weekday() in (1, 2, 3, 4) and (datetime.time(0, 0) <= t_curr <= datetime.time(0, 29, 59)):
+                    elif wd_curr in (0, 1, 2, 3) and (datetime.time(22, 45) <= t_curr <= datetime.time(23, 59, 59)):
+                        is_rollover_time = True
+                    elif wd_curr in (0, 1, 2, 3, 4) and (datetime.time(0, 0) <= t_curr <= datetime.time(0, 29, 59)):
                         is_rollover_time = True
                             
                     is_sosp_rollover = param.get("sospeso_rollover", False)
                     
                     if param.get("attivo", False) and not param.get("sospeso_weekend", False) and param.get("stato") != "MANUALE":
                         if is_rollover_time and not is_sosp_rollover:
-                            print_log(nome, "🌙 INIZIO PAUSA ROLLOVER (22:45): Sgancio SL e cancello Pendenti...")
+                            msg_ora = "21:45" if wd_curr == 6 else "22:45"
+                            print_log(nome, f"🌙 INIZIO PAUSA ROLLOVER ({msg_ora}): Sgancio SL e cancello Pendenti...")
                             snap_pos = [{"dealId": p['position']['dealId'], "stopLevel": p['position'].get('stopLevel')} for p in posizioni if p['position'].get('stopLevel')]
                             snap_ord = [{"dealId": o['workingOrderData']['dealId'], "direction": o['workingOrderData']['direction'], "level": o['workingOrderData']['orderLevel'], "size": o['workingOrderData'].get('orderSize', o['workingOrderData'].get('size', 0)), "type": o['workingOrderData'].get('orderType', 'LIMIT'), "lim": o['workingOrderData'].get('limitLevel'), "stop": o['workingOrderData'].get('stopLevel')} for o in pendenti]
                             
@@ -1250,7 +1255,7 @@ def esegui_motore():
                             continue
                             
                         elif is_sosp_rollover and not is_rollover_time:
-                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:29): Ripristino SL e Pendenti...")
+                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:30): Ripristino SL e Pendenti...")
                             snap = param.get("rollover_snapshot", {})
                             snap_pos = snap.get("posizioni", [])
                             snap_ord = snap.get("pendenti", [])

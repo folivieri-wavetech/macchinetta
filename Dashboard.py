@@ -2039,7 +2039,7 @@ else:
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
                         elif is_sosp_rollover:
-                            st.warning("🌙 **PAUSA NOTTURNA (ROLLOVER) ATTIVA.** Le funzioni sono bloccate e gli ordini pendenti rimossi temporaneamente per protezione dallo spread. Ripresa automatica alle 00:29.")
+                            st.warning("🌙 **PAUSA NOTTURNA (ROLLOVER) ATTIVA.** Le funzioni sono bloccate e gli ordini pendenti rimossi temporaneamente per protezione dallo spread. Ripresa automatica alle 00:30.")
                         elif modalita_manuale:
                             st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
                             col_m1, col_m2 = st.columns(2, vertical_alignment="center")
@@ -2112,7 +2112,7 @@ else:
                         if not modalita_manuale:
                             if stato_attivo:
                                 if is_sospeso_wk: st.warning(f"🌴 IN PAUSA WEEKEND ({direzione}) | In attesa di ripresa")
-                                elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:29")
+                                elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:30")
                                 elif stato_corrente == "FASE_2_STANDBY": st.markdown("<div style='background-color: #FFD700; color: #000000; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 1rem;'>⏳ IN ATTESA DI RIENTRO | Motore in Stand-By</div>", unsafe_allow_html=True)
                                 else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
                             else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
