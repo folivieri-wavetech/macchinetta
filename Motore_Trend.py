@@ -694,9 +694,31 @@ def is_rollover_active():
         return True
     return False
 
+def is_weekend_active():
+    """
+    Ritorna True se siamo nel weekend a mercati chiusi:
+    - Venerdì sera dalle 23:00 in poi (weekday 4, t >= 23:00)
+    - Sabato tutto il giorno (weekday 5)
+    - Domenica fino alle 21:45 (weekday 6, t < 21:45)
+    (Dalle 21:45 di domenica subentra poi la Pausa Rollover fino alle 00:30 di lunedì).
+    """
+    ora = now_it()
+    t = ora.time()
+    wd = ora.weekday()
+    if wd == 4 and t >= datetime.time(23, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 45):
+        return True
+    return False
+
 LAST_FETCH_BOUNDARY = {}
 
 def esegui_ciclo_trend():
+    if is_weekend_active():
+        return
+
     headers = ottieni_headers_ig()
     if not headers:
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")

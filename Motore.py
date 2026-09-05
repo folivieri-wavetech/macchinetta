@@ -1031,6 +1031,22 @@ def esegui_motore():
                     }
                     invia_notifica(f"🔄 TOKEN RINNOVATO: {NOME_CONTO}", f"Il token di sessione IG per il conto {NOME_CONTO} è stato rinnovato o rigenerato con successo.", "arrows_counterclockwise")
 
+            def is_weekend_active():
+                ora = now_it()
+                t = ora.time()
+                wd = ora.weekday()
+                if wd == 4 and t >= datetime.time(23, 0):
+                    return True
+                if wd == 5:
+                    return True
+                if wd == 6 and t < datetime.time(21, 45):
+                    return True
+                return False
+
+            if is_weekend_active():
+                time.sleep(15)
+                continue
+
             dati_mercati = ottieni_dati_mercati_batch(h)
             
             prezzi_live = {}
