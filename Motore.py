@@ -385,7 +385,7 @@ def is_weekend_active():
     - Venerdì sera dalle 23:00 in poi (weekday 4, t >= 23:00)
     - Sabato tutto il giorno (weekday 5)
     - Domenica fino alle 21:45 (weekday 6, t < 21:45)
-    (Dalle 21:45 di domenica subentra poi la Pausa Rollover fino alle 00:30 di lunedì).
+    (Dalle 21:45 di domenica subentra poi la Pausa Rollover fino alle 00:15 di lunedì).
     """
     ora = now_it()
     t = ora.time()
@@ -1273,7 +1273,7 @@ def esegui_motore():
                     is_rollover_time = False
                     # Domenica sera: 21:45 - 23:59:59 (weekday 6)
                     # Lun-Gio sera: 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
-                    # Lun-Ven notte: 00:00 - 00:29:59 (weekday 0, 1, 2, 3, 4)
+                    # Lun-Ven notte: 00:00 - 00:14:59 (weekday 0, 1, 2, 3, 4)
                     # Venerdì sera e sabato: nessun rollover.
                     t_curr = ora_it.time()
                     wd_curr = ora_it.weekday()
@@ -1281,7 +1281,7 @@ def esegui_motore():
                         is_rollover_time = True
                     elif wd_curr in (0, 1, 2, 3) and (datetime.time(22, 45) <= t_curr <= datetime.time(23, 59, 59)):
                         is_rollover_time = True
-                    elif wd_curr in (0, 1, 2, 3, 4) and (datetime.time(0, 0) <= t_curr <= datetime.time(0, 29, 59)):
+                    elif wd_curr in (0, 1, 2, 3, 4) and (datetime.time(0, 0) <= t_curr <= datetime.time(0, 14, 59)):
                         is_rollover_time = True
                             
                     is_sosp_rollover = param.get("sospeso_rollover", False)
@@ -1304,7 +1304,7 @@ def esegui_motore():
                             continue
                             
                         elif is_sosp_rollover and not is_rollover_time:
-                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:30): Ripristino SL e Pendenti...")
+                            print_log(nome, "☀️ FINE PAUSA ROLLOVER (00:15): Ripristino SL e Pendenti...")
                             snap = param.get("rollover_snapshot", {})
                             snap_pos = snap.get("posizioni", [])
                             snap_ord = snap.get("pendenti", [])
