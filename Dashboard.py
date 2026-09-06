@@ -1021,7 +1021,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
 
         st.html(f"""
         <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
-        <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
+        <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
         <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
             <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
             <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
