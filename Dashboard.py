@@ -1383,24 +1383,42 @@ else:
             
             st.markdown("""
                 <style>
+                div.st-key-btn_radar_sidebar {
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    width: 100% !important;
+                    margin: 0 auto !important;
+                }
                 div.st-key-btn_radar_sidebar button {
                     background-color: #000000 !important;
-                    border: 1.5px solid #FFD700 !important;
+                    border: 2px solid #FFD700 !important;
                     border-radius: 8px !important;
-                    padding: 8px 12px !important;
-                    min-height: 42px !important;
-                    box-shadow: 0 0 10px rgba(255, 215, 0, 0.25) !important;
+                    padding: 10px 6px !important;
+                    min-height: 52px !important;
+                    width: 100% !important;
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    text-align: center !important;
+                    box-shadow: 0 0 14px rgba(255, 215, 0, 0.35) !important;
                 }
                 div.st-key-btn_radar_sidebar button p {
                     color: #FFD700 !important;
-                    font-size: 0.96rem !important;
-                    font-weight: bold !important;
-                    letter-spacing: 0.5px !important;
+                    font-size: 1.35rem !important;
+                    font-weight: 900 !important;
+                    letter-spacing: 1px !important;
+                    text-transform: uppercase !important;
+                    text-align: center !important;
+                    width: 100% !important;
+                    margin: 0 auto !important;
+                    padding: 0 !important;
+                    line-height: 1.2 !important;
                 }
                 div.st-key-btn_radar_sidebar button:hover {
                     background-color: #1a1a00 !important;
                     border-color: #FFE55C !important;
-                    box-shadow: 0 0 15px rgba(255, 215, 0, 0.45) !important;
+                    box-shadow: 0 0 20px rgba(255, 215, 0, 0.55) !important;
                 }
                 div.st-key-btn_radar_sidebar button:hover p {
                     color: #FFE55C !important;
@@ -1410,7 +1428,7 @@ else:
             
             st.markdown("<div style='margin-top: 15px; margin-bottom: 5px;'></div>", unsafe_allow_html=True)
             is_radar_sel = (st.session_state.get("vista_sidebar", "CONTO") == "RADAR")
-            if st.button("📡 Radar Trend", key="btn_radar_sidebar", type="primary" if is_radar_sel else "secondary", use_container_width=True):
+            if st.button("📡 RADAR TREND", key="btn_radar_sidebar", type="primary" if is_radar_sel else "secondary", use_container_width=True):
                 st.session_state.vista_sidebar = "RADAR"
                 st.rerun()
 
