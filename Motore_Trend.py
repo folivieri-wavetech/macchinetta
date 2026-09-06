@@ -430,23 +430,100 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
             pass
     return res
 
+YAHOO_SYMBOLS = {
+    "AUD/CAD": "AUDCAD=X",
+    "AUD/NZD": "AUDNZD=X",
+    "CAD/JPY": "CADJPY=X",
+    "EUR/GBP": "EURGBP=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/CAD": "USDCAD=X",
+    "USD/CHF": "USDCHF=X",
+    "USD/JPY": "USDJPY=X",
+    "Spot Gold": "GC=F",
+    "US 500 Cash": "^GSPC"
+}
+
+def scarica_candele_yahoo(nome, tf):
+    symb = YAHOO_SYMBOLS.get(nome)
+    if not symb:
+        return []
+    interval_map = {
+        "MINUTE_5": ("5m", "5d"),
+        "MINUTE_15": ("15m", "10d"),
+        "HOUR": ("1h", "1mo"),
+        "HOUR_4": ("1h", "3mo"),
+        "DAY": ("1d", "6mo")
+    }
+    int_str, rng_str = interval_map.get(tf, ("1h", "1mo"))
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 200:
+            res = r.json().get('chart', {}).get('result', [{}])[0]
+            quotes = res.get('indicators', {}).get('quote', [{}])[0]
+            timestamps = res.get('timestamp', [])
+            opens = quotes.get('open', [])
+            highs = quotes.get('high', [])
+            lows = quotes.get('low', [])
+            closes = quotes.get('close', [])
+            
+            candele = []
+            for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
+                if h is not None and l is not None and o is not None and c is not None:
+                    snap = datetime.datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
+                    candele.append({
+                        "snapshotTime": snap,
+                        "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
+                        "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
+                        "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
+                        "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
+                    })
+            if tf == "HOUR_4" and candele:
+                candele = aggrega_candele_multitf(candele, "HOUR", "HOUR_4")
+            return candele
+    except Exception:
+        pass
+    return []
+
 def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
     
-    # 1. Controlla prima il file specifico locale
+    # 1. Controlla prima il file specifico locale (se ha almeno 55 barre ed è valido)
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if is_valid_candele(data):
+                if len(data) >= 55 and is_valid_candele(data):
                     return data
         except Exception:
             pass
             
-    # 2. Cerca across accounts e across timeframes con aggregazione intelligente
-    tf_order = [tf] + [t for t in ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"] if t != tf]
+    # 2. Cerca across accounts (se ha almeno 55 barre)
+    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
+        alt_path = os.path.join("..", altro, f"candele_{clean}_{tf}.json")
+        if os.path.exists(alt_path):
+            try:
+                with open(alt_path, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if len(d) >= 55 and is_valid_candele(d):
+                        salva_candele_locali(nome, tf, d)
+                        return d
+            except Exception:
+                pass
+
+    # 3. Fallback intelligente: scarica storico completo (0 chiamate API a IG)
+    c_yh = scarica_candele_yahoo(nome, tf)
+    if c_yh and len(c_yh) >= 10 and is_valid_candele(c_yh):
+        salva_candele_locali(nome, tf, c_yh)
+        return c_yh
+
+    # 4. Aggregazione da altri timeframe locali
+    tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
     for tf_try in tf_order:
+        if tf_try == tf:
+            continue
         fname = f"candele_{clean}_{tf_try}.json"
         for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "."]:
             alt_path = os.path.join("..", altro, fname) if altro != "." else fname
@@ -455,18 +532,14 @@ def carica_candele_locali(nome, tf, px_live=None):
                     with open(alt_path, "r", encoding="utf-8") as f:
                         d = json.load(f)
                         if is_valid_candele(d):
-                            if tf_try == tf:
-                                salva_candele_locali(nome, tf, d)
-                                return d
-                            else:
-                                c_agg = aggrega_candele_multitf(d, tf_try, tf)
-                                if is_valid_candele(c_agg):
-                                    salva_candele_locali(nome, tf, c_agg)
-                                    return c_agg
+                            c_agg = aggrega_candele_multitf(d, tf_try, tf)
+                            if is_valid_candele(c_agg):
+                                salva_candele_locali(nome, tf, c_agg)
+                                return c_agg
                 except Exception:
                     pass
                     
-    # 3. Fallback estremo: sintesi temporanea da px_live se non esiste alcuno storico
+    # 5. Fallback estremo: sintesi temporanea da px_live se non esiste alcuno storico
     if px_live and isinstance(px_live, (int, float)):
         res = []
         now_dt = now_it()

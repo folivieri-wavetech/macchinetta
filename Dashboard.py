@@ -2374,33 +2374,89 @@ else:
                         pass
                 return res
 
+            def scarica_candele_yahoo_dash(nome, tf):
+                yahoo_syms = {
+                    "AUD/CAD": "AUDCAD=X", "AUD/NZD": "AUDNZD=X", "CAD/JPY": "CADJPY=X",
+                    "EUR/GBP": "EURGBP=X", "GBP/USD": "GBPUSD=X", "USD/CAD": "USDCAD=X",
+                    "USD/CHF": "USDCHF=X", "USD/JPY": "USDJPY=X", "Spot Gold": "GC=F", "US 500 Cash": "^GSPC"
+                }
+                symb = yahoo_syms.get(nome)
+                if not symb:
+                    return []
+                interval_map = {"MINUTE_5": ("5m", "5d"), "MINUTE_15": ("15m", "10d"), "HOUR": ("1h", "1mo"), "HOUR_4": ("1h", "3mo"), "DAY": ("1d", "6mo")}
+                int_str, rng_str = interval_map.get(tf, ("1h", "1mo"))
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
+                headers = {"User-Agent": "Mozilla/5.0"}
+                try:
+                    r = requests.get(url, headers=headers, timeout=5)
+                    if r.status_code == 200:
+                        res = r.json().get('chart', {}).get('result', [{}])[0]
+                        quotes = res.get('indicators', {}).get('quote', [{}])[0]
+                        timestamps = res.get('timestamp', [])
+                        opens = quotes.get('open', [])
+                        highs = quotes.get('high', [])
+                        lows = quotes.get('low', [])
+                        closes = quotes.get('close', [])
+                        candele = []
+                        for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
+                            if h is not None and l is not None and o is not None and c is not None:
+                                snap = datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
+                                candele.append({
+                                    "snapshotTime": snap,
+                                    "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
+                                    "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
+                                    "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
+                                    "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
+                                })
+                        if tf == "HOUR_4" and candele:
+                            candele = aggrega_candele_dash(candele, "HOUR", "HOUR_4")
+                        return candele
+                except Exception:
+                    pass
+                return []
+
             def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                 clean = nome.replace("/", "_").replace(" ", "_")
-                tf_order = [tf] + [t for t in ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"] if t != tf]
-                
+                fname = f"candele_{clean}_{tf}.json"
+                candidates = [
+                    os.path.join(conto, fname),
+                    fname,
+                    os.path.join("..", conto, fname)
+                ]
+                for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
+                    candidates.append(os.path.join(altro, fname))
+                    candidates.append(os.path.join("..", altro, fname))
+                    
+                for p in candidates:
+                    if os.path.exists(p):
+                        try:
+                            with open(p, "r", encoding="utf-8") as f:
+                                d = json.load(f)
+                                if len(d) >= 55 and is_valid_candele_dash(d):
+                                    return d
+                        except Exception:
+                            pass
+                            
+                # Fallback intelligente su storico pubblico (0 chiamate API a IG)
+                c_yh = scarica_candele_yahoo_dash(nome, tf)
+                if c_yh and len(c_yh) >= 10 and is_valid_candele_dash(c_yh):
+                    return c_yh
+                    
+                tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
                 for tf_try in tf_order:
-                    fname = f"candele_{clean}_{tf_try}.json"
-                    candidates = [
-                        os.path.join(conto, fname),
-                        fname,
-                        os.path.join("..", conto, fname)
-                    ]
-                    for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
-                        candidates.append(os.path.join(altro, fname))
-                        candidates.append(os.path.join("..", altro, fname))
-                        
-                    for p in candidates:
-                        if os.path.exists(p):
+                    if tf_try == tf:
+                        continue
+                    fname_alt = f"candele_{clean}_{tf_try}.json"
+                    for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO", "."]:
+                        p_alt = os.path.join(altro, fname_alt) if altro != "." else fname_alt
+                        if os.path.exists(p_alt):
                             try:
-                                with open(p, "r", encoding="utf-8") as f:
+                                with open(p_alt, "r", encoding="utf-8") as f:
                                     d = json.load(f)
                                     if is_valid_candele_dash(d):
-                                        if tf_try == tf:
-                                            return d
-                                        else:
-                                            c_agg = aggrega_candele_dash(d, tf_try, tf)
-                                            if is_valid_candele_dash(c_agg):
-                                                return c_agg
+                                        c_agg = aggrega_candele_dash(d, tf_try, tf)
+                                        if is_valid_candele_dash(c_agg):
+                                            return c_agg
                             except Exception:
                                 pass
                                 
