@@ -464,7 +464,7 @@ YAHOO_SYMBOLS = {
     "USD/CHF": "USDCHF=X",
     "USD/JPY": "USDJPY=X",
     "Spot Gold": "GC=F",
-    "US 500 Cash": "^GSPC"
+    "US 500 Cash": "ES=F"
 }
 
 def scarica_candele_yahoo(nome, tf):

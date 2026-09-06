@@ -1032,7 +1032,7 @@ def scarica_candele_yahoo_dash(nome, tf):
     yahoo_syms = {
         "AUD/CAD": "AUDCAD=X", "AUD/NZD": "AUDNZD=X", "CAD/JPY": "CADJPY=X",
         "EUR/GBP": "EURGBP=X", "GBP/USD": "GBPUSD=X", "USD/CAD": "USDCAD=X",
-        "USD/CHF": "USDCHF=X", "USD/JPY": "USDJPY=X", "Spot Gold": "GC=F", "US 500 Cash": "^GSPC"
+        "USD/CHF": "USDCHF=X", "USD/JPY": "USDJPY=X", "Spot Gold": "GC=F", "US 500 Cash": "ES=F"
     }
     symb = yahoo_syms.get(nome)
     if not symb:
