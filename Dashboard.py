@@ -1020,12 +1020,12 @@ def renderizza_schermata_radar(conto_selezionato=None):
             ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
 
         st.html(f"""
-        <h1 style='color: #00BFFF; margin-top: -10px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>
-        <div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
-        <div style='display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85rem;'>
-            <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
-            <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
-            <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
+        <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
+        <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
+        <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
+            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
+            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
+            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
         </div>
         """)
 
@@ -1033,16 +1033,16 @@ def renderizza_schermata_radar(conto_selezionato=None):
         tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
         
         html_table = """
-        <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 8px; overflow: hidden; font-family: sans-serif; font-size: 0.85rem;'>
+        <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem;'>
             <thead>
                 <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
-                    <th style='padding: 10px; text-align: left;'>Strumento</th>
-                    <th style='padding: 10px;'>Prezzo Live</th>
-                    <th style='padding: 10px;'>M5 (KJ55)</th>
-                    <th style='padding: 10px;'>H1 (KJ55)</th>
-                    <th style='padding: 10px;'>H4 (KJ55)</th>
-                    <th style='padding: 10px;'>Daily D1 (KJ55)</th>
-                    <th style='padding: 10px;'>Stato Trend</th>
+                    <th style='padding: 6px 8px; text-align: left; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Prezzo Live</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>M5 (KJ55)</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1 (KJ55)</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4 (KJ55)</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Daily D1 (KJ55)</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Stato Trend</th>
                 </tr>
             </thead>
             <tbody>
@@ -1076,10 +1076,10 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     break
             
             if is_attivo:
-                conto_tag = f" <span style='font-size:0.75rem; color:#cbd5e1;'>[{conto_trade}]</span>" if conto_trade else ""
-                badge_stato = f"<span style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; border-radius: 4px; padding: 2px 6px; font-weight: bold;'>🟢 {stato_s} ({tf_attivo_lbl}){conto_tag}</span>"
+                conto_tag = f" <span style='font-size:0.68rem; color:#cbd5e1;'>[{conto_trade}]</span>" if conto_trade else ""
+                badge_stato = f"<span style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; border-radius: 3px; padding: 2px 5px; font-weight: bold; font-size: 0.70rem;'>🟢 {stato_s} ({tf_attivo_lbl}){conto_tag}</span>"
             else:
-                badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 4px; padding: 2px 6px;'>⏳ FLAT</span>"
+                badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
             
             px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
             
@@ -1093,7 +1093,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 is_current_tf_trade = (is_attivo and stato_s in ("LONG", "SHORT") and tf_attivo_lbl == lbl_key)
                 
                 if is_current_tf_trade:
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: #60a5fa;'>IN TRADE</b><br><span style='font-size:0.72rem; color:#93c5fd;'>({stato_s})</span></div>"
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: #60a5fa; font-size: 0.72rem;'>IN TRADE</b><br><span style='font-size:0.65rem; color:#93c5fd;'>({stato_s})</span></div>"
                     
                 if kj_v is None and px and isinstance(px, (int, float)):
                     tf_code = tf_map_code.get(lbl_key, "HOUR")
@@ -1107,7 +1107,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                         vicino = (dist_p <= 15)
 
                 if kj_v is None or dist_p is None:
-                    return "<div style='color: #64748b; text-align: center;'>-</div>"
+                    return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
                     
                 kj_formatted = f"{kj_v:.{dec}f}"
                 dist_int = int(round(dist_p))
@@ -1118,9 +1118,9 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 if vicino:
                     bg_cell = "rgba(34, 197, 94, 0.2)" if is_long else "rgba(239, 68, 68, 0.2)"
                     bdr_cell = "#22c55e" if is_long else "#ef4444"
-                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 6px; padding: 4px 6px; text-align: center;'><b style='color: {col_dir};'>⚡ {dist_int} punti</b><br><span style='font-size:0.72rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
+                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_dir}; font-size: 0.74rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.62rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
                 else:
-                    return f"<div style='text-align: center; color: #94a3b8;'><span style='font-weight: bold;'>{dist_int} punti</span><br><span style='font-size:0.72rem; color:#cbd5e1;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
+                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.74rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:#cbd5e1;'>{dir_label}</span><br><span style='font-size:0.62rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
 
             c_m5 = format_radar_cell("M5")
             c_h1 = format_radar_cell("H1")
@@ -1130,13 +1130,13 @@ def renderizza_schermata_radar(conto_selezionato=None):
             bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
             html_table += f"""
             <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
-                <td style='padding: 8px 10px; font-weight: bold;'>{formatta_mercato_con_bandiere(s_nome)}</td>
-                <td style='padding: 8px 10px; text-align: center; color: #00E676;'>{px_str}</td>
-                <td style='padding: 6px 8px;'>{c_m5}</td>
-                <td style='padding: 6px 8px;'>{c_h1}</td>
-                <td style='padding: 6px 8px;'>{c_h4}</td>
-                <td style='padding: 6px 8px;'>{c_d1}</td>
-                <td style='padding: 8px 10px; text-align: center;'>{badge_stato}</td>
+                <td style='padding: 3px 8px; font-weight: bold; font-size: 0.76rem;'>{formatta_mercato_con_bandiere(s_nome)}</td>
+                <td style='padding: 3px 6px; text-align: center; color: #00E676; font-size: 0.76rem;'>{px_str}</td>
+                <td style='padding: 2px 4px;'>{c_m5}</td>
+                <td style='padding: 2px 4px;'>{c_h1}</td>
+                <td style='padding: 2px 4px;'>{c_h4}</td>
+                <td style='padding: 2px 4px;'>{c_d1}</td>
+                <td style='padding: 3px 6px; text-align: center;'>{badge_stato}</td>
             </tr>
             """
         
@@ -1366,6 +1366,33 @@ else:
             st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
+            
+            st.markdown("""
+                <style>
+                div.st-key-btn_radar_sidebar button {
+                    background-color: #000000 !important;
+                    border: 1.5px solid #FFD700 !important;
+                    border-radius: 8px !important;
+                    padding: 8px 12px !important;
+                    min-height: 42px !important;
+                    box-shadow: 0 0 10px rgba(255, 215, 0, 0.25) !important;
+                }
+                div.st-key-btn_radar_sidebar button p {
+                    color: #FFD700 !important;
+                    font-size: 0.96rem !important;
+                    font-weight: bold !important;
+                    letter-spacing: 0.5px !important;
+                }
+                div.st-key-btn_radar_sidebar button:hover {
+                    background-color: #1a1a00 !important;
+                    border-color: #FFE55C !important;
+                    box-shadow: 0 0 15px rgba(255, 215, 0, 0.45) !important;
+                }
+                div.st-key-btn_radar_sidebar button:hover p {
+                    color: #FFE55C !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
             
             st.markdown("<div style='margin-top: 15px; margin-bottom: 5px;'></div>", unsafe_allow_html=True)
             is_radar_sel = (st.session_state.get("vista_sidebar", "CONTO") == "RADAR")
