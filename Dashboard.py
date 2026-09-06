@@ -968,7 +968,7 @@ def calcola_kj55_da_candele_dash(candele_list, periods=55):
     lowest = min(v[1] for v in valid)
     return (highest + lowest) / 2.0
 
-def is_valid_candele_dash(data):
+def is_valid_candele_dash(data, tf=None):
     if not data or len(data) < 2:
         return False
     try:
@@ -976,7 +976,31 @@ def is_valid_candele_dash(data):
         lows = [float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in data if c.get('lowPrice', {}).get('bid') or c.get('low')]
         if not highs or not lows:
             return False
-        return (max(highs) - min(lows)) > 1e-6
+        if (max(highs) - min(lows)) <= 1e-6:
+            return False
+            
+        tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
+        if tf and tf in tf_mins:
+            expected_min = tf_mins[tf]
+            times = []
+            for c in data[:10]:
+                st_str = c.get('snapshotTime')
+                if st_str:
+                    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M:00", "%Y-%m-%d %H:%M:%S"):
+                        try:
+                            times.append(datetime.strptime(st_str, fmt))
+                            break
+                        except Exception:
+                            pass
+            if len(times) >= 2:
+                delta_m = round((times[1] - times[0]).total_seconds() / 60.0)
+                if expected_min <= 15 and delta_m >= 30:
+                    return False
+                if expected_min == 60 and (delta_m < 30 or delta_m > 120):
+                    return False
+                if expected_min >= 1440 and delta_m < 720:
+                    return False
+        return True
     except Exception:
         return False
 
@@ -985,7 +1009,7 @@ def aggrega_candele_dash(candele_src, tf_src, tf_dest):
     m_src = tf_mins.get(tf_src, 5)
     m_dest = tf_mins.get(tf_dest, 60)
     if m_dest <= m_src:
-        return candele_src
+        return []
     ratio = max(1, m_dest // m_src)
     res = []
     for i in range(0, len(candele_src), ratio):
@@ -996,6 +1020,7 @@ def aggrega_candele_dash(candele_src, tf_src, tf_dest):
             h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
             l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
             res.append({
+                "snapshotTime": chunk[0].get("snapshotTime"),
                 "highPrice": {"bid": h_bid, "ask": h_bid},
                 "lowPrice": {"bid": l_bid, "ask": l_bid}
             })
@@ -1061,19 +1086,20 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     d = json.load(f)
-                    if len(d) >= 55 and is_valid_candele_dash(d):
+                    if len(d) >= 55 and is_valid_candele_dash(d, tf):
                         return d
             except Exception:
                 pass
                 
     # Fallback intelligente su storico pubblico (0 chiamate API a IG)
     c_yh = scarica_candele_yahoo_dash(nome, tf)
-    if c_yh and len(c_yh) >= 10 and is_valid_candele_dash(c_yh):
+    if c_yh and len(c_yh) >= 10 and is_valid_candele_dash(c_yh, tf):
         return c_yh
         
     tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
+    tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
     for tf_try in tf_order:
-        if tf_try == tf:
+        if tf_try == tf or tf_mins.get(tf_try, 0) >= tf_mins.get(tf, 0):
             continue
         fname_alt = f"candele_{clean}_{tf_try}.json"
         for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO", "."]:
@@ -1082,9 +1108,9 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                 try:
                     with open(p_alt, "r", encoding="utf-8") as f:
                         d = json.load(f)
-                        if is_valid_candele_dash(d):
+                        if is_valid_candele_dash(d, tf_try):
                             c_agg = aggrega_candele_dash(d, tf_try, tf)
-                            if is_valid_candele_dash(c_agg):
+                            if is_valid_candele_dash(c_agg, tf):
                                 return c_agg
                 except Exception:
                     pass

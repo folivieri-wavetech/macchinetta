@@ -396,7 +396,7 @@ def get_file_candele(nome, tf):
     clean = nome.replace("/", "_").replace(" ", "_")
     return f"candele_{clean}_{tf}.json"
 
-def is_valid_candele(data):
+def is_valid_candele(data, tf=None):
     if not data or len(data) < 2:
         return False
     try:
@@ -404,7 +404,30 @@ def is_valid_candele(data):
         lows = [float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in data if c.get('lowPrice', {}).get('bid') or c.get('low')]
         if not highs or not lows:
             return False
-        return (max(highs) - min(lows)) > 1e-6
+        if (max(highs) - min(lows)) <= 1e-6:
+            return False
+            
+        if tf and tf in TF_MAP:
+            expected_min = TF_MAP[tf]
+            times = []
+            for c in data[:10]:
+                st_str = c.get('snapshotTime')
+                if st_str:
+                    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M:00", "%Y-%m-%d %H:%M:%S"):
+                        try:
+                            times.append(datetime.datetime.strptime(st_str, fmt))
+                            break
+                        except Exception:
+                            pass
+            if len(times) >= 2:
+                delta_m = round((times[1] - times[0]).total_seconds() / 60.0)
+                if expected_min <= 15 and delta_m >= 30:
+                    return False
+                if expected_min == 60 and (delta_m < 30 or delta_m > 120):
+                    return False
+                if expected_min >= 1440 and delta_m < 720:
+                    return False
+        return True
     except Exception:
         return False
 
@@ -412,7 +435,7 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
     m_src = TF_MAP.get(tf_src, 5)
     m_dest = TF_MAP.get(tf_dest, 60)
     if m_dest <= m_src:
-        return candele_src
+        return []
     ratio = max(1, m_dest // m_src)
     res = []
     for i in range(0, len(candele_src), ratio):
@@ -423,6 +446,7 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
             h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
             l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
             res.append({
+                "snapshotTime": chunk[0].get("snapshotTime"),
                 "highPrice": {"bid": h_bid, "ask": h_bid},
                 "lowPrice": {"bid": l_bid, "ask": l_bid}
             })
@@ -490,24 +514,24 @@ def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
     
-    # 1. Controlla prima il file specifico locale (se ha almeno 55 barre ed è valido)
+    # 1. Controlla prima il file specifico locale (se ha almeno 55 barre ed è valido per il tf)
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if len(data) >= 55 and is_valid_candele(data):
+                if len(data) >= 55 and is_valid_candele(data, tf):
                     return data
         except Exception:
             pass
             
-    # 2. Cerca across accounts (se ha almeno 55 barre)
+    # 2. Cerca across accounts (se ha almeno 55 barre ed è valido per il tf)
     for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
         alt_path = os.path.join("..", altro, f"candele_{clean}_{tf}.json")
         if os.path.exists(alt_path):
             try:
                 with open(alt_path, "r", encoding="utf-8") as f:
                     d = json.load(f)
-                    if len(d) >= 55 and is_valid_candele(d):
+                    if len(d) >= 55 and is_valid_candele(d, tf):
                         salva_candele_locali(nome, tf, d)
                         return d
             except Exception:
@@ -515,14 +539,14 @@ def carica_candele_locali(nome, tf, px_live=None):
 
     # 3. Fallback intelligente: scarica storico completo (0 chiamate API a IG)
     c_yh = scarica_candele_yahoo(nome, tf)
-    if c_yh and len(c_yh) >= 10 and is_valid_candele(c_yh):
+    if c_yh and len(c_yh) >= 10 and is_valid_candele(c_yh, tf):
         salva_candele_locali(nome, tf, c_yh)
         return c_yh
 
-    # 4. Aggregazione da altri timeframe locali
+    # 4. Aggregazione da timeframe minori a maggiori
     tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
     for tf_try in tf_order:
-        if tf_try == tf:
+        if tf_try == tf or TF_MAP.get(tf_try, 0) >= TF_MAP.get(tf, 0):
             continue
         fname = f"candele_{clean}_{tf_try}.json"
         for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "."]:
@@ -531,9 +555,9 @@ def carica_candele_locali(nome, tf, px_live=None):
                 try:
                     with open(alt_path, "r", encoding="utf-8") as f:
                         d = json.load(f)
-                        if is_valid_candele(d):
+                        if is_valid_candele(d, tf_try):
                             c_agg = aggrega_candele_multitf(d, tf_try, tf)
-                            if is_valid_candele(c_agg):
+                            if is_valid_candele(c_agg, tf):
                                 salva_candele_locali(nome, tf, c_agg)
                                 return c_agg
                 except Exception:
