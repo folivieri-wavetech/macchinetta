@@ -1069,6 +1069,62 @@ def scarica_candele_yahoo_dash(nome, tf):
         pass
     return []
 
+def allinea_candele_live_dash(candele_locali, nome, tf, px_live):
+    if not candele_locali or not px_live or not isinstance(px_live, (int, float)):
+        return candele_locali
+    now_t = now_it()
+    ora_dt = now_t.time()
+    wd = now_t.weekday()
+    if (wd == 4 and ora_dt >= time(23, 0)) or wd == 5 or (wd == 6 and ora_dt < time(21, 45)):
+        return candele_locali
+        
+    tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
+    min_tf = tf_mins.get(tf, 5)
+    offset = 60 if min_tf in (60, 240, 1440) else 0
+    min_tot = now_t.hour * 60 + now_t.minute
+    boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
+    b_h = (boundary_min // 60) % 24
+    b_m = boundary_min % 60
+    target_dt = now_t.replace(hour=b_h, minute=b_m, second=0, microsecond=0)
+    
+    try:
+        last_t_str = candele_locali[-1].get("snapshotTime")
+        last_dt = datetime.strptime(last_t_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+    except Exception:
+        return candele_locali
+
+    if last_dt >= target_dt:
+        return candele_locali
+        
+    curr_dt = last_dt + timedelta(minutes=min_tf)
+    added = 0
+    while curr_dt <= target_dt and added < 100:
+        c_ora = curr_dt.time()
+        c_wd = curr_dt.weekday()
+        if (c_wd == 4 and c_ora >= time(23, 0)) or c_wd == 5 or (c_wd == 6 and c_ora < time(21, 45)):
+            curr_dt += timedelta(minutes=min_tf)
+            continue
+            
+        snap_synth = curr_dt.strftime("%Y/%m/%d %H:%M:00")
+        last_c = candele_locali[-1]
+        try:
+            prev_close = (float(last_c.get('closePrice',{}).get('bid', px_live)) + float(last_c.get('closePrice',{}).get('ask', px_live))) / 2
+        except Exception:
+            prev_close = px_live
+            
+        synth_candle = {
+            "snapshotTime": snap_synth,
+            "openPrice": {"bid": prev_close, "ask": prev_close, "lastTraded": None},
+            "highPrice": {"bid": max(prev_close, px_live), "ask": max(prev_close, px_live), "lastTraded": None},
+            "lowPrice": {"bid": min(prev_close, px_live), "ask": min(prev_close, px_live), "lastTraded": None},
+            "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
+        }
+        candele_locali.append(synth_candle)
+        added += 1
+        curr_dt += timedelta(minutes=min_tf)
+        
+    return candele_locali[-100:]
+
 def carica_candele_locali_dash(conto, nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
     fname = f"candele_{clean}_{tf}.json"
@@ -1087,6 +1143,8 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                 with open(p, "r", encoding="utf-8") as f:
                     d = json.load(f)
                     if len(d) >= 55 and is_valid_candele_dash(d, tf):
+                        if px_live and isinstance(px_live, (int, float)):
+                            return allinea_candele_live_dash(d, nome, tf, px_live)
                         return d
             except Exception:
                 pass
@@ -1094,6 +1152,8 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
     # Fallback intelligente su storico pubblico (0 chiamate API a IG)
     c_yh = scarica_candele_yahoo_dash(nome, tf)
     if c_yh and len(c_yh) >= 10 and is_valid_candele_dash(c_yh, tf):
+        if px_live and isinstance(px_live, (int, float)):
+            return allinea_candele_live_dash(c_yh, nome, tf, px_live)
         return c_yh
         
     tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
@@ -1111,6 +1171,8 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                         if is_valid_candele_dash(d, tf_try):
                             c_agg = aggrega_candele_dash(d, tf_try, tf)
                             if is_valid_candele_dash(c_agg, tf):
+                                if px_live and isinstance(px_live, (int, float)):
+                                    return allinea_candele_live_dash(c_agg, nome, tf, px_live)
                                 return c_agg
                 except Exception:
                     pass

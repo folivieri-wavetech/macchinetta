@@ -510,6 +510,63 @@ def scarica_candele_yahoo(nome, tf):
         pass
     return []
 
+def allinea_candele_live(candele_locali, nome, tf, px_live):
+    """Garantisce che la lista candele sia continua fino al momento attuale a mercati aperti."""
+    if not candele_locali or not px_live or not isinstance(px_live, (int, float)):
+        return candele_locali
+    if is_weekend_active():
+        return candele_locali
+        
+    now_t = now_it()
+    min_tf = TF_MAP.get(tf, 5)
+    offset = 60 if min_tf in (60, 240, 1440) else 0
+    min_tot = now_t.hour * 60 + now_t.minute
+    boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
+    b_h = (boundary_min // 60) % 24
+    b_m = boundary_min % 60
+    target_dt = now_t.replace(hour=b_h, minute=b_m, second=0, microsecond=0)
+    
+    try:
+        last_t_str = candele_locali[-1].get("snapshotTime")
+        last_dt = datetime.datetime.strptime(last_t_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+    except Exception:
+        return candele_locali
+
+    if last_dt >= target_dt:
+        return candele_locali
+        
+    curr_dt = last_dt + datetime.timedelta(minutes=min_tf)
+    added = 0
+    while curr_dt <= target_dt and added < 100:
+        ora_dt = curr_dt.time()
+        wd = curr_dt.weekday()
+        if (wd == 4 and ora_dt >= datetime.time(23, 0)) or wd == 5 or (wd == 6 and ora_dt < datetime.time(21, 45)):
+            curr_dt += datetime.timedelta(minutes=min_tf)
+            continue
+            
+        snap_synth = curr_dt.strftime("%Y/%m/%d %H:%M:00")
+        last_c = candele_locali[-1]
+        try:
+            prev_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
+        except Exception:
+            prev_close = px_live
+            
+        synth_candle = {
+            "snapshotTime": snap_synth,
+            "openPrice": {"bid": prev_close, "ask": prev_close, "lastTraded": None},
+            "highPrice": {"bid": max(prev_close, px_live), "ask": max(prev_close, px_live), "lastTraded": None},
+            "lowPrice": {"bid": min(prev_close, px_live), "ask": min(prev_close, px_live), "lastTraded": None},
+            "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
+        }
+        candele_locali.append(synth_candle)
+        added += 1
+        curr_dt += datetime.timedelta(minutes=min_tf)
+        
+    res = candele_locali[-100:]
+    if added > 0:
+        salva_candele_locali(nome, tf, res)
+    return res
+
 def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
@@ -520,6 +577,8 @@ def carica_candele_locali(nome, tf, px_live=None):
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if len(data) >= 55 and is_valid_candele(data, tf):
+                    if px_live and isinstance(px_live, (int, float)):
+                        return allinea_candele_live(data, nome, tf, px_live)
                     return data
         except Exception:
             pass
@@ -532,6 +591,8 @@ def carica_candele_locali(nome, tf, px_live=None):
                 with open(alt_path, "r", encoding="utf-8") as f:
                     d = json.load(f)
                     if len(d) >= 55 and is_valid_candele(d, tf):
+                        if px_live and isinstance(px_live, (int, float)):
+                            d = allinea_candele_live(d, nome, tf, px_live)
                         salva_candele_locali(nome, tf, d)
                         return d
             except Exception:
@@ -540,6 +601,8 @@ def carica_candele_locali(nome, tf, px_live=None):
     # 3. Fallback intelligente: scarica storico completo (0 chiamate API a IG)
     c_yh = scarica_candele_yahoo(nome, tf)
     if c_yh and len(c_yh) >= 10 and is_valid_candele(c_yh, tf):
+        if px_live and isinstance(px_live, (int, float)):
+            c_yh = allinea_candele_live(c_yh, nome, tf, px_live)
         salva_candele_locali(nome, tf, c_yh)
         return c_yh
 
@@ -558,6 +621,8 @@ def carica_candele_locali(nome, tf, px_live=None):
                         if is_valid_candele(d, tf_try):
                             c_agg = aggrega_candele_multitf(d, tf_try, tf)
                             if is_valid_candele(c_agg, tf):
+                                if px_live and isinstance(px_live, (int, float)):
+                                    c_agg = allinea_candele_live(c_agg, nome, tf, px_live)
                                 salva_candele_locali(nome, tf, c_agg)
                                 return c_agg
                 except Exception:
@@ -569,7 +634,7 @@ def carica_candele_locali(nome, tf, px_live=None):
         now_dt = now_it()
         min_tf = TF_MAP.get(tf, 5)
         for i in range(60, 0, -1):
-            t = now_dt - timedelta(minutes=i * min_tf)
+            t = now_dt - datetime.timedelta(minutes=i * min_tf)
             snap = t.strftime("%Y/%m/%d %H:%M:00")
             res.append({
                 "snapshotTime": snap,
@@ -578,6 +643,7 @@ def carica_candele_locali(nome, tf, px_live=None):
                 "lowPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
                 "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
             })
+        salva_candele_locali(nome, tf, res)
         return res
         
     return []
