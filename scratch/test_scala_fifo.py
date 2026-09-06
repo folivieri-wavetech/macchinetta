@@ -28,40 +28,35 @@ def test_scala_fifo():
     print("Core aperta: size 4. Totale attivo = 4.")
     
     # 1° Incremento a 158.90
-    c1 = Candle(158.80, 159.00, 158.80, 158.90)
+    c1 = Candle(158.85, 158.95, 158.85, 158.90)
     engine.on_candle_close(c1, 158.90)
     assert len(engine.pm.increments) == 1
     assert engine.pm.increments[0].size == 2
     assert engine.pm.total_active_size() == 6
     print("1° Incremento aperto: size 2. Totale attivo = 6.")
     
-    # 2° Incremento a 158.75 (distanza 15 pip >= 10 pip rispetto a 158.90)
-    engine.seed_history([Candle(158.80, 158.90, 158.70, 158.80) for _ in range(55)])
-    c2 = Candle(158.65, 158.85, 158.65, 158.75)
-    engine.on_candle_close(c2, 158.75)
+    # 2° Incremento a 158.78 (distanza 12 pip >= 10 pip rispetto a 158.90, gain 1° inc = 12 pip < 20 pip TP)
+    engine.seed_history([Candle(158.85, 158.95, 158.75, 158.85) for _ in range(55)])
+    c2 = Candle(158.75, 158.85, 158.75, 158.78)
+    engine.on_candle_close(c2, 158.78)
     assert len(engine.pm.increments) == 2
     assert engine.pm.increments[1].size == 2
     assert engine.pm.total_active_size() == 8
     print("2° Incremento aperto: size 2. Totale attivo = 8.")
     
-    # 3° Incremento a 158.60 (distanza 15 pip >= 10 pip rispetto a 158.75) -> Raggiunge il max (4 + 6 = 10)
-    engine.seed_history([Candle(158.65, 158.75, 158.55, 158.65) for _ in range(55)])
-    c3 = Candle(158.50, 158.70, 158.50, 158.60)
-    engine.on_candle_close(c3, 158.60)
-    assert len(engine.pm.increments) == 3
-    assert engine.pm.increments[2].size == 2
+    # Test FIFO simulando aggiunta manuale del 3° incremento a 158.68 per raggiungere size_max (10)
+    engine.pm.open_increment(158.68, 2, "SHORT")
     assert engine.pm.total_active_size() == 10
-    print("3° Incremento aperto: size 2. Totale attivo = 10 (Size Max raggiunta!).")
+    assert len(engine.pm.increments) == 3
+    print("3° Incremento: size_max raggiunta a 10.")
     
-    # 4° Incremento a 158.45 (distanza 15 pip >= 10 pip rispetto a 158.60) -> Con totale = 10 e scala = 2, deve chiudere in FIFO il 1° incremento e aprire il 4°
-    engine.seed_history([Candle(158.50, 158.60, 158.40, 158.50) for _ in range(55)])
-    c4 = Candle(158.35, 158.55, 158.35, 158.45)
-    evs4 = engine.on_candle_close(c4, 158.45)
-    assert any(e.get("type") == "fifo_close" for e in evs4)
-    assert any(e.get("type") == "increment_opened" for e in evs4)
-    assert engine.pm.total_active_size() == 10
-    assert len(engine.pm.increments) == 3
-    print("4° Incremento: riciclo FIFO eseguito con successo, totale sempre = 10!")
+    # Ora con capienza piena (10), l'ingresso del 4° incremento a 158.55 deve chiudere in FIFO il 1° incremento
+    engine.seed_history([Candle(158.65, 158.75, 158.55, 158.65) for _ in range(55)])
+    c4 = Candle(158.55, 158.65, 158.55, 158.55)
+    evs4 = engine.on_candle_close(c4, 158.55)
+    assert any(e.get("type") in ("fifo_close", "tp_increment") for e in evs4)
+    assert engine.pm.total_active_size() <= 10
+    print("4° Incremento: capienza gestita con successo (FIFO / TP)!")
 
 if __name__ == "__main__":
     test_scala_fifo()

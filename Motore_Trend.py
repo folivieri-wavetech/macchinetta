@@ -577,13 +577,13 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             else:
                 engine.pm.increments.remove(pos)
                 
-        elif tipo in ('core_closed', 'increment_closed', 'fifo_close', 'increments_cleared'):
+        elif tipo in ('core_closed', 'increment_closed', 'fifo_close', 'increments_cleared', 'tp_increment'):
             deal_id = ev.get('ticket')
             if deal_id:
                 dir_chiusura = "SELL" if ev['direction'] == "LONG" else "BUY"
                 sz = ev.get('size', size_i)
                 is_bancomat = (ev.get('reason') == 'bancomat')
-                etichetta_tag = "[BANCOMAT]" if is_bancomat else f"[{tipo.upper()}]"
+                etichetta_tag = "[TP_INCR]" if tipo == 'tp_increment' else ("[BANCOMAT]" if is_bancomat else f"[{tipo.upper()}]")
                 chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
                 
                 raw_diff = ev.get('pnl', 0)
@@ -614,6 +614,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     tag_motivo = "Trailing Core" if "trailing" in r_reason else "Stop KJ"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     invia_notifica(f"🛑 STOP KJ: {nome}", f"[{nome}] {msg}", "warning")
+                elif tipo == 'tp_increment':
+                    tp_p = ev.get('tp_pips', 20)
+                    msg = f"🎯 TP Incr (+{tp_p}p) ({sz}){px_str}{pnl_str}"
+                    print_log(nome, msg)
+                    invia_notifica(f"🎯 TP INCR: {nome}", f"[{nome}] {msg}", "dart")
                 elif is_bancomat:
                     msg = f"💰 Bancomat ({sz}){px_str}{pnl_str}"
                     invia_notifica(f"💰 BANCOMAT: {nome}", f"[{nome}] {msg}", "moneybag")
