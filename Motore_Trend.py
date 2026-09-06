@@ -20,7 +20,7 @@ def now_it():
 from dotenv import dotenv_values
 
 from macchinetta_trend.core_engine import CoreEngine, Candle
-from macchinetta_trend.position_manager import PositionManager
+from macchinetta_trend.position_manager import PositionManager, Position
 
 # --- MAPPA TIMEFRAMES (IN MINUTI) ---
 TF_MAP = {
@@ -976,6 +976,15 @@ def esegui_ciclo_trend():
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
         return
         
+    if not has_pos_live_data or not posizioni_live_ig:
+        try:
+            r_pos = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=5)
+            if r_pos.status_code == 200:
+                posizioni_live_ig = r_pos.json().get('positions', [])
+                has_pos_live_data = True
+        except Exception:
+            pass
+
     for nome, dati in parametri.items():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
             continue
@@ -1117,10 +1126,11 @@ def esegui_ciclo_trend():
                         pass
 
         # -------------------------------------------------------------
-        # RICONCILIAZIONE AUTOMATICA CON POSIZIONI REALI SU IG
+        # RICONCILIAZIONE AUTOMATICA BIDIREZIONALE CON POSIZIONI REALI SU IG
         # -------------------------------------------------------------
-        if has_pos_live_data and engine.is_running:
-            ticket_aperti_epic = {p.get('position', {}).get('dealId') for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic}
+        if has_pos_live_data:
+            pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic]
+            ticket_aperti_epic = {p.get('position', {}).get('dealId') for p in pos_ig_strum}
             storico_aggiornato = False
             storico = dati.get("storico_wip_trend", [])
             ora_str = now_it().strftime("%d/%m %H:%M:%S")
@@ -1128,35 +1138,89 @@ def esegui_ciclo_trend():
             mult = CONFIG_STRUMENTI[nome]["moltiplicatore"]
             px_live = prezzi_live.get(nome)
             
-            # 1. Verifica se la Core è stata chiusa a mano su IG
-            if engine.pm.core_position and engine.pm.core_position.ticket:
-                if engine.pm.core_position.ticket not in ticket_aperti_epic:
-                    pnl_txt = ""
-                    if px_live and isinstance(px_live, (int, float)):
-                        pts = (engine.pm.core_position.entry_price - px_live)/mult if engine.pm.core_position.direction == "SHORT" else (px_live - engine.pm.core_position.entry_price)/mult
-                        rate = get_conversion_rate(valuta, prezzi_live)
-                        pnl_est = pts * engine.pm.core_position.size * valore_punto * rate
-                        pnl_txt = f" [PnL: {pnl_est:+.0f} €]"
-                    msg = f"🛑 Manual IG: Close Core {engine.pm.core_position.direction} ({engine.pm.core_position.size}){pnl_txt}"
-                    storico.append(f"[{ora_str}] {msg}")
-                    print_log(nome, f"ℹ️ Rilevata chiusura manuale Core ({engine.pm.core_position.ticket}) su IG. Posizione rimossa dal live.")
-                    engine.pm.core_position = None
-                    engine.trailing_sl_core = None
+            # CASO A: Esistono posizioni aperte reali su IG per questo strumento
+            if pos_ig_strum:
+                # Se il motore locale è spento, o FLAT, o ha perso la Core: RIAGGANCIA SUBITO!
+                if engine.pm.core_position is None or not engine.is_running or engine.current_direction == "FLAT":
+                    pos_ordinate = sorted(pos_ig_strum, key=lambda x: x.get('position', {}).get('createdDate', ''))
+                    p_core_ig = pos_ordinate[0].get('position', {})
+                    dir_core_str = "LONG" if p_core_ig.get('direction') == "BUY" else "SHORT"
+                    lvl_core_val = float(p_core_ig.get('level', 0.0))
+                    sz_core_val = float(p_core_ig.get('size', size_i))
+                    deal_id_core = p_core_ig.get('dealId')
+                    
+                    pos_obj = Position(lvl_core_val, sz_core_val, "core", dir_core_str)
+                    pos_obj.ticket = deal_id_core
+                    engine.pm.core_position = pos_obj
+                    engine.is_running = True
+                    engine.current_direction = dir_core_str
+                    
+                    # Riaggancia eventuali incrementi residui
+                    engine.pm.increments = []
+                    for p_inc_ig in pos_ordinate[1:]:
+                        pi = p_inc_ig.get('position', {})
+                        dir_i_str = "LONG" if pi.get('direction') == "BUY" else "SHORT"
+                        lvl_i_val = float(pi.get('level', 0.0))
+                        sz_i_val = float(pi.get('size', 1.0))
+                        deal_id_i = pi.get('dealId')
+                        pos_i_obj = Position(lvl_i_val, sz_i_val, "increment", dir_i_str)
+                        pos_i_obj.ticket = deal_id_i
+                        engine.pm.increments.append(pos_i_obj)
+                    
+                    msg_reconcile = f"🛡️ Riconciliazione IG: Riagganciata Core {dir_core_str} ({sz_core_val}) a {lvl_core_val} [ID: {deal_id_core}]"
+                    print_log(nome, msg_reconcile)
+                    storico.append(f"[{ora_str}] {msg_reconcile}")
                     storico_aggiornato = True
+                    
+                    dati["attivo"] = True
+                    dati["stato"] = dir_core_str
+                    dati["direzione"] = dir_core_str
+                    dati["tipo_strategia"] = "TREND"
+                else:
+                    # Il motore ha già una Core: controlla se il ticket è ancora aperto su IG
+                    if engine.pm.core_position and engine.pm.core_position.ticket:
+                        if engine.pm.core_position.ticket not in ticket_aperti_epic:
+                            pnl_txt = ""
+                            if px_live and isinstance(px_live, (int, float)):
+                                pts = (engine.pm.core_position.entry_price - px_live)/mult if engine.pm.core_position.direction == "SHORT" else (px_live - engine.pm.core_position.entry_price)/mult
+                                rate = get_conversion_rate(valuta, prezzi_live)
+                                pnl_est = pts * engine.pm.core_position.size * valore_punto * rate
+                                pnl_txt = f" [PnL: {pnl_est:+.0f} €]"
+                            msg = f"🛑 Manual IG: Close Core {engine.pm.core_position.direction} ({engine.pm.core_position.size}){pnl_txt}"
+                            storico.append(f"[{ora_str}] {msg}")
+                            print_log(nome, f"ℹ️ Rilevata chiusura manuale Core ({engine.pm.core_position.ticket}) su IG. Posizione rimossa dal live.")
+                            engine.pm.core_position = None
+                            engine.trailing_sl_core = None
+                            storico_aggiornato = True
+                    
+                    # Verifica incrementi
+                    for inc in list(engine.pm.increments):
+                        if inc.ticket and inc.ticket not in ticket_aperti_epic:
+                            pnl_txt = ""
+                            if px_live and isinstance(px_live, (int, float)):
+                                pts = (inc.entry_price - px_live)/mult if inc.direction == "SHORT" else (px_live - inc.entry_price)/mult
+                                rate = get_conversion_rate(valuta, prezzi_live)
+                                pnl_est = pts * inc.size * valore_punto * rate
+                                pnl_txt = f" [PnL: {pnl_est:+.0f} €]"
+                            msg = f"🛑 Manual IG: Close Incr ({inc.size}){pnl_txt}"
+                            storico.append(f"[{ora_str}] {msg}")
+                            print_log(nome, f"ℹ️ Rilevata chiusura manuale Incremento ({inc.ticket}) su IG. Rimosso dal live.")
+                            engine.pm.increments.remove(inc)
+                            storico_aggiornato = True
             
-            # 2. Verifica se qualche incremento è stato chiuso a mano su IG
-            for inc in list(engine.pm.increments):
-                if inc.ticket and inc.ticket not in ticket_aperti_epic:
-                    pnl_txt = ""
-                    if px_live and isinstance(px_live, (int, float)):
-                        pts = (inc.entry_price - px_live)/mult if inc.direction == "SHORT" else (px_live - inc.entry_price)/mult
-                        rate = get_conversion_rate(valuta, prezzi_live)
-                        pnl_est = pts * inc.size * valore_punto * rate
-                        pnl_txt = f" [PnL: {pnl_est:+.0f} €]"
-                    msg = f"🛑 Manual IG: Close Incr ({inc.size}){pnl_txt}"
+            # CASO B: Nessuna posizione aperta su IG per questo strumento ma il motore pensa di essere in trade
+            elif not pos_ig_strum and engine.is_running:
+                if engine.pm.core_position or engine.pm.increments:
+                    msg = f"ℹ️ Riconciliazione IG: Nessuna posizione aperta su IG per {nome}. Resetto motore a FLAT."
+                    print_log(nome, msg)
                     storico.append(f"[{ora_str}] {msg}")
-                    print_log(nome, f"ℹ️ Rilevata chiusura manuale Incremento ({inc.ticket}) su IG. Rimosso dal live.")
-                    engine.pm.increments.remove(inc)
+                    engine.pm.core_position = None
+                    engine.pm.increments = []
+                    engine.trailing_sl_core = None
+                    engine.trailing_sl_incr = None
+                    engine.is_running = False
+                    engine.current_direction = "FLAT"
+                    engine.reset()
                     storico_aggiornato = True
             
             if storico_aggiornato:
@@ -1169,7 +1233,12 @@ def esegui_ciclo_trend():
                     "trailing_sl_incr": engine.trailing_sl_incr,
                     "storico_wip_trend": storico[-30:]
                 }
-                if not engine.pm.core_position and not engine.pm.increments:
+                if engine.pm.core_position:
+                    up_dict["stato"] = engine.pm.core_position.direction
+                    up_dict["direzione"] = engine.pm.core_position.direction
+                    up_dict["attivo"] = True
+                    up_dict["tipo_strategia"] = "TREND"
+                elif not engine.pm.core_position and not engine.pm.increments:
                     engine.is_running = False
                     engine.current_direction = "FLAT"
                     engine.reset()
