@@ -831,6 +831,320 @@ def salva_ultimo_utente(username):
     except Exception:
         pass
 
+def calcola_kj55_da_candele_dash(candele_list, periods=55):
+    if not candele_list:
+        return None
+    recent = candele_list[-periods:] if len(candele_list) >= periods else candele_list
+    valid = []
+    for c in recent:
+        h = c.get('highPrice', {}).get('bid') or c.get('highPrice', {}).get('ask') or c.get('high')
+        l = c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')
+        if h is not None and l is not None:
+            try:
+                vh, vl = float(h), float(l)
+                if 0 < vh < 1e8 and 0 < vl < 1e8:
+                    valid.append((vh, vl))
+            except (ValueError, TypeError):
+                pass
+    if not valid:
+        return None
+    highest = max(v[0] for v in valid)
+    lowest = min(v[1] for v in valid)
+    return (highest + lowest) / 2.0
+
+def is_valid_candele_dash(data):
+    if not data or len(data) < 2:
+        return False
+    try:
+        highs = [float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in data if c.get('highPrice', {}).get('bid') or c.get('high')]
+        lows = [float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in data if c.get('lowPrice', {}).get('bid') or c.get('low')]
+        if not highs or not lows:
+            return False
+        return (max(highs) - min(lows)) > 1e-6
+    except Exception:
+        return False
+
+def aggrega_candele_dash(candele_src, tf_src, tf_dest):
+    tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
+    m_src = tf_mins.get(tf_src, 5)
+    m_dest = tf_mins.get(tf_dest, 60)
+    if m_dest <= m_src:
+        return candele_src
+    ratio = max(1, m_dest // m_src)
+    res = []
+    for i in range(0, len(candele_src), ratio):
+        chunk = candele_src[i:i+ratio]
+        if not chunk:
+            continue
+        try:
+            h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
+            l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
+            res.append({
+                "highPrice": {"bid": h_bid, "ask": h_bid},
+                "lowPrice": {"bid": l_bid, "ask": l_bid}
+            })
+        except Exception:
+            pass
+    return res
+
+def scarica_candele_yahoo_dash(nome, tf):
+    yahoo_syms = {
+        "AUD/CAD": "AUDCAD=X", "AUD/NZD": "AUDNZD=X", "CAD/JPY": "CADJPY=X",
+        "EUR/GBP": "EURGBP=X", "GBP/USD": "GBPUSD=X", "USD/CAD": "USDCAD=X",
+        "USD/CHF": "USDCHF=X", "USD/JPY": "USDJPY=X", "Spot Gold": "GC=F", "US 500 Cash": "^GSPC"
+    }
+    symb = yahoo_syms.get(nome)
+    if not symb:
+        return []
+    interval_map = {"MINUTE_5": ("5m", "5d"), "MINUTE_15": ("15m", "10d"), "HOUR": ("1h", "1mo"), "HOUR_4": ("1h", "3mo"), "DAY": ("1d", "6mo")}
+    int_str, rng_str = interval_map.get(tf, ("1h", "1mo"))
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 200:
+            res = r.json().get('chart', {}).get('result', [{}])[0]
+            quotes = res.get('indicators', {}).get('quote', [{}])[0]
+            timestamps = res.get('timestamp', [])
+            opens = quotes.get('open', [])
+            highs = quotes.get('high', [])
+            lows = quotes.get('low', [])
+            closes = quotes.get('close', [])
+            candele = []
+            for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
+                if h is not None and l is not None and o is not None and c is not None:
+                    snap = datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
+                    candele.append({
+                        "snapshotTime": snap,
+                        "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
+                        "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
+                        "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
+                        "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
+                    })
+            if tf == "HOUR_4" and candele:
+                candele = aggrega_candele_dash(candele, "HOUR", "HOUR_4")
+            return candele
+    except Exception:
+        pass
+    return []
+
+def carica_candele_locali_dash(conto, nome, tf, px_live=None):
+    clean = nome.replace("/", "_").replace(" ", "_")
+    fname = f"candele_{clean}_{tf}.json"
+    candidates = [
+        os.path.join(conto, fname) if conto else fname,
+        fname,
+        os.path.join("..", conto, fname) if conto else fname
+    ]
+    for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
+        candidates.append(os.path.join(altro, fname))
+        candidates.append(os.path.join("..", altro, fname))
+        
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if len(d) >= 55 and is_valid_candele_dash(d):
+                        return d
+            except Exception:
+                pass
+                
+    # Fallback intelligente su storico pubblico (0 chiamate API a IG)
+    c_yh = scarica_candele_yahoo_dash(nome, tf)
+    if c_yh and len(c_yh) >= 10 and is_valid_candele_dash(c_yh):
+        return c_yh
+        
+    tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
+    for tf_try in tf_order:
+        if tf_try == tf:
+            continue
+        fname_alt = f"candele_{clean}_{tf_try}.json"
+        for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO", "."]:
+            p_alt = os.path.join(altro, fname_alt) if altro != "." else fname_alt
+            if os.path.exists(p_alt):
+                try:
+                    with open(p_alt, "r", encoding="utf-8") as f:
+                        d = json.load(f)
+                        if is_valid_candele_dash(d):
+                            c_agg = aggrega_candele_dash(d, tf_try, tf)
+                            if is_valid_candele_dash(c_agg):
+                                return c_agg
+                except Exception:
+                    pass
+                    
+    if px_live and isinstance(px_live, (int, float)):
+        return [{"highPrice": {"bid": px_live, "ask": px_live}, "lowPrice": {"bid": px_live, "ask": px_live}}]
+    return []
+
+def renderizza_schermata_radar(conto_selezionato=None):
+    @st.fragment(run_every=15)
+    def renderizza_radar_body():
+        radar_data = {}
+        ts_aggiornamento = None
+        prezzi_live = {}
+        
+        accs = get_accounts()
+        if conto_selezionato and conto_selezionato not in accs:
+            accs = [conto_selezionato] + accs
+            
+        for c_dir in accs:
+            r_file = os.path.join(c_dir, "radar_trend.json")
+            if os.path.exists(r_file):
+                try:
+                    with open(r_file, "r", encoding="utf-8") as f_rf:
+                        rf_d = json.load(f_rf)
+                        d_r = rf_d.get("radar_trend", {})
+                        ts_r = rf_d.get("radar_trend_ts")
+                        if d_r:
+                            radar_data.update(d_r)
+                            if not ts_aggiornamento or (ts_r and ts_r > ts_aggiornamento):
+                                ts_aggiornamento = ts_r
+                except Exception:
+                    pass
+            st_file = os.path.join(c_dir, STATO_SISTEMA)
+            if os.path.exists(st_file):
+                try:
+                    with open(st_file, "r", encoding="utf-8") as f_st:
+                        st_d = json.load(f_st)
+                        pl = st_d.get("prezzi_live", {})
+                        if pl:
+                            prezzi_live.update(pl)
+                        if not radar_data and st_d.get("radar_trend"):
+                            radar_data = st_d.get("radar_trend", {})
+                            ts_aggiornamento = st_d.get("radar_trend_ts")
+                except Exception:
+                    pass
+                    
+        if not ts_aggiornamento:
+            ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
+
+        st.html(f"""
+        <h1 style='color: #00BFFF; margin-top: -10px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>
+        <div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
+        <div style='display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85rem;'>
+            <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
+            <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
+            <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
+        </div>
+        """)
+
+        tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+        tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
+        
+        html_table = """
+        <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 8px; overflow: hidden; font-family: sans-serif; font-size: 0.85rem;'>
+            <thead>
+                <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
+                    <th style='padding: 10px; text-align: left;'>Strumento</th>
+                    <th style='padding: 10px;'>Prezzo Live</th>
+                    <th style='padding: 10px;'>M5 (KJ55)</th>
+                    <th style='padding: 10px;'>H1 (KJ55)</th>
+                    <th style='padding: 10px;'>H4 (KJ55)</th>
+                    <th style='padding: 10px;'>Daily D1 (KJ55)</th>
+                    <th style='padding: 10px;'>Stato Trend</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        
+        for idx, s_nome in enumerate(tutti_strumenti):
+            cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
+            dec = cfg_s.get("decimali", 2)
+            mult = cfg_s.get("moltiplicatore", 0.0001)
+            px = prezzi_live.get(s_nome)
+            
+            info_r = radar_data.get(s_nome, {})
+            tf_dict = info_r.get("timeframes", {})
+            
+            is_attivo = False
+            stato_s = "FLAT"
+            tf_attivo_lbl = "H1"
+            conto_trade = ""
+            
+            check_dirs = [conto_selezionato] + [d for d in accs if d != conto_selezionato] if conto_selezionato else accs
+            for c_dir in check_dirs:
+                if not c_dir: continue
+                mem_c = carica_memoria(c_dir)
+                mem_s = mem_c.get(s_nome, {})
+                if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
+                    is_attivo = True
+                    stato_s = mem_s.get("stato")
+                    tf_a = mem_s.get("timeframe", "HOUR")
+                    tf_attivo_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
+                    conto_trade = c_dir.replace("_DEMO", "").replace("_REALE", "")
+                    break
+            
+            if is_attivo:
+                conto_tag = f" <span style='font-size:0.75rem; color:#cbd5e1;'>[{conto_trade}]</span>" if conto_trade else ""
+                badge_stato = f"<span style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; border-radius: 4px; padding: 2px 6px; font-weight: bold;'>🟢 {stato_s} ({tf_attivo_lbl}){conto_tag}</span>"
+            else:
+                badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 4px; padding: 2px 6px;'>⏳ FLAT</span>"
+            
+            px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
+            
+            def format_radar_cell(lbl_key):
+                t_data = tf_dict.get(lbl_key, {})
+                kj_v = t_data.get("kj")
+                dist_p = t_data.get("dist_pips")
+                dir_p = t_data.get("dir", "-")
+                vicino = t_data.get("vicino", False)
+                
+                is_current_tf_trade = (is_attivo and stato_s in ("LONG", "SHORT") and tf_attivo_lbl == lbl_key)
+                
+                if is_current_tf_trade:
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: #60a5fa;'>IN TRADE</b><br><span style='font-size:0.72rem; color:#93c5fd;'>({stato_s})</span></div>"
+                    
+                if kj_v is None and px and isinstance(px, (int, float)):
+                    tf_code = tf_map_code.get(lbl_key, "HOUR")
+                    candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
+                    kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
+                    if kj_c is not None:
+                        kj_v = kj_c
+                        diff_pts = px - kj_v
+                        dist_p = round(abs(diff_pts) / mult)
+                        dir_p = "Possibile LONG" if diff_pts >= 0 else "Possibile SHORT"
+                        vicino = (dist_p <= 15)
+
+                if kj_v is None or dist_p is None:
+                    return "<div style='color: #64748b; text-align: center;'>-</div>"
+                    
+                kj_formatted = f"{kj_v:.{dec}f}"
+                dist_int = int(round(dist_p))
+                is_long = (dir_p in ("SOPRA", "Possibile LONG"))
+                dir_label = "Possibile LONG" if is_long else "Possibile SHORT"
+                col_dir = "#4ade80" if is_long else "#f87171"
+                
+                if vicino:
+                    bg_cell = "rgba(34, 197, 94, 0.2)" if is_long else "rgba(239, 68, 68, 0.2)"
+                    bdr_cell = "#22c55e" if is_long else "#ef4444"
+                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 6px; padding: 4px 6px; text-align: center;'><b style='color: {col_dir};'>⚡ {dist_int} punti</b><br><span style='font-size:0.72rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
+                else:
+                    return f"<div style='text-align: center; color: #94a3b8;'><span style='font-weight: bold;'>{dist_int} punti</span><br><span style='font-size:0.72rem; color:#cbd5e1;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
+
+            c_m5 = format_radar_cell("M5")
+            c_h1 = format_radar_cell("H1")
+            c_h4 = format_radar_cell("H4")
+            c_d1 = format_radar_cell("D1")
+            
+            bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
+            html_table += f"""
+            <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                <td style='padding: 8px 10px; font-weight: bold;'>{formatta_mercato_con_bandiere(s_nome)}</td>
+                <td style='padding: 8px 10px; text-align: center; color: #00E676;'>{px_str}</td>
+                <td style='padding: 6px 8px;'>{c_m5}</td>
+                <td style='padding: 6px 8px;'>{c_h1}</td>
+                <td style='padding: 6px 8px;'>{c_h4}</td>
+                <td style='padding: 6px 8px;'>{c_d1}</td>
+                <td style='padding: 8px 10px; text-align: center;'>{badge_stato}</td>
+            </tr>
+            """
+        
+        html_table += "</tbody></table>"
+        st.html(html_table)
+        
+    renderizza_radar_body()
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.ruolo = "VIEWER"
@@ -953,20 +1267,21 @@ else:
                 except:
                     return "🟢"
 
+            vista_side = st.session_state.get("vista_sidebar", "CONTO")
             if conti_reali:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
                 for cr in conti_reali:
                     nome_cr_clean = cr.replace("_REALE", "")
                     st_cr = leggi_stato_sistema(cr)
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
-                    is_sel = (cr == conto_attivo)
+                    is_sel = (cr == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cr, st_cr)
                     salute = get_stato_salute(cr)
                     label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
-                        if not is_sel:
-                            st.session_state.conto_selezionato = cr
-                            st.rerun()
+                        st.session_state.conto_selezionato = cr
+                        st.session_state.vista_sidebar = "CONTO"
+                        st.rerun()
                 st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
                 
             if conti_demo:
@@ -975,14 +1290,14 @@ else:
                     nome_cd_clean = cd.replace("_DEMO", "")
                     st_cd = leggi_stato_sistema(cd)
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
-                    is_sel = (cd == conto_attivo)
+                    is_sel = (cd == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
                     label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} {salute}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
-                        if not is_sel:
-                            st.session_state.conto_selezionato = cd
-                            st.rerun()
+                        st.session_state.conto_selezionato = cd
+                        st.session_state.vista_sidebar = "CONTO"
+                        st.rerun()
                             
         renderizza_sidebar_conti()
                         
@@ -1051,8 +1366,18 @@ else:
             st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
             st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
-        
+            
+            st.markdown("<div style='margin-top: 15px; margin-bottom: 5px;'></div>", unsafe_allow_html=True)
+            is_radar_sel = (st.session_state.get("vista_sidebar", "CONTO") == "RADAR")
+            if st.button("📡 Radar Trend", key="btn_radar_sidebar", type="primary" if is_radar_sel else "secondary", use_container_width=True):
+                st.session_state.vista_sidebar = "RADAR"
+                st.rerun()
+
         renderizza_sidebar_stats()
+
+    if st.session_state.get("vista_sidebar", "CONTO") == "RADAR":
+        renderizza_schermata_radar(conto_selezionato)
+        st.stop()
 
     ruolo = st.session_state.get("ruolo", "VIEWER")
     is_regista = (ruolo == "REGISTA")
@@ -1075,11 +1400,11 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "📡 Radar", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_radar, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📡 Radar", "📄 Report"])
-        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_radar, tab_report = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report"])
+        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_report = tabs
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     with tab_portafoglio:
@@ -2315,295 +2640,6 @@ else:
                             crea_riquadro_trend(tutti_strumenti[i+1])
 
             renderizza_dati_trend()
-
-    if tab_radar is not None:
-        with tab_radar:
-            def calcola_kj55_da_candele_dash(candele_list, periods=55):
-                if not candele_list:
-                    return None
-                recent = candele_list[-periods:] if len(candele_list) >= periods else candele_list
-                valid = []
-                for c in recent:
-                    h = c.get('highPrice', {}).get('bid') or c.get('highPrice', {}).get('ask') or c.get('high')
-                    l = c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')
-                    if h is not None and l is not None:
-                        try:
-                            vh, vl = float(h), float(l)
-                            if 0 < vh < 1e8 and 0 < vl < 1e8:
-                                valid.append((vh, vl))
-                        except (ValueError, TypeError):
-                            pass
-                if not valid:
-                    return None
-                highest = max(v[0] for v in valid)
-                lowest = min(v[1] for v in valid)
-                return (highest + lowest) / 2.0
-
-            def is_valid_candele_dash(data):
-                if not data or len(data) < 2:
-                    return False
-                try:
-                    highs = [float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in data if c.get('highPrice', {}).get('bid') or c.get('high')]
-                    lows = [float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in data if c.get('lowPrice', {}).get('bid') or c.get('low')]
-                    if not highs or not lows:
-                        return False
-                    return (max(highs) - min(lows)) > 1e-6
-                except Exception:
-                    return False
-
-            def aggrega_candele_dash(candele_src, tf_src, tf_dest):
-                tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
-                m_src = tf_mins.get(tf_src, 5)
-                m_dest = tf_mins.get(tf_dest, 60)
-                if m_dest <= m_src:
-                    return candele_src
-                ratio = max(1, m_dest // m_src)
-                res = []
-                for i in range(0, len(candele_src), ratio):
-                    chunk = candele_src[i:i+ratio]
-                    if not chunk:
-                        continue
-                    try:
-                        h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
-                        l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
-                        res.append({
-                            "highPrice": {"bid": h_bid, "ask": h_bid},
-                            "lowPrice": {"bid": l_bid, "ask": l_bid}
-                        })
-                    except Exception:
-                        pass
-                return res
-
-            def scarica_candele_yahoo_dash(nome, tf):
-                yahoo_syms = {
-                    "AUD/CAD": "AUDCAD=X", "AUD/NZD": "AUDNZD=X", "CAD/JPY": "CADJPY=X",
-                    "EUR/GBP": "EURGBP=X", "GBP/USD": "GBPUSD=X", "USD/CAD": "USDCAD=X",
-                    "USD/CHF": "USDCHF=X", "USD/JPY": "USDJPY=X", "Spot Gold": "GC=F", "US 500 Cash": "^GSPC"
-                }
-                symb = yahoo_syms.get(nome)
-                if not symb:
-                    return []
-                interval_map = {"MINUTE_5": ("5m", "5d"), "MINUTE_15": ("15m", "10d"), "HOUR": ("1h", "1mo"), "HOUR_4": ("1h", "3mo"), "DAY": ("1d", "6mo")}
-                int_str, rng_str = interval_map.get(tf, ("1h", "1mo"))
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
-                headers = {"User-Agent": "Mozilla/5.0"}
-                try:
-                    r = requests.get(url, headers=headers, timeout=5)
-                    if r.status_code == 200:
-                        res = r.json().get('chart', {}).get('result', [{}])[0]
-                        quotes = res.get('indicators', {}).get('quote', [{}])[0]
-                        timestamps = res.get('timestamp', [])
-                        opens = quotes.get('open', [])
-                        highs = quotes.get('high', [])
-                        lows = quotes.get('low', [])
-                        closes = quotes.get('close', [])
-                        candele = []
-                        for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
-                            if h is not None and l is not None and o is not None and c is not None:
-                                snap = datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
-                                candele.append({
-                                    "snapshotTime": snap,
-                                    "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
-                                    "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
-                                    "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
-                                    "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
-                                })
-                        if tf == "HOUR_4" and candele:
-                            candele = aggrega_candele_dash(candele, "HOUR", "HOUR_4")
-                        return candele
-                except Exception:
-                    pass
-                return []
-
-            def carica_candele_locali_dash(conto, nome, tf, px_live=None):
-                clean = nome.replace("/", "_").replace(" ", "_")
-                fname = f"candele_{clean}_{tf}.json"
-                candidates = [
-                    os.path.join(conto, fname),
-                    fname,
-                    os.path.join("..", conto, fname)
-                ]
-                for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
-                    candidates.append(os.path.join(altro, fname))
-                    candidates.append(os.path.join("..", altro, fname))
-                    
-                for p in candidates:
-                    if os.path.exists(p):
-                        try:
-                            with open(p, "r", encoding="utf-8") as f:
-                                d = json.load(f)
-                                if len(d) >= 55 and is_valid_candele_dash(d):
-                                    return d
-                        except Exception:
-                            pass
-                            
-                # Fallback intelligente su storico pubblico (0 chiamate API a IG)
-                c_yh = scarica_candele_yahoo_dash(nome, tf)
-                if c_yh and len(c_yh) >= 10 and is_valid_candele_dash(c_yh):
-                    return c_yh
-                    
-                tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
-                for tf_try in tf_order:
-                    if tf_try == tf:
-                        continue
-                    fname_alt = f"candele_{clean}_{tf_try}.json"
-                    for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO", "."]:
-                        p_alt = os.path.join(altro, fname_alt) if altro != "." else fname_alt
-                        if os.path.exists(p_alt):
-                            try:
-                                with open(p_alt, "r", encoding="utf-8") as f:
-                                    d = json.load(f)
-                                    if is_valid_candele_dash(d):
-                                        c_agg = aggrega_candele_dash(d, tf_try, tf)
-                                        if is_valid_candele_dash(c_agg):
-                                            return c_agg
-                            except Exception:
-                                pass
-                                
-                if px_live and isinstance(px_live, (int, float)):
-                    return [{"highPrice": {"bid": px_live, "ask": px_live}, "lowPrice": {"bid": px_live, "ask": px_live}}]
-                return []
-
-            @st.fragment(run_every=15)
-            def renderizza_tab_radar():
-                memoria_attuale = carica_memoria(conto_selezionato)
-                stato = leggi_stato_sistema(conto_selezionato)
-                prezzi_live = stato.get("prezzi_live", {})
-                
-                radar_file = os.path.join(conto_selezionato, "radar_trend.json")
-                radar_data = {}
-                ts_aggiornamento = None
-                if os.path.exists(radar_file):
-                    try:
-                        with open(radar_file, "r", encoding="utf-8") as f_rf:
-                            rf_d = json.load(f_rf)
-                            radar_data = rf_d.get("radar_trend", {})
-                            ts_aggiornamento = rf_d.get("radar_trend_ts")
-                    except Exception:
-                        pass
-                        
-                if not radar_data:
-                    radar_data = stato.get("radar_trend", {})
-                    ts_aggiornamento = stato.get("radar_trend_ts")
-                    
-                if not ts_aggiornamento:
-                    ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
-                
-                header_html = f"""
-                <h1 style='color: #00BFFF; margin-top: -15px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>
-                <div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
-                <div style='display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85rem;'>
-                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
-                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
-                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
-                </div>
-                """
-                st.html(header_html)
-                
-                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-                tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
-                
-                html_table = """
-                <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 8px; overflow: hidden; font-family: sans-serif; font-size: 0.85rem;'>
-                    <thead>
-                        <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
-                            <th style='padding: 10px; text-align: left;'>Strumento</th>
-                            <th style='padding: 10px;'>Prezzo Live</th>
-                            <th style='padding: 10px;'>M5 (KJ55)</th>
-                            <th style='padding: 10px;'>H1 (KJ55)</th>
-                            <th style='padding: 10px;'>H4 (KJ55)</th>
-                            <th style='padding: 10px;'>Daily D1 (KJ55)</th>
-                            <th style='padding: 10px;'>Stato Trend</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                """
-                
-                for idx, s_nome in enumerate(tutti_strumenti):
-                    cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
-                    dec = cfg_s.get("decimali", 2)
-                    mult = cfg_s.get("moltiplicatore", 0.0001)
-                    px = prezzi_live.get(s_nome)
-                    
-                    info_r = radar_data.get(s_nome, {})
-                    tf_dict = info_r.get("timeframes", {})
-                    
-                    mem_s = memoria_attuale.get(s_nome, {})
-                    is_attivo = mem_s.get("attivo", False)
-                    dir_s = mem_s.get("direzione", "")
-                    stato_s = mem_s.get("stato", "FLAT")
-                    tf_attivo = mem_s.get("timeframe", "HOUR")
-                    tf_attivo_lbl = "M5" if "MINUTE_5" in tf_attivo else ("H1" if "HOUR" in tf_attivo and "HOUR_4" not in tf_attivo else ("H4" if "HOUR_4" in tf_attivo else "D1"))
-                    
-                    if is_attivo and stato_s in ("LONG", "SHORT"):
-                        badge_stato = f"<span style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; border-radius: 4px; padding: 2px 6px; font-weight: bold;'>🟢 {stato_s} ({tf_attivo_lbl})</span>"
-                    else:
-                        badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 4px; padding: 2px 6px;'>⏳ FLAT</span>"
-                    
-                    px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
-                    
-                    def format_radar_cell(lbl_key):
-                        t_data = tf_dict.get(lbl_key, {})
-                        kj_v = t_data.get("kj")
-                        dist_p = t_data.get("dist_pips")
-                        dir_p = t_data.get("dir", "-")
-                        vicino = t_data.get("vicino", False)
-                        
-                        is_current_tf_trade = (is_attivo and stato_s in ("LONG", "SHORT") and tf_attivo_lbl == lbl_key)
-                        
-                        if is_current_tf_trade:
-                            return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: #60a5fa;'>IN TRADE</b><br><span style='font-size:0.72rem; color:#93c5fd;'>({stato_s})</span></div>"
-                            
-                        # Fallback di calcolo locale se kj_v non è ancora nel file di stato
-                        if kj_v is None and px and isinstance(px, (int, float)):
-                            tf_code = tf_map_code.get(lbl_key, "HOUR")
-                            candele_c = carica_candele_locali_dash(conto_selezionato, s_nome, tf_code, px_live=px)
-                            kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
-                            if kj_c is not None:
-                                kj_v = kj_c
-                                diff_pts = px - kj_v
-                                dist_p = round(abs(diff_pts) / mult)
-                                dir_p = "Possibile LONG" if diff_pts >= 0 else "Possibile SHORT"
-                                vicino = (dist_p <= 15)
-
-                        if kj_v is None or dist_p is None:
-                            return "<div style='color: #64748b; text-align: center;'>-</div>"
-                            
-                        kj_formatted = f"{kj_v:.{dec}f}"
-                        dist_int = int(round(dist_p))
-                        is_long = (dir_p in ("SOPRA", "Possibile LONG"))
-                        dir_label = "Possibile LONG" if is_long else "Possibile SHORT"
-                        col_dir = "#4ade80" if is_long else "#f87171"
-                        
-                        if vicino:
-                            bg_cell = "rgba(34, 197, 94, 0.2)" if is_long else "rgba(239, 68, 68, 0.2)"
-                            bdr_cell = "#22c55e" if is_long else "#ef4444"
-                            return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 6px; padding: 4px 6px; text-align: center;'><b style='color: {col_dir};'>⚡ {dist_int} punti</b><br><span style='font-size:0.72rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
-                        else:
-                            return f"<div style='text-align: center; color: #94a3b8;'><span style='font-weight: bold;'>{dist_int} punti</span><br><span style='font-size:0.72rem; color:#cbd5e1;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
-
-                    c_m5 = format_radar_cell("M5")
-                    c_h1 = format_radar_cell("H1")
-                    c_h4 = format_radar_cell("H4")
-                    c_d1 = format_radar_cell("D1")
-                    
-                    bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
-                    html_table += f"""
-                    <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
-                        <td style='padding: 8px 10px; font-weight: bold;'>{formatta_mercato_con_bandiere(s_nome)}</td>
-                        <td style='padding: 8px 10px; text-align: center; color: #00E676;'>{px_str}</td>
-                        <td style='padding: 6px 8px;'>{c_m5}</td>
-                        <td style='padding: 6px 8px;'>{c_h1}</td>
-                        <td style='padding: 6px 8px;'>{c_h4}</td>
-                        <td style='padding: 6px 8px;'>{c_d1}</td>
-                        <td style='padding: 8px 10px; text-align: center;'>{badge_stato}</td>
-                    </tr>
-                    """
-                
-                html_table += "</tbody></table>"
-                st.html(html_table)
-                
-            renderizza_tab_radar()
 
     if tab_restore is not None:
         with tab_restore:
