@@ -2413,8 +2413,25 @@ else:
                 memoria_attuale = carica_memoria(conto_selezionato)
                 stato = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato.get("prezzi_live", {})
-                radar_data = stato.get("radar_trend", {})
-                ts_aggiornamento = stato.get("radar_trend_ts", now_it().strftime("%d/%m/%Y %H:%M:%S"))
+                
+                radar_file = os.path.join(conto_selezionato, "radar_trend.json")
+                radar_data = {}
+                ts_aggiornamento = None
+                if os.path.exists(radar_file):
+                    try:
+                        with open(radar_file, "r", encoding="utf-8") as f_rf:
+                            rf_d = json.load(f_rf)
+                            radar_data = rf_d.get("radar_trend", {})
+                            ts_aggiornamento = rf_d.get("radar_trend_ts")
+                    except Exception:
+                        pass
+                        
+                if not radar_data:
+                    radar_data = stato.get("radar_trend", {})
+                    ts_aggiornamento = stato.get("radar_trend_ts")
+                    
+                if not ts_aggiornamento:
+                    ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
                 
                 st.markdown("<h1 style='color: #00BFFF; margin-top: -15px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>", unsafe_allow_html=True)
                 st.markdown(f"<div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>", unsafe_allow_html=True)

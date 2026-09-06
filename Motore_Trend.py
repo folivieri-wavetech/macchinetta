@@ -613,13 +613,20 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     "vicino": False
                 }
                 
+    ts_radar = now_it().strftime("%d/%m/%Y %H:%M:%S")
+    try:
+        with open("radar_trend.json", "w") as f_r:
+            json.dump({"radar_trend": radar_data, "radar_trend_ts": ts_radar}, f_r, indent=4)
+    except Exception:
+        pass
+
     try:
         stato_full = {}
         if os.path.exists(STATO_SISTEMA):
             with open(STATO_SISTEMA, "r") as f:
                 stato_full = json.load(f)
         stato_full["radar_trend"] = radar_data
-        stato_full["radar_trend_ts"] = now_it().strftime("%d/%m/%Y %H:%M:%S")
+        stato_full["radar_trend_ts"] = ts_radar
         with open(STATO_SISTEMA, "w") as f:
             json.dump(stato_full, f, indent=4)
     except Exception:

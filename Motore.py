@@ -442,7 +442,14 @@ def salva_report_giornaliero(saldo, margine, drawdown):
 
 def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None):
     salva_report_giornaliero(saldo, margine, drawdown)
-    dati = {
+    dati = {}
+    if os.path.exists("stato_sistema.json"):
+        try:
+            with open("stato_sistema.json", "r") as f:
+                dati = json.load(f)
+        except Exception:
+            dati = {}
+    dati.update({
         "saldo": str(saldo),
         "disponibile": str(disponibile),
         "margine": str(margine),
@@ -453,9 +460,12 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
         "prezzi_live": prezzi_live or {},
         "distanze_minime": distanze_minime or {},
         "prezzi_bid_ask": prezzi_bid_ask or {}
-    }
-    with open("stato_sistema.json", "w") as f:
-        json.dump(dati, f, indent=4)
+    })
+    try:
+        with open("stato_sistema.json", "w") as f:
+            json.dump(dati, f, indent=4)
+    except Exception:
+        pass
 
 def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=6):
     headers_req = headers.copy()
