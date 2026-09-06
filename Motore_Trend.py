@@ -580,7 +580,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 if core_close_summary:
                     msg = f"{core_close_summary} 🔄 Reverse {dir_auto} a {entry_px}"
                     print_log(nome, msg)
-                    invia_notifica(f"🔄 REVERSE {tf_label}", f"[{nome}] {msg}", "arrows_counterclockwise")
+                    invia_notifica(f"🔄 STP&REV {tf_label}", f"[{nome}] {msg}", "arrows_counterclockwise")
                 else:
                     msg = f"🚀 Restart {dir_auto} a {entry_px}"
                     print_log(nome, msg)
