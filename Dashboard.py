@@ -1057,10 +1057,8 @@ def renderizza_schermata_radar(conto_selezionato=None):
             info_r = radar_data.get(s_nome, {})
             tf_dict = info_r.get("timeframes", {})
             
-            is_attivo = False
-            stato_s = "FLAT"
-            tf_attivo_lbl = "H1"
-            conto_trade = ""
+            # Raccogli tutti i trade attivi per questo strumento su tutti i conti/timeframe
+            trades_tf = {}
             
             check_dirs = [conto_selezionato] + [d for d in accs if d != conto_selezionato] if conto_selezionato else accs
             for c_dir in check_dirs:
@@ -1068,16 +1066,29 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 mem_c = carica_memoria(c_dir)
                 mem_s = mem_c.get(s_nome, {})
                 if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
-                    is_attivo = True
-                    stato_s = mem_s.get("stato")
                     tf_a = mem_s.get("timeframe", "HOUR")
-                    tf_attivo_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
-                    conto_trade = c_dir.replace("_DEMO", "").replace("_REALE", "")
-                    break
+                    tf_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
+                    if tf_lbl not in trades_tf:
+                        trades_tf[tf_lbl] = {
+                            "stato": mem_s.get("stato"),
+                            "conto": c_dir.replace("_DEMO", "").replace("_REALE", "")
+                        }
             
-            if is_attivo:
-                conto_tag = f" <span style='font-size:0.68rem; color:#cbd5e1;'>[{conto_trade}]</span>" if conto_trade else ""
-                badge_stato = f"<span style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; border-radius: 3px; padding: 2px 5px; font-weight: bold; font-size: 0.70rem;'>🟢 {stato_s} ({tf_attivo_lbl}){conto_tag}</span>"
+            if trades_tf:
+                pills = []
+                for tf_k in ["M5", "H1", "H4", "D1"]:
+                    if tf_k in trades_tf:
+                        t_info = trades_tf[tf_k]
+                        st_dir = t_info["stato"]
+                        ct_name = t_info["conto"]
+                        is_l = (st_dir == "LONG")
+                        col_bg = "rgba(34, 197, 94, 0.2)" if is_l else "rgba(239, 68, 68, 0.2)"
+                        col_bdr = "#22c55e" if is_l else "#ef4444"
+                        col_txt = "#4ade80" if is_l else "#f87171"
+                        icon_d = "🟢" if is_l else "🔴"
+                        tag_d = "L" if is_l else "S"
+                        pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir})'>{icon_d} {tf_k} ({tag_d})</span>")
+                badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
             else:
                 badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
             
@@ -1090,10 +1101,13 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 dir_p = t_data.get("dir", "-")
                 vicino = t_data.get("vicino", False)
                 
-                is_current_tf_trade = (is_attivo and stato_s in ("LONG", "SHORT") and tf_attivo_lbl == lbl_key)
+                is_current_tf_trade = (lbl_key in trades_tf)
                 
                 if is_current_tf_trade:
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: #60a5fa; font-size: 0.72rem;'>IN TRADE</b><br><span style='font-size:0.65rem; color:#93c5fd;'>({stato_s})</span></div>"
+                    t_info = trades_tf[lbl_key]
+                    st_val = t_info["stato"]
+                    ct_val = t_info["conto"]
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='Conto: {ct_val}'><b style='color: #60a5fa; font-size: 0.72rem;'>IN TRADE</b><br><span style='font-size:0.65rem; color:#93c5fd;'>({st_val})</span></div>"
                     
                 if kj_v is None and px and isinstance(px, (int, float)):
                     tf_code = tf_map_code.get(lbl_key, "HOUR")
