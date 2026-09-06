@@ -463,10 +463,11 @@ YAHOO_SYMBOLS = {
     "USD/CAD": "USDCAD=X",
     "USD/CHF": "USDCHF=X",
     "USD/JPY": "USDJPY=X",
+    "Spot Gold": "GC=F",
     "US 500 Cash": "ES=F"
 }
 
-def scarica_candele_yahoo(nome, tf):
+def scarica_candele_yahoo(nome, tf, px_live=None):
     symb = YAHOO_SYMBOLS.get(nome)
     if not symb:
         return []
@@ -491,17 +492,29 @@ def scarica_candele_yahoo(nome, tf):
             lows = quotes.get('low', [])
             closes = quotes.get('close', [])
             
-            candele = []
+            raw = []
             for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
                 if h is not None and l is not None and o is not None and c is not None:
-                    snap = datetime.datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
-                    candele.append({
-                        "snapshotTime": snap,
-                        "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
-                        "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
-                        "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
-                        "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
-                    })
+                    raw.append((t, float(o), float(h), float(l), float(c)))
+            if not raw:
+                return []
+                
+            ratio = 1.0
+            if nome == "Spot Gold" and px_live and isinstance(px_live, (int, float)):
+                last_cme = raw[-1][4]
+                if last_cme > 0:
+                    ratio = px_live / last_cme
+                    
+            candele = []
+            for t, o, h, l, c in raw:
+                snap = datetime.datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
+                candele.append({
+                    "snapshotTime": snap,
+                    "openPrice": {"bid": round(o * ratio, 1), "ask": round(o * ratio, 1), "lastTraded": None},
+                    "highPrice": {"bid": round(h * ratio, 1), "ask": round(h * ratio, 1), "lastTraded": None},
+                    "lowPrice": {"bid": round(l * ratio, 1), "ask": round(l * ratio, 1), "lastTraded": None},
+                    "closePrice": {"bid": round(c * ratio, 1), "ask": round(c * ratio, 1), "lastTraded": None}
+                })
             if tf == "HOUR_4" and candele:
                 candele = aggrega_candele_multitf(candele, "HOUR", "HOUR_4")
             return candele
@@ -598,7 +611,7 @@ def carica_candele_locali(nome, tf, px_live=None):
                 pass
 
     # 3. Fallback intelligente: scarica storico completo (0 chiamate API a IG)
-    c_yh = scarica_candele_yahoo(nome, tf)
+    c_yh = scarica_candele_yahoo(nome, tf, px_live=px_live)
     if c_yh and len(c_yh) >= 10 and is_valid_candele(c_yh, tf):
         if px_live and isinstance(px_live, (int, float)):
             c_yh = allinea_candele_live(c_yh, nome, tf, px_live)
