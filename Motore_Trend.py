@@ -396,68 +396,77 @@ def get_file_candele(nome, tf):
     clean = nome.replace("/", "_").replace(" ", "_")
     return f"candele_{clean}_{tf}.json"
 
-def aggrega_candele_m5(candele_m5, tf_dest):
-    bar_mult = {"MINUTE_10": 2, "HOUR": 12, "HOUR_4": 48, "DAY": 288}.get(tf_dest, 1)
-    if bar_mult <= 1 or len(candele_m5) < bar_mult:
-        return []
+def is_valid_candele(data):
+    if not data or len(data) < 2:
+        return False
+    try:
+        highs = [float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in data if c.get('highPrice', {}).get('bid') or c.get('high')]
+        lows = [float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in data if c.get('lowPrice', {}).get('bid') or c.get('low')]
+        if not highs or not lows:
+            return False
+        return (max(highs) - min(lows)) > 1e-6
+    except Exception:
+        return False
+
+def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
+    m_src = TF_MAP.get(tf_src, 5)
+    m_dest = TF_MAP.get(tf_dest, 60)
+    if m_dest <= m_src:
+        return candele_src
+    ratio = max(1, m_dest // m_src)
     res = []
-    for i in range(0, len(candele_m5) - (len(candele_m5) % bar_mult), bar_mult):
-        chunk = candele_m5[i:i+bar_mult]
-        b_o = chunk[0].get('openPrice', {})
-        b_c = chunk[-1].get('closePrice', {})
+    for i in range(0, len(candele_src), ratio):
+        chunk = candele_src[i:i+ratio]
+        if not chunk:
+            continue
         try:
-            h_bid = max(c['highPrice']['bid'] for c in chunk)
-            h_ask = max(c['highPrice']['ask'] for c in chunk)
-            l_bid = min(c['lowPrice']['bid'] for c in chunk)
-            l_ask = min(c['lowPrice']['ask'] for c in chunk)
-            snap = chunk[0].get('snapshotTime')
+            h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
+            l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
             res.append({
-                "snapshotTime": snap,
-                "openPrice": b_o,
-                "highPrice": {"bid": h_bid, "ask": h_ask, "lastTraded": None},
-                "lowPrice": {"bid": l_bid, "ask": l_ask, "lastTraded": None},
-                "closePrice": b_c
+                "highPrice": {"bid": h_bid, "ask": h_bid},
+                "lowPrice": {"bid": l_bid, "ask": l_bid}
             })
         except Exception:
             pass
     return res
 
 def carica_candele_locali(nome, tf, px_live=None):
+    clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
+    
+    # 1. Controlla prima il file specifico locale
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if len(data) >= 2:
+                if is_valid_candele(data):
                     return data
         except Exception:
             pass
             
-    # Fallback incrociato: cerca nei file degli altri conti nella PVC /data
-    clean = nome.replace("/", "_").replace(" ", "_")
-    fname = f"candele_{clean}_{tf}.json"
-    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
-        alt_path = os.path.join("..", altro, fname)
-        if os.path.exists(alt_path):
-            try:
-                with open(alt_path, "r", encoding="utf-8") as f:
-                    d = json.load(f)
-                    if len(d) >= 2:
-                        salva_candele_locali(nome, tf, d)
-                        return d
-            except Exception:
-                pass
-                
-    # Fallback aggregazione da candele MINUTE_5
-    if tf != "MINUTE_5":
-        c_m5 = carica_candele_locali(nome, "MINUTE_5")
-        if c_m5:
-            c_agg = aggrega_candele_m5(c_m5, tf)
-            if len(c_agg) >= 2:
-                salva_candele_locali(nome, tf, c_agg)
-                return c_agg
-                
-    # Fallback sintesi iniziale da prezzo live se presente
+    # 2. Cerca across accounts e across timeframes con aggregazione intelligente
+    tf_order = [tf] + [t for t in ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"] if t != tf]
+    for tf_try in tf_order:
+        fname = f"candele_{clean}_{tf_try}.json"
+        for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "."]:
+            alt_path = os.path.join("..", altro, fname) if altro != "." else fname
+            if os.path.exists(alt_path):
+                try:
+                    with open(alt_path, "r", encoding="utf-8") as f:
+                        d = json.load(f)
+                        if is_valid_candele(d):
+                            if tf_try == tf:
+                                salva_candele_locali(nome, tf, d)
+                                return d
+                            else:
+                                c_agg = aggrega_candele_multitf(d, tf_try, tf)
+                                if is_valid_candele(c_agg):
+                                    salva_candele_locali(nome, tf, c_agg)
+                                    return c_agg
+                except Exception:
+                    pass
+                    
+    # 3. Fallback estremo: sintesi temporanea da px_live se non esiste alcuno storico
     if px_live and isinstance(px_live, (int, float)):
         res = []
         now_dt = now_it()
@@ -472,7 +481,6 @@ def carica_candele_locali(nome, tf, px_live=None):
                 "lowPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
                 "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
             })
-        salva_candele_locali(nome, tf, res)
         return res
         
     return []

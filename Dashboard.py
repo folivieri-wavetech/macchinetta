@@ -2339,50 +2339,71 @@ else:
                 lowest = min(v[1] for v in valid)
                 return (highest + lowest) / 2.0
 
+            def is_valid_candele_dash(data):
+                if not data or len(data) < 2:
+                    return False
+                try:
+                    highs = [float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in data if c.get('highPrice', {}).get('bid') or c.get('high')]
+                    lows = [float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in data if c.get('lowPrice', {}).get('bid') or c.get('low')]
+                    if not highs or not lows:
+                        return False
+                    return (max(highs) - min(lows)) > 1e-6
+                except Exception:
+                    return False
+
+            def aggrega_candele_dash(candele_src, tf_src, tf_dest):
+                tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
+                m_src = tf_mins.get(tf_src, 5)
+                m_dest = tf_mins.get(tf_dest, 60)
+                if m_dest <= m_src:
+                    return candele_src
+                ratio = max(1, m_dest // m_src)
+                res = []
+                for i in range(0, len(candele_src), ratio):
+                    chunk = candele_src[i:i+ratio]
+                    if not chunk:
+                        continue
+                    try:
+                        h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
+                        l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
+                        res.append({
+                            "highPrice": {"bid": h_bid, "ask": h_bid},
+                            "lowPrice": {"bid": l_bid, "ask": l_bid}
+                        })
+                    except Exception:
+                        pass
+                return res
+
             def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                 clean = nome.replace("/", "_").replace(" ", "_")
-                fname = f"candele_{clean}_{tf}.json"
-                candidates = [
-                    os.path.join(conto, fname),
-                    fname,
-                    os.path.join("..", conto, fname)
-                ]
-                for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
-                    candidates.append(os.path.join(altro, fname))
-                    candidates.append(os.path.join("..", altro, fname))
-                    
-                for p in candidates:
-                    if os.path.exists(p):
-                        try:
-                            with open(p, "r", encoding="utf-8") as f:
-                                d = json.load(f)
-                                if len(d) >= 2:
-                                    return d
-                        except Exception:
-                            pass
-                            
-                if tf != "MINUTE_5":
-                    c_m5 = carica_candele_locali_dash(conto, nome, "MINUTE_5", px_live=px_live)
-                    if c_m5 and len(c_m5) >= 2:
-                        bar_mult = {"MINUTE_10": 2, "MINUTE_15": 3, "HOUR": 12, "HOUR_4": 48, "DAY": 288}.get(tf, 1)
-                        res = []
-                        step = max(1, bar_mult)
-                        for i in range(0, len(c_m5), step):
-                            chunk = c_m5[i:i+step]
-                            if not chunk:
-                                continue
+                tf_order = [tf] + [t for t in ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"] if t != tf]
+                
+                for tf_try in tf_order:
+                    fname = f"candele_{clean}_{tf_try}.json"
+                    candidates = [
+                        os.path.join(conto, fname),
+                        fname,
+                        os.path.join("..", conto, fname)
+                    ]
+                    for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
+                        candidates.append(os.path.join(altro, fname))
+                        candidates.append(os.path.join("..", altro, fname))
+                        
+                    for p in candidates:
+                        if os.path.exists(p):
                             try:
-                                h_bid = max(c.get('highPrice', {}).get('bid', c.get('high', 0)) for c in chunk)
-                                l_bid = min(c.get('lowPrice', {}).get('bid', c.get('low', 0)) for c in chunk)
-                                res.append({
-                                    "highPrice": {"bid": h_bid, "ask": h_bid},
-                                    "lowPrice": {"bid": l_bid, "ask": l_bid}
-                                })
+                                with open(p, "r", encoding="utf-8") as f:
+                                    d = json.load(f)
+                                    if is_valid_candele_dash(d):
+                                        if tf_try == tf:
+                                            return d
+                                        else:
+                                            c_agg = aggrega_candele_dash(d, tf_try, tf)
+                                            if is_valid_candele_dash(c_agg):
+                                                return c_agg
                             except Exception:
                                 pass
-                        if len(res) >= 1:
-                            return res
-                            
+                                
                 if px_live and isinstance(px_live, (int, float)):
                     return [{"highPrice": {"bid": px_live, "ask": px_live}, "lowPrice": {"bid": px_live, "ask": px_live}}]
                 return []
