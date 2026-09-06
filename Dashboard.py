@@ -1,6 +1,7 @@
 import sys
 sys.path.append("/data/libs")
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import os
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1134,15 +1135,44 @@ def renderizza_schermata_radar(conto_selezionato=None):
         if not ts_aggiornamento:
             ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
 
-        st.html(f"""
-        <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
-        <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
-        <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
-            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
-            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
-            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
-        </div>
-        """)
+        col_radar_info, col_radar_btn = st.columns([5, 1.2])
+        with col_radar_info:
+            st.html(f"""
+            <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
+            <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
+            <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
+                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
+                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
+                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
+            </div>
+            """)
+        with col_radar_btn:
+            st.markdown("""
+            <style>
+            div.st-key-btn_radar_nav_trend button {
+                background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
+                color: #ffffff !important;
+                border: 1px solid #60a5fa !important;
+                font-weight: bold !important;
+                font-size: 0.85rem !important;
+                border-radius: 6px !important;
+                padding: 6px 14px !important;
+                margin-top: 10px !important;
+                box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35) !important;
+                transition: all 0.2s ease-in-out !important;
+            }
+            div.st-key-btn_radar_nav_trend button:hover {
+                background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+                border-color: #93c5fd !important;
+                box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6) !important;
+                transform: translateY(-1px);
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            if st.button("📈 TREND", key="btn_radar_nav_trend", use_container_width=True):
+                st.session_state.vista_sidebar = "CONTO"
+                st.session_state.target_tab = "Trend"
+                st.rerun()
 
         tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
         tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
@@ -1580,6 +1610,32 @@ else:
         tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report"])
         tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_report = tabs
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
+
+    target_tab_to_open = st.session_state.pop("target_tab", None)
+    if target_tab_to_open:
+        components.html(f"""
+            <script>
+            setTimeout(function() {{
+                try {{
+                    const tabs = window.parent.document.querySelectorAll('div[data-testid="stTabs"] button');
+                    for (let t of tabs) {{
+                        const txt = (t.innerText || t.textContent || "").trim();
+                        if ("{target_tab_to_open}" === "Trend") {{
+                            if (txt.includes("Trend") && !txt.includes("Sintesi")) {{
+                                t.click();
+                                break;
+                            }}
+                        }} else if (txt.includes("{target_tab_to_open}")) {{
+                            t.click();
+                            break;
+                        }}
+                    }}
+                }} catch(e) {{
+                    console.error("Tab switch error:", e);
+                }}
+            }}, 150);
+            </script>
+        """, height=0, width=0)
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
