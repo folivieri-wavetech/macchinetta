@@ -466,6 +466,121 @@ def dialog_sync_start(conto_partenza, nome_strumento):
             st.rerun()
 
 
+@st.dialog("Configurazione Avvio Multiconto (Trend + Range)", width="large")
+def dialog_sync_start_trend(conto_partenza, nome_strumento):
+    conti_disponibili = [d for d in os.listdir(".") if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
+    if len(conti_disponibili) < 2:
+        st.error("⚠️ Sono necessari almeno due conti (Demo o Reali) per utilizzare l'Avvio Multiconto.")
+        return
+        
+    st.markdown(f"### ⚖️ Avvio Multiconto Trend-Range per {nome_strumento}")
+    st.write("Avvia contemporaneamente una gamba in **TREND** su un conto e una gamba di copertura in **RANGE** nella direzione opposta su un secondo conto.")
+    st.info("ℹ️ **Regola Timeframe:** L'Avvio Multiconto Trend è consentito esclusivamente su **H1 (1 Ora)** e **H4 (4 Ore)**.")
+    
+    idx_trend = conti_disponibili.index(conto_partenza) if conto_partenza in conti_disponibili else 0
+    idx_range = (idx_trend + 1) % len(conti_disponibili) if len(conti_disponibili) > 1 else 0
+    
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        conto_t = st.selectbox("📈 Conto TREND", conti_disponibili, index=idx_trend, key=f"synct_ct_{nome_strumento}")
+        dir_trend = st.radio("Direzione Trend", ["LONG", "SHORT"], horizontal=True, key=f"synct_dir_{nome_strumento}")
+        
+        tf_options = {"HOUR": "H1 (1 Ora)", "HOUR_4": "H4 (4 Ore)"}
+        mem_t_curr = carica_memoria(conto_t).get(nome_strumento, {})
+        tf_curr = mem_t_curr.get("timeframe", "HOUR")
+        if tf_curr not in tf_options:
+            tf_curr = "HOUR"
+        tf_keys = list(tf_options.keys())
+        idx_tf = tf_keys.index(tf_curr) if tf_curr in tf_keys else 0
+        tf_scelto = st.selectbox("Timeframe Trend (Solo H1 o H4)", tf_keys, index=idx_tf, format_func=lambda x: tf_options[x], key=f"synct_tf_{nome_strumento}")
+        
+    with col_c2:
+        conto_r = st.selectbox("🔄 Conto RANGE (Opposto)", conti_disponibili, index=idx_range, key=f"synct_cr_{nome_strumento}")
+        dir_range = "SHORT" if dir_trend == "LONG" else "LONG"
+        dir_color = "#FA8072" if dir_range == "SHORT" else "#00E676"
+        st.markdown(f"<div style='margin-top: 15px; margin-bottom: 25px;'><b>Direzione Range automatica:</b> <span style='color: {dir_color}; font-weight: bold; font-size: 1.15rem;'>{dir_range}</span></div>", unsafe_allow_html=True)
+        
+    if conto_t == conto_r:
+        st.error("⚠️ Devi selezionare due conti differenti per l'Avvio Multiconto!")
+        if st.button("❌ ANNULLA", key=f"synct_annulla_err_{nome_strumento}"):
+            st.session_state[f"sync_trend_open_{nome_strumento}"] = False
+            st.rerun()
+        return
+        
+    # Info parametri di entrambi i conti
+    mem_t = carica_memoria(conto_t).get(nome_strumento, {})
+    mem_r = carica_memoria(conto_r).get(nome_strumento, {})
+    
+    sz_t = mem_t.get("size", 3)
+    szm_t = mem_t.get("size_max", 5)
+    sc_t = mem_t.get("scala", 1)
+    bd_t = mem_t.get("min_body", 10)
+    
+    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash"]
+    def_tp = 100 if is_asset else 50
+    def_opp = 20 if is_asset else 10
+    def_dts = 10 if is_asset else 5
+    tp_r = mem_r.get("tp", def_tp)
+    opp_r = mem_r.get("opp", def_opp)
+    dts_r = mem_r.get("dts", def_dts)
+    sz_r = mem_r.get("size", 4)
+    
+    st.markdown("---")
+    col_info_t, col_info_r = st.columns(2)
+    with col_info_t:
+        st.markdown(f"**🎯 Parametri Trend ({conto_t}):**\n- TF: **{tf_options[tf_scelto]}**\n- Entry Size: **{sz_t}** | Max Size: **{szm_t}**\n- Scala: **{sc_t}** | Min Body: **{bd_t}**")
+    with col_info_r:
+        st.markdown(f"**🛡️ Parametri Range ({conto_r}):**\n- Direzione: **{dir_range}**\n- TP: **{tp_r}** | OPP: **{opp_r}**\n- DTS: **{dts_r}** | Size: **{sz_r}**")
+        
+    c_btn1, c_btn2 = st.columns(2)
+    with c_btn1:
+        if st.button("⚡ CONFERMA AVVIO MULTICONTO", type="primary", use_container_width=True, key=f"synct_conf_{nome_strumento}"):
+            full_mem_t = carica_memoria(conto_t)
+            full_mem_r = carica_memoria(conto_r)
+            
+            full_mem_t[nome_strumento] = {
+                **mem_t,
+                "attivo": True,
+                "direzione": dir_trend,
+                "stato": "FLAT",
+                "tipo_strategia": "TREND",
+                "timeframe": tf_scelto,
+                "needs_manual_start": True,
+                "msg_manuale": "",
+                "storico_wip_trend": [],
+                "posizioni_core": [],
+                "posizioni_incr": [],
+                "trailing_sl_core": None,
+                "trailing_sl_incr": None
+            }
+            salva_memoria(conto_t, full_mem_t)
+            
+            full_mem_r[nome_strumento] = {
+                **mem_r,
+                "attivo": True,
+                "direzione": dir_range,
+                "tp": tp_r,
+                "opp": opp_r,
+                "dts": dts_r,
+                "size": sz_r,
+                "stato": "IN_ATTESA",
+                "tipo_strategia": "RANGE",
+                "storico_wip": [],
+                "errore_avvio": False,
+                "errore_ripristino": False,
+                "comando_manuale": False,
+                "msg_manuale": ""
+            }
+            salva_memoria(conto_r, full_mem_r)
+            
+            st.session_state[f"sync_trend_open_{nome_strumento}"] = False
+            st.rerun()
+    with c_btn2:
+        if st.button("❌ ANNULLA", use_container_width=True, key=f"synct_annulla_{nome_strumento}"):
+            st.session_state[f"sync_trend_open_{nome_strumento}"] = False
+            st.rerun()
+
+
 @st.dialog("Modifica SL/TP su IG", width="large")
 def dialog_sync(conto_selezionato, nome_strumento):
     st.markdown(f"### ⚙️ {nome_strumento} | Gestione Posizioni IG")
@@ -2620,6 +2735,12 @@ else:
                                     st.session_state[err_key] = ""
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
+                                        "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
+                                        "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                        "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                        "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
+                                        "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
+                                        "auto_restart": auto_restart,
                                         "attivo": True, 
                                         "direzione": "LONG", 
                                         "stato": "FLAT", 
@@ -2639,6 +2760,12 @@ else:
                                     st.session_state[err_key] = ""
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
+                                        "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
+                                        "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                        "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                        "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
+                                        "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
+                                        "auto_restart": auto_restart,
                                         "attivo": True, 
                                         "direzione": "SHORT", 
                                         "stato": "FLAT", 
@@ -2653,6 +2780,13 @@ else:
                                     }
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
+
+                            if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True):
+                                st.session_state[f"sync_trend_open_{nome}"] = True
+                                st.rerun()
+                            
+                            if st.session_state.get(f"sync_trend_open_{nome}", False):
+                                dialog_sync_start_trend(conto_selezionato, nome)
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
