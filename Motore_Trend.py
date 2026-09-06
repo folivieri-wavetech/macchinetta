@@ -454,76 +454,8 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
             pass
     return res
 
-YAHOO_SYMBOLS = {
-    "AUD/CAD": "AUDCAD=X",
-    "AUD/NZD": "AUDNZD=X",
-    "CAD/JPY": "CADJPY=X",
-    "EUR/GBP": "EURGBP=X",
-    "GBP/USD": "GBPUSD=X",
-    "USD/CAD": "USDCAD=X",
-    "USD/CHF": "USDCHF=X",
-    "USD/JPY": "USDJPY=X",
-    "Spot Gold": "GC=F",
-    "US 500 Cash": "ES=F"
-}
-
-def scarica_candele_yahoo(nome, tf, px_live=None):
-    symb = YAHOO_SYMBOLS.get(nome)
-    if not symb:
-        return []
-    interval_map = {
-        "MINUTE_5": ("5m", "5d"),
-        "MINUTE_15": ("15m", "10d"),
-        "HOUR": ("1h", "1mo"),
-        "HOUR_4": ("1h", "3mo"),
-        "DAY": ("1d", "6mo")
-    }
-    int_str, rng_str = interval_map.get(tf, ("1h", "1mo"))
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers, timeout=5)
-        if r.status_code == 200:
-            res = r.json().get('chart', {}).get('result', [{}])[0]
-            quotes = res.get('indicators', {}).get('quote', [{}])[0]
-            timestamps = res.get('timestamp', [])
-            opens = quotes.get('open', [])
-            highs = quotes.get('high', [])
-            lows = quotes.get('low', [])
-            closes = quotes.get('close', [])
-            
-            raw = []
-            for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
-                if h is not None and l is not None and o is not None and c is not None:
-                    raw.append((t, float(o), float(h), float(l), float(c)))
-            if not raw:
-                return []
-                
-            ratio = 1.0
-            if nome == "Spot Gold" and px_live and isinstance(px_live, (int, float)):
-                last_cme = raw[-1][4]
-                if last_cme > 0:
-                    ratio = px_live / last_cme
-                    
-            candele = []
-            for t, o, h, l, c in raw:
-                snap = datetime.datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
-                candele.append({
-                    "snapshotTime": snap,
-                    "openPrice": {"bid": round(o * ratio, 1), "ask": round(o * ratio, 1), "lastTraded": None},
-                    "highPrice": {"bid": round(h * ratio, 1), "ask": round(h * ratio, 1), "lastTraded": None},
-                    "lowPrice": {"bid": round(l * ratio, 1), "ask": round(l * ratio, 1), "lastTraded": None},
-                    "closePrice": {"bid": round(c * ratio, 1), "ask": round(c * ratio, 1), "lastTraded": None}
-                })
-            if tf == "HOUR_4" and candele:
-                candele = aggrega_candele_multitf(candele, "HOUR", "HOUR_4")
-            return candele
-    except Exception:
-        pass
-    return []
-
 def allinea_candele_live(candele_locali, nome, tf, px_live):
-    """Garantisce che la lista candele sia continua fino al momento attuale a mercati aperti."""
+    """Proietta il prezzo live per formare l'ombra della candela ATTUALE, senza inventare i buchi."""
     if not candele_locali or not px_live or not isinstance(px_live, (int, float)):
         return candele_locali
     if is_weekend_active():
@@ -547,37 +479,22 @@ def allinea_candele_live(candele_locali, nome, tf, px_live):
     if last_dt >= target_dt:
         return candele_locali
         
-    curr_dt = last_dt + datetime.timedelta(minutes=min_tf)
-    added = 0
-    while curr_dt <= target_dt and added < 100:
-        ora_dt = curr_dt.time()
-        wd = curr_dt.weekday()
-        if (wd == 4 and ora_dt >= datetime.time(23, 0)) or wd == 5 or (wd == 6 and ora_dt < datetime.time(21, 45)):
-            curr_dt += datetime.timedelta(minutes=min_tf)
-            continue
-            
-        snap_synth = curr_dt.strftime("%Y/%m/%d %H:%M:00")
-        last_c = candele_locali[-1]
-        try:
-            prev_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
-        except Exception:
-            prev_close = px_live
-            
-        synth_candle = {
-            "snapshotTime": snap_synth,
-            "openPrice": {"bid": prev_close, "ask": prev_close, "lastTraded": None},
-            "highPrice": {"bid": max(prev_close, px_live), "ask": max(prev_close, px_live), "lastTraded": None},
-            "lowPrice": {"bid": min(prev_close, px_live), "ask": min(prev_close, px_live), "lastTraded": None},
-            "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
-        }
-        candele_locali.append(synth_candle)
-        added += 1
-        curr_dt += datetime.timedelta(minutes=min_tf)
+    snap_synth = target_dt.strftime("%Y/%m/%d %H:%M:00")
+    last_c = candele_locali[-1]
+    try:
+        prev_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
+    except Exception:
+        prev_close = px_live
         
-    res = candele_locali[-100:]
-    if added > 0:
-        salva_candele_locali(nome, tf, res)
-    return res
+    synth_candle = {
+        "snapshotTime": snap_synth,
+        "openPrice": {"bid": prev_close, "ask": prev_close, "lastTraded": None},
+        "highPrice": {"bid": max(prev_close, px_live), "ask": max(prev_close, px_live), "lastTraded": None},
+        "lowPrice": {"bid": min(prev_close, px_live), "ask": min(prev_close, px_live), "lastTraded": None},
+        "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
+    }
+    candele_locali.append(synth_candle)
+    return candele_locali
 
 def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
@@ -610,15 +527,7 @@ def carica_candele_locali(nome, tf, px_live=None):
             except Exception:
                 pass
 
-    # 3. Fallback intelligente: scarica storico completo (0 chiamate API a IG)
-    c_yh = scarica_candele_yahoo(nome, tf, px_live=px_live)
-    if c_yh and len(c_yh) >= 10 and is_valid_candele(c_yh, tf):
-        if px_live and isinstance(px_live, (int, float)):
-            c_yh = allinea_candele_live(c_yh, nome, tf, px_live)
-        salva_candele_locali(nome, tf, c_yh)
-        return c_yh
-
-    # 4. Aggregazione da timeframe minori a maggiori
+    # 3. Aggregazione da timeframe minori a maggiori
     tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
     for tf_try in tf_order:
         if tf_try == tf or TF_MAP.get(tf_try, 0) >= TF_MAP.get(tf, 0):
@@ -640,7 +549,7 @@ def carica_candele_locali(nome, tf, px_live=None):
                 except Exception:
                     pass
                     
-    # 5. Fallback estremo: sintesi temporanea da px_live se non esiste alcuno storico
+    # 4. Nessun fallback sintetico completo, lasciamo che il motore identifichi il buco e scarichi da IG
     if px_live and isinstance(px_live, (int, float)):
         res = []
         now_dt = now_it()
@@ -1395,12 +1304,20 @@ def esegui_ciclo_trend():
         
         candele_locali = carica_candele_locali(nome, tf, px_live=prezzi_live.get(nome))
         
-        # 1. Recupero candele a fine candela
-        limite_download = 100 if len(candele_locali) < 55 else 2
+        # 1. Recupero candele a fine candela o individuazione GAP
+        try:
+            last_t_str = candele_locali[-1].get("snapshotTime")
+            last_dt = datetime.datetime.strptime(last_t_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+            delta_m = (now_t - last_dt).total_seconds() / 60.0
+            has_gap = delta_m > (min_tf * 3) # Se manca più dell'equivalente di 3 candele
+        except Exception:
+            has_gap = True
+
+        limite_download = 100 if (len(candele_locali) < 55 or has_gap) else 2
         boundary_id = f"{nome}_{tf}_{min_tot // min_tf}"
         
         prices = []
-        if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and (len(candele_locali) < 55 or is_just_closed):
+        if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and (len(candele_locali) < 55 or is_just_closed or has_gap):
             LAST_FETCH_BOUNDARY[nome] = boundary_id
             prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
@@ -1431,7 +1348,14 @@ def esegui_ciclo_trend():
                 
         # Unione e aggiornamento del buffer locale di 100 candele
         if prices and isinstance(prices, list) and len(prices) >= 2:
-            snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
+            if limite_download == 100:
+                # Sovrascrive completamente lo storico locale con i dati perfetti di IG (risolve i gap)
+                candele_locali = []
+                snap_esistenti = set()
+                print_log(nome, f"📡 Scaricate {len(prices)} candele da IG per {tf} (colmatura buco/avvio).")
+            else:
+                snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
+                
             for pr in prices[:-1]: # tutte le chiuse tranne l'ancora aperta
                 st = pr.get("snapshotTime")
                 if st and st not in snap_esistenti:
