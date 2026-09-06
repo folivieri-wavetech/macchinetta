@@ -675,9 +675,8 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     # Cooldown 1 ora (3600 secondi)
                     if now_ts - last_alert_time >= 3600:
                         RADAR_LAST_ALERT[k_alert] = now_ts
-                        msg_alert = f"[{nome}] Prezzo a {int(dist_pips)} punti dalla Kijun {lbl} ({px:.{dec}f} vs KJ55 {kj:.{dec}f} - {dir_pos})"
-                        print_log("RADAR", f"📡 {msg_alert}")
-                        invia_notifica(f"📡 RADAR {lbl}", msg_alert, "satellite")
+                        print_log("RADAR", f"📡 [{nome} {lbl}] {dir_pos} (distanza: {int(dist_pips)} punti, KJ55: {kj:.{dec}f})")
+                        invia_notifica(f"📡 {nome} {lbl}", dir_pos, "satellite")
             else:
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": None,
