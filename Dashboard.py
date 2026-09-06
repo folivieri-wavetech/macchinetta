@@ -1151,12 +1151,12 @@ def renderizza_schermata_radar(conto_selezionato=None):
         <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem;'>
             <thead>
                 <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
-                    <th style='padding: 6px 8px; text-align: left; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Prezzo Live</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>M5 (KJ55)</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1 (KJ55)</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4 (KJ55)</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Daily D1 (KJ55)</th>
+                    <th style='padding: 6px 8px; text-align: center; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Live</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>M5</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4</th>
+                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>D1</th>
                     <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Stato Trend</th>
                 </tr>
             </thead>
