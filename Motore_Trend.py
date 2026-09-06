@@ -519,11 +519,30 @@ def aggiorna_memoria(nome, update_dict):
     except Exception:
         pass
 
+def format_tf_label(tf_val):
+    tf_s = str(tf_val or "").upper()
+    if tf_s in ("MINUTE_5", "M5"):
+        return "M5"
+    elif tf_s in ("MINUTE_15", "M15"):
+        return "M15"
+    elif tf_s in ("MINUTE_30", "M30"):
+        return "M30"
+    elif tf_s in ("HOUR", "HOUR_1", "H1"):
+        return "H1"
+    elif tf_s in ("HOUR_4", "H4"):
+        return "H4"
+    elif tf_s.startswith("MINUTE_"):
+        return f"M{tf_s.replace('MINUTE_', '')}"
+    elif tf_s.startswith("HOUR_"):
+        return f"H{tf_s.replace('HOUR_', '')}"
+    return tf_s if tf_s else "H1"
+
 def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, dec, auto_restart, dati):
     if not events:
         return
     storico = dati.get("storico_wip_trend", [])
     ha_fatto_eventi = False
+    tf_label = format_tf_label(dati.get("timeframe") or (engine.config.get("timeframe") if engine else "H1"))
     
     for ev in events:
         tipo = ev['type']
@@ -541,7 +560,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 pos_residue_2 = conta_posizioni_aperte_epic(epic, headers)
                 if pos_residue_2 > 0:
                     print_log(nome, f"🚨 [BLOCCO REVERSAL] Core {dir_auto} annullata: {pos_residue_2} posizioni ancora bloccate su IG!")
-                    invia_notifica("🚨 BLOCCO REVERSAL", f"[{nome}] Trovate {pos_residue_2} posizioni residue non chiuse su IG. Auto-Restart bloccato per sicurezza.", "sos")
+                    invia_notifica(f"🚨 BLOCCO REVERSAL {tf_label}", f"[{nome}] Trovate {pos_residue_2} posizioni residue non chiuse su IG. Auto-Restart bloccato per sicurezza.", "sos")
                     engine.reset()
                     aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "bancomat_sl": None})
                     continue
@@ -554,7 +573,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     engine.pm.core_position.ticket = deal_id
                 msg = f"🚀 Restart {dir_auto} a {entry_px}"
                 print_log(nome, msg)
-                invia_notifica("🚀 RESTART", f"[{nome}] {msg}", "rocket")
+                invia_notifica(f"🚀 RESTART {tf_label}", f"[{nome}] {msg}", "rocket")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
@@ -571,7 +590,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 pos.ticket = deal_id
                 msg = f"➕ Open Incr {dir_incr} a {pos.entry_price}"
                 print_log(nome, msg)
-                invia_notifica("➕ OPEN INCR", f"[{nome}] {msg}", "heavy_plus_sign")
+                invia_notifica(f"➕ OPEN INCR {tf_label}", f"[{nome}] {msg}", "heavy_plus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
             else:
@@ -613,27 +632,27 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     r_reason = reversal_ev.get("reason", "")
                     tag_motivo = "Trailing Core" if "trailing" in r_reason else "Stop KJ"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
-                    invia_notifica("🛑 STOP KJ", f"[{nome}] {msg}", "warning")
+                    invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {msg}", "warning")
                 elif tipo == 'tp_increment':
                     tp_p = ev.get('tp_pips', 20)
                     msg = f"🎯 TP Incr (+{tp_p}p) ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica("🎯 TP INCR", f"[{nome}] {msg}", "dart")
+                    invia_notifica(f"🎯 TP INCR {tf_label}", f"[{nome}] {msg}", "dart")
                 elif is_bancomat:
                     msg = f"💰 Bancomat ({sz}){px_str}{pnl_str}"
-                    invia_notifica("💰 BANCOMAT", f"[{nome}] {msg}", "moneybag")
+                    invia_notifica(f"💰 BANCOMAT {tf_label}", f"[{nome}] {msg}", "moneybag")
                 elif tipo == 'fifo_close':
                     msg = f"➖ FIFO Incr ({sz}){px_str}{pnl_str}"
-                    invia_notifica("➖ FIFO INCR", f"[{nome}] {msg}", "heavy_minus_sign")
+                    invia_notifica(f"➖ FIFO INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increment_closed':
                     msg = f"➖ Close Incr ({sz}){px_str}{pnl_str}"
-                    invia_notifica("➖ CLOSE INCR", f"[{nome}] {msg}", "heavy_minus_sign")
+                    invia_notifica(f"➖ CLOSE INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increments_cleared':
                     msg = f"🛑 Stop TK: Close Incr ({sz}){px_str}{pnl_str}"
-                    invia_notifica("🛑 STOP TK", f"[{nome}] {msg}", "heavy_minus_sign")
+                    invia_notifica(f"🛑 STOP TK {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 else:
                     msg = f"➖ Close Core ({sz}){px_str}{pnl_str}"
-                    invia_notifica("➖ CLOSE CORE", f"[{nome}] {msg}", "heavy_minus_sign")
+                    invia_notifica(f"➖ CLOSE CORE {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
         
@@ -647,7 +666,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 tag_motivo = "Stop KJ" if "live_stop" in reason_str else "Kijun"
                 msg = f"🛑 {tag_motivo} ➡️ {new_d}"
                 print_log(nome, msg)
-                invia_notifica("🛑 REVERSAL", f"[{nome}] {msg}", "warning")
+                invia_notifica(f"🛑 REVERSAL {tf_label}", f"[{nome}] {msg}", "warning")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 
@@ -1137,7 +1156,7 @@ def esegui_ciclo_trend():
                     "storico_wip_trend": [f"[{ora_str}] {msg}"]
                 })
                 print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}.")
-                invia_notifica("🚀 OPEN CORE", f"[{nome}] {msg}", "rocket")
+                invia_notifica(f"🚀 OPEN CORE {format_tf_label(tf)}", f"[{nome}] {msg}", "rocket")
             else:
                 engine.reset()
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True, "needs_manual_start": False})
