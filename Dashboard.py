@@ -1118,9 +1118,9 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 if vicino:
                     bg_cell = "rgba(34, 197, 94, 0.2)" if is_long else "rgba(239, 68, 68, 0.2)"
                     bdr_cell = "#22c55e" if is_long else "#ef4444"
-                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_dir}; font-size: 0.74rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.62rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
+                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_dir}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
                 else:
-                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.74rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:#cbd5e1;'>{dir_label}</span><br><span style='font-size:0.62rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
+                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_dir};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
 
             c_m5 = format_radar_cell("M5")
             c_h1 = format_radar_cell("H1")
