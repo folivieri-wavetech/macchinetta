@@ -1542,22 +1542,29 @@ else:
                     background-color: #000000 !important;
                     border: 2px solid #FFD700 !important;
                     border-radius: 8px !important;
-                    padding: 10px 6px !important;
-                    min-height: 52px !important;
+                    padding: 12px 6px !important;
+                    min-height: 54px !important;
                     width: 100% !important;
                     display: flex !important;
                     justify-content: center !important;
                     align-items: center !important;
                     text-align: center !important;
-                    box-shadow: 0 0 14px rgba(255, 215, 0, 0.35) !important;
+                    box-shadow: 0 0 16px rgba(255, 215, 0, 0.4) !important;
+                    transition: all 0.2s ease-in-out !important;
                 }
-                div.st-key-btn_radar_sidebar button p {
-                    color: #FFD700 !important;
-                    font-size: 1.35rem !important;
-                    font-weight: 900 !important;
-                    letter-spacing: 1px !important;
-                    text-transform: uppercase !important;
+                div.st-key-btn_radar_sidebar button div[data-testid="stMarkdownContainer"],
+                div.st-key-btn_radar_sidebar button div,
+                div.st-key-btn_radar_sidebar button p,
+                div.st-key-btn_radar_sidebar button span {
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
                     text-align: center !important;
+                    color: #FFD700 !important;
+                    font-size: 1.22rem !important;
+                    font-weight: 900 !important;
+                    letter-spacing: 1.2px !important;
+                    text-transform: uppercase !important;
                     width: 100% !important;
                     margin: 0 auto !important;
                     padding: 0 !important;
@@ -1566,9 +1573,13 @@ else:
                 div.st-key-btn_radar_sidebar button:hover {
                     background-color: #1a1a00 !important;
                     border-color: #FFE55C !important;
-                    box-shadow: 0 0 20px rgba(255, 215, 0, 0.55) !important;
+                    box-shadow: 0 0 24px rgba(255, 215, 0, 0.65) !important;
+                    transform: translateY(-1px);
                 }
-                div.st-key-btn_radar_sidebar button:hover p {
+                div.st-key-btn_radar_sidebar button:hover div[data-testid="stMarkdownContainer"],
+                div.st-key-btn_radar_sidebar button:hover div,
+                div.st-key-btn_radar_sidebar button:hover p,
+                div.st-key-btn_radar_sidebar button:hover span {
                     color: #FFE55C !important;
                 }
                 </style>
