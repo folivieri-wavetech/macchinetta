@@ -463,7 +463,6 @@ YAHOO_SYMBOLS = {
     "USD/CAD": "USDCAD=X",
     "USD/CHF": "USDCHF=X",
     "USD/JPY": "USDJPY=X",
-    "Spot Gold": "GC=F",
     "US 500 Cash": "ES=F"
 }
 
