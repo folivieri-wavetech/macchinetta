@@ -2489,16 +2489,16 @@ else:
                 if not ts_aggiornamento:
                     ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
                 
-                st.markdown("<h1 style='color: #00BFFF; margin-top: -15px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>", unsafe_allow_html=True)
-                st.markdown(f"<div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>", unsafe_allow_html=True)
-                
-                st.markdown("""
+                header_html = f"""
+                <h1 style='color: #00BFFF; margin-top: -15px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>
+                <div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
                 <div style='display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85rem;'>
                     <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 pip)</b>: Possibile ingresso imminente</div>
                     <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 pip)</b>: Monitoraggio continuo</div>
                     <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
+                st.html(header_html)
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
@@ -2597,7 +2597,7 @@ else:
                     """
                 
                 html_table += "</tbody></table>"
-                st.markdown(html_table, unsafe_allow_html=True)
+                st.html(html_table)
                 
             renderizza_tab_radar()
 
