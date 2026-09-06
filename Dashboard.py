@@ -2318,6 +2318,75 @@ else:
 
     if tab_radar is not None:
         with tab_radar:
+            def calcola_kj55_da_candele_dash(candele_list, periods=55):
+                if not candele_list:
+                    return None
+                recent = candele_list[-periods:] if len(candele_list) >= periods else candele_list
+                valid = []
+                for c in recent:
+                    h = c.get('highPrice', {}).get('bid') or c.get('highPrice', {}).get('ask') or c.get('high')
+                    l = c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')
+                    if h is not None and l is not None:
+                        try:
+                            vh, vl = float(h), float(l)
+                            if 0 < vh < 1e8 and 0 < vl < 1e8:
+                                valid.append((vh, vl))
+                        except (ValueError, TypeError):
+                            pass
+                if not valid:
+                    return None
+                highest = max(v[0] for v in valid)
+                lowest = min(v[1] for v in valid)
+                return (highest + lowest) / 2.0
+
+            def carica_candele_locali_dash(conto, nome, tf, px_live=None):
+                clean = nome.replace("/", "_").replace(" ", "_")
+                fname = f"candele_{clean}_{tf}.json"
+                candidates = [
+                    os.path.join(conto, fname),
+                    fname,
+                    os.path.join("..", conto, fname)
+                ]
+                for altro in ["DANY_DEMO", "FIORDOK_DEMO", "BONGIOLO_DEMO"]:
+                    candidates.append(os.path.join(altro, fname))
+                    candidates.append(os.path.join("..", altro, fname))
+                    
+                for p in candidates:
+                    if os.path.exists(p):
+                        try:
+                            with open(p, "r", encoding="utf-8") as f:
+                                d = json.load(f)
+                                if len(d) >= 2:
+                                    return d
+                        except Exception:
+                            pass
+                            
+                if tf != "MINUTE_5":
+                    c_m5 = carica_candele_locali_dash(conto, nome, "MINUTE_5", px_live=px_live)
+                    if c_m5 and len(c_m5) >= 2:
+                        bar_mult = {"MINUTE_10": 2, "MINUTE_15": 3, "HOUR": 12, "HOUR_4": 48, "DAY": 288}.get(tf, 1)
+                        res = []
+                        step = max(1, bar_mult)
+                        for i in range(0, len(c_m5), step):
+                            chunk = c_m5[i:i+step]
+                            if not chunk:
+                                continue
+                            try:
+                                h_bid = max(c.get('highPrice', {}).get('bid', c.get('high', 0)) for c in chunk)
+                                l_bid = min(c.get('lowPrice', {}).get('bid', c.get('low', 0)) for c in chunk)
+                                res.append({
+                                    "highPrice": {"bid": h_bid, "ask": h_bid},
+                                    "lowPrice": {"bid": l_bid, "ask": l_bid}
+                                })
+                            except Exception:
+                                pass
+                        if len(res) >= 1:
+                            return res
+                            
+                if px_live and isinstance(px_live, (int, float)):
+                    return [{"highPrice": {"bid": px_live, "ask": px_live}, "lowPrice": {"bid": px_live, "ask": px_live}}]
+                return []
+
             @st.fragment(run_every=15)
             def renderizza_tab_radar():
                 memoria_attuale = carica_memoria(conto_selezionato)
@@ -2338,6 +2407,7 @@ else:
                 """, unsafe_allow_html=True)
                 
                 tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
                 
                 html_table = """
                 <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 8px; overflow: hidden; font-family: sans-serif; font-size: 0.85rem;'>
@@ -2390,6 +2460,18 @@ else:
                         if is_current_tf_trade:
                             return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: #60a5fa;'>IN TRADE</b><br><span style='font-size:0.72rem; color:#93c5fd;'>({stato_s})</span></div>"
                             
+                        # Fallback di calcolo locale se kj_v non è ancora nel file di stato
+                        if kj_v is None and px and isinstance(px, (int, float)):
+                            tf_code = tf_map_code.get(lbl_key, "HOUR")
+                            candele_c = carica_candele_locali_dash(conto_selezionato, s_nome, tf_code, px_live=px)
+                            kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
+                            if kj_c is not None:
+                                kj_v = kj_c
+                                diff_pts = px - kj_v
+                                dist_p = round(abs(diff_pts) / mult, 1)
+                                dir_p = "SOPRA" if diff_pts >= 0 else "SOTTO"
+                                vicino = (dist_p <= 15.0)
+
                         if kj_v is None or dist_p is None:
                             return "<div style='color: #64748b; text-align: center;'>-</div>"
                             

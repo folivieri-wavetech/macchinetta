@@ -4,6 +4,7 @@ import os
 import requests
 import traceback
 import datetime
+from datetime import timedelta
 import sys
 import socket
 import hashlib
@@ -852,14 +853,6 @@ def is_weekend_active():
 LAST_FETCH_BOUNDARY = {}
 
 def esegui_ciclo_trend():
-    if is_weekend_active():
-        return
-
-    headers = ottieni_headers_ig()
-    if not headers:
-        print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
-        return
-        
     # Lettura prezzi live locali e posizioni aperte reali (a 0 chiamate API a IG)
     prezzi_live = {}
     posizioni_live_ig = []
@@ -874,16 +867,27 @@ def esegui_ciclo_trend():
         except Exception:
             pass
 
+    parametri = {}
     try:
-        with open(FILE_MEMORIA, "r") as f: parametri = json.load(f)
+        with open(FILE_MEMORIA, "r") as f: 
+            parametri = json.load(f)
     except Exception:
-        return
+        pass
         
     # Aggiornamento continuo Radar Trend (calcolo distanze KJ55 su tutti i 4 TF a 0 API)
+    # Eseguito SEMPRE anche a mercati chiusi per consentire il monitoraggio Dashboard
     try:
         aggiorna_radar_trend(prezzi_live, parametri)
     except Exception as e_rad:
         pass
+
+    if is_weekend_active():
+        return
+
+    headers = ottieni_headers_ig()
+    if not headers:
+        print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
+        return
         
     for nome, dati in parametri.items():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
