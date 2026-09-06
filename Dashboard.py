@@ -2493,8 +2493,8 @@ else:
                 <h1 style='color: #00BFFF; margin-top: -15px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>
                 <div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>
                 <div style='display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85rem;'>
-                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 pip)</b>: Possibile ingresso imminente</div>
-                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 pip)</b>: Monitoraggio continuo</div>
+                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
+                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
                     <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
                 </div>
                 """
@@ -2562,21 +2562,25 @@ else:
                             if kj_c is not None:
                                 kj_v = kj_c
                                 diff_pts = px - kj_v
-                                dist_p = round(abs(diff_pts) / mult, 1)
-                                dir_p = "SOPRA" if diff_pts >= 0 else "SOTTO"
-                                vicino = (dist_p <= 15.0)
+                                dist_p = round(abs(diff_pts) / mult)
+                                dir_p = "Possibile LONG" if diff_pts >= 0 else "Possibile SHORT"
+                                vicino = (dist_p <= 15)
 
                         if kj_v is None or dist_p is None:
                             return "<div style='color: #64748b; text-align: center;'>-</div>"
                             
                         kj_formatted = f"{kj_v:.{dec}f}"
+                        dist_int = int(round(dist_p))
+                        is_long = (dir_p in ("SOPRA", "Possibile LONG"))
+                        dir_label = "Possibile LONG" if is_long else "Possibile SHORT"
+                        col_dir = "#4ade80" if is_long else "#f87171"
+                        
                         if vicino:
-                            col_dir = "#4ade80" if dir_p == "SOPRA" else "#f87171"
-                            bg_cell = "rgba(34, 197, 94, 0.2)" if dir_p == "SOPRA" else "rgba(239, 68, 68, 0.2)"
-                            bdr_cell = "#22c55e" if dir_p == "SOPRA" else "#ef4444"
-                            return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: {col_dir};'>⚡ {dist_p:.1f}p</b> <span style='font-size:0.72rem; color:#cbd5e1;'>({dir_p})</span><br><span style='font-size:0.72rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
+                            bg_cell = "rgba(34, 197, 94, 0.2)" if is_long else "rgba(239, 68, 68, 0.2)"
+                            bdr_cell = "#22c55e" if is_long else "#ef4444"
+                            return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 6px; padding: 4px 6px; text-align: center;'><b style='color: {col_dir};'>⚡ {dist_int} punti</b><br><span style='font-size:0.72rem; color:{col_dir}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
                         else:
-                            return f"<div style='text-align: center; color: #94a3b8;'><span style='font-weight: bold;'>{dist_p:.1f}p</span> <span style='font-size:0.72rem;'>({dir_p})</span><br><span style='font-size:0.72rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
+                            return f"<div style='text-align: center; color: #94a3b8;'><span style='font-weight: bold;'>{dist_int} punti</span><br><span style='font-size:0.72rem; color:#cbd5e1;'>{dir_label}</span><br><span style='font-size:0.72rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
 
                     c_m5 = format_radar_cell("M5")
                     c_h1 = format_radar_cell("H1")

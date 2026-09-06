@@ -657,25 +657,25 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
             kj = calcola_kj55_da_candele(candele, periods=55)
             if kj is not None:
                 diff_pts = px - kj
-                dist_pips = abs(diff_pts) / mult
-                dir_pos = "SOPRA" if diff_pts >= 0 else "SOTTO"
-                is_vicino = (dist_pips <= 15.0)
+                dist_pips = round(abs(diff_pts) / mult)
+                dir_pos = "Possibile LONG" if diff_pts >= 0 else "Possibile SHORT"
+                is_vicino = (dist_pips <= 15)
                 
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": kj,
-                    "dist_pips": round(dist_pips, 1),
+                    "dist_pips": int(dist_pips),
                     "dir": dir_pos,
                     "vicino": is_vicino
                 }
                 
-                # Invio notifica Push solo se lo strumento NON è in trade ed entra nella soglia <= 15 pip
+                # Invio notifica Push solo se lo strumento NON è in trade ed entra nella soglia <= 15 punti
                 if is_vicino and not is_in_trade and not is_rollover_active():
                     k_alert = f"{nome}_{lbl}"
                     last_alert_time = RADAR_LAST_ALERT.get(k_alert, 0)
                     # Cooldown 1 ora (3600 secondi)
                     if now_ts - last_alert_time >= 3600:
                         RADAR_LAST_ALERT[k_alert] = now_ts
-                        msg_alert = f"[{nome}] Prezzo a {dist_pips:.1f}p dalla Kijun {lbl} ({px:.{dec}f} vs KJ55 {kj:.{dec}f} {dir_pos})"
+                        msg_alert = f"[{nome}] Prezzo a {int(dist_pips)} punti dalla Kijun {lbl} ({px:.{dec}f} vs KJ55 {kj:.{dec}f} - {dir_pos})"
                         print_log("RADAR", f"📡 {msg_alert}")
                         invia_notifica(f"📡 RADAR {lbl}", msg_alert, "satellite")
             else:
