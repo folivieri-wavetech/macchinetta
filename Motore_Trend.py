@@ -543,8 +543,13 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
     storico = dati.get("storico_wip_trend", [])
     ha_fatto_eventi = False
     tf_label = format_tf_label(dati.get("timeframe") or (engine.config.get("timeframe") if engine else "H1"))
+    has_auto_start = any(e.get('type') == 'auto_start' for e in events)
+    core_close_summary = None
     
-    for ev in events:
+    # Processiamo prima le chiusure e poi gli avvii/incrementi per garantire la sequenza logica corretta
+    ordinati_events = sorted(events, key=lambda x: 0 if x.get('type') in ('core_closed', 'increment_closed', 'fifo_close', 'increments_cleared', 'tp_increment', 'reversal') else 1)
+    
+    for ev in ordinati_events:
         tipo = ev['type']
         ora_str = now_it().strftime("%d/%m %H:%M:%S")
         
@@ -571,15 +576,23 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 if engine.pm.core_position:
                     engine.pm.core_position.entry_price = entry_px
                     engine.pm.core_position.ticket = deal_id
-                msg = f"🚀 Restart {dir_auto} a {entry_px}"
-                print_log(nome, msg)
-                invia_notifica(f"🚀 RESTART {tf_label}", f"[{nome}] {msg}", "rocket")
+                
+                if core_close_summary:
+                    msg = f"{core_close_summary} 🔄 Reverse {dir_auto} a {entry_px}"
+                    print_log(nome, msg)
+                    invia_notifica(f"🔄 REVERSE {tf_label}", f"[{nome}] {msg}", "arrows_counterclockwise")
+                else:
+                    msg = f"🚀 Restart {dir_auto} a {entry_px}"
+                    print_log(nome, msg)
+                    invia_notifica(f"🚀 RESTART {tf_label}", f"[{nome}] {msg}", "rocket")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
             else:
                 engine.reset()
                 print_log(nome, "⚠️ Fallito Restart Core.")
+                if core_close_summary:
+                    invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {core_close_summary} ➡️ FLAT", "warning")
         
         elif tipo == 'increment_opened':
             dir_incr = ev['direction']
@@ -631,8 +644,10 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 if tipo == 'core_closed' and reversal_ev:
                     r_reason = reversal_ev.get("reason", "")
                     tag_motivo = "Trailing Core" if "trailing" in r_reason else "Stop KJ"
+                    core_close_summary = f"🛑 {tag_motivo} ({sz}){pnl_str}"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
-                    invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {msg}", "warning")
+                    if not has_auto_start:
+                        invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {msg}", "warning")
                 elif tipo == 'tp_increment':
                     tp_p = ev.get('tp_pips', 20)
                     msg = f"🎯 TP Incr (+{tp_p}p) ({sz}){px_str}{pnl_str}"
@@ -662,7 +677,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             has_core_in_events = any(e.get('type') == 'core_closed' for e in events)
             
             # Se la Core è già stata registrata con il relativo motivo e passaggio a FLAT, evitiamo il doppio messaggio
-            if not has_core_in_events:
+            if not has_core_in_events and not has_auto_start:
                 tag_motivo = "Stop KJ" if "live_stop" in reason_str else "Kijun"
                 msg = f"🛑 {tag_motivo} ➡️ {new_d}"
                 print_log(nome, msg)
