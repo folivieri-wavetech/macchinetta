@@ -79,6 +79,18 @@ class CoreEngine:
         lowest = min(c.low for c in valid_candles)
         return (highest + lowest) / 2.0
 
+    def _get_core_trailing_pips(self):
+        """Restituisce la distanza/offset in pip per il Trailing SL Core in base al Timeframe."""
+        tf_val = str(self.config.get("timeframe", "HOUR")).upper()
+        if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
+            return 20
+        elif "HOUR_4" in tf_val or "H4" in tf_val:
+            return 40
+        elif "HOUR" in tf_val or "H1" in tf_val:
+            return 30
+        else:
+            return 30
+
     def on_candle_close(self, closed_candle, next_open_price=None):
         """
         Metodo da chiamare OGNI VOLTA che si chiude una candela sul TF stabilito.
@@ -105,6 +117,7 @@ class CoreEngine:
         min_body = self.config.get("min_body", 5) or 5
         min_body_price = min_body * pip_val
         size_max = self.config.get("size_max") or self.config.get("size_f", 10)
+        core_trailing_pips = self._get_core_trailing_pips()
         
         # ==========================================
         # LOGICA BI-DIREZIONALE (STOP & REVERSE)
@@ -115,7 +128,7 @@ class CoreEngine:
             sl_core_base = kj # A fine candela: Stop Core a rottura Kijun (0 buffer)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if c_close < effective_sl_core:
-                # Sotto lo Stop Core (KJ a fine candela o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
+                # Sotto lo Stop Core (KJ a fine candela o Trailing SL Core): Chiude tutto e passa in FLAT
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
@@ -129,10 +142,10 @@ class CoreEngine:
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
             else:
-                # Aggiornamento Trailing SL Core a 40 pip da Close se distanza da KJ >= 40 pip (cricchetto che sale)
+                # Aggiornamento Trailing SL Core da Close se distanza da KJ >= core_trailing_pips (M5: 20, H1: 30, H4: 40)
                 dist_kj = c_close - kj
-                if dist_kj >= (40 * pip_val):
-                    nuovo_sl_core = c_close - (40 * pip_val)
+                if dist_kj >= (core_trailing_pips * pip_val):
+                    nuovo_sl_core = c_close - (core_trailing_pips * pip_val)
                     if self.trailing_sl_core is None:
                         self.trailing_sl_core = nuovo_sl_core
                     else:
@@ -217,7 +230,7 @@ class CoreEngine:
             sl_core_base = kj # A fine candela: Stop Core a rottura Kijun (0 buffer)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if c_close > effective_sl_core:
-                # Sopra lo Stop Core (KJ a fine candela o Trailing SL Core a 40 pip): Chiude tutto e passa in FLAT
+                # Sopra lo Stop Core (KJ a fine candela o Trailing SL Core): Chiude tutto e passa in FLAT
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 events.extend(self.pm.close_all_increments(exec_price))
@@ -231,10 +244,10 @@ class CoreEngine:
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
                 
             else:
-                # Aggiornamento Trailing SL Core a 40 pip da Close se distanza da KJ >= 40 pip (cricchetto che scende)
+                # Aggiornamento Trailing SL Core da Close se distanza da KJ >= core_trailing_pips (M5: 20, H1: 30, H4: 40)
                 dist_kj = kj - c_close
-                if dist_kj >= (40 * pip_val):
-                    nuovo_sl_core = c_close + (40 * pip_val)
+                if dist_kj >= (core_trailing_pips * pip_val):
+                    nuovo_sl_core = c_close + (core_trailing_pips * pip_val)
                     if self.trailing_sl_core is None:
                         self.trailing_sl_core = nuovo_sl_core
                     else:

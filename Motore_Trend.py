@@ -841,20 +841,30 @@ def esegui_ciclo_trend():
                         c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
                         pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
                         
-                        # Trailing SL Core: KJ 40 / 40 (distanza KJ >= 40 pip -> stop a 40 pip da Close)
+                        # Trailing SL Core: M5=20/20, H1=30/30, H4=40/40
+                        tf_val = str(tf).upper()
+                        if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
+                            core_trailing_pips = 20
+                        elif "HOUR_4" in tf_val or "H4" in tf_val:
+                            core_trailing_pips = 40
+                        elif "HOUR" in tf_val or "H1" in tf_val:
+                            core_trailing_pips = 30
+                        else:
+                            core_trailing_pips = 30
+
                         if engine.trailing_sl_core is None and engine.current_kj is not None:
                             if stato_corrente == "SHORT":
                                 dist_kj = engine.current_kj - c_close
-                                if dist_kj >= (40 * pip_val):
-                                    engine.trailing_sl_core = c_close + (40 * pip_val)
+                                if dist_kj >= (core_trailing_pips * pip_val):
+                                    engine.trailing_sl_core = c_close + (core_trailing_pips * pip_val)
                                     aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
-                                    print_log(nome, f"🎯 Trailing SL Core inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
+                                    print_log(nome, f"🎯 Trailing SL Core ({tf}) inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
                             elif stato_corrente == "LONG":
                                 dist_kj = c_close - engine.current_kj
-                                if dist_kj >= (40 * pip_val):
-                                    engine.trailing_sl_core = c_close - (40 * pip_val)
+                                if dist_kj >= (core_trailing_pips * pip_val):
+                                    engine.trailing_sl_core = c_close - (core_trailing_pips * pip_val)
                                     aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
-                                    print_log(nome, f"🎯 Trailing SL Core inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
+                                    print_log(nome, f"🎯 Trailing SL Core ({tf}) inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
 
                         # Trailing SL Incrementi: TK 20 / 20 (distanza TK >= 20 pip -> stop a 20 pip da Close)
                         if engine.trailing_sl_incr is None and len(pos_incr) > 0 and engine.current_tk is not None:
