@@ -1075,11 +1075,11 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "📡 Radar", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_radar, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report"])
-        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_report = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📡 Radar", "📄 Report"])
+        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_radar, tab_report = tabs
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     with tab_portafoglio:
@@ -2315,6 +2315,115 @@ else:
                             crea_riquadro_trend(tutti_strumenti[i+1])
 
             renderizza_dati_trend()
+
+    if tab_radar is not None:
+        with tab_radar:
+            @st.fragment(run_every=15)
+            def renderizza_tab_radar():
+                memoria_attuale = carica_memoria(conto_selezionato)
+                stato = leggi_stato_sistema(conto_selezionato)
+                prezzi_live = stato.get("prezzi_live", {})
+                radar_data = stato.get("radar_trend", {})
+                ts_aggiornamento = stato.get("radar_trend_ts", now_it().strftime("%d/%m/%Y %H:%M:%S"))
+                
+                st.markdown("<h1 style='color: #00BFFF; margin-top: -15px;'>📡 Radar Trend Multi-Timeframe (KJ55)</h1>", unsafe_allow_html=True)
+                st.markdown(f"<div style='color: #aaa; font-size: 0.88rem; margin-top: -10px; margin-bottom: 12px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b>{ts_aggiornamento}</b></div>", unsafe_allow_html=True)
+                
+                st.markdown("""
+                <div style='display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.85rem;'>
+                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 pip)</b>: Possibile ingresso imminente</div>
+                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 pip)</b>: Monitoraggio continuo</div>
+                    <div style='display: flex; align-items: center; gap: 6px;'><span style='display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "EUR/GBP", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                
+                html_table = """
+                <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 8px; overflow: hidden; font-family: sans-serif; font-size: 0.85rem;'>
+                    <thead>
+                        <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
+                            <th style='padding: 10px; text-align: left;'>Strumento</th>
+                            <th style='padding: 10px;'>Prezzo Live</th>
+                            <th style='padding: 10px;'>M5 (KJ55)</th>
+                            <th style='padding: 10px;'>H1 (KJ55)</th>
+                            <th style='padding: 10px;'>H4 (KJ55)</th>
+                            <th style='padding: 10px;'>Daily D1 (KJ55)</th>
+                            <th style='padding: 10px;'>Stato Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                """
+                
+                for idx, s_nome in enumerate(tutti_strumenti):
+                    cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
+                    dec = cfg_s.get("decimali", 2)
+                    mult = cfg_s.get("moltiplicatore", 0.0001)
+                    px = prezzi_live.get(s_nome)
+                    
+                    info_r = radar_data.get(s_nome, {})
+                    tf_dict = info_r.get("timeframes", {})
+                    
+                    mem_s = memoria_attuale.get(s_nome, {})
+                    is_attivo = mem_s.get("attivo", False)
+                    dir_s = mem_s.get("direzione", "")
+                    stato_s = mem_s.get("stato", "FLAT")
+                    tf_attivo = mem_s.get("timeframe", "HOUR")
+                    tf_attivo_lbl = "M5" if "MINUTE_5" in tf_attivo else ("H1" if "HOUR" in tf_attivo and "HOUR_4" not in tf_attivo else ("H4" if "HOUR_4" in tf_attivo else "D1"))
+                    
+                    if is_attivo and stato_s in ("LONG", "SHORT"):
+                        badge_stato = f"<span style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; border-radius: 4px; padding: 2px 6px; font-weight: bold;'>🟢 {stato_s} ({tf_attivo_lbl})</span>"
+                    else:
+                        badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 4px; padding: 2px 6px;'>⏳ FLAT</span>"
+                    
+                    px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
+                    
+                    def format_radar_cell(lbl_key):
+                        t_data = tf_dict.get(lbl_key, {})
+                        kj_v = t_data.get("kj")
+                        dist_p = t_data.get("dist_pips")
+                        dir_p = t_data.get("dir", "-")
+                        vicino = t_data.get("vicino", False)
+                        
+                        is_current_tf_trade = (is_attivo and stato_s in ("LONG", "SHORT") and tf_attivo_lbl == lbl_key)
+                        
+                        if is_current_tf_trade:
+                            return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: #60a5fa;'>IN TRADE</b><br><span style='font-size:0.72rem; color:#93c5fd;'>({stato_s})</span></div>"
+                            
+                        if kj_v is None or dist_p is None:
+                            return "<div style='color: #64748b; text-align: center;'>-</div>"
+                            
+                        kj_formatted = f"{kj_v:.{dec}f}"
+                        if vicino:
+                            col_dir = "#4ade80" if dir_p == "SOPRA" else "#f87171"
+                            bg_cell = "rgba(34, 197, 94, 0.2)" if dir_p == "SOPRA" else "rgba(239, 68, 68, 0.2)"
+                            bdr_cell = "#22c55e" if dir_p == "SOPRA" else "#ef4444"
+                            return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 6px; padding: 3px 6px; text-align: center;'><b style='color: {col_dir};'>⚡ {dist_p:.1f}p</b> <span style='font-size:0.72rem; color:#cbd5e1;'>({dir_p})</span><br><span style='font-size:0.72rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
+                        else:
+                            return f"<div style='text-align: center; color: #94a3b8;'><span style='font-weight: bold;'>{dist_p:.1f}p</span> <span style='font-size:0.72rem;'>({dir_p})</span><br><span style='font-size:0.72rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
+
+                    c_m5 = format_radar_cell("M5")
+                    c_h1 = format_radar_cell("H1")
+                    c_h4 = format_radar_cell("H4")
+                    c_d1 = format_radar_cell("D1")
+                    
+                    bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
+                    html_table += f"""
+                    <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                        <td style='padding: 8px 10px; font-weight: bold;'>{formatta_mercato_con_bandiere(s_nome)}</td>
+                        <td style='padding: 8px 10px; text-align: center; color: #00E676;'>{px_str}</td>
+                        <td style='padding: 6px 8px;'>{c_m5}</td>
+                        <td style='padding: 6px 8px;'>{c_h1}</td>
+                        <td style='padding: 6px 8px;'>{c_h4}</td>
+                        <td style='padding: 6px 8px;'>{c_d1}</td>
+                        <td style='padding: 8px 10px; text-align: center;'>{badge_stato}</td>
+                    </tr>
+                    """
+                
+                html_table += "</tbody></table>"
+                st.markdown(html_table, unsafe_allow_html=True)
+                
+            renderizza_tab_radar()
 
     if tab_restore is not None:
         with tab_restore:

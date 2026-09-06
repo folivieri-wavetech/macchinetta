@@ -519,6 +519,103 @@ def aggiorna_memoria(nome, update_dict):
     except Exception:
         pass
 
+RADAR_LAST_ALERT = {} # (nome, tf) -> timestamp
+
+def calcola_kj55_da_candele(candele_list, periods=55):
+    """Calcola la mediana Donchian (Max+Min)/2 a 55 periodi sulle candele fornite."""
+    if not candele_list:
+        return None
+    recent = candele_list[-periods:] if len(candele_list) >= periods else candele_list
+    valid = []
+    for c in recent:
+        h = c.get('highPrice', {}).get('bid') or c.get('highPrice', {}).get('ask') or c.get('high')
+        l = c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')
+        if h is not None and l is not None:
+            try:
+                vh, vl = float(h), float(l)
+                if 0 < vh < 1e8 and 0 < vl < 1e8:
+                    valid.append((vh, vl))
+            except (ValueError, TypeError):
+                pass
+    if not valid:
+        return None
+    highest = max(v[0] for v in valid)
+    lowest = min(v[1] for v in valid)
+    return (highest + lowest) / 2.0
+
+def aggiorna_radar_trend(prezzi_live, memoria_attuale):
+    """Scansiona tutti gli strumenti sui 4 TF (M5, H1, H4, D1) per calcolare la distanza da KJ55 e inviare alert di prossimità."""
+    if not prezzi_live:
+        return
+    radar_data = {}
+    now_ts = time.time()
+    tfs_radar = ["MINUTE_5", "HOUR", "HOUR_4", "DAY"]
+    tf_labels = {"MINUTE_5": "M5", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+    
+    for nome, cfg in CONFIG_STRUMENTI.items():
+        px = prezzi_live.get(nome)
+        if not px or not isinstance(px, (int, float)):
+            continue
+        mult = cfg.get("moltiplicatore", 0.0001)
+        dec = cfg.get("decimali", 2)
+        dati_mem = memoria_attuale.get(nome, {})
+        is_in_trade = (dati_mem.get("stato") in ("LONG", "SHORT")) and dati_mem.get("attivo", False)
+        
+        radar_data[nome] = {
+            "prezzo": px,
+            "in_trade": is_in_trade,
+            "direzione_trade": dati_mem.get("direzione", "") if is_in_trade else "",
+            "timeframe_trade": format_tf_label(dati_mem.get("timeframe", "HOUR")),
+            "timeframes": {}
+        }
+        
+        for tf in tfs_radar:
+            lbl = tf_labels[tf]
+            candele = carica_candele_locali(nome, tf, px_live=px)
+            kj = calcola_kj55_da_candele(candele, periods=55)
+            if kj is not None:
+                diff_pts = px - kj
+                dist_pips = abs(diff_pts) / mult
+                dir_pos = "SOPRA" if diff_pts >= 0 else "SOTTO"
+                is_vicino = (dist_pips <= 15.0)
+                
+                radar_data[nome]["timeframes"][lbl] = {
+                    "kj": kj,
+                    "dist_pips": round(dist_pips, 1),
+                    "dir": dir_pos,
+                    "vicino": is_vicino
+                }
+                
+                # Invio notifica Push solo se lo strumento NON è in trade ed entra nella soglia <= 15 pip
+                if is_vicino and not is_in_trade and not is_rollover_active():
+                    k_alert = f"{nome}_{lbl}"
+                    last_alert_time = RADAR_LAST_ALERT.get(k_alert, 0)
+                    # Cooldown 1 ora (3600 secondi)
+                    if now_ts - last_alert_time >= 3600:
+                        RADAR_LAST_ALERT[k_alert] = now_ts
+                        msg_alert = f"[{nome}] Prezzo a {dist_pips:.1f}p dalla Kijun {lbl} ({px:.{dec}f} vs KJ55 {kj:.{dec}f} {dir_pos})"
+                        print_log("RADAR", f"📡 {msg_alert}")
+                        invia_notifica(f"📡 RADAR {lbl}", msg_alert, "satellite")
+            else:
+                radar_data[nome]["timeframes"][lbl] = {
+                    "kj": None,
+                    "dist_pips": None,
+                    "dir": "-",
+                    "vicino": False
+                }
+                
+    try:
+        stato_full = {}
+        if os.path.exists(STATO_SISTEMA):
+            with open(STATO_SISTEMA, "r") as f:
+                stato_full = json.load(f)
+        stato_full["radar_trend"] = radar_data
+        stato_full["radar_trend_ts"] = now_it().strftime("%d/%m/%Y %H:%M:%S")
+        with open(STATO_SISTEMA, "w") as f:
+            json.dump(stato_full, f, indent=4)
+    except Exception:
+        pass
+
 def format_tf_label(tf_val):
     tf_s = str(tf_val or "").upper()
     if tf_s in ("MINUTE_5", "M5"):
@@ -781,6 +878,12 @@ def esegui_ciclo_trend():
         with open(FILE_MEMORIA, "r") as f: parametri = json.load(f)
     except Exception:
         return
+        
+    # Aggiornamento continuo Radar Trend (calcolo distanze KJ55 su tutti i 4 TF a 0 API)
+    try:
+        aggiorna_radar_trend(prezzi_live, parametri)
+    except Exception as e_rad:
+        pass
         
     for nome, dati in parametri.items():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
