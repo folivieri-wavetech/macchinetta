@@ -1252,7 +1252,10 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     t_info = trades_tf[lbl_key]
                     st_val = t_info["stato"]
                     ct_val = t_info["conto"]
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='Conto: {ct_val}'><b style='color: #60a5fa; font-size: 0.72rem;'>IN TRADE</b><br><span style='font-size:0.65rem; color:#93c5fd;'>({st_val})</span></div>"
+                    is_long_tr = (st_val == "LONG")
+                    col_dir_tr = "#4ade80" if is_long_tr else "#fa8072"  # Verde erba / Rosso salmone
+                    icon_dir = "🟢" if is_long_tr else "🔴"
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='Conto: {ct_val} ({st_val})'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span></div>"
                     
                 if kj_v is None and px and isinstance(px, (int, float)):
                     tf_code = tf_map_code.get(lbl_key, "HOUR")
