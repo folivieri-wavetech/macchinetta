@@ -379,6 +379,25 @@ def aggiorna_memoria(nome_strumento, aggiornamenti, log_wip=None):
             time.sleep(0.5)
     print_log(nome_strumento, "⚠️ Errore salvataggio Diario: File bloccato.")
 
+def is_weekend_active():
+    """
+    Ritorna True se siamo nel weekend a mercati chiusi:
+    - Venerdì sera dalle 23:00 in poi (weekday 4, t >= 23:00)
+    - Sabato tutto il giorno (weekday 5)
+    - Domenica fino alle 21:45 (weekday 6, t < 21:45)
+    (Dalle 21:45 di domenica subentra poi la Pausa Rollover fino alle 00:30 di lunedì).
+    """
+    ora = now_it()
+    t = ora.time()
+    wd = ora.weekday()
+    if wd == 4 and t >= datetime.time(23, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 45):
+        return True
+    return False
+
 ULTIMO_SALVATAGGIO_REPORT = None
 
 def salva_report_giornaliero(saldo, margine, drawdown):
@@ -550,7 +569,8 @@ def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=No
             marg = il_mio_conto['balance'].get('deposit', 0)
             dd = il_mio_conto['balance'].get('profitLoss', 0)
             
-            scrivi_stato_sistema(bal, disp, marg, dd, "Sistema Online", prezzi_live, dist_min, prezzi_bid_ask)
+            msg = "Mercati Chiusi (Weekend)" if is_weekend_active() else "Sistema Online"
+            scrivi_stato_sistema(bal, disp, marg, dd, msg, prezzi_live, dist_min, prezzi_bid_ask)
     except Exception:
         pass
 
@@ -987,6 +1007,18 @@ def esegui_motore():
             h = {}
         
         ultimo_controllo_saldo = 0
+        prezzi_live = {}
+        distanze_minime = {}
+        prezzi_bid_ask = {}
+        if os.path.exists("stato_sistema.json"):
+            try:
+                with open("stato_sistema.json", "r") as f_st:
+                    d_st = json.load(f_st)
+                    prezzi_live = d_st.get("prezzi_live", {})
+                    distanze_minime = d_st.get("distanze_minime", {})
+                    prezzi_bid_ask = d_st.get("prezzi_bid_ask", {})
+            except Exception:
+                pass
 
         import random
         while True:
@@ -1031,19 +1063,10 @@ def esegui_motore():
                     }
                     invia_notifica(f"🔄 TOKEN RINNOVATO: {NOME_CONTO}", f"Il token di sessione IG per il conto {NOME_CONTO} è stato rinnovato o rigenerato con successo.", "arrows_counterclockwise")
 
-            def is_weekend_active():
-                ora = now_it()
-                t = ora.time()
-                wd = ora.weekday()
-                if wd == 4 and t >= datetime.time(23, 0):
-                    return True
-                if wd == 5:
-                    return True
-                if wd == 6 and t < datetime.time(21, 45):
-                    return True
-                return False
-
             if is_weekend_active():
+                if ora_attuale - ultimo_controllo_saldo >= 30:
+                    ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
+                    ultimo_controllo_saldo = ora_attuale
                 time.sleep(15)
                 continue
 
