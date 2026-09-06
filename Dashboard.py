@@ -1885,7 +1885,7 @@ else:
                             elif dati.get("needs_manual_start", False):
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(13,110,253,0.15); color: #0d6efd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🚀 AVVIO ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Esecuzione a mercato...</span></div>", unsafe_allow_html=True)
                             else:
-                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>In attesa chiusura candela</span></div>", unsafe_allow_html=True)
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
                             c2.markdown("<span style='background-color: rgba(23,162,184,0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
@@ -2301,7 +2301,7 @@ else:
                                 elif dati_salvati.get("needs_manual_start", False):
                                     st.info(f"🚀 AVVIO IN CORSO ({direzione})...")
                                 else:
-                                    st.warning(f"⏳ IN ATTESA CHIUSURA CANDELA (FLAT) | ({tf_display})")
+                                    st.warning(f"⏳ FLAT | ({tf_display})")
                         
 
 
