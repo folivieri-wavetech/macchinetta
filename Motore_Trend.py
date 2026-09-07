@@ -974,7 +974,7 @@ def is_rollover_active():
     ora = now_it()
     t = ora.time()
     wd = ora.weekday()
-    if wd == 6 and (datetime.time(21, 45) <= t <= datetime.time(23, 59, 59)):
+    if wd == 6 and (datetime.time(21, 58) <= t <= datetime.time(23, 59, 59)):
         return True
     if wd in (0, 1, 2, 3) and (datetime.time(22, 45) <= t <= datetime.time(23, 59, 59)):
         return True
@@ -987,8 +987,8 @@ def is_weekend_active():
     Ritorna True se siamo nel weekend a mercati chiusi:
     - Venerdì sera dalle 23:00 in poi (weekday 4, t >= 23:00)
     - Sabato tutto il giorno (weekday 5)
-    - Domenica fino alle 21:45 (weekday 6, t < 21:45)
-    (Dalle 21:45 di domenica subentra poi la Pausa Rollover fino alle 00:15 di lunedì).
+    - Domenica fino alle 21:57:59 (weekday 6, t < 21:58)
+    (Dalle 21:58 di domenica subentra la Pausa Rollover fino alle 00:15 di lunedì; i mercati aprono alle 22:00 e le candele vengono memorizzate regolarmente).
     """
     ora = now_it()
     t = ora.time()
@@ -997,7 +997,7 @@ def is_weekend_active():
         return True
     if wd == 5:
         return True
-    if wd == 6 and t < datetime.time(21, 45):
+    if wd == 6 and t < datetime.time(21, 58):
         return True
     return False
 
@@ -1330,7 +1330,7 @@ def esegui_ciclo_trend():
         in_rollover = is_rollover_active()
         is_sosp_rollover = dati.get("sospeso_rollover", False)
         if in_rollover and not is_sosp_rollover:
-            msg_ora = "21:45" if now_it().weekday() == 6 else "22:45"
+            msg_ora = "21:58" if now_it().weekday() == 6 else "22:45"
             print_log(nome, f"🌙 INIZIO PAUSA ROLLOVER ({msg_ora}): Stop live congelati e ingressi sospesi per protezione spread.")
             aggiorna_memoria(nome, {"sospeso_rollover": True})
             dati["sospeso_rollover"] = True
@@ -1350,10 +1350,8 @@ def esegui_ciclo_trend():
                     processa_eventi_engine(nome, engine, live_events, epic, valuta, size_i, headers, dec, auto_restart, dati)
 
         # -------------------------------------------------------------
-        # FASE 2: TIMING FINE CANDELA O AVVIO MANUALE
+        # FASE 2: TIMING FINE CANDELA (Registrazione candele e calcolo KJ sempre attivi dalle 22:00)
         # -------------------------------------------------------------
-        if in_rollover:
-            continue
         has_no_core = (engine.pm.core_position is None) if (engine and hasattr(engine, 'pm')) else True
         needs_start = dati.get("needs_manual_start", False) or (is_attivo and has_no_core and not dati.get("posizioni_core") and direzione in ("LONG", "SHORT"))
         
@@ -1488,6 +1486,13 @@ def esegui_ciclo_trend():
             "last_candle_time": snapshot_time
         })
         
+        # -------------------------------------------------------------
+        # PROTEZIONE SPREAD ROLLOVER: Candele e KJ calcolate regolarmente,
+        # ma aperture trade ed esecuzioni a mercato congelate fino alle 00:15
+        # -------------------------------------------------------------
+        if in_rollover:
+            continue
+
         pos_core = dati.get("posizioni_core", [])
         pos_incr = dati.get("posizioni_incr", [])
         
