@@ -43,6 +43,7 @@ FILE_TOKEN = "token_ig.json"
 STATO_SISTEMA = "stato_sistema.json"
 CONSOLE_LOG_FILE = "console_live.log"
 STATO_TREND = "stato_trend.json"
+ULTIMO_LOG_ATTESA = {}
 
 if len(sys.argv) < 2:
     print("🚨 ERRORE: Devi specificare il nome della cartella del conto all'avvio!")
@@ -1200,6 +1201,36 @@ def esegui_ciclo_trend():
             pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic] if has_pos_live_data else []
             
             if pos_ig_strum or pos_core or pos_incr or da_chiudere:
+                m_status = "TRADEABLE"
+                if pos_ig_strum:
+                    m_status = pos_ig_strum[0].get('market', {}).get('marketStatus', 'TRADEABLE')
+                
+                if m_status != "TRADEABLE":
+                    t_now = time.time()
+                    if t_now - ULTIMO_LOG_ATTESA.get(nome, 0) > 60:
+                        ULTIMO_LOG_ATTESA[nome] = t_now
+                        print_log(nome, f"⏳ Posizione in attesa liquidazione: mercato IG non negoziabile ({m_status}).")
+                    
+                    up_pend = {
+                        "attivo": False,
+                        "stato": "IN_ATTESA_CHIUSURA",
+                        "da_chiudere_a_riapertura": True,
+                        "msg_manuale": f"⚠️ Mercato {m_status} su IG. La posizione verrà chiusa automaticamente appena il mercato torna TRADEABLE."
+                    }
+                    if pos_ig_strum and not pos_core:
+                        p0 = pos_ig_strum[0].get('position', {})
+                        d_str = "LONG" if p0.get('direction') == "BUY" else "SHORT"
+                        up_pend["posizioni_core"] = [{
+                            "entry": float(p0.get('level', 0.0)),
+                            "size": float(p0.get('size', size_i)),
+                            "ticket": p0.get('dealId'),
+                            "direction": d_str,
+                            "tipo": "core"
+                        }]
+                        up_pend["direzione"] = d_str
+                    aggiorna_memoria(nome, up_pend)
+                    continue
+
                 print_log(nome, f"Motore spento o in attesa chiusura. Verifica liquidazione su IG...")
                 
                 # Costruisci l'elenco delle posizioni da chiudere dando priorità assoluta ai dealId live su IG
