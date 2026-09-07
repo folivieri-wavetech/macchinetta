@@ -1019,13 +1019,29 @@ def esegui_ciclo_trend():
         candele_locali = carica_candele_locali(nome, tf)
 
         if not is_attivo:
-            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria, ripuliscile e registra su WIP
+            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria, ripuliscile e chiudi su IG
             pos_core = dati.get("posizioni_core", [])
             pos_incr = dati.get("posizioni_incr", [])
             if pos_core or pos_incr:
+                print_log(nome, f"Motore spento manualmente da Dashboard. Chiusura forzata di tutte le posizioni attive su IG.")
+                
+                # Chiudi tutte le posizioni su IG
+                for p in pos_core + pos_incr:
+                    deal_id = p.get("ticket")
+                    if deal_id:
+                        dir_chiusura = "SELL" if p.get("direction") == "LONG" else "BUY"
+                        sz = p.get("size", size_i)
+                        tipo_pos = p.get("tipo", "core")
+                        etichetta_tag = f"[{tipo_pos.upper()}]"
+                        chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
+                        import time
+                        time.sleep(0.2)
+                
+                invia_notifica(f"⏹️ MOTORE SPENTO: {nome}", f"[{nome}] Chiusura forzata posizioni per spegnimento manuale.", "stop_button")
+                
                 storico = dati.get("storico_wip_trend", [])
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                storico.append(f"[{ora_str}] 🛑 STOP: Spento")
+                storico.append(f"[{ora_str}] 🛑 STOP: Spento e chiuso")
                 aggiorna_memoria(nome, {
                     "posizioni_core": [], 
                     "posizioni_incr": [], 
