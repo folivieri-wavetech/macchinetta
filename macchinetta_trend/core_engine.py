@@ -220,8 +220,9 @@ class CoreEngine:
                             
                         distanza_percorsa = self.retracement_start_price - closed_candle.low
                         
-                        if distanza_percorsa >= min_body_price:
-                            entry_price = exec_price 
+                        tf_val = self.config.get("timeframe", "MINUTE_5")
+                        if tf_val == "MINUTE_5" or distanza_percorsa >= min_body_price:
+                            entry_price = exec_price
                             
                             # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
                             tf_val = self.config.get("timeframe", "MINUTE_5")
@@ -343,8 +344,9 @@ class CoreEngine:
                             
                         distanza_percorsa = closed_candle.high - self.retracement_start_price
                         
-                        if distanza_percorsa >= min_body_price:
-                            entry_price = exec_price 
+                        tf_val = self.config.get("timeframe", "MINUTE_5")
+                        if tf_val == "MINUTE_5" or distanza_percorsa >= min_body_price:
+                            entry_price = exec_price
                             
                             # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
                             tf_val = self.config.get("timeframe", "MINUTE_5")
