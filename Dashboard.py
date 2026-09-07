@@ -1305,6 +1305,17 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 dir_p = t_data.get("dir", "-")
                 vicino = t_data.get("vicino", False)
                 
+                if kj_v is None and px and isinstance(px, (int, float)):
+                    tf_code = tf_map_code.get(lbl_key, "HOUR")
+                    candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
+                    kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
+                    if kj_c is not None:
+                        kj_v = kj_c
+                        diff_pts = px - kj_v
+                        dist_p = round(abs(diff_pts) / mult)
+                        dir_p = "Possibile Entrata"
+                        vicino = (dist_p <= 15)
+
                 is_current_tf_trade = (lbl_key in trades_tf)
                 
                 if is_current_tf_trade:
@@ -1317,18 +1328,8 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     icon_dir = "🟢" if is_profit else "🔴"
                     pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
                     title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span></div>"
-                    
-                if kj_v is None and px and isinstance(px, (int, float)):
-                    tf_code = tf_map_code.get(lbl_key, "HOUR")
-                    candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
-                    kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
-                    if kj_c is not None:
-                        kj_v = kj_c
-                        diff_pts = px - kj_v
-                        dist_p = round(abs(diff_pts) / mult)
-                        dir_p = "Possibile Entrata"
-                        vicino = (dist_p <= 15)
+                    kj_line = f"<span style='font-size:0.60rem; color:#94a3b8;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
 
                 if kj_v is None or dist_p is None:
                     return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
