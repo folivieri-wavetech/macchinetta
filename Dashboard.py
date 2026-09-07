@@ -1243,9 +1243,36 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     tf_a = mem_s.get("timeframe", "HOUR")
                     tf_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
                     if tf_lbl not in trades_tf:
+                        pos_c = mem_s.get("posizioni_core", [])
+                        pos_i = mem_s.get("posizioni_incr", [])
+                        tot_pnl_pts = 0.0
+                        has_pos = False
+                        
+                        if px and isinstance(px, (int, float)):
+                            for pc in pos_c:
+                                e_px = pc.get("entry")
+                                sz = pc.get("size", 1)
+                                d_pos = pc.get("direction", mem_s.get("stato"))
+                                if e_px and isinstance(e_px, (int, float)) and e_px > 0:
+                                    has_pos = True
+                                    diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
+                                    tot_pnl_pts += (diff / mult) * sz
+                            for pi in pos_i:
+                                e_px = pi.get("entry")
+                                sz = pi.get("size", 1)
+                                d_pos = pi.get("direction", mem_s.get("stato"))
+                                if e_px and isinstance(e_px, (int, float)) and e_px > 0:
+                                    has_pos = True
+                                    diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
+                                    tot_pnl_pts += (diff / mult) * sz
+                        
+                        is_profit = (tot_pnl_pts >= 0) if has_pos else True
+                        
                         trades_tf[tf_lbl] = {
                             "stato": mem_s.get("stato"),
-                            "conto": c_dir.replace("_DEMO", "").replace("_REALE", "")
+                            "conto": c_dir.replace("_DEMO", "").replace("_REALE", ""),
+                            "is_profit": is_profit,
+                            "pnl_pts": tot_pnl_pts
                         }
             
             if trades_tf:
@@ -1255,13 +1282,16 @@ def renderizza_schermata_radar(conto_selezionato=None):
                         t_info = trades_tf[tf_k]
                         st_dir = t_info["stato"]
                         ct_name = t_info["conto"]
-                        is_l = (st_dir == "LONG")
-                        col_bg = "rgba(34, 197, 94, 0.2)" if is_l else "rgba(239, 68, 68, 0.2)"
-                        col_bdr = "#22c55e" if is_l else "#ef4444"
-                        col_txt = "#4ade80" if is_l else "#f87171"
-                        icon_d = "🟢" if is_l else "🔴"
-                        tag_d = "L" if is_l else "S"
-                        pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir})'>{icon_d} {tf_k} ({tag_d})</span>")
+                        is_profit = t_info.get("is_profit", True)
+                        pnl_pts = t_info.get("pnl_pts", 0.0)
+                        pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
+                        
+                        col_bg = "rgba(34, 197, 94, 0.2)" if is_profit else "rgba(239, 68, 68, 0.2)"
+                        col_bdr = "#22c55e" if is_profit else "#ef4444"
+                        col_txt = "#4ade80" if is_profit else "#f87171"
+                        icon_d = "🟢" if is_profit else "🔴"
+                        tag_d = "L" if st_dir == "LONG" else "S"
+                        pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt'>{icon_d} {tf_k} ({tag_d})</span>")
                 badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
             else:
                 badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
@@ -1281,10 +1311,13 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     t_info = trades_tf[lbl_key]
                     st_val = t_info["stato"]
                     ct_val = t_info["conto"]
-                    is_long_tr = (st_val == "LONG")
-                    col_dir_tr = "#4ade80" if is_long_tr else "#fa8072"  # Verde erba / Rosso salmone
-                    icon_dir = "🟢" if is_long_tr else "🔴"
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='Conto: {ct_val} ({st_val})'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span></div>"
+                    is_profit = t_info.get("is_profit", True)
+                    pnl_pts = t_info.get("pnl_pts", 0.0)
+                    col_dir_tr = "#4ade80" if is_profit else "#f87171"
+                    icon_dir = "🟢" if is_profit else "🔴"
+                    pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
+                    title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span></div>"
                     
                 if kj_v is None and px and isinstance(px, (int, float)):
                     tf_code = tf_map_code.get(lbl_key, "HOUR")
