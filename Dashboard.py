@@ -446,6 +446,7 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
                     r_c = requests.post(f"{base_url}/positions/otc", json=body, headers=h_del, timeout=8)
                     if r_c.status_code == 200:
                         chiusi += 1
+                    time.sleep(0.5)
         return True, f"{chiusi} posizioni chiuse"
     except Exception as e:
         return False, str(e)
