@@ -2893,18 +2893,10 @@ else:
                                     st.session_state[err_key] = ""
                                     ora_str = datetime.now().strftime("%d/%m %H:%M:%S")
                                     storico = dati_salvati.get("storico_wip_trend", [])
-                                    storico.append(f"[{ora_str}] 🛑 STOP: Spento")
+                                    # Non scriviamo STOP: Spento qui. Lasciamo che Motore_Trend.py se ne occupi dopo aver chiuso su IG!
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
                                         "attivo": False, 
-                                        "direzione": "", 
-                                        "stato": "FLAT", 
-                                        "tipo_strategia": "TREND", 
-                                        "posizioni_core": [], 
-                                        "posizioni_incr": [], 
-                                        "trailing_sl_core": None, 
-                                        "trailing_sl_incr": None, 
-                                        "storico_wip_trend": storico[-30:],
                                         "msg_manuale": ""
                                     }
                                     salva_memoria(conto_selezionato, memoria_attuale)
