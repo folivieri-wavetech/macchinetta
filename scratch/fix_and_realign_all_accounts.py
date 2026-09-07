@@ -6,7 +6,7 @@ import os
 CONFIG_EPIC = {
     "Spot Gold": "CS.D.CFEGOLD.CBE.IP",
     "US 500 Cash": "IX.D.SPTRD.IFD.IP",
-    "EUR/USD": "CS.D.EURUSD.MINI.IP",
+    "EUR/USD": "CS.D.EURUSD.CEBM.IP",
     "GBP/USD": "CS.D.GBPUSD.MINI.IP",
     "USD/JPY": "CS.D.USDJPY.MINI.IP",
     "AUD/CAD": "CS.D.AUDCAD.MINI.IP",

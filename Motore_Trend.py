@@ -61,7 +61,7 @@ config = dotenv_values(".env")
 CONFIG_STRUMENTI = {
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "EUR/USD": {"epic": "CS.D.EURUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
+    "EUR/USD": {"epic": "CS.D.EURUSD.CEBM.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
     "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
@@ -721,19 +721,6 @@ def salva_candele_locali(nome, tf, candele_list):
         buffer_100 = candele_list[-100:]
         with open(fpath, "w", encoding="utf-8") as f:
             json.dump(buffer_100, f, indent=2)
-        # Sincronizzazione immediata cross-account sulla PVC condivisa /data:
-        # Quando un pod aggiorna il file, gli altri pod trovano subito la candela e non chiamano IG!
-        clean = nome.replace("/", "_").replace(" ", "_")
-        fname = f"candele_{clean}_{tf}.json"
-        for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
-            alt_dir = os.path.join("..", altro)
-            alt_path = os.path.join(alt_dir, fname)
-            if os.path.isdir(alt_dir) and os.path.abspath(alt_path) != os.path.abspath(fpath):
-                try:
-                    with open(alt_path, "w", encoding="utf-8") as f_alt:
-                        json.dump(buffer_100, f_alt, indent=2)
-                except Exception:
-                    pass
     except Exception as e:
         print_log(nome, f"Errore salvataggio candele locali: {e}")
 

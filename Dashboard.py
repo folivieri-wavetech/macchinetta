@@ -35,7 +35,7 @@ import Sistema.auth_manager as auth_manager
 CONFIG_STRUMENTI = {
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "margine_unitario": 310},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 210},
-    "EUR/USD": {"epic": "CS.D.EURUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 335},
+    "EUR/USD": {"epic": "CS.D.EURUSD.CEBM.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 335},
     "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 400},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 300},
@@ -398,6 +398,57 @@ def get_ig_headers(conto_selezionato):
         }
     except:
         return None
+
+def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
+    """Chiude immediatamente a mercato tutte le posizioni reali su IG aperte per lo strumento dato."""
+    h = get_ig_headers(conto)
+    if not h:
+        return False, "Headers IG non disponibili"
+    
+    base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto.upper() else "https://demo-api.ig.com/gateway/deal"
+    epic = CONFIG_STRUMENTI.get(nome_strumento, {}).get("epic")
+    
+    h_v2 = h.copy()
+    h_v2["VERSION"] = "2"
+    
+    try:
+        r = requests.get(f"{base_url}/positions", headers=h_v2, timeout=6)
+        if r.status_code != 200:
+            return False, f"Errore recupero posizioni IG ({r.status_code})"
+        
+        pos_list = r.json().get("positions", [])
+        chiusi = 0
+        h_del = h.copy()
+        h_del["VERSION"] = "1"
+        h_del["_method"] = "DELETE"
+        
+        clean_nome = nome_strumento.upper().replace("/", "").replace(" ", "")
+        for p in pos_list:
+            m = p.get("market", {})
+            pos = p.get("position", {})
+            p_epic = m.get("epic", "")
+            p_name = m.get("instrumentName", "")
+            clean_pname = p_name.upper().replace("/", "").replace(" ", "")
+            
+            # Match per epic o per nome strumento
+            if (epic and p_epic == epic) or (clean_nome in clean_pname) or (clean_pname in clean_nome):
+                deal_id = pos.get("dealId")
+                direction = pos.get("direction")
+                size = pos.get("size")
+                if deal_id and direction and size:
+                    dir_chiusura = "SELL" if direction in ("BUY", "LONG") else "BUY"
+                    body = {
+                        "dealId": deal_id,
+                        "direction": dir_chiusura,
+                        "size": str(int(size)) if float(size).is_integer() else str(size),
+                        "orderType": "MARKET"
+                    }
+                    r_c = requests.post(f"{base_url}/positions/otc", json=body, headers=h_del, timeout=8)
+                    if r_c.status_code == 200:
+                        chiusi += 1
+        return True, f"{chiusi} posizioni chiuse"
+    except Exception as e:
+        return False, str(e)
 
 @st.dialog("Configurazione Avvio Sincrono Multiconto", width="large")
 def dialog_sync_start(conto_partenza, nome_strumento):
@@ -2958,11 +3009,20 @@ else:
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
                                     st.session_state[err_key] = ""
                                     ora_str = datetime.now().strftime("%d/%m %H:%M:%S")
+                                    ok_ig, msg_ig = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
                                     storico = dati_salvati.get("storico_wip_trend", [])
-                                    # Non scriviamo STOP: Spento qui. Lasciamo che Motore_Trend.py se ne occupi dopo aver chiuso su IG!
+                                    storico.append(f"[{ora_str}] 🛑 STOP: Spento e chiuso su IG ({msg_ig})")
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
-                                        "attivo": False, 
+                                        "attivo": False,
+                                        "stato": "FLAT",
+                                        "direzione": "",
+                                        "posizioni_core": [],
+                                        "posizioni_incr": [],
+                                        "trailing_sl_core": None,
+                                        "trailing_sl_incr": None,
+                                        "needs_manual_start": False,
+                                        "storico_wip_trend": storico[-30:],
                                         "msg_manuale": ""
                                     }
                                     salva_memoria(conto_selezionato, memoria_attuale)
