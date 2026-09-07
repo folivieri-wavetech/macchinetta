@@ -2779,6 +2779,16 @@ else:
 
 
 
+                radar_data = stato.get("radar_trend", {})
+                if not radar_data:
+                    r_file = os.path.join(conto_selezionato, "radar_trend.json")
+                    if os.path.exists(r_file):
+                        try:
+                            with open(r_file, "r", encoding="utf-8") as f_rf:
+                                radar_data = json.load(f_rf).get("radar_trend", {})
+                        except Exception:
+                            pass
+
                 def crea_riquadro_trend(nome, def_body=10, def_size=3, def_size_max=5, def_scala=1):
                     with st.container(border=True):
                         dati_salvati = memoria_attuale.get(nome, {})
@@ -2794,6 +2804,10 @@ else:
                         auto_restart = dati_salvati.get("auto_restart", False)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         
+                        tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+                        tf_selected = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
+                        tf_badge = tf_map.get(tf_selected, "M5")
+                        
                         col_titolo, col_salva = st.columns([3, 1], vertical_alignment="center")
                         with col_titolo:
                             auto_restart = st.checkbox("Auto-Restart", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
@@ -2804,15 +2818,25 @@ else:
                             
                             bid = prezzi_bid_ask.get(nome, {}).get("bid", "-")
                             ask = prezzi_bid_ask.get(nome, {}).get("ask", "-")
-                            current_kj = dati_salvati.get("current_kj")
-                            current_tk = dati_salvati.get("current_tk")
+                            
+                            # Allineamento dinamico Kijun (KJ55) con Radar Trend per il timeframe selezionato
+                            current_kj = None
+                            if radar_data and nome in radar_data:
+                                current_kj = radar_data[nome].get("timeframes", {}).get(tf_badge, {}).get("kj")
+                            
+                            px_ref = bid if isinstance(bid, (int, float)) else (ask if isinstance(ask, (int, float)) else None)
+                            if current_kj is None:
+                                candele_loc = carica_candele_locali_dash(conto_selezionato, nome, tf_selected, px_live=px_ref)
+                                current_kj = calcola_kj55_da_candele_dash(candele_loc, periods=55)
+                                
+                            candele_loc = carica_candele_locali_dash(conto_selezionato, nome, tf_selected, px_live=px_ref)
+                            current_tk = calcola_kj55_da_candele_dash(candele_loc, periods=21)
+                            
                             dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                             kj_str = f"{current_kj:.{dec}f}" if current_kj is not None else "-"
                             tk_str = f"{current_tk:.{dec}f}" if current_tk is not None else "-"
-                            tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
-                            tf_badge = tf_map.get(tf_val, tf_val)
                             st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 2px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 6px;'><b style='color: #FFD700;'>🟡 Kijun ({tf_badge}):</b> <span style='color: #FFD700;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan ({tf_badge}):</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 6px;'><b style='color: #FFD700;'>🟡 Kijun ({tf_badge}):</b> <span style='color: #FFFF00; font-weight: 500;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan ({tf_badge}):</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
@@ -2823,7 +2847,9 @@ else:
                                     "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
                                     "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
                                     "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
-                                    "auto_restart": auto_restart
+                                    "auto_restart": auto_restart,
+                                    "current_kj": current_kj,
+                                    "current_tk": current_tk
                                 }
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()

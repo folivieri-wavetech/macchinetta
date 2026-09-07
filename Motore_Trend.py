@@ -862,6 +862,17 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     "dir": "-",
                     "vicino": False
                 }
+        
+        # Allineamento automatico continuo di current_kj e current_tk per il timeframe configurato dello strumento
+        tf_conf = dati_mem.get("timeframe", "MINUTE_5")
+        lbl_conf = tf_labels.get(tf_conf, "M5")
+        kj_conf = radar_data[nome]["timeframes"].get(lbl_conf, {}).get("kj")
+        if kj_conf is not None and (dati_mem.get("current_kj") != kj_conf):
+            candele_conf = carica_candele_locali(nome, tf_conf, px_live=px)
+            tk_conf = calcola_kj55_da_candele(candele_conf, periods=21)
+            aggiorna_memoria(nome, {"current_kj": kj_conf, "current_tk": tk_conf})
+            dati_mem["current_kj"] = kj_conf
+            dati_mem["current_tk"] = tk_conf
                 
     ts_radar = now_it().strftime("%d/%m/%Y %H:%M:%S")
     try:
@@ -1599,8 +1610,8 @@ def esegui_ciclo_trend():
             
         engine.seed_history(storic_candles)
         
-        tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 9))
-        kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 26))
+        tk_val = engine._calculate_donchian(engine.config.get("tk_periods", 21))
+        kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 55))
         
         # Salva SEMPRE tk, kj e il timestamp della candela
         aggiorna_memoria(nome, {
