@@ -798,7 +798,7 @@ def calcola_kj55_da_candele(candele_list, periods=55):
                     valid.append((vh, vl))
             except (ValueError, TypeError):
                 pass
-    if not valid:
+    if not valid or len(valid) < periods:
         return None
     highest = max(v[0] for v in valid)
     lowest = min(v[1] for v in valid)
