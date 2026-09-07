@@ -104,7 +104,7 @@ CONFIG_STRUMENTI = {
     "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "EUR/GBP": {"epic": "CS.D.EURGBP.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "GBP", "valore_punto": 1},
+    "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
     "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
@@ -150,11 +150,14 @@ def get_eur_rate(valuta, prezzi):
     eur_gbp = prezzi.get("EUR/GBP")
     gbp_usd = prezzi.get("GBP/USD")
     
-    if not eur_gbp or not gbp_usd:
+    if eur_gbp and gbp_usd:
+        eur_usd = eur_gbp * gbp_usd
+    elif gbp_usd:
+        eur_usd = 1.08
+        eur_gbp = eur_usd / gbp_usd
+    else:
         return 1.0
         
-    eur_usd = eur_gbp * gbp_usd
-    
     if valuta == "USD":
         return 1.0 / eur_usd
     if valuta == "GBP":
