@@ -86,6 +86,121 @@ def invia_notifica(titolo, messaggio, tags="rotating_light"):
         except Exception as e:
             print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
 
+FILE_NOTIFICHE_SISTEMA_DEDUP = "notifiche_sistema_dedup.json"
+
+def invia_notifica_sistema(chiave_evento, titolo, messaggio, tags="information_source", cooldown_sec=14400):
+    """
+    Invia una notifica unificata a livello di MACCHINETTA (de-duplicata per tutti i conti e pod).
+    Se un qualsiasi pod o conto ha già inviato questa notifica entro il cooldown, non viene reinviata.
+    """
+    topic = config.get("NTFY_TOPIC")
+    if not topic:
+        return
+    
+    target_path = None
+    for base in ["/data/Logs_e_Cache", "../Logs_e_Cache", "Logs_e_Cache", "."]:
+        if os.path.exists(base):
+            target_path = os.path.join(base, FILE_NOTIFICHE_SISTEMA_DEDUP)
+            break
+    if not target_path:
+        target_path = FILE_NOTIFICHE_SISTEMA_DEDUP
+
+    now_ts = time.time()
+    stato_notifiche = {}
+    if os.path.exists(target_path):
+        try:
+            with open(target_path, "r", encoding="utf-8") as f:
+                stato_notifiche = json.load(f)
+        except Exception:
+            stato_notifiche = {}
+
+    last_sent = stato_notifiche.get(chiave_evento, 0)
+    if now_ts - last_sent < cooldown_sec:
+        return
+
+    # Registra subito il timestamp per prevenire race conditions tra pod
+    stato_notifiche[chiave_evento] = now_ts
+    stato_notifiche = {k: v for k, v in stato_notifiche.items() if (now_ts - v) < 7 * 86400}
+    try:
+        with open(target_path, "w", encoding="utf-8") as f:
+            json.dump(stato_notifiche, f, indent=2)
+    except Exception:
+        pass
+
+    try:
+        orario = now_it().strftime("%H:%M:%S")
+        messaggio_con_orario = f"[{orario}] {messaggio}"
+        headers = {
+            "Title": f"[MACCHINETTA] {titolo}".encode('utf-8'),
+            "Tags": tags
+        }
+        requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
+        print_log("SISTEMA", f"📢 Notifica di Sistema inviata: {titolo}")
+    except Exception as e:
+        print_log("SISTEMA", f"⚠️ Errore invio notifica Sistema: {e}")
+
+def verifica_notifiche_sistema_transizioni():
+    """Verifica e notifica le transizioni temporali globali della Macchinetta (una sola volta a livello di sistema)."""
+    now_t = now_it()
+    wd = now_t.weekday()
+    t = now_t.time()
+
+    # 1. Venerdì ore 22:45 -> Sospensione operatività weekend
+    if wd == 4 and datetime.time(22, 45) <= t <= datetime.time(23, 0):
+        chiave = f"freeze_weekend_{now_t.strftime('%Y_%m_%d')}"
+        invia_notifica_sistema(
+            chiave,
+            "⏸️ SOSPENSIONE OPERATIVITÀ WEEKEND",
+            "Operatività a mercato sospesa per chiusura weekend fino a domenica ore 21:57:59. Candele di fine settimana regolarmente in registrazione fino alle 23:00.",
+            tags="pause_button",
+            cooldown_sec=7200
+        )
+
+    # 2. Domenica ore 21:58 -> Inizio Pausa Rollover apertura mercati
+    elif wd == 6 and datetime.time(21, 58) <= t <= datetime.time(22, 15):
+        chiave = f"rollover_domenica_{now_t.strftime('%Y_%m_%d')}"
+        invia_notifica_sistema(
+            chiave,
+            "🌙 INIZIO PAUSA ROLLOVER",
+            "Pausa Rollover attiva fino alle 00:15 di lunedì. Mercati aperti dalle 22:00: candele e Kijun-sen in regolare registrazione; operatività a mercato congelata per protezione spread.",
+            tags="crescent_moon",
+            cooldown_sec=7200
+        )
+
+    # 3. Lun-Gio ore 22:45 -> Rollover notturno
+    elif wd in (0, 1, 2, 3) and datetime.time(22, 45) <= t <= datetime.time(23, 0):
+        chiave = f"rollover_notte_{now_t.strftime('%Y_%m_%d')}"
+        invia_notifica_sistema(
+            chiave,
+            "🌙 PAUSA ROLLOVER NOTTURNA",
+            "Pausa Rollover notturna attiva dalle 22:45 alle 00:15: stop live e ingressi congelati per protezione spread.",
+            tags="crescent_moon",
+            cooldown_sec=7200
+        )
+
+    # 4. Lunedì-Venerdì ore 00:15 -> Fine Rollover e ripresa attività normale
+    elif wd in (0, 1, 2, 3, 4) and datetime.time(0, 15) <= t <= datetime.time(0, 30):
+        chiave = f"fine_rollover_{now_t.strftime('%Y_%m_%d')}"
+        invia_notifica_sistema(
+            chiave,
+            "☀️ FINE PAUSA ROLLOVER",
+            "Ripresa regolare della normale operatività a mercato su tutti i conti.",
+            tags="sunny",
+            cooldown_sec=7200
+        )
+
+    # 5. Alert Quota Storica IG se in esaurimento (controllo centralizzato)
+    rem_quota = get_remaining_quota_ig()
+    if rem_quota < 1000:
+        chiave = f"quota_ig_warning_{now_t.strftime('%Y_%m_%d')}"
+        invia_notifica_sistema(
+            chiave,
+            "⚠️ QUOTA DATI IG IN ESAURIMENTO",
+            f"Quota residua storico IG a {rem_quota} punti. Attivata protezione automatica minima a consumo ridotto.",
+            tags="warning",
+            cooldown_sec=43200
+        )
+
 def print_log(strumento, messaggio):
     ora = now_it().strftime("%H:%M:%S")
     riga = f"[{ora}] [{strumento}] {messaggio}"
@@ -1032,6 +1147,12 @@ def esegui_ciclo_trend():
     try:
         aggiorna_radar_trend(prezzi_live, parametri)
     except Exception as e_rad:
+        pass
+
+    # Controllo e invio notifiche di sistema unificate per la Macchinetta (transizioni orarie e rollover)
+    try:
+        verifica_notifiche_sistema_transizioni()
+    except Exception:
         pass
 
     if is_weekend_active():
