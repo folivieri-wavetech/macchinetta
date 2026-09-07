@@ -150,8 +150,8 @@ def verifica_notifiche_sistema_transizioni():
         chiave = f"freeze_weekend_{now_t.strftime('%Y_%m_%d')}"
         invia_notifica_sistema(
             chiave,
-            "⏸️ SOSPENSIONE OPERATIVITÀ WEEKEND",
-            "Operatività a mercato sospesa per chiusura weekend fino a domenica ore 21:57:59. Candele di fine settimana regolarmente in registrazione fino alle 23:00.",
+            "SOSPENSIONE WEEKEND",
+            "Fino a domenica alle 21:57:59",
             tags="pause_button",
             cooldown_sec=7200
         )
@@ -161,8 +161,8 @@ def verifica_notifiche_sistema_transizioni():
         chiave = f"rollover_domenica_{now_t.strftime('%Y_%m_%d')}"
         invia_notifica_sistema(
             chiave,
-            "🌙 INIZIO PAUSA ROLLOVER",
-            "Pausa Rollover attiva fino alle 00:15 di lunedì. Mercati aperti dalle 22:00: candele e Kijun-sen in regolare registrazione; operatività a mercato congelata per protezione spread.",
+            "START PAUSA ROLLOVER",
+            "Fino alle 00:15",
             tags="crescent_moon",
             cooldown_sec=7200
         )
@@ -172,8 +172,8 @@ def verifica_notifiche_sistema_transizioni():
         chiave = f"rollover_notte_{now_t.strftime('%Y_%m_%d')}"
         invia_notifica_sistema(
             chiave,
-            "🌙 PAUSA ROLLOVER NOTTURNA",
-            "Pausa Rollover notturna attiva dalle 22:45 alle 00:15: stop live e ingressi congelati per protezione spread.",
+            "PAUSA ROLLOVER NOTTURNA",
+            "Fino alle 00:15",
             tags="crescent_moon",
             cooldown_sec=7200
         )
@@ -183,8 +183,8 @@ def verifica_notifiche_sistema_transizioni():
         chiave = f"fine_rollover_{now_t.strftime('%Y_%m_%d')}"
         invia_notifica_sistema(
             chiave,
-            "☀️ FINE PAUSA ROLLOVER",
-            "Ripresa regolare della normale operatività a mercato su tutti i conti.",
+            "STOP PAUSA ROLLOVER",
+            "Ripresa regolare operatività",
             tags="sunny",
             cooldown_sec=7200
         )
@@ -195,8 +195,8 @@ def verifica_notifiche_sistema_transizioni():
         chiave = f"quota_ig_warning_{now_t.strftime('%Y_%m_%d')}"
         invia_notifica_sistema(
             chiave,
-            "⚠️ QUOTA DATI IG IN ESAURIMENTO",
-            f"Quota residua storico IG a {rem_quota} punti. Attivata protezione automatica minima a consumo ridotto.",
+            "DATI IG IN ESAURIMENTO",
+            "Attivazione protezione automatica",
             tags="warning",
             cooldown_sec=43200
         )
