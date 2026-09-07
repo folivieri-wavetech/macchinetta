@@ -1319,7 +1319,27 @@ def esegui_ciclo_trend():
         prices = []
         if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and (len(candele_locali) < 55 or is_just_closed or has_gap):
             LAST_FETCH_BOUNDARY[nome] = boundary_id
-            prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
+            
+            # ANTI-RACE CONDITION PER QUOTA IG: Se dobbiamo scaricare 100 candele, sfalsiamo i pod
+            if limite_download == 100:
+                if "DANY" in NOME_CONTO: time.sleep(10)
+                elif "BONGIOLO" in NOME_CONTO: time.sleep(20)
+                
+                # Ricontrolla se nel frattempo un altro pod ha salvato il file
+                cand_check = carica_candele_locali(nome, tf, px_live=None)
+                try:
+                    last_dt_check = datetime.datetime.strptime(cand_check[-1].get("snapshotTime"), "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+                    delta_m_check = (now_t - last_dt_check).total_seconds() / 60.0
+                    has_gap_check = delta_m_check > (min_tf * 3)
+                except Exception:
+                    has_gap_check = True
+                    
+                if len(cand_check) >= 55 and not has_gap_check:
+                    candele_locali = cand_check
+                    limite_download = 2 # Il file è già stato sistemato da un altro pod!
+            
+            if limite_download == 100 or is_just_closed:
+                prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
         if prices == "QUOTA_ESAURITA" or not prices or not isinstance(prices, list) or len(prices) < 2:
             # Fallback automatico su sintesi locale se la quota IG è esaurita o API in errore
