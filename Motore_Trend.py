@@ -569,31 +569,96 @@ def carica_candele_locali(nome, tf, px_live=None):
         
     return []
 
+def is_market_closed_weekend(dt=None):
+    """Verifica se il mercato forex/indici è chiuso per il fine settimana (venerdì 23:00 -> domenica 23:00 italiane)."""
+    t = dt or now_it()
+    w = t.weekday() # 0: Lunedi, ..., 4: Venerdi, 5: Sabato, 6: Domenica
+    if w == 4 and t.hour >= 23:
+        return True
+    if w == 5:
+        return True
+    if w == 6 and t.hour < 23:
+        return True
+    return False
+
+FILE_QUOTA_IG = "ig_quota_status.json"
+
+def get_remaining_quota_ig():
+    for base in [".", ".."]:
+        p = os.path.join(base, FILE_QUOTA_IG)
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    q = json.load(f)
+                    return q.get("remainingAllowance", 10000)
+            except Exception:
+                pass
+    return 10000
+
+def salva_quota_ig(allowance_dict):
+    if not allowance_dict or not isinstance(allowance_dict, dict):
+        return
+    for base in [".", ".."]:
+        p = os.path.join(base, FILE_QUOTA_IG)
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(allowance_dict, f, indent=2)
+        except Exception:
+            pass
+
 def salva_candele_locali(nome, tf, candele_list):
     fpath = get_file_candele(nome, tf)
     try:
         buffer_100 = candele_list[-100:]
         with open(fpath, "w", encoding="utf-8") as f:
             json.dump(buffer_100, f, indent=2)
+        # Sincronizzazione immediata cross-account sulla PVC condivisa /data:
+        # Quando un pod aggiorna il file, gli altri pod trovano subito la candela e non chiamano IG!
+        clean = nome.replace("/", "_").replace(" ", "_")
+        fname = f"candele_{clean}_{tf}.json"
+        for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
+            alt_dir = os.path.join("..", altro)
+            alt_path = os.path.join(alt_dir, fname)
+            if os.path.isdir(alt_dir) and os.path.abspath(alt_path) != os.path.abspath(fpath):
+                try:
+                    with open(alt_path, "w", encoding="utf-8") as f_alt:
+                        json.dump(buffer_100, f_alt, indent=2)
+                except Exception:
+                    pass
     except Exception as e:
         print_log(nome, f"Errore salvataggio candele locali: {e}")
 
 # --- FUNZIONI CORE ---
 def scarica_candele(epic, timeframe, limit=2, headers=None):
+    # REGOLA FERREA: MAI richiedere più di 2 candele per nessun motivo (budget quota IG blindato)
+    limit = min(int(limit or 2), 2)
+    
+    # CIRCUIT BREAKER: se la quota residua nota scende sotto 500 punti, stop chiamate preventivo
+    rem_quota = get_remaining_quota_ig()
+    if rem_quota < 500:
+        print_log("SISTEMA", f"🛑 CIRCUIT BREAKER ATTIVO: Quota residua IG ({rem_quota}) inferiore a 500. Chiamata bloccata a monte.")
+        return "QUOTA_ESAURITA"
+
     h = headers.copy()
     h["Version"] = "3"
-    for _ in range(3):
+    for _ in range(2):
         try:
             ig_rate_limiter.acquire()
             url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
             r = requests.get(url, headers=h, timeout=10)
             if r.status_code == 200:
-                return r.json().get('prices', [])
+                dati = r.json()
+                # Tracciamento ufficiale quota IG
+                allowance = dati.get("allowance")
+                if allowance and isinstance(allowance, dict):
+                    salva_quota_ig(allowance)
+                return dati.get('prices', [])
             elif r.status_code == 403 and "exceeded-api-key" in r.text:
                 time.sleep(2.5)
                 continue
             else:
                 if r.status_code == 403 and ("historical-data-allowance" in r.text or "exceeded-account-allowance" in r.text or "exceeded-allowance" in r.text or "error.public-api.exceeded" in r.text):
+                    salva_quota_ig({"remainingAllowance": 0, "status": "QUOTA_ESAURITA"})
                     return "QUOTA_ESAURITA"
                 print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
                 return []
@@ -1315,47 +1380,43 @@ def esegui_ciclo_trend():
         if not is_just_closed and not needs_start:
             continue
         
+        # Nel weekend (mercati chiusi), nessuna candela chiude e nessuna chiamata IG deve partire
+        if is_market_closed_weekend(now_t):
+            continue
+
         candele_locali = carica_candele_locali(nome, tf, px_live=prezzi_live.get(nome))
         
-        # 1. Recupero candele a fine candela o individuazione GAP
-        try:
-            last_t_str = candele_locali[-1].get("snapshotTime")
-            last_dt = datetime.datetime.strptime(last_t_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
-            delta_m = (now_t - last_dt).total_seconds() / 60.0
-            has_gap = delta_m > (min_tf * 3) # Se manca più dell'equivalente di 3 candele
-        except Exception:
-            has_gap = True
-
-        limite_download = 100 if (len(candele_locali) < 55 or has_gap) else 2
+        # 1. Recupero candela appena chiusa da IG (RIGOROSAMENTE limit=2 per non sforare mai la quota)
+        limite_download = 2
         boundary_id = f"{nome}_{tf}_{min_tot // min_tf}"
         
         prices = []
-        if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and (len(candele_locali) < 55 or is_just_closed or has_gap):
+        if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and is_just_closed:
             LAST_FETCH_BOUNDARY[nome] = boundary_id
             
-            # ANTI-RACE CONDITION PER QUOTA IG: Se dobbiamo scaricare 100 candele, sfalsiamo i pod
-            if limite_download == 100:
-                if "DANY" in NOME_CONTO: time.sleep(10)
-                elif "BONGIOLO" in NOME_CONTO: time.sleep(20)
-                
-                # Ricontrolla se nel frattempo un altro pod ha salvato il file
-                cand_check = carica_candele_locali(nome, tf, px_live=None)
-                try:
-                    last_dt_check = datetime.datetime.strptime(cand_check[-1].get("snapshotTime"), "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
-                    delta_m_check = (now_t - last_dt_check).total_seconds() / 60.0
-                    has_gap_check = delta_m_check > (min_tf * 3)
-                except Exception:
-                    has_gap_check = True
-                    
-                if len(cand_check) >= 55 and not has_gap_check:
-                    candele_locali = cand_check
-                    limite_download = 2 # Il file è già stato sistemato da un altro pod!
+            # COORDINAMENTO MULTI-POD (PVC CONDIVISA):
+            # Se siamo su DANY o BONGIOLO, attendiamo 4-8 secondi per dare precedenza al pod FIORDOK
+            if "DANY" in NOME_CONTO: time.sleep(4)
+            elif "BONGIOLO" in NOME_CONTO: time.sleep(8)
             
-            if limite_download == 100 or is_just_closed:
+            # Ricontrolla se nel frattempo FIORDOK (o un altro pod) ha già scaricato e salvato la candela
+            cand_check = carica_candele_locali(nome, tf, px_live=None)
+            if cand_check and len(cand_check) >= 55:
+                # Controlla se l'ultima candela è già quella dell'orario appena chiuso
+                last_snap = cand_check[-1].get("snapshotTime", "")
+                boundary_min = (min_tot // min_tf) * min_tf
+                expected_snap = now_t.replace(hour=boundary_min // 60, minute=boundary_min % 60, second=0).strftime("%Y/%m/%d %H:%M:00")
+                if last_snap == expected_snap:
+                    candele_locali = cand_check
+                    # Candela già aggiornata dall'altro pod: 0 chiamate API consumate!
+                    prices = []
+                else:
+                    prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
+            else:
                 prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
         if prices == "QUOTA_ESAURITA" or not prices or not isinstance(prices, list) or len(prices) < 2:
-            # Fallback automatico su sintesi locale se la quota IG è esaurita o API in errore
+            # Fallback su chiusura della candela da tick/prezzo live se API in ritardo o quota
             if len(candele_locali) >= 55 and is_just_closed:
                 live_px = prezzi_live.get(nome)
                 if live_px and isinstance(live_px, (int, float)):
@@ -1376,18 +1437,12 @@ def esegui_ciclo_trend():
                         }
                         candele_locali.append(synth_candle)
                         salva_candele_locali(nome, tf, candele_locali)
-                        print_log(nome, f"🕯️ Candela ({tf}) sintetizzata localmente: {snap_synth} a {live_px:.5f}.")
+                        print_log(nome, f"🕯️ Candela ({tf}) registrata da streaming live IG: {snap_synth} a {live_px:.5f}.")
             prices = []
                 
-        # Unione e aggiornamento del buffer locale di 100 candele
+        # Unione e aggiornamento del buffer locale delle candele (NON SI CANCELLA MAI NULLA)
         if prices and isinstance(prices, list) and len(prices) >= 2:
-            if limite_download == 100:
-                # Sovrascrive completamente lo storico locale con i dati perfetti di IG (risolve i gap)
-                candele_locali = []
-                snap_esistenti = set()
-                print_log(nome, f"📡 Scaricate {len(prices)} candele da IG per {tf} (colmatura buco/avvio).")
-            else:
-                snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
+            snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
                 
             for pr in prices[:-1]: # tutte le chiuse tranne l'ancora aperta
                 st = pr.get("snapshotTime")
