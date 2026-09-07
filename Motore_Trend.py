@@ -669,7 +669,9 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
             if kj is not None:
                 diff_pts = px - kj
                 dist_pips = round(abs(diff_pts) / mult)
-                dir_pos = "Possibile LONG" if diff_pts >= 0 else "Possibile SHORT"
+                # Inversione direzione: se px < kj il prezzo sale verso KJ -> Possibile LONG al breakout
+                # Se px >= kj il prezzo scende verso KJ -> Possibile SHORT al breakout
+                dir_pos = "Possibile SHORT" if diff_pts >= 0 else "Possibile LONG"
                 is_vicino = (dist_pips <= 15)
                 
                 radar_data[nome]["timeframes"][lbl] = {
@@ -679,7 +681,7 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     "vicino": is_vicino
                 }
                 
-                # Invio notifica Push solo se lo strumento NON è in trade ed entra nella soglia <= 15 punti
+                # Log radar senza invio notifica push (in Trend notifiche solo per trade ed incrementi)
                 if is_vicino and not is_in_trade and not is_rollover_active():
                     k_alert = f"{nome}_{lbl}"
                     last_alert_time = RADAR_LAST_ALERT.get(k_alert, 0)
@@ -687,7 +689,6 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     if now_ts - last_alert_time >= 3600:
                         RADAR_LAST_ALERT[k_alert] = now_ts
                         print_log("RADAR", f"📡 [{nome} {lbl}] {dir_pos} (distanza: {int(dist_pips)} punti, KJ55: {kj:.{dec}f})")
-                        invia_notifica(f"📡 {nome} {lbl}", dir_pos, "satellite")
             else:
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": None,

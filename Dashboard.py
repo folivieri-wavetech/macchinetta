@@ -1294,7 +1294,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                         kj_v = kj_c
                         diff_pts = px - kj_v
                         dist_p = round(abs(diff_pts) / mult)
-                        dir_p = "Possibile LONG" if diff_pts >= 0 else "Possibile SHORT"
+                        dir_p = "Possibile SHORT" if diff_pts >= 0 else "Possibile LONG"
                         vicino = (dist_p <= 15)
 
                 if kj_v is None or dist_p is None:
