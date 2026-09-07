@@ -1,0 +1,398 @@
+{
+    "saldo": "74730.7",
+    "disponibile": "64804.38",
+    "margine": "9694.32",
+    "drawdown": "-232.0",
+    "messaggio": "Sistema Online",
+    "durata_sessione": "29h 4m",
+    "ultimo_aggiornamento": "08:34:10",
+    "prezzi_live": {
+        "USD/CHF": 0.81001,
+        "CAD/JPY": 112.554,
+        "EUR/GBP": 0.85871,
+        "USD/JPY": 155.655,
+        "AUD/CAD": 0.99795,
+        "Spot Gold": 4397.4,
+        "US 500 Cash": 7715.45,
+        "AUD/NZD": 1.22751,
+        "GBP/USD": 1.35299,
+        "USD/CAD": 1.38295
+    },
+    "distanze_minime": {
+        "USD/CHF": 4.0,
+        "CAD/JPY": 8.0,
+        "EUR/GBP": 2.0,
+        "USD/JPY": 2.0,
+        "AUD/CAD": 5.0,
+        "Spot Gold": 1.0,
+        "US 500 Cash": 1.0,
+        "AUD/NZD": 6.0,
+        "GBP/USD": 12.0,
+        "USD/CAD": 4.0
+    },
+    "prezzi_bid_ask": {
+        "USD/CHF": {
+            "bid": 0.80994,
+            "ask": 0.81009
+        },
+        "CAD/JPY": {
+            "bid": 112.544,
+            "ask": 112.564
+        },
+        "EUR/GBP": {
+            "bid": 0.85866,
+            "ask": 0.85875
+        },
+        "USD/JPY": {
+            "bid": 155.65,
+            "ask": 155.66
+        },
+        "AUD/CAD": {
+            "bid": 0.99788,
+            "ask": 0.99803
+        },
+        "Spot Gold": {
+            "bid": 4396.9,
+            "ask": 4397.8
+        },
+        "US 500 Cash": {
+            "bid": 7715.05,
+            "ask": 7715.85
+        },
+        "AUD/NZD": {
+            "bid": 1.22739,
+            "ask": 1.22764
+        },
+        "GBP/USD": {
+            "bid": 1.35295,
+            "ask": 1.35304
+        },
+        "USD/CAD": {
+            "bid": 1.38289,
+            "ask": 1.38302
+        }
+    },
+    "radar_trend": {
+        "AUD/CAD": {
+            "prezzo": 0.99646,
+            "in_trade": true,
+            "direzione_trade": "SHORT",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 0.996445,
+                    "dist_pips": 0,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 0.9939549999999999,
+                    "dist_pips": 25,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 0.996795,
+                    "dist_pips": 3,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 0.986945,
+                    "dist_pips": 95,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        },
+        "AUD/NZD": {
+            "prezzo": 1.22661,
+            "in_trade": true,
+            "direzione_trade": "LONG",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 1.225075,
+                    "dist_pips": 15,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 1.22377,
+                    "dist_pips": 28,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 1.224965,
+                    "dist_pips": 16,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                },
+                "D1": {
+                    "kj": 1.209785,
+                    "dist_pips": 168,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        },
+        "CAD/JPY": {
+            "prezzo": 112.822,
+            "in_trade": false,
+            "direzione_trade": "",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 112.890005,
+                    "dist_pips": 7,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 113.453535,
+                    "dist_pips": 63,
+                    "dir": "Possibile SHORT",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 112.77699999999999,
+                    "dist_pips": 5,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 113.67105000000001,
+                    "dist_pips": 85,
+                    "dir": "Possibile SHORT",
+                    "vicino": false
+                }
+            }
+        },
+        "EUR/GBP": {
+            "prezzo": 0.85942,
+            "in_trade": true,
+            "direzione_trade": "LONG",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 0.859115,
+                    "dist_pips": 3,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 0.85954,
+                    "dist_pips": 1,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H4": {
+                    "kj": 0.85929,
+                    "dist_pips": 1,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 0.8559749999999999,
+                    "dist_pips": 34,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        },
+        "GBP/USD": {
+            "prezzo": 1.35079,
+            "in_trade": true,
+            "direzione_trade": "SHORT",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 1.351465,
+                    "dist_pips": 7,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 1.3513899999999999,
+                    "dist_pips": 6,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H4": {
+                    "kj": 1.35162,
+                    "dist_pips": 8,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 1.34083,
+                    "dist_pips": 100,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        },
+        "USD/CAD": {
+            "prezzo": 1.38407,
+            "in_trade": true,
+            "direzione_trade": "LONG",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 1.383125,
+                    "dist_pips": 9,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 1.3816199999999998,
+                    "dist_pips": 25,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 1.384125,
+                    "dist_pips": 1,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 1.398985,
+                    "dist_pips": 149,
+                    "dir": "Possibile SHORT",
+                    "vicino": false
+                }
+            }
+        },
+        "USD/CHF": {
+            "prezzo": 0.81085,
+            "in_trade": true,
+            "direzione_trade": "LONG",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 0.8098749999999999,
+                    "dist_pips": 10,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 0.8092349999999999,
+                    "dist_pips": 16,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 0.80986,
+                    "dist_pips": 10,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 0.807535,
+                    "dist_pips": 33,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        },
+        "USD/JPY": {
+            "prezzo": 156.153,
+            "in_trade": true,
+            "direzione_trade": "LONG",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 156.1655,
+                    "dist_pips": 1,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 157.153535,
+                    "dist_pips": 100,
+                    "dir": "Possibile SHORT",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 156.0745,
+                    "dist_pips": 8,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 159.621585,
+                    "dist_pips": 347,
+                    "dir": "Possibile SHORT",
+                    "vicino": false
+                }
+            }
+        },
+        "Spot Gold": {
+            "prezzo": 4406.5,
+            "in_trade": true,
+            "direzione_trade": "SHORT",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 4421.75,
+                    "dist_pips": 15,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 4433.85,
+                    "dist_pips": 27,
+                    "dir": "Possibile SHORT",
+                    "vicino": false
+                },
+                "H4": {
+                    "kj": 4403.5,
+                    "dist_pips": 3,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 4267.7,
+                    "dist_pips": 139,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        },
+        "US 500 Cash": {
+            "prezzo": 7706.94,
+            "in_trade": false,
+            "direzione_trade": "",
+            "timeframe_trade": "M5",
+            "timeframes": {
+                "M5": {
+                    "kj": 7714.415,
+                    "dist_pips": 7,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "H1": {
+                    "kj": 7701.055,
+                    "dist_pips": 6,
+                    "dir": "Possibile LONG",
+                    "vicino": true
+                },
+                "H4": {
+                    "kj": 7721.780000000001,
+                    "dist_pips": 15,
+                    "dir": "Possibile SHORT",
+                    "vicino": true
+                },
+                "D1": {
+                    "kj": 7571.844999999999,
+                    "dist_pips": 135,
+                    "dir": "Possibile LONG",
+                    "vicino": false
+                }
+            }
+        }
+    },
+    "radar_trend_ts": "07/09/2026 05:11:06"
+}
