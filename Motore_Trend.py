@@ -669,9 +669,7 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
             if kj is not None:
                 diff_pts = px - kj
                 dist_pips = round(abs(diff_pts) / mult)
-                # Inversione direzione: se px < kj il prezzo sale verso KJ -> Possibile LONG al breakout
-                # Se px >= kj il prezzo scende verso KJ -> Possibile SHORT al breakout
-                dir_pos = "Possibile SHORT" if diff_pts >= 0 else "Possibile LONG"
+                dir_pos = "Possibile Entrata"
                 is_vicino = (dist_pips <= 15)
                 
                 radar_data[nome]["timeframes"][lbl] = {
