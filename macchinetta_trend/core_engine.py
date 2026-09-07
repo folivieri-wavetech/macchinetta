@@ -208,8 +208,8 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
-                # Paletto: TK > KJ (o tollerato), candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
-                if (tk > kj or abs(tk - kj) <= min_body_price) and closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
+                # Candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
+                if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
                     if closed_candle.is_red():
                         if self.retracement_start_price is None:
                             self.retracement_start_price = closed_candle.open
@@ -333,8 +333,8 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
-                # Paletto: TK < KJ (o tollerato), candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
-                if (tk < kj or abs(tk - kj) <= min_body_price) and closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
+                # Candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
+                if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
                     if closed_candle.is_green():
                         if self.retracement_start_price is None:
                             self.retracement_start_price = closed_candle.open
@@ -431,7 +431,7 @@ class CoreEngine:
         """
         Valuta Stop Loss e Take Profit in tempo reale (intracandela):
         - Core: KJ +- 5 pip o Trailing SL Core
-        - Incrementi Stop: TK +- 5 pip o Trailing SL Incr
+        - Incrementi Stop: TK +- 10 pip o Trailing SL Incr
         - Incrementi Take Profit: +20 pip (M5), +30 pip (H1), +40 pip (H4)
         """
         events = []
@@ -460,8 +460,8 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Loss Incrementi: TK - 5 pip o Trailing SL a 20 pip (il più alto / restrittivo)
-            sl_incr_base = tk - (5 * pip_val)
+            # 2. Stop Loss Incrementi: TK - 10 pip o Trailing SL a 20 pip (il più alto / restrittivo)
+            sl_incr_base = tk - (10 * pip_val)
             effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price <= effective_sl_incr:
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
@@ -509,8 +509,8 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Loss Incrementi: TK + 5 pip o Trailing SL a 20 pip (il più basso / restrittivo)
-            sl_incr_base = tk + (5 * pip_val)
+            # 2. Stop Loss Incrementi: TK + 10 pip o Trailing SL a 20 pip (il più basso / restrittivo)
+            sl_incr_base = tk + (10 * pip_val)
             effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price >= effective_sl_incr:
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
