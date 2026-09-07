@@ -211,13 +211,11 @@ class CoreEngine:
                 # Candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
                 if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
                     if closed_candle.is_red():
-                        if self.retracement_start_price is None:
-                            self.retracement_start_price = closed_candle.open
-                            
-                        distanza_percorsa = self.retracement_start_price - closed_candle.low
-                        
                         tf_val = self.config.get("timeframe", "MINUTE_5")
-                        if tf_val == "MINUTE_5" or distanza_percorsa >= min_body_price:
+                        candle_range = closed_candle.high - closed_candle.low
+                        
+                        # Su H1, H4 (e TF diversi da M5), l'escursione totale della candela (High - Low) deve essere >= min_body
+                        if tf_val in ("MINUTE_5", "M1", "M2", "M3", "M5", "MINUTE_1", "MINUTE_2", "MINUTE_3") or candle_range >= min_body_price:
                             entry_price = exec_price
                             
                             # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
@@ -336,13 +334,11 @@ class CoreEngine:
                 # Candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
                 if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
                     if closed_candle.is_green():
-                        if self.retracement_start_price is None:
-                            self.retracement_start_price = closed_candle.open
-                            
-                        distanza_percorsa = closed_candle.high - self.retracement_start_price
-                        
                         tf_val = self.config.get("timeframe", "MINUTE_5")
-                        if tf_val == "MINUTE_5" or distanza_percorsa >= min_body_price:
+                        candle_range = closed_candle.high - closed_candle.low
+                        
+                        # Su H1, H4 (e TF diversi da M5), l'escursione totale della candela (High - Low) deve essere >= min_body
+                        if tf_val in ("MINUTE_5", "M1", "M2", "M3", "M5", "MINUTE_1", "MINUTE_2", "MINUTE_3") or candle_range >= min_body_price:
                             entry_price = exec_price
                             
                             # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
