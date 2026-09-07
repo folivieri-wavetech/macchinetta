@@ -569,18 +569,6 @@ def carica_candele_locali(nome, tf, px_live=None):
         
     return []
 
-def is_market_closed_weekend(dt=None):
-    """Verifica se il mercato forex/indici è chiuso per il fine settimana (venerdì 23:00 -> domenica 23:00 italiane)."""
-    t = dt or now_it()
-    w = t.weekday() # 0: Lunedi, ..., 4: Venerdi, 5: Sabato, 6: Domenica
-    if w == 4 and t.hour >= 23:
-        return True
-    if w == 5:
-        return True
-    if w == 6 and t.hour < 23:
-        return True
-    return False
-
 FILE_QUOTA_IG = "ig_quota_status.json"
 
 def get_remaining_quota_ig():
@@ -1379,8 +1367,8 @@ def esegui_ciclo_trend():
         if not is_just_closed and not needs_start:
             continue
         
-        # Nel weekend (mercati chiusi), nessuna candela chiude e nessuna chiamata IG deve partire
-        if is_market_closed_weekend(now_t):
+        # Nel weekend (mercati chiusi fino a domenica 21:45), nessuna candela chiude e nessuna chiamata IG
+        if is_weekend_active():
             continue
 
         candele_locali = carica_candele_locali(nome, tf, px_live=prezzi_live.get(nome))
