@@ -1328,7 +1328,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     icon_dir = "🟢" if is_profit else "🔴"
                     pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
                     title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
-                    kj_line = f"<span style='font-size:0.60rem; color:#94a3b8;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
+                    kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
                     return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
 
                 if kj_v is None or dist_p is None:
@@ -1342,9 +1342,9 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 if vicino:
                     bg_cell = "rgba(251, 191, 36, 0.2)"
                     bdr_cell = "#f59e0b"
-                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_gold}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_gold}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#94a3b8;'>KJ: {kj_formatted}</span></div>"
+                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_gold}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_gold}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
                 else:
-                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#64748b;'>KJ: {kj_formatted}</span></div>"
+                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
 
             c_m5 = format_radar_cell("M5")
             c_h1 = format_radar_cell("H1")
