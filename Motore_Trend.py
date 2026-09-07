@@ -966,10 +966,10 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
 def is_rollover_active():
     """
     Ritorna True se siamo nella finestra di Rollover notturno / apertura domenica:
-    - Domenica sera: 21:45 - 23:59:59 (weekday 6)
+    - Domenica sera: 21:58 - 23:59:59 (weekday 6)
     - Lun-Gio sera: 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
     - Lun-Ven notte: 00:00 - 00:14:59 (weekday 0, 1, 2, 3, 4)
-    Venerdì sera e sabato: nessun rollover.
+    - Venerdì sera: 22:45 - 23:00:59 (weekday 4, freeze operatività prima del weekend)
     """
     ora = now_it()
     t = ora.time()
@@ -980,12 +980,14 @@ def is_rollover_active():
         return True
     if wd in (0, 1, 2, 3, 4) and (datetime.time(0, 0) <= t <= datetime.time(0, 14, 59)):
         return True
+    if wd == 4 and (datetime.time(22, 45) <= t <= datetime.time(23, 0, 59)):
+        return True
     return False
 
 def is_weekend_active():
     """
     Ritorna True se siamo nel weekend a mercati chiusi:
-    - Venerdì sera dalle 23:00 in poi (weekday 4, t >= 23:00)
+    - Venerdì sera dalle 23:01 in poi (weekday 4, t >= 23:01, lasciando registrare la candela delle 23:00)
     - Sabato tutto il giorno (weekday 5)
     - Domenica fino alle 21:57:59 (weekday 6, t < 21:58)
     (Dalle 21:58 di domenica subentra la Pausa Rollover fino alle 00:15 di lunedì; i mercati aprono alle 22:00 e le candele vengono memorizzate regolarmente).
@@ -993,7 +995,7 @@ def is_weekend_active():
     ora = now_it()
     t = ora.time()
     wd = ora.weekday()
-    if wd == 4 and t >= datetime.time(23, 0):
+    if wd == 4 and t >= datetime.time(23, 1):
         return True
     if wd == 5:
         return True
