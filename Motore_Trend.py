@@ -59,9 +59,9 @@ config = dotenv_values(".env")
 
 # Vocabolario base
 CONFIG_STRUMENTI = {
-    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
+    "EUR/USD": {"epic": "CS.D.EURUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
     "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
@@ -221,20 +221,20 @@ def print_log(strumento, messaggio):
 def get_eur_rate(valuta, prezzi):
     if valuta == "EUR":
         return 1.0
-    eur_gbp = prezzi.get("EUR/GBP")
+    eur_usd = prezzi.get("EUR/USD")
     gbp_usd = prezzi.get("GBP/USD")
-    if eur_gbp and gbp_usd:
-        eur_usd = eur_gbp * gbp_usd
-    elif gbp_usd:
-        eur_usd = 1.08
-        eur_gbp = eur_usd / gbp_usd
-    else:
-        return 1.0
-    eur_usd = eur_gbp * gbp_usd
+    if not eur_usd:
+        eur_gbp = prezzi.get("EUR/GBP")
+        if eur_gbp and gbp_usd:
+            eur_usd = eur_gbp * gbp_usd
+        elif gbp_usd:
+            eur_usd = 1.08
+        else:
+            eur_usd = 1.08
     if valuta == "USD":
         return 1.0 / eur_usd
     if valuta == "GBP":
-        return 1.0 / eur_gbp
+        return (gbp_usd / eur_usd) if gbp_usd else (1.25 / eur_usd)
     if valuta == "CAD":
         usd_cad = prezzi.get("USD/CAD")
         if usd_cad: return 1.0 / (eur_usd * usd_cad)
@@ -252,6 +252,7 @@ def get_eur_rate(valuta, prezzi):
             eur_cad = eur_usd * usd_cad
             eur_nzd = (eur_cad / aud_cad) * aud_nzd
             return 1.0 / eur_nzd
+        return 0.58 / eur_usd
     return 1.0
 
 def ottieni_headers_ig():

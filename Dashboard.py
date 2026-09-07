@@ -33,9 +33,9 @@ import Sistema.auth_manager as auth_manager
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
-    "AUD/CAD": {"epic": "CS.D.AUDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 310},
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "margine_unitario": 310},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 210},
+    "EUR/USD": {"epic": "CS.D.EURUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 335},
     "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 400},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 300},
@@ -151,19 +151,19 @@ def formatta_eur(valore_str):
 
 def get_eur_rate(valuta, prezzi):
     if valuta == "EUR": return 1.0
-    eur_gbp = prezzi.get("EUR/GBP")
+    eur_usd = prezzi.get("EUR/USD")
     gbp_usd = prezzi.get("GBP/USD")
-    if eur_gbp and gbp_usd:
-        eur_usd = eur_gbp * gbp_usd
-    elif gbp_usd:
-        eur_usd = 1.08
-        eur_gbp = eur_usd / gbp_usd
-    else:
-        return 1.0
-    eur_usd = eur_gbp * gbp_usd
+    if not eur_usd:
+        eur_gbp = prezzi.get("EUR/GBP")
+        if eur_gbp and gbp_usd:
+            eur_usd = eur_gbp * gbp_usd
+        elif gbp_usd:
+            eur_usd = 1.08
+        else:
+            eur_usd = 1.08
     
     if valuta == "USD": return 1.0 / eur_usd
-    if valuta == "GBP": return 1.0 / eur_gbp
+    if valuta == "GBP": return (gbp_usd / eur_usd) if gbp_usd else (1.25 / eur_usd)
     if valuta == "CAD":
         usd_cad = prezzi.get("USD/CAD")
         if usd_cad: return 1.0 / (eur_usd * usd_cad)
@@ -182,6 +182,7 @@ def get_eur_rate(valuta, prezzi):
             eur_aud = eur_cad / aud_cad
             eur_nzd = eur_aud * aud_nzd
             return 1.0 / eur_nzd
+        return 0.58 / eur_usd
     return 1.0
 
 def is_oltrepassato(tipo, direzione, livello_ideale, prezzo_live):
@@ -1209,7 +1210,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 st.session_state.target_tab = "Trend"
                 st.rerun()
 
-        tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+        tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
         tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
         
         html_table = """
@@ -2229,7 +2230,7 @@ else:
                 c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
                 st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
-                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 
                 for nome in strumenti_ordinati:
@@ -2370,7 +2371,7 @@ else:
                 stato_sys = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato_sys.get("prezzi_live", {})
                 
-                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 
                 st.html("""
@@ -2754,7 +2755,7 @@ else:
                                 else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
                             else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
 
-                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
@@ -2979,7 +2980,7 @@ else:
                         
 
 
-                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
@@ -2998,7 +2999,7 @@ else:
 
             col1, col2, col3 = st.columns(3)
             with col1:
-                tutti_strumenti = ["AUD/CAD", "AUD/NZD", "CAD/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 r_nome = st.selectbox("1. Seleziona Strumento", tutti_strumenti)
             with col2:
                 r_fase = st.selectbox("2. Seleziona Fase", ["FASE 1", "FASE 2", "FASE 3"])
