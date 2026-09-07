@@ -210,44 +210,26 @@ class CoreEngine:
                 # --- INGRESSI INCREMENTO LONG ---
                 # Candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
                 if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
-                    if closed_candle.is_red():
-                        tf_val = self.config.get("timeframe", "MINUTE_5")
-                        candle_range = closed_candle.high - closed_candle.low
-                        
-                        # Su H1, H4 (e TF diversi da M5), l'escursione totale della candela (High - Low) deve essere >= min_body
-                        if tf_val in ("MINUTE_5", "M1", "M2", "M3", "M5", "MINUTE_1", "MINUTE_2", "MINUTE_3") or candle_range >= min_body_price:
-                            entry_price = exec_price
-                            
-                            # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
-                            tf_val = self.config.get("timeframe", "MINUTE_5")
-                            min_dist_pips = 10 if tf_val == "MINUTE_5" else 20
-                            min_dist_price = min_dist_pips * pip_val
-                            
-                            can_open = True
-                            if len(self.pm.increments) > 0:
-                                last_inc = self.pm.increments[-1]
-                                if abs(entry_price - last_inc.entry_price) < min_dist_price:
-                                    can_open = False
-                                    
-                            if can_open:
-                                scala = int(self.config.get("scala", 1) or 1)
-                                while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
-                                    best = self.pm.force_close_best_increment(entry_price)
-                                    if best:
-                                        events.append({
-                                            "type": "fifo_close", 
-                                            "pnl": best.pnl, 
-                                            "price": entry_price, 
-                                            "ticket": best.ticket, 
-                                            "size": best.size,
-                                            "direction": "LONG"
-                                        })
-                                    else:
-                                        break
-                                pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
-                                events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
-                            
-                            self.retracement_start_price = None # Resetta il conteggio dopo il tentativo di incremento
+                    # Candela rossa di almeno 3 pip su tutti i TF
+                    if (closed_candle.open - closed_candle.close) >= (3 * pip_val):
+                        entry_price = exec_price
+                        scala = int(self.config.get("scala", 1) or 1)
+                        while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
+                            best = self.pm.force_close_best_increment(entry_price)
+                            if best:
+                                events.append({
+                                    "type": "fifo_close", 
+                                    "pnl": best.pnl, 
+                                    "price": entry_price, 
+                                    "ticket": best.ticket, 
+                                    "size": best.size,
+                                    "direction": "LONG"
+                                })
+                            else:
+                                break
+                        pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
+                        events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
+                        self.retracement_start_price = None
                     else:
                         self.retracement_start_price = None # Ritracciamento interrotto da candela verde
                 else:
@@ -333,44 +315,26 @@ class CoreEngine:
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
                 if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
-                    if closed_candle.is_green():
-                        tf_val = self.config.get("timeframe", "MINUTE_5")
-                        candle_range = closed_candle.high - closed_candle.low
-                        
-                        # Su H1, H4 (e TF diversi da M5), l'escursione totale della candela (High - Low) deve essere >= min_body
-                        if tf_val in ("MINUTE_5", "M1", "M2", "M3", "M5", "MINUTE_1", "MINUTE_2", "MINUTE_3") or candle_range >= min_body_price:
-                            entry_price = exec_price
-                            
-                            # Paletto: Distanza minima tra incrementi consecutivi (10 pip su M5, 20 pip sugli altri TF)
-                            tf_val = self.config.get("timeframe", "MINUTE_5")
-                            min_dist_pips = 10 if tf_val == "MINUTE_5" else 20
-                            min_dist_price = min_dist_pips * pip_val
-                            
-                            can_open = True
-                            if len(self.pm.increments) > 0:
-                                last_inc = self.pm.increments[-1]
-                                if abs(entry_price - last_inc.entry_price) < min_dist_price:
-                                    can_open = False
-                                    
-                            if can_open:
-                                scala = int(self.config.get("scala", 1) or 1)
-                                while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
-                                    best = self.pm.force_close_best_increment(entry_price)
-                                    if best:
-                                        events.append({
-                                            "type": "fifo_close", 
-                                            "pnl": best.pnl, 
-                                            "price": entry_price, 
-                                            "ticket": best.ticket, 
-                                            "size": best.size,
-                                            "direction": "SHORT"
-                                        })
-                                    else:
-                                        break
-                                pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
-                                events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
-                            
-                            self.retracement_start_price = None # Resetta il conteggio dopo il tentativo di incremento
+                    # Candela verde di almeno 3 pip su tutti i TF
+                    if (closed_candle.close - closed_candle.open) >= (3 * pip_val):
+                        entry_price = exec_price
+                        scala = int(self.config.get("scala", 1) or 1)
+                        while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
+                            best = self.pm.force_close_best_increment(entry_price)
+                            if best:
+                                events.append({
+                                    "type": "fifo_close", 
+                                    "pnl": best.pnl, 
+                                    "price": entry_price, 
+                                    "ticket": best.ticket, 
+                                    "size": best.size,
+                                    "direction": "SHORT"
+                                })
+                            else:
+                                break
+                        pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
+                        events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
+                        self.retracement_start_price = None
                     else:
                         self.retracement_start_price = None # Ritracciamento interrotto da candela rossa
                 else:

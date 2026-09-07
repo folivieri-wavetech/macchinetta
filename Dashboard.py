@@ -611,7 +611,6 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     sz_t = mem_t.get("size", 3)
     szm_t = mem_t.get("size_max", 5)
     sc_t = mem_t.get("scala", 1)
-    bd_t = mem_t.get("min_body", 10)
     
     is_asset = nome_strumento in ["Spot Gold", "US 500 Cash"]
     def_tp = 100 if is_asset else 50
@@ -625,7 +624,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     st.markdown("---")
     col_info_t, col_info_r = st.columns(2)
     with col_info_t:
-        st.markdown(f"**🎯 Parametri Trend ({conto_t}):**\n- TF: **{tf_options[tf_scelto]}**\n- Entry Size: **{sz_t}** | Max Size: **{szm_t}**\n- Scala: **{sc_t}** | Min Body: **{bd_t}**")
+        st.markdown(f"**🎯 Parametri Trend ({conto_t}):**\n- TF: **{tf_options[tf_scelto]}**\n- Entry Size: **{sz_t}** | Max Size: **{szm_t}**\n- Scala: **{sc_t}**")
     with col_info_r:
         st.markdown(f"**🛡️ Parametri Range ({conto_r}):**\n- Direzione: **{dir_range}**\n- TP: **{tp_r}** | OPP: **{opp_r}**\n- DTS: **{dts_r}** | Size: **{sz_r}**")
         
@@ -2906,7 +2905,6 @@ else:
                         size_val = dati_salvati.get("size", def_size)
                         size_max_val = dati_salvati.get("size_max", def_size_max)
                         scala_val = dati_salvati.get("scala", def_scala)
-                        body_val = dati_salvati.get("min_body", def_body)
                         auto_restart = dati_salvati.get("auto_restart", False)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         
@@ -2952,7 +2950,6 @@ else:
                                     "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
                                     "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
                                     "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
-                                    "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
                                     "auto_restart": auto_restart,
                                     "current_kj": current_kj,
                                     "current_tk": current_tk
@@ -2962,21 +2959,17 @@ else:
                             if st.button("📋 WIP", key=f"WIP_T_{conto_selezionato}_{nome}", width="stretch"):
                                 mostra_diario_wip_trend(nome, dati_salvati.get("storico_wip_trend", []))
 
-                        c_r1_1, c_r1_2 = st.columns(2)
-                        with c_r1_1:
+                        c_r1, c_r2, c_r3, c_r4 = st.columns(4)
+                        with c_r1:
                             tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                             tf_keys = list(tf_map.keys())
                             idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
                             st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
-                        with c_r1_2:
-                            st.number_input("Body Min", value=int(body_val), min_value=1, step=1, key=f"bd_{conto_selezionato}_{nome}")
-                        
-                        c_r2_1, c_r2_2, c_r2_3 = st.columns(3)
-                        with c_r2_1:
+                        with c_r2:
                             st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
-                        with c_r2_2:
+                        with c_r3:
                             st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
-                        with c_r2_3:
+                        with c_r4:
                             st.number_input("Scala", value=int(scala_val), min_value=1, step=1, key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento")
                         
                         err_key = f"err_trend_{conto_selezionato}_{nome}"
@@ -3003,7 +2996,6 @@ else:
                                         "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
                                         "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
                                         "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
-                                        "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
                                         "auto_restart": auto_restart,
                                         "attivo": True, 
                                         "direzione": "LONG", 
@@ -3029,7 +3021,6 @@ else:
                                         "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
                                         "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
                                         "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
-                                        "min_body": st.session_state.get(f"bd_{conto_selezionato}_{nome}", body_val),
                                         "auto_restart": auto_restart,
                                         "attivo": True, 
                                         "direzione": "SHORT", 
