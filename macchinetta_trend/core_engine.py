@@ -80,16 +80,11 @@ class CoreEngine:
         return (highest + lowest) / 2.0
 
     def _get_core_trailing_pips(self):
-        """Restituisce la distanza/offset in pip per il Trailing SL Core in base al Timeframe."""
+        """Restituisce la distanza/offset in pip per il Trailing SL Core in base al Timeframe. SOLO M5 (20 pip)."""
         tf_val = str(self.config.get("timeframe", "HOUR")).upper()
         if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
             return 20
-        elif "HOUR_4" in tf_val or "H4" in tf_val:
-            return 40
-        elif "HOUR" in tf_val or "H1" in tf_val:
-            return 30
-        else:
-            return 30
+        return None
 
     def _get_increment_tp_pips(self):
         """Restituisce il target Take Profit in pip per gli incrementi in base al Timeframe."""
@@ -154,14 +149,15 @@ class CoreEngine:
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
                 
             else:
-                # Aggiornamento Trailing SL Core da Close se distanza da KJ >= core_trailing_pips (M5: 20, H1: 30, H4: 40)
-                dist_kj = c_close - kj
-                if dist_kj >= (core_trailing_pips * pip_val):
-                    nuovo_sl_core = c_close - (core_trailing_pips * pip_val)
-                    if self.trailing_sl_core is None:
-                        self.trailing_sl_core = nuovo_sl_core
-                    else:
-                        self.trailing_sl_core = max(self.trailing_sl_core, nuovo_sl_core)
+                # Aggiornamento Trailing SL Core da Close (SOLO M5 se core_trailing_pips è attivo)
+                if core_trailing_pips is not None:
+                    dist_kj = c_close - kj
+                    if dist_kj >= (core_trailing_pips * pip_val):
+                        nuovo_sl_core = c_close - (core_trailing_pips * pip_val)
+                        if self.trailing_sl_core is None:
+                            self.trailing_sl_core = nuovo_sl_core
+                        else:
+                            self.trailing_sl_core = max(self.trailing_sl_core, nuovo_sl_core)
 
                 # Gestione Stop Loss Incrementi: TK a fine candela o Trailing SL (il più alto / restrittivo)
                 sl_incr_base = tk # A fine candela: Stop Incrementi a rottura Tenkan (0 buffer)
@@ -278,14 +274,15 @@ class CoreEngine:
                 # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
                 
             else:
-                # Aggiornamento Trailing SL Core da Close se distanza da KJ >= core_trailing_pips (M5: 20, H1: 30, H4: 40)
-                dist_kj = kj - c_close
-                if dist_kj >= (core_trailing_pips * pip_val):
-                    nuovo_sl_core = c_close + (core_trailing_pips * pip_val)
-                    if self.trailing_sl_core is None:
-                        self.trailing_sl_core = nuovo_sl_core
-                    else:
-                        self.trailing_sl_core = min(self.trailing_sl_core, nuovo_sl_core)
+                # Aggiornamento Trailing SL Core da Close (SOLO M5 se core_trailing_pips è attivo)
+                if core_trailing_pips is not None:
+                    dist_kj = kj - c_close
+                    if dist_kj >= (core_trailing_pips * pip_val):
+                        nuovo_sl_core = c_close + (core_trailing_pips * pip_val)
+                        if self.trailing_sl_core is None:
+                            self.trailing_sl_core = nuovo_sl_core
+                        else:
+                            self.trailing_sl_core = min(self.trailing_sl_core, nuovo_sl_core)
 
                 # Gestione Stop Loss Incrementi: TK a fine candela o Trailing SL (il più basso / restrittivo)
                 sl_incr_base = tk # A fine candela: Stop Incrementi a rottura Tenkan (0 buffer)
@@ -392,7 +389,7 @@ class CoreEngine:
             is_short_cond = c_close < kj and closed_candle.is_red()
             
             pip_val = self.config.get("pip_value") or 0.0001
-            max_dist = (self.config.get("max_kj_distance") or 50.0) * pip_val
+            max_dist = (self.config.get("max_kj_distance") or 30.0) * pip_val
             max_delay = self.config.get("max_entry_delay") or 5
             
             if is_long_cond:
@@ -448,8 +445,8 @@ class CoreEngine:
         pip_val = self.config.get("pip_value") or 0.0001
         
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core: KJ - 5 pip o Trailing SL Core (il più alto / restrittivo)
-            sl_core_base = kj - (5 * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 20 pip o Trailing SL Core (su M5 se più restrittivo)
+            sl_core_base = kj - (20 * pip_val)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price <= effective_sl_core:
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
@@ -497,8 +494,8 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core: KJ + 5 pip o Trailing SL Core (il più basso / restrittivo)
-            sl_core_base = kj + (5 * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 20 pip o Trailing SL Core (su M5 se più restrittivo)
+            sl_core_base = kj + (20 * pip_val)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price >= effective_sl_core:
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"

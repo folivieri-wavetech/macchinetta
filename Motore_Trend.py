@@ -840,11 +840,12 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 reversal_ev = next((e for e in events if e.get('type') == 'reversal'), None)
                 if tipo == 'core_closed' and reversal_ev:
                     r_reason = reversal_ev.get("reason", "")
-                    tag_motivo = "Trailing Core" if "trailing" in r_reason else "Stop KJ"
+                    tag_motivo = "Trailing Core" if "trailing" in r_reason else ("Paracadute KJ" if "live_stop" in r_reason else "Stop KJ")
                     core_close_summary = f"🛑 {tag_motivo} ({sz}){pnl_str}"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     if not has_auto_start:
-                        invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {msg}", "warning")
+                        tag_title = "PARACADUTE KJ" if "live_stop" in r_reason else "STOP KJ"
+                        invia_notifica(f"🛑 {tag_title} {tf_label}", f"[{nome}] {msg}", "warning")
                 elif tipo == 'tp_increment':
                     tp_p = ev.get('tp_pips', 20)
                     msg = f"🎯 TP Incr (+{tp_p}p) ({sz}){px_str}{pnl_str}"
@@ -1067,7 +1068,7 @@ def esegui_ciclo_trend():
                 "kj_periods": 55,
                 "min_body": min_body,
                 "pip_value": CONFIG_STRUMENTI[nome]["moltiplicatore"],
-                "max_kj_distance": 50.0,
+                "max_kj_distance": 30.0,
                 "max_entry_delay": 5,
                 "auto_restart": auto_restart
             }
@@ -1079,6 +1080,7 @@ def esegui_ciclo_trend():
             stato_motore.motori[nome].config["timeframe"] = tf
             stato_motore.motori[nome].config["min_body"] = min_body
             stato_motore.motori[nome].config["pip_value"] = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+            stato_motore.motori[nome].config["max_kj_distance"] = 30.0
             stato_motore.motori[nome].config["auto_restart"] = auto_restart
         
         engine = stato_motore.motori[nome]
@@ -1111,18 +1113,14 @@ def esegui_ciclo_trend():
                         c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
                         pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
                         
-                        # Trailing SL Core: M5=20/20, H1=30/30, H4=40/40
+                        # Trailing SL Core: SOLO M5 (20 pip), disattivato su H1, H4, D1
                         tf_val = str(tf).upper()
                         if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
                             core_trailing_pips = 20
-                        elif "HOUR_4" in tf_val or "H4" in tf_val:
-                            core_trailing_pips = 40
-                        elif "HOUR" in tf_val or "H1" in tf_val:
-                            core_trailing_pips = 30
                         else:
-                            core_trailing_pips = 30
+                            core_trailing_pips = None
 
-                        if engine.trailing_sl_core is None and engine.current_kj is not None:
+                        if core_trailing_pips is not None and engine.trailing_sl_core is None and engine.current_kj is not None:
                             if stato_corrente == "SHORT":
                                 dist_kj = engine.current_kj - c_close
                                 if dist_kj >= (core_trailing_pips * pip_val):

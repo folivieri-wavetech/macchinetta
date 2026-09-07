@@ -19,7 +19,7 @@ class Config:
             "kj_periods": 55,       # Periodi Kijun-sen (Donchian Lento)
             
             # Risk Management
-            "max_kj_distance": 10.0, # Distanza massima consentita tra prezzo e KJ per l'ingresso Core
+            "max_kj_distance": 30.0, # Distanza massima consentita tra prezzo e KJ per l'ingresso Core (30 pip)
             "max_entry_delay": 3,    # Candele massime di ritardo per aspettare un ritracciamento valido
             
             
