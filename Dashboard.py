@@ -403,7 +403,7 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
     """Chiude immediatamente a mercato tutte le posizioni reali su IG aperte per lo strumento dato."""
     h = get_ig_headers(conto)
     if not h:
-        return False, "Headers IG non disponibili"
+        return False, "Headers IG non disponibili", []
     
     base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto.upper() else "https://demo-api.ig.com/gateway/deal"
     epic = CONFIG_STRUMENTI.get(nome_strumento, {}).get("epic")
@@ -414,10 +414,13 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
     try:
         r = requests.get(f"{base_url}/positions", headers=h_v2, timeout=6)
         if r.status_code != 200:
-            return False, f"Errore recupero posizioni IG ({r.status_code})"
+            return False, f"Errore recupero posizioni IG ({r.status_code})", []
         
         pos_list = r.json().get("positions", [])
         chiusi = 0
+        errori = []
+        rimaste = []
+        
         h_del = h.copy()
         h_del["VERSION"] = "1"
         h_del["_method"] = "DELETE"
@@ -435,6 +438,13 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
                 deal_id = pos.get("dealId")
                 direction = pos.get("direction")
                 size = pos.get("size")
+                m_status = m.get("marketStatus", "TRADEABLE")
+                
+                if m_status != "TRADEABLE":
+                    errori.append(f"{m_status}")
+                    rimaste.append(pos)
+                    continue
+                
                 if deal_id and direction and size:
                     dir_chiusura = "SELL" if direction in ("BUY", "LONG") else "BUY"
                     body = {
@@ -444,12 +454,39 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
                         "orderType": "MARKET"
                     }
                     r_c = requests.post(f"{base_url}/positions/otc", json=body, headers=h_del, timeout=8)
+                    accettato = False
                     if r_c.status_code == 200:
-                        chiusi += 1
+                        ref = r_c.json().get("dealReference")
+                        if ref:
+                            for _ in range(4):
+                                time.sleep(0.5)
+                                try:
+                                    r_conf = requests.get(f"{base_url}/confirms/{ref}", headers={"X-IG-API-KEY": h.get("X-IG-API-KEY"), "CST": h.get("CST"), "X-SECURITY-TOKEN": h.get("X-SECURITY-TOKEN"), "VERSION": "1"}, timeout=5)
+                                    if r_conf.status_code == 200:
+                                        c_data = r_conf.json()
+                                        if c_data.get("dealStatus") == "ACCEPTED":
+                                            accettato = True
+                                            break
+                                        elif c_data.get("dealStatus") == "REJECTED":
+                                            errori.append(c_data.get("reason", "REJECTED"))
+                                            break
+                                except Exception:
+                                    pass
+                        if accettato:
+                            chiusi += 1
+                        else:
+                            rimaste.append(pos)
+                    else:
+                        errori.append(f"HTTP {r_c.status_code}")
+                        rimaste.append(pos)
                     time.sleep(0.5)
-        return True, f"{chiusi} posizioni chiuse"
+                    
+        if rimaste or errori:
+            err_str = ", ".join(set(errori)) if errori else "Posizioni non chiuse"
+            return False, err_str, rimaste
+        return True, f"{chiusi} posizioni chiuse", []
     except Exception as e:
-        return False, str(e)
+        return False, str(e), []
 
 @st.dialog("Configurazione Avvio Sincrono Multiconto", width="large")
 def dialog_sync_start(conto_partenza, nome_strumento):
@@ -2955,7 +2992,7 @@ else:
 
                         if tipo_strategia == "RANGE" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
-                        elif not stato_attivo:
+                        elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
                                 if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch"):
@@ -2973,6 +3010,7 @@ else:
                                         "stato": "FLAT", 
                                         "tipo_strategia": "TREND", 
                                         "needs_manual_start": True,
+                                        "da_chiudere_a_riapertura": False,
                                         "msg_manuale": "",
                                         "storico_wip_trend": [],
                                         "posizioni_core": [],
@@ -2998,6 +3036,7 @@ else:
                                         "stato": "FLAT", 
                                         "tipo_strategia": "TREND", 
                                         "needs_manual_start": True,
+                                        "da_chiudere_a_riapertura": False,
                                         "msg_manuale": "",
                                         "storico_wip_trend": [],
                                         "posizioni_core": [],
@@ -3020,29 +3059,44 @@ else:
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
                                     st.session_state[err_key] = ""
                                     ora_str = datetime.now().strftime("%d/%m %H:%M:%S")
-                                    ok_ig, msg_ig = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
+                                    ok_ig, msg_ig, rimaste = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
                                     storico = dati_salvati.get("storico_wip_trend", [])
-                                    storico.append(f"[{ora_str}] 🛑 STOP: Spento e chiuso su IG ({msg_ig})")
-                                    memoria_attuale[nome] = {
-                                        **dati_salvati, 
-                                        "attivo": False,
-                                        "stato": "FLAT",
-                                        "direzione": "",
-                                        "posizioni_core": [],
-                                        "posizioni_incr": [],
-                                        "trailing_sl_core": None,
-                                        "trailing_sl_incr": None,
-                                        "needs_manual_start": False,
-                                        "storico_wip_trend": storico[-30:],
-                                        "msg_manuale": ""
-                                    }
+                                    if ok_ig:
+                                        storico.append(f"[{ora_str}] 🛑 STOP: Spento e chiuso su IG ({msg_ig})")
+                                        memoria_attuale[nome] = {
+                                            **dati_salvati, 
+                                            "attivo": False,
+                                            "stato": "FLAT",
+                                            "direzione": "",
+                                            "posizioni_core": [],
+                                            "posizioni_incr": [],
+                                            "trailing_sl_core": None,
+                                            "trailing_sl_incr": None,
+                                            "needs_manual_start": False,
+                                            "da_chiudere_a_riapertura": False,
+                                            "storico_wip_trend": storico[-30:],
+                                            "msg_manuale": ""
+                                        }
+                                    else:
+                                        storico.append(f"[{ora_str}] ⚠️ STOP Rifiutato su IG ({msg_ig}). Posizione in attesa di riapertura.")
+                                        memoria_attuale[nome] = {
+                                            **dati_salvati, 
+                                            "attivo": False,
+                                            "stato": "IN_ATTESA_CHIUSURA",
+                                            "da_chiudere_a_riapertura": True,
+                                            "needs_manual_start": False,
+                                            "storico_wip_trend": storico[-30:],
+                                            "msg_manuale": f"⚠️ Chiusura IG rifiutata ({msg_ig}). La posizione verrà liquidata automaticamente alla riapertura del mercato."
+                                        }
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
                                 tf_display = tf_map.get(tf_val, tf_val)
                                 pos_c = dati_salvati.get("posizioni_core", [])
                                 pos_i = dati_salvati.get("posizioni_incr", [])
-                                if direzione in ("LONG", "SHORT") and (pos_c or pos_i):
+                                if dati_salvati.get("da_chiudere_a_riapertura") or stato_corrente == "IN_ATTESA_CHIUSURA":
+                                    st.error(f"🔴 STOP RICHIESTO (Mercato Sospeso/Chiuso) | Posizione {direzione} in attesa liquidazione")
+                                elif direzione in ("LONG", "SHORT") and (pos_c or pos_i):
                                     st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
                                 elif dati_salvati.get("needs_manual_start", False):
                                     st.info(f"🚀 AVVIO IN CORSO ({direzione})...")

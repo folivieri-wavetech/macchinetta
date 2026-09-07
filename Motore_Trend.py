@@ -1192,39 +1192,88 @@ def esegui_ciclo_trend():
         candele_locali = carica_candele_locali(nome, tf)
 
         if not is_attivo:
-            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria, ripuliscile e chiudi su IG
+            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria o su IG, ripuliscile e chiudi su IG
             pos_core = dati.get("posizioni_core", [])
             pos_incr = dati.get("posizioni_incr", [])
-            if pos_core or pos_incr:
-                print_log(nome, f"Motore spento manualmente da Dashboard. Chiusura forzata di tutte le posizioni attive su IG.")
+            da_chiudere = dati.get("da_chiudere_a_riapertura", False) or (stato_corrente == "IN_ATTESA_CHIUSURA")
+            
+            pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic] if has_pos_live_data else []
+            
+            if pos_ig_strum or pos_core or pos_incr or da_chiudere:
+                print_log(nome, f"Motore spento o in attesa chiusura. Verifica liquidazione su IG...")
                 
-                # Chiudi tutte le posizioni su IG
-                for p in pos_core + pos_incr:
-                    deal_id = p.get("ticket")
-                    if deal_id:
-                        dir_chiusura = "SELL" if p.get("direction") == "LONG" else "BUY"
-                        sz = p.get("size", size_i)
-                        tipo_pos = p.get("tipo", "core")
-                        etichetta_tag = f"[{tipo_pos.upper()}]"
-                        chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
-                        time.sleep(0.2)
+                # Costruisci l'elenco delle posizioni da chiudere dando priorità assoluta ai dealId live su IG
+                tickets_da_chiudere = []
+                if pos_ig_strum:
+                    for p_ig in pos_ig_strum:
+                        pos_info = p_ig.get('position', {})
+                        t_id = pos_info.get('dealId')
+                        d_ig = pos_info.get('direction', 'BUY')
+                        sz_ig = pos_info.get('size', size_i)
+                        dir_c = "SELL" if d_ig in ("BUY", "LONG") else "BUY"
+                        tickets_da_chiudere.append((t_id, dir_c, sz_ig, "[IG_LIVE]"))
+                else:
+                    for p in (pos_core + pos_incr):
+                        t_id = p.get("ticket")
+                        if t_id:
+                            dir_c = "SELL" if p.get("direction") == "LONG" else "BUY"
+                            sz = p.get("size", size_i)
+                            tipo_pos = p.get("tipo", "core")
+                            tickets_da_chiudere.append((t_id, dir_c, sz, f"[{tipo_pos.upper()}]"))
                 
-                invia_notifica(f"⏹️ MOTORE SPENTO: {nome}", f"[{nome}] Chiusura forzata posizioni per spegnimento manuale.", "stop_button")
+                tutti_chiusi = True
+                if tickets_da_chiudere:
+                    for t_id, dir_c, sz, tag in tickets_da_chiudere:
+                        ok = chiudi_parziale(nome, t_id, dir_c, sz, headers, etichetta=tag)
+                        if not ok:
+                            tutti_chiusi = False
+                        time.sleep(0.3)
+                else:
+                    tutti_chiusi = True
                 
                 storico = dati.get("storico_wip_trend", [])
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                storico.append(f"[{ora_str}] 🛑 STOP: Spento e chiuso")
-                aggiorna_memoria(nome, {
-                    "posizioni_core": [], 
-                    "posizioni_incr": [], 
-                    "trailing_sl_core": None, 
-                    "trailing_sl_incr": None, 
-                    "stato": "FLAT",
-                    "direzione": "",
-                    "storico_wip_trend": storico[-30:]
-                })
-                if nome in stato_motore.motori:
-                    stato_motore.motori[nome].reset()
+                
+                if tutti_chiusi:
+                    print_log(nome, f"✅ Motore spento e tutte le posizioni su IG chiuse con successo.")
+                    invia_notifica(f"⏹️ MOTORE SPENTO: {nome}", f"[{nome}] Chiusura forzata completata su IG.", "stop_button")
+                    storico.append(f"[{ora_str}] 🛑 STOP: Posizioni chiuse su IG e motore FLAT.")
+                    aggiorna_memoria(nome, {
+                        "attivo": False,
+                        "posizioni_core": [], 
+                        "posizioni_incr": [], 
+                        "trailing_sl_core": None, 
+                        "trailing_sl_incr": None, 
+                        "stato": "FLAT",
+                        "direzione": "",
+                        "da_chiudere_a_riapertura": False,
+                        "msg_manuale": "",
+                        "storico_wip_trend": storico[-30:]
+                    })
+                    if nome in stato_motore.motori:
+                        stato_motore.motori[nome].reset()
+                else:
+                    # Mercato chiuso o rifiutato (es. EDITS_ONLY): preserva la posizione in memoria
+                    print_log(nome, f"⚠️ Impossibile chiudere posizioni su IG per {nome} (mercato chiuso o non negoziabile). In attesa di riapertura.")
+                    up_pend = {
+                        "attivo": False,
+                        "stato": "IN_ATTESA_CHIUSURA",
+                        "da_chiudere_a_riapertura": True,
+                        "msg_manuale": "⚠️ Mercato chiuso/sospeso su IG. La posizione verrà chiusa automaticamente appena il mercato riapre.",
+                        "storico_wip_trend": storico[-30:]
+                    }
+                    if pos_ig_strum and not pos_core:
+                        p0 = pos_ig_strum[0].get('position', {})
+                        d_str = "LONG" if p0.get('direction') == "BUY" else "SHORT"
+                        up_pend["posizioni_core"] = [{
+                            "entry": float(p0.get('level', 0.0)),
+                            "size": float(p0.get('size', size_i)),
+                            "ticket": p0.get('dealId'),
+                            "direction": d_str,
+                            "tipo": "core"
+                        }]
+                        up_pend["direzione"] = d_str
+                    aggiorna_memoria(nome, up_pend)
             continue
         
         # Inizializza/Recupera Engine
