@@ -1099,7 +1099,6 @@ def esegui_ciclo_trend():
                         tipo_pos = p.get("tipo", "core")
                         etichetta_tag = f"[{tipo_pos.upper()}]"
                         chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
-                        import time
                         time.sleep(0.2)
                 
                 invia_notifica(f"⏹️ MOTORE SPENTO: {nome}", f"[{nome}] Chiusura forzata posizioni per spegnimento manuale.", "stop_button")
