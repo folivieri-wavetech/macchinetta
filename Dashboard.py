@@ -42,7 +42,7 @@ CONFIG_STRUMENTI = {
     "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1, "margine_unitario": 290},
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400}
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400}
 }
 
 config = dotenv_values(".env")
@@ -971,8 +971,14 @@ def carica_memoria(conto_selezionato):
 
 def salva_memoria(conto_selezionato, dati):
     path = os.path.join(conto_selezionato, FILE_MEMORIA)
-    with open(path, "w") as f:
-        json.dump(dati, f, indent=4)
+    tmp_path = f"{path}.tmp.{os.getpid()}"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(dati, f, indent=4)
+        os.replace(tmp_path, path)
+    except Exception:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(dati, f, indent=4)
 
 def carica_preferenze(conto_selezionato):
     path = os.path.join(conto_selezionato, "preferenze_ui.json")
@@ -984,9 +990,13 @@ def carica_preferenze(conto_selezionato):
 
 def salva_preferenze(conto_selezionato, prefs):
     path = os.path.join(conto_selezionato, "preferenze_ui.json")
+    tmp_path = f"{path}.tmp.{os.getpid()}"
     try:
-        with open(path, "w") as f: json.dump(prefs, f, indent=4)
-    except: pass
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(prefs, f, indent=4)
+        os.replace(tmp_path, path)
+    except Exception:
+        pass
 
 def carica_ultimo_utente():
     path = "ultimo_utente.json"

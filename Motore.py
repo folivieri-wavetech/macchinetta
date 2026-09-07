@@ -60,14 +60,8 @@ if "_REALE" in NOME_CONTO.upper():
 else:
     BASE_URL = "https://demo-api.ig.com/gateway/deal"
 
-# --- SISTEMA ANTI-DOPPIA ISTANZA MULTI-CONTO ---
-try:
-    lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    porta_unica = 10000 + int(hashlib.md5(NOME_CONTO.encode()).hexdigest(), 16) % 40000
-    lock_socket.bind(("127.0.0.1", porta_unica))
-except socket.error:
-    print(f"\n🚨 ERRORE CRITICO: Il Motore per il conto '{NOME_CONTO}' è già in esecuzione in background!")
-    sys.exit()
+# --- SISTEMA ANTI-DOPPIA ISTANZA MULTI-CONTO (Gestito in esegui_motore) ---
+
 
 # --- CONFIGURAZIONI ---
 FILE_MEMORIA = "memoria_parametri.json"
@@ -109,7 +103,6 @@ CONFIG_STRUMENTI = {
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
     "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "Ethereum": {"epic": "CS.D.ETHUSD.CFD.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "USD", "valore_punto": 1},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1},
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1}
 }
@@ -377,8 +370,10 @@ def aggiorna_memoria(nome_strumento, aggiornamenti, log_wip=None):
                     ora = now_it().strftime("%d/%m %H:%M:%S")
                     dati[nome_strumento]["storico_wip"].append(f"[{ora}] {log_wip}")
                 
-                with open(FILE_MEMORIA, "w") as f:
+                tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}"
+                with open(tmp_f, "w", encoding="utf-8") as f:
                     json.dump(dati, f, indent=4)
+                os.replace(tmp_f, FILE_MEMORIA)
             return
         except Exception:
             time.sleep(0.5)
@@ -467,8 +462,10 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
         "prezzi_bid_ask": prezzi_bid_ask or {}
     })
     try:
-        with open("stato_sistema.json", "w") as f:
+        tmp_st = f"stato_sistema.json.tmp.{os.getpid()}"
+        with open(tmp_st, "w", encoding="utf-8") as f:
             json.dump(dati, f, indent=4)
+        os.replace(tmp_st, "stato_sistema.json")
     except Exception:
         pass
 
@@ -996,6 +993,14 @@ def esegui_fase_1(nome, dir, size, tp, opp, dts, bid, ask, mult, dec, epic, val,
             return False, False, None
 
 def esegui_motore():
+    try:
+        lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        porta_unica = 10000 + int(hashlib.md5(NOME_CONTO.encode()).hexdigest(), 16) % 40000
+        lock_socket.bind(("127.0.0.1", porta_unica))
+    except socket.error:
+        print(f"\n🚨 ERRORE CRITICO: Il Motore per il conto '{NOME_CONTO}' è già in esecuzione in background!")
+        sys.exit()
+
     try:
         print_log("SISTEMA", f"--- MOTORE AVVIATO PER CONTO: {NOME_CONTO} ---")
         

@@ -769,7 +769,10 @@ def aggiorna_memoria(nome, update_dict):
         if nome in p:
             for k, v in update_dict.items():
                 p[nome][k] = v
-            with open(FILE_MEMORIA, "w") as f: json.dump(p, f, indent=4)
+            tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}"
+            with open(tmp_f, "w", encoding="utf-8") as f:
+                json.dump(p, f, indent=4)
+            os.replace(tmp_f, FILE_MEMORIA)
     except Exception:
         pass
 
@@ -869,20 +872,10 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                 
     ts_radar = now_it().strftime("%d/%m/%Y %H:%M:%S")
     try:
-        with open("radar_trend.json", "w") as f_r:
+        tmp_r = f"radar_trend.json.tmp.{os.getpid()}"
+        with open(tmp_r, "w", encoding="utf-8") as f_r:
             json.dump({"radar_trend": radar_data, "radar_trend_ts": ts_radar}, f_r, indent=4)
-    except Exception:
-        pass
-
-    try:
-        stato_full = {}
-        if os.path.exists(STATO_SISTEMA):
-            with open(STATO_SISTEMA, "r") as f:
-                stato_full = json.load(f)
-        stato_full["radar_trend"] = radar_data
-        stato_full["radar_trend_ts"] = ts_radar
-        with open(STATO_SISTEMA, "w") as f:
-            json.dump(stato_full, f, indent=4)
+        os.replace(tmp_r, "radar_trend.json")
     except Exception:
         pass
 
