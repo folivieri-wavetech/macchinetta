@@ -1507,7 +1507,7 @@ def esegui_ciclo_trend():
                         if t_id and t_id != deal_id_core and t_id not in ticket_engine_incr:
                             pi = p_ig.get('position', {})
                             dir_i_str = "LONG" if pi.get('direction') == "BUY" else "SHORT"
-                            lvl_i_val = float(pi.get('level', 0.0))
+                            lvl_i_val = float(pi.get('level') or pi.get('openLevel') or 0.0)
                             sz_i_val = float(pi.get('size', 1.0))
                             pos_i_obj = Position(lvl_i_val, sz_i_val, "increment", dir_i_str)
                             pos_i_obj.ticket = t_id
