@@ -210,8 +210,8 @@ class CoreEngine:
                 # --- INGRESSI INCREMENTO LONG ---
                 # Candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
                 if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
-                    # Candela rossa di almeno 3 pip su tutti i TF
-                    if (closed_candle.open - closed_candle.close) >= (3 * pip_val):
+                    # Candela rossa di almeno 1 pip su tutti i TF
+                    if (closed_candle.open - closed_candle.close) >= (1 * pip_val):
                         entry_price = exec_price
                         scala = int(self.config.get("scala", 1) or 1)
                         while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
@@ -315,8 +315,8 @@ class CoreEngine:
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
                 if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
-                    # Candela verde di almeno 3 pip su tutti i TF
-                    if (closed_candle.close - closed_candle.open) >= (3 * pip_val):
+                    # Candela verde di almeno 1 pip su tutti i TF
+                    if (closed_candle.close - closed_candle.open) >= (1 * pip_val):
                         entry_price = exec_price
                         scala = int(self.config.get("scala", 1) or 1)
                         while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
