@@ -618,6 +618,65 @@ def allinea_candele_live(candele_locali, nome, tf, px_live):
     candele_locali.append(synth_candle)
     return candele_locali
 
+YAHOO_SYMBOLS = {
+    "AUD/NZD": "AUDNZD=X",
+    "CAD/JPY": "CADJPY=X",
+    "EUR/USD": "EURUSD=X",
+    "GBP/JPY": "GBPJPY=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/CAD": "USDCAD=X",
+    "USD/CHF": "USDCHF=X",
+    "USD/JPY": "USDJPY=X",
+    "Spot Gold": "GC=F",
+    "US 500 Cash": "^GSPC"
+}
+
+def scarica_candele_yahoo(nome, tf, limit=100):
+    symb = YAHOO_SYMBOLS.get(nome)
+    if not symb:
+        return []
+    interval_map = {
+        "MINUTE_5": ("5m", "3d"),
+        "MINUTE_10": ("5m", "4d"),
+        "MINUTE_15": ("15m", "7d"),
+        "HOUR": ("1h", "1mo"),
+        "HOUR_4": ("1h", "3mo"),
+        "DAY": ("1d", "1y")
+    }
+    int_str, rng_str = interval_map.get(tf, ("5m", "3d"))
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    try:
+        r = requests.get(url, headers=headers, timeout=6)
+        if r.status_code == 200:
+            res = r.json().get('chart', {}).get('result', [{}])[0]
+            quotes = res.get('indicators', {}).get('quote', [{}])[0]
+            timestamps = res.get('timestamp', [])
+            opens = quotes.get('open', [])
+            highs = quotes.get('high', [])
+            lows = quotes.get('low', [])
+            closes = quotes.get('close', [])
+            
+            candele = []
+            for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
+                if h is not None and l is not None and o is not None and c is not None:
+                    snap = datetime.datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
+                    candele.append({
+                        "snapshotTime": snap,
+                        "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
+                        "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
+                        "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
+                        "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
+                    })
+            if tf == "HOUR_4" and candele:
+                candele = aggrega_candele_multitf(candele, "HOUR", "HOUR_4")
+            if tf == "MINUTE_10" and candele:
+                candele = aggrega_candele_multitf(candele, "MINUTE_5", "MINUTE_10")
+            return candele[-limit:] if limit else candele
+    except Exception:
+        pass
+    return []
+
 def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
@@ -628,6 +687,18 @@ def carica_candele_locali(nome, tf, px_live=None):
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if len(data) >= 55 and is_valid_candele(data, tf):
+                    # Controllo freschezza dati: se lo storico locale è più vecchio di 2 ore, recupera da Yahoo
+                    last_t = data[-1].get("snapshotTime", "")
+                    try:
+                        last_dt = datetime.datetime.strptime(last_t, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+                        if (now_it() - last_dt).total_seconds() > 7200 and not is_weekend_active():
+                            c_yh = scarica_candele_yahoo(nome, tf, limit=100)
+                            if c_yh and len(c_yh) >= 55:
+                                salva_candele_locali(nome, tf, c_yh)
+                                print_log(nome, f"🔄 Storico {tf} sincronizzato da feed continuo Yahoo (colmato gap).")
+                                return c_yh
+                    except Exception:
+                        pass
                     if px_live and isinstance(px_live, (int, float)):
                         return allinea_candele_live(data, nome, tf, px_live)
                     return data
@@ -1601,8 +1672,12 @@ def esegui_ciclo_trend():
                 prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
         
         if prices == "QUOTA_ESAURITA" or not prices or not isinstance(prices, list) or len(prices) < 2:
-            # Fallback su chiusura della candela da tick/prezzo live se API in ritardo o quota
-            if len(candele_locali) >= 55 and is_just_closed:
+            # Fallback 1: Recupero candele chiuse da feed continuo Yahoo Finance (0 API IG consumate)
+            c_yh = scarica_candele_yahoo(nome, tf, limit=5)
+            if c_yh and len(c_yh) >= 2:
+                prices = c_yh
+            # Fallback 2: Chiusura della candela da tick/prezzo live se API in ritardo o quota
+            elif len(candele_locali) >= 55 and is_just_closed:
                 live_px = prezzi_live.get(nome)
                 if live_px and isinstance(live_px, (int, float)):
                     boundary_min = (min_tot // min_tf) * min_tf
