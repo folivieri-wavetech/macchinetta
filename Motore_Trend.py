@@ -1498,6 +1498,22 @@ def esegui_ciclo_trend():
                             print_log(nome, f"ℹ️ Rilevata chiusura manuale Incremento ({inc.ticket}) su IG. Rimosso dal live.")
                             engine.pm.increments.remove(inc)
                             storico_aggiornato = True
+                    
+                    # Riaggancio incrementi presenti su IG ma mancanti nel motore locale
+                    ticket_engine_incr = {inc.ticket for inc in engine.pm.increments if inc.ticket}
+                    deal_id_core = engine.pm.core_position.ticket if engine.pm.core_position else None
+                    for p_ig in pos_ig_strum:
+                        t_id = p_ig.get('position', {}).get('dealId')
+                        if t_id and t_id != deal_id_core and t_id not in ticket_engine_incr:
+                            pi = p_ig.get('position', {})
+                            dir_i_str = "LONG" if pi.get('direction') == "BUY" else "SHORT"
+                            lvl_i_val = float(pi.get('level', 0.0))
+                            sz_i_val = float(pi.get('size', 1.0))
+                            pos_i_obj = Position(lvl_i_val, sz_i_val, "increment", dir_i_str)
+                            pos_i_obj.ticket = t_id
+                            engine.pm.increments.append(pos_i_obj)
+                            print_log(nome, f"🛡️ Riconciliazione IG: Riagganciato incremento {dir_i_str} ({sz_i_val}) a {lvl_i_val} [ID: {t_id}]")
+                            storico_aggiornato = True
             
             # CASO B: Nessuna posizione aperta su IG per questo strumento ma il motore pensa di essere in trade
             elif not pos_ig_strum and engine.is_running:
