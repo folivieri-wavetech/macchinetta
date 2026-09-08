@@ -1034,7 +1034,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                     salva_candele_locali(nome, tf, c_loc)
                 
                 tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D1" if tf == "DAY" else "M5"))
-                print_log(nome, f"🕯️ Candela ({tf_lbl}) CHIUSA: {closed_snap} (alle {now_t.strftime('%H:%M')} ora italiana) | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
+                print_log(nome, f"🕯️ Candela [{tf_lbl}] chiusa alle {now_t.strftime('%H:%M')} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
                 candele_chiuse[(nome, tf)] = closed_candle_dict
             else:
                 # Aggiorna candela in corso

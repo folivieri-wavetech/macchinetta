@@ -3743,27 +3743,57 @@ else:
                 try:
                     path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
                     with open(path_log, "r", encoding="utf-8") as f:
-                        lines = [l for l in f.readlines() if l.strip()]
+                        lines = [l.strip().replace("\r", " ").replace("\n", " ") for l in f.readlines() if l.strip()]
                     # Mostra prima le righe più recenti in alto
-                    logs = "\n".join(reversed(lines))
+                    reversed_lines = list(reversed(lines))
                 except FileNotFoundError:
-                    logs = f"> In attesa di connessione col Motore per {conto_selezionato}..."
+                    reversed_lines = [f"> In attesa di connessione col Motore per {conto_selezionato}..."]
                 
-                logs_escaped = logs.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                righe_html = []
+                for riga in reversed_lines:
+                    # Abbreviazione formato candela esteso se presente nello storico
+                    riga = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"Candela [\1] chiusa alle \2", riga)
+                    riga_esc = riga.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    # Evidenziazione pulita timestamp e strumento
+                    riga_fmt = re.sub(
+                        r"^(\[(?:\d{1,2}/\d{1,2}\s+)?\d{2}:\d{2}:\d{2}\])",
+                        r"<span style='color: #64748b; font-weight: 500;'>\1</span>",
+                        riga_esc
+                    )
+                    riga_fmt = re.sub(
+                        r"(</span>\s*)(\[[A-Za-z0-9_/\s\.\-]+\])",
+                        r"\1<span style='color: #38bdf8; font-weight: 600;'>\2</span>",
+                        riga_fmt
+                    )
+                    riga_fmt = re.sub(
+                        r"(\[PnL:\s*\+[^\]]+\])",
+                        r"<span style='color: #4ade80; font-weight: 600;'>\1</span>",
+                        riga_fmt
+                    )
+                    riga_fmt = re.sub(
+                        r"(\[PnL:\s*\-[^\]]+\])",
+                        r"<span style='color: #f87171; font-weight: 600;'>\1</span>",
+                        riga_fmt
+                    )
+                    righe_html.append(f"<div style='padding: 1px 0;'>{riga_fmt}</div>")
+                
+                logs_content = "".join(righe_html)
                 st.html(f"""
                     <div style='
-                        background-color: #1E1E1E; 
-                        color: #D4D4D4; 
-                        font-family: "Courier New", Courier, monospace; 
-                        font-size: 0.82rem; 
-                        padding: 10px; 
-                        border-radius: 5px; 
-                        max-height: 500px; 
+                        background-color: #0f172a; 
+                        color: #e2e8f0; 
+                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+                        font-size: 0.80rem; 
+                        padding: 8px 12px; 
+                        border-radius: 6px; 
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        max-height: 520px; 
                         overflow-y: auto;
-                        line-height: 1.4;
+                        overflow-x: auto;
+                        line-height: 1.25;
                         white-space: nowrap;
                     '>
-                        {logs_escaped}
+                        {logs_content}
                     </div>
                 """)
             
