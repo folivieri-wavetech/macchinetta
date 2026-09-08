@@ -1,26 +1,28 @@
 ---
-description: Critical rules for interacting with the IG API, specifically regarding historical data allowances and race conditions.
+description: Regole di ferro per la gestione della quota dati storici IG (/prices) e accumulo candele live.
 ---
 
-# IG API Quota & Historical Data Handling
+# Regola di Ferro: Quota IG e Accumulo Candele Live
 
-## 1. Weekly Historical Data Allowance
-IG Demo accounts have a strict historical data allowance of 10,000 data points per week. 
-The `/prices` endpoint consumes this quota. Once exhausted, IG returns HTTP 403 `exceeded-account-historical-data-allowance` for the rest of the week (until reset on Sunday night).
+## 1. Limite Quota IG Settimanale
+* I conti IG hanno un tetto massimo di **10.000 punti dati storici a settimana** (reset la domenica notte).
+* L'endpoint `/prices` consuma punti proporzionali al `limit`.
+* Una volta esaurita la quota, IG restituisce HTTP 403 `exceeded-account-historical-data-allowance` fino al reset settimanale.
 
-## 2. Pod Race Condition Warning
-The system runs multiple Kubernetes pods (e.g., FIORDOK, DANY, BONGIOLO). 
-If these pods start simultaneously and the historical JSON files are missing from the shared PVC (`/data`), they will all attempt to download history at the same time.
-- 10 instruments * 4 timeframes * 100 candles * 3 pods = 12,000 requests.
-- This will instantly blow the weekly quota in a single second.
+## 2. Divieto Assoluto di Polling Continuo su `/prices`
+* **MAI** interrogare l'endpoint `/prices` di IG ad ogni chiusura candela (M5, H1, H4, D1).
+* Interrogare 10 strumenti ogni 5 minuti consuma 5.760 punti/giorno, bruciando la quota in meno di 48 ore.
+* A regime continuo, le candele devono essere formate e chiuse al **100% dall'accumulo locale dei tick streaming di IG** (`prezzi_live` via Lightstreamer), che è gratuito, illimitato e non consuma quota.
 
-## 3. The Enforced Solution
-To prevent this, `Motore_Trend.py` implements a staggered startup delay (`time.sleep`) based on the account name when downloading 100 candles. 
-- Only one pod fetches the history.
-- The other pods wait, check the shared PVC to see if the file is populated, and then read it directly, bypassing the API.
+## 3. Chiamata Seed UNA TANTUM all'Avvio
+* Se i file JSON locali non hanno almeno 55 candele (necessarie per Donchian TK 21 e KJ 55), viene eseguita una sola chiamata iniziale con `limit=60`.
+* 10 strumenti * 60 = 600 punti consumati su 10.000 (consumo pari al 6%).
+* **Regola Multi-Pod (PVC condivisa):** Solo il pod principale effettua il download; gli altri pod attendono e leggono il file condiviso dalla PVC `/data`, consumando 0 chiamate API.
 
-## 4. NEVER Delete Historical JSONs
-NEVER delete the `candele_*.json` files from the PVC during the week unless you have a specific, safe plan to restore them without using the IG API, as doing so will force the system to attempt a fetch and potentially hit the quota limit.
+## 4. MAI usare servizi terzi non autorizzati
+* Non usare Yahoo Finance né altri feed esterni per il trading live. Lo streaming tick di IG è l'unica fonte di verità del broker.
 
-## 5. Synthetic Fallback
-If the quota is exhausted, `Motore_Trend.py` falls back to synthesizing candles tick-by-tick from live prices. It is critical that these synthesized candles are saved back to disk (`salva_candele_locali`) to prevent the historical data from freezing in time.
+## 5. Procedura Lunedì (Reset Quota)
+* Alla riapertura settimanale, non scaricare a raffica:
+  * Se i file locali sono già popolati, proseguire con l'accumulo live.
+  * Se serve colmare il gap del weekend, fare una singola chiamata una tantum per strumento (`limit=60`) e poi passare all'accumulo live.
