@@ -45,6 +45,8 @@ CONSOLE_LOG_FILE = "console_live.log"
 STATO_TREND = "stato_trend.json"
 ULTIMO_LOG_ATTESA = {}
 LIVE_OHLC_TRACKER = {}
+LOCAL_CANDELE_CACHE = {}
+LAST_RADAR_SCAN = 0
 
 if len(sys.argv) < 2:
     print("🚨 ERRORE: Devi specificare il nome della cartella del conto all'avvio!")
@@ -619,6 +621,14 @@ def allinea_candele_live(candele_locali, nome, tf, px_live):
     return list(candele_locali) + [synth_candle]
 
 def carica_candele_locali(nome, tf, px_live=None):
+    # Se presente in cache locale in memoria e valida, usa subito la cache senza toccare il disco
+    if (nome, tf) in LOCAL_CANDELE_CACHE:
+        cached = LOCAL_CANDELE_CACHE[(nome, tf)]
+        if len(cached) >= 55 and is_valid_candele(cached, tf):
+            if px_live and isinstance(px_live, (int, float)):
+                return allinea_candele_live(cached, nome, tf, px_live)
+            return cached
+
     clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
     
@@ -628,6 +638,9 @@ def carica_candele_locali(nome, tf, px_live=None):
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if len(data) >= 55 and is_valid_candele(data, tf):
+                    LOCAL_CANDELE_CACHE[(nome, tf)] = data[-60:]
+                    if px_live and isinstance(px_live, (int, float)):
+                        return allinea_candele_live(data, nome, tf, px_live)
                     return data
         except Exception:
             pass
@@ -715,8 +728,9 @@ def salva_quota_ig(allowance_dict):
 
 def salva_candele_locali(nome, tf, candele_list):
     fpath = get_file_candele(nome, tf)
+    buffer_60 = candele_list[-60:]
+    LOCAL_CANDELE_CACHE[(nome, tf)] = buffer_60
     try:
-        buffer_60 = candele_list[-60:]
         with open(fpath, "w", encoding="utf-8") as f:
             json.dump(buffer_60, f, indent=2)
     except Exception as e:
@@ -802,8 +816,12 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
     """Scansiona tutti gli strumenti sui 4 TF (M5, H1, H4, D1) per calcolare la distanza da KJ55 e inviare alert di prossimità."""
     if not prezzi_live:
         return
-    radar_data = {}
+    global LAST_RADAR_SCAN
     now_ts = time.time()
+    if now_ts - LAST_RADAR_SCAN < 15:
+        return
+    LAST_RADAR_SCAN = now_ts
+    radar_data = {}
     tfs_radar = ["MINUTE_5", "HOUR", "HOUR_4", "DAY"]
     tf_labels = {"MINUTE_5": "M5", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
     
