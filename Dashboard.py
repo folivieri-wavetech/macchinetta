@@ -392,9 +392,9 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
                     break
         stato_c_lbl = "Chiusa"
 
+    col_oro = "#FFD700"
     segno_c = "+" if pnl_c > 0 else ""
-    col_c = "#00E676" if pnl_c > 0 else ("#FA8072" if pnl_c < 0 else "#cccccc")
-    line1_html = f"<div><b>Core [{dir_c}] [{stato_c_lbl}]:</b> <span style='color: {col_c}; font-weight: bold;'>{segno_c}{pnl_c:.0f} €</span></div>"
+    line1_html = f"<div style='color: {col_oro}; font-weight: normal;'>Core [{dir_c}] [{stato_c_lbl}]: {segno_c}{pnl_c:.0f} €</div>"
 
     # 2. Incr. Chiusi [n1]: +-yyyy €
     tot_inc_c = 0.0
@@ -406,8 +406,7 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
                 tot_inc_c += float(m_inc.group(1).replace(",", "."))
                 n_inc_c += 1
     segno_ic = "+" if tot_inc_c > 0 else ""
-    col_ic = "#00E676" if tot_inc_c > 0 else ("#FA8072" if tot_inc_c < 0 else "#cccccc")
-    line2_html = f"<div><b>Incr. Chiusi [{n_inc_c}]:</b> <span style='color: {col_ic}; font-weight: bold;'>{segno_ic}{tot_inc_c:.0f} €</span></div>"
+    line2_html = f"<div style='color: {col_oro}; font-weight: normal;'>Incr. Chiusi [{n_inc_c}]: {segno_ic}{tot_inc_c:.0f} €</div>"
 
     # 3. Incr. Aperti [n2]: +-zzzz €
     tot_inc_a = 0.0
@@ -420,8 +419,7 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
             pts_i = (px - e_i)/c_mult if dir_i == "LONG" else (e_i - px)/c_mult
             tot_inc_a += (pts_i * sz_i * c_valore_punto * c_rate)
     segno_ia = "+" if tot_inc_a > 0 else ""
-    col_ia = "#00E676" if tot_inc_a > 0 else ("#FA8072" if tot_inc_a < 0 else "#cccccc")
-    line3_html = f"<div><b>Incr. Aperti [{n_inc_a}]:</b> <span style='color: {col_ia}; font-weight: bold;'>{segno_ia}{tot_inc_a:.0f} €</span></div>"
+    line3_html = f"<div style='color: {col_oro}; font-weight: normal;'>Incr. Aperti [{n_inc_a}]: {segno_ia}{tot_inc_a:.0f} €</div>"
 
     # 4. Box Sintesi + Linea Divisoria
     box_sintesi_html = f"""
