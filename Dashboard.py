@@ -348,32 +348,101 @@ def mostra_diario_wip(nome_strumento, storico, conto=None):
     st.markdown("---")
 
 @st.dialog("📈 Cronologia Trend WIP")
-def mostra_diario_wip_trend(nome_strumento, storico):
+def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     st.markdown(f"### 📈 Cronologia Trend WIP: {nome_strumento}")
     st.markdown("---")
+    
+    conto_eff = conto or st.session_state.get("conto_selezionato", "FIORDOK_DEMO")
+    mem_conto = carica_memoria(conto_eff)
+    dati_inst = mem_conto.get(nome_strumento, {})
+    stato_sys = leggi_stato_sistema(conto_eff)
+    prezzi_live = stato_sys.get("prezzi_live", {})
+    px = prezzi_live.get(nome_strumento)
+
+    pos_core = dati_inst.get("posizioni_core", [])
+    pos_incr = dati_inst.get("posizioni_incr", [])
+    dir_t = dati_inst.get("direzione", "")
+
+    c_cfg = CONFIG_STRUMENTI.get(nome_strumento, {})
+    c_mult = c_cfg.get("moltiplicatore", 1)
+    c_valore_punto = c_cfg.get("valore_punto", 1)
+    c_valuta = c_cfg.get("valuta", "USD")
+    c_rate = get_eur_rate(c_valuta, prezzi_live)
+
+    # 1. Core [LONG/SHORT] [Aperta/Chiusa]: +-xxxx €
+    if pos_core:
+        c_p = pos_core[0]
+        e_c = float(c_p.get("entry", 0))
+        sz_c = float(c_p.get("size", 1))
+        dir_c = c_p.get("direction", dir_t or "LONG")
+        if px and c_mult > 0:
+            pts_c = (px - e_c)/c_mult if dir_c == "LONG" else (e_c - px)/c_mult
+            pnl_c = pts_c * sz_c * c_valore_punto * c_rate
+        else:
+            pnl_c = 0.0
+        stato_c_lbl = "Aperta"
+    else:
+        dir_c = dir_t if dir_t else "-"
+        pnl_c = 0.0
+        for r in (storico or []):
+            if any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core")):
+                m_c = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", r)
+                if m_c:
+                    pnl_c = float(m_c.group(1).replace(",", "."))
+                    break
+        stato_c_lbl = "Chiusa"
+
+    segno_c = "+" if pnl_c > 0 else ""
+    col_c = "#00E676" if pnl_c > 0 else ("#FA8072" if pnl_c < 0 else "#cccccc")
+    line1_html = f"<div><b>Core [{dir_c}] [{stato_c_lbl}]:</b> <span style='color: {col_c}; font-weight: bold;'>{segno_c}{pnl_c:.0f} €</span></div>"
+
+    # 2. Incr. Chiusi [n1]: +-yyyy €
+    tot_inc_c = 0.0
+    n_inc_c = 0
+    for r in (storico or []):
+        if not any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core")):
+            m_inc = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", r)
+            if m_inc:
+                tot_inc_c += float(m_inc.group(1).replace(",", "."))
+                n_inc_c += 1
+    segno_ic = "+" if tot_inc_c > 0 else ""
+    col_ic = "#00E676" if tot_inc_c > 0 else ("#FA8072" if tot_inc_c < 0 else "#cccccc")
+    line2_html = f"<div><b>Incr. Chiusi [{n_inc_c}]:</b> <span style='color: {col_ic}; font-weight: bold;'>{segno_ic}{tot_inc_c:.0f} €</span></div>"
+
+    # 3. Incr. Aperti [n2]: +-zzzz €
+    tot_inc_a = 0.0
+    n_inc_a = len(pos_incr)
+    for ip in pos_incr:
+        e_i = float(ip.get("entry", 0))
+        sz_i = float(ip.get("size", 1))
+        dir_i = ip.get("direction", dir_t or "LONG")
+        if px and c_mult > 0:
+            pts_i = (px - e_i)/c_mult if dir_i == "LONG" else (e_i - px)/c_mult
+            tot_inc_a += (pts_i * sz_i * c_valore_punto * c_rate)
+    segno_ia = "+" if tot_inc_a > 0 else ""
+    col_ia = "#00E676" if tot_inc_a > 0 else ("#FA8072" if tot_inc_a < 0 else "#cccccc")
+    line3_html = f"<div><b>Incr. Aperti [{n_inc_a}]:</b> <span style='color: {col_ia}; font-weight: bold;'>{segno_ia}{tot_inc_a:.0f} €</span></div>"
+
+    # 4. Box Sintesi + Linea Divisoria
+    box_sintesi_html = f"""
+    <div style='background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 10px 14px; font-family: monospace; font-size: 0.95rem; line-height: 1.6; margin-bottom: 8px;'>
+        {line1_html}
+        {line2_html}
+        {line3_html}
+    </div>
+    <div style='letter-spacing: 2px; color: rgba(255,255,255,0.3); text-align: center; margin-bottom: 12px; font-weight: bold; font-size: 0.9rem;'>================================================</div>
+    """
+    st.html(box_sintesi_html)
+
     if storico:
-        totale = 0.0
-        for riga in storico:
-            match = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
-            if match:
-                totale += float(match.group(1).replace(",", "."))
-        
         righe_eventi = []
         for riga in storico:
             riga_arr = re.sub(r"\[PnL:\s*([+-]?\d+)(?:[\.,]\d+)?\s*€\]", r"[PnL: \1 €]", riga)
             riga_colorata = re.sub(r"(\[PnL:.*?\])", r"<span style='color: #FFD700;'>\1</span>", riga_arr)
             righe_eventi.append(f"&bull; {riga_colorata}<br>")
         
-        segno = "+" if totale > 0 else ""
-        col_tot = "#09ab3b" if totale > 0 else ("#ff4b4b" if totale < 0 else "#FFD700")
-        
-        html_str = f"<div style='margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.2); font-size: 1.05rem;'>"
-        html_str += f"<span style='color: #FFD700;'><b>Totale PnL Chiusure:</b> <span style='color: {col_tot}; font-weight: bold;'>{segno}{totale:.0f} €</span></span></div>"
-        html_str += "<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>"
-        html_str += "".join(righe_eventi)
-        html_str += "</div>"
-        
-        st.html(html_str)
+        eventi_html = f"<div style='font-size: 0.85rem; line-height: 1.6; max-height: 350px; overflow-y: auto; padding-right: 5px;'>{''.join(righe_eventi)}</div>"
+        st.html(eventi_html)
     else:
         st.info("Nessun evento Trend registrato in questo ciclo.")
     st.markdown("---")
@@ -2605,7 +2674,7 @@ else:
                             st.markdown(f"<span class='{marker_class_t}'></span>{css_marker_t}", unsafe_allow_html=True)
                             st.markdown(html_tot_wip_t, unsafe_allow_html=True)
                             if st.button(nome, key=f"wip_trend_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
-                                mostra_diario_wip_trend(nome, storico)
+                                mostra_diario_wip_trend(nome, storico, conto=conto_selezionato)
                         
                         if is_attivo and tipo_strat == "TREND":
                             tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
@@ -2957,7 +3026,7 @@ else:
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
                             if st.button("📋 WIP", key=f"WIP_T_{conto_selezionato}_{nome}", width="stretch"):
-                                mostra_diario_wip_trend(nome, dati_salvati.get("storico_wip_trend", []))
+                                mostra_diario_wip_trend(nome, dati_salvati.get("storico_wip_trend", []), conto=conto_selezionato)
 
                         c_r1, c_r2, c_r3, c_r4 = st.columns(4)
                         with c_r1:
