@@ -552,6 +552,21 @@ def is_valid_candele(data, tf=None):
                     return False
                 if expected_min >= 1440 and delta_m < 720:
                     return False
+                    
+            # Controllo freschezza ultima candela (evita di accettare cache ferme a ore/giorni fa)
+            if not is_weekend_active():
+                st_last = data[-1].get('snapshotTime')
+                if st_last:
+                    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M:00", "%Y-%m-%d %H:%M:%S"):
+                        try:
+                            last_dt = datetime.datetime.strptime(st_last, fmt).replace(tzinfo=TZ_ITALIA)
+                            age_m = (now_it() - last_dt).total_seconds() / 60.0
+                            max_age_tollerata = max(expected_min * 4, 30)
+                            if age_m > max_age_tollerata:
+                                return False
+                            break
+                        except Exception:
+                            pass
         return True
     except Exception:
         return False
@@ -727,14 +742,25 @@ def salva_quota_ig(allowance_dict):
             pass
 
 def salva_candele_locali(nome, tf, candele_list):
-    fpath = get_file_candele(nome, tf)
+    clean = nome.replace("/", "_").replace(" ", "_")
+    fname = f"candele_{clean}_{tf}.json"
     buffer_60 = candele_list[-60:]
     LOCAL_CANDELE_CACHE[(nome, tf)] = buffer_60
-    try:
-        with open(fpath, "w", encoding="utf-8") as f:
-            json.dump(buffer_60, f, indent=2)
-    except Exception as e:
-        print_log(nome, f"Errore salvataggio candele locali: {e}")
+    
+    target_dirs = [".", "Logs_e_Cache", "../Logs_e_Cache", "/data/Logs_e_Cache"]
+    for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
+        target_dirs.extend([f"../{acc}", f"/data/{acc}", acc])
+        
+    for d in set(target_dirs):
+        if os.path.exists(d) and os.path.isdir(d):
+            dest = os.path.join(d, fname)
+            try:
+                tmp = f"{dest}.tmp.{os.getpid()}"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(buffer_60, f, indent=2)
+                os.replace(tmp, dest)
+            except Exception:
+                pass
 
 # --- FUNZIONI CORE ---
 def scarica_candele(epic, timeframe, limit=60, headers=None):
@@ -894,6 +920,79 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
         os.replace(tmp_r, "radar_trend.json")
     except Exception:
         pass
+
+def aggiorna_candele_live_globale(prezzi_live):
+    """
+    Costruttore continuo di candele OHLC da tick streaming IG a ZERO chiamate API.
+    Aggiorna in tempo reale M5, H1, H4 e D1 per TUTTI i 10 strumenti in CONFIG_STRUMENTI,
+    anche quando gli strumenti sono spenti, FLAT o in RANGE, mantenendo i file sempre
+    freschi, continui e privi di buchi temporali.
+    Ritorna un dizionario di candele appena chiuse nel ciclo: {(nome, tf): closed_candle_dict}
+    """
+    if not prezzi_live or is_weekend_active():
+        return {}
+
+    now_t = now_it()
+    min_tot = now_t.hour * 60 + now_t.minute
+    candele_chiuse = {}
+    
+    for nome, cfg in CONFIG_STRUMENTI.items():
+        live_px = prezzi_live.get(nome)
+        if not live_px or not isinstance(live_px, (int, float)):
+            continue
+            
+        for tf in ["MINUTE_5", "HOUR", "HOUR_4", "DAY"]:
+            min_tf = TF_MAP.get(tf, 5)
+            offset = 60 if min_tf in (60, 240, 1440) else 0
+            boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
+            curr_snap = now_t.replace(hour=(boundary_min // 60) % 24, minute=boundary_min % 60, second=0).strftime("%Y/%m/%d %H:%M:00")
+            
+            tracker = LIVE_OHLC_TRACKER.get((nome, tf))
+            if not tracker:
+                LIVE_OHLC_TRACKER[(nome, tf)] = {
+                    "snap": curr_snap,
+                    "open": live_px,
+                    "high": live_px,
+                    "low": live_px,
+                    "close": live_px
+                }
+            elif tracker["snap"] != curr_snap:
+                # Candela conclusa al passaggio del boundary!
+                closed_snap = tracker["snap"]
+                closed_candle_dict = {
+                    "snapshotTime": closed_snap,
+                    "openPrice": {"bid": tracker["open"], "ask": tracker["open"], "lastTraded": None},
+                    "highPrice": {"bid": tracker["high"], "ask": tracker["high"], "lastTraded": None},
+                    "lowPrice": {"bid": tracker["low"], "ask": tracker["low"], "lastTraded": None},
+                    "closePrice": {"bid": tracker["close"], "ask": tracker["close"], "lastTraded": None}
+                }
+                # Reset tracker per la nuova candela che si apre adesso
+                LIVE_OHLC_TRACKER[(nome, tf)] = {
+                    "snap": curr_snap,
+                    "open": live_px,
+                    "high": live_px,
+                    "low": live_px,
+                    "close": live_px
+                }
+                
+                # Aggiornamento storico locale (FIFO: mantieni sempre ultime 60 candele)
+                c_loc = carica_candele_locali(nome, tf)
+                snaps = {c.get("snapshotTime") for c in c_loc if "snapshotTime" in c}
+                if closed_snap not in snaps:
+                    c_loc.append(closed_candle_dict)
+                    if len(c_loc) > 60:
+                        c_loc = c_loc[-60:]
+                    salva_candele_locali(nome, tf, c_loc)
+                    if tf == "MINUTE_5":
+                        print_log(nome, f"🕯️ Candela ({tf}) CHIUSA su IG: {closed_snap} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
+                candele_chiuse[(nome, tf)] = closed_candle_dict
+            else:
+                # Aggiorna candela in corso
+                tracker["high"] = max(tracker["high"], live_px)
+                tracker["low"] = min(tracker["low"], live_px)
+                tracker["close"] = live_px
+                
+    return candele_chiuse
 
 def format_tf_label(tf_val):
     tf_s = str(tf_val or "").upper()
@@ -1170,6 +1269,13 @@ def esegui_ciclo_trend():
 
     if is_weekend_active():
         return
+
+    # Costruzione continua e chiusura candele OHLC per TUTTI gli strumenti a ZERO chiamate API
+    candele_appena_chiuse = {}
+    try:
+        candele_appena_chiuse = aggiorna_candele_live_globale(prezzi_live)
+    except Exception as e_cg:
+        pass
 
     headers = ottieni_headers_ig()
     if not headers:
@@ -1620,60 +1726,7 @@ def esegui_ciclo_trend():
         if not candele_locali and not needs_start:
             continue
 
-        now_t = now_it()
-        min_tf = TF_MAP.get(tf, 5)
-        min_tot = now_t.hour * 60 + now_t.minute
-        offset = 60 if min_tf in (60, 240, 1440) else 0
-        boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
-        curr_snap = now_t.replace(hour=(boundary_min // 60) % 24, minute=boundary_min % 60, second=0).strftime("%Y/%m/%d %H:%M:00")
-
-        # Tracker tick live per formare e chiudere le candele OHLC (0 chiamate API storiche IG)
-        tracker = LIVE_OHLC_TRACKER.get((nome, tf))
-        is_candle_just_closed = False
-
-        if not tracker:
-            LIVE_OHLC_TRACKER[(nome, tf)] = {
-                "snap": curr_snap,
-                "open": live_px,
-                "high": live_px,
-                "low": live_px,
-                "close": live_px
-            }
-        elif tracker["snap"] != curr_snap:
-            # Una candela si è appena conclusa al passaggio del periodo!
-            is_candle_just_closed = True
-            closed_snap = tracker["snap"]
-            closed_candle_dict = {
-                "snapshotTime": closed_snap,
-                "openPrice": {"bid": tracker["open"], "ask": tracker["open"], "lastTraded": None},
-                "highPrice": {"bid": tracker["high"], "ask": tracker["high"], "lastTraded": None},
-                "lowPrice": {"bid": tracker["low"], "ask": tracker["low"], "lastTraded": None},
-                "closePrice": {"bid": tracker["close"], "ask": tracker["close"], "lastTraded": None}
-            }
-            # Reset tracker per la nuova candela che si apre adesso
-            LIVE_OHLC_TRACKER[(nome, tf)] = {
-                "snap": curr_snap,
-                "open": live_px,
-                "high": live_px,
-                "low": live_px,
-                "close": live_px
-            }
-            
-            # Ammonticchia nello storico locale se non già presente
-            existing_snaps = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
-            if closed_snap not in existing_snaps:
-                candele_locali.append(closed_candle_dict)
-                # Mantieni finestra mobile fissa (ultime 60 candele: 55 storiche + margine)
-                if len(candele_locali) > 60:
-                    candele_locali = candele_locali[-60:]
-                salva_candele_locali(nome, tf, candele_locali)
-                print_log(nome, f"🕯️ Candela ({tf}) CHIUSA su IG: {closed_snap} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
-        else:
-            # Candela in corso: aggiorna High, Low e Close
-            tracker["high"] = max(tracker["high"], live_px)
-            tracker["low"] = min(tracker["low"], live_px)
-            tracker["close"] = live_px
-
+        is_candle_just_closed = (nome, tf) in candele_appena_chiuse
         if not is_candle_just_closed and not needs_start:
             continue
 
