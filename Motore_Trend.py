@@ -44,6 +44,7 @@ STATO_SISTEMA = "stato_sistema.json"
 CONSOLE_LOG_FILE = "console_live.log"
 STATO_TREND = "stato_trend.json"
 ULTIMO_LOG_ATTESA = {}
+LIVE_OHLC_TRACKER = {}
 
 if len(sys.argv) < 2:
     print("🚨 ERRORE: Devi specificare il nome della cartella del conto all'avvio!")
@@ -615,67 +616,7 @@ def allinea_candele_live(candele_locali, nome, tf, px_live):
         "lowPrice": {"bid": min(prev_close, px_live), "ask": min(prev_close, px_live), "lastTraded": None},
         "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
     }
-    candele_locali.append(synth_candle)
-    return candele_locali
-
-YAHOO_SYMBOLS = {
-    "AUD/NZD": "AUDNZD=X",
-    "CAD/JPY": "CADJPY=X",
-    "EUR/USD": "EURUSD=X",
-    "GBP/JPY": "GBPJPY=X",
-    "GBP/USD": "GBPUSD=X",
-    "USD/CAD": "USDCAD=X",
-    "USD/CHF": "USDCHF=X",
-    "USD/JPY": "USDJPY=X",
-    "Spot Gold": "GC=F",
-    "US 500 Cash": "^GSPC"
-}
-
-def scarica_candele_yahoo(nome, tf, limit=100):
-    symb = YAHOO_SYMBOLS.get(nome)
-    if not symb:
-        return []
-    interval_map = {
-        "MINUTE_5": ("5m", "3d"),
-        "MINUTE_10": ("5m", "4d"),
-        "MINUTE_15": ("15m", "7d"),
-        "HOUR": ("1h", "1mo"),
-        "HOUR_4": ("1h", "3mo"),
-        "DAY": ("1d", "1y")
-    }
-    int_str, rng_str = interval_map.get(tf, ("5m", "3d"))
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symb}?range={rng_str}&interval={int_str}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    try:
-        r = requests.get(url, headers=headers, timeout=6)
-        if r.status_code == 200:
-            res = r.json().get('chart', {}).get('result', [{}])[0]
-            quotes = res.get('indicators', {}).get('quote', [{}])[0]
-            timestamps = res.get('timestamp', [])
-            opens = quotes.get('open', [])
-            highs = quotes.get('high', [])
-            lows = quotes.get('low', [])
-            closes = quotes.get('close', [])
-            
-            candele = []
-            for t, o, h, l, c in zip(timestamps, opens, highs, lows, closes):
-                if h is not None and l is not None and o is not None and c is not None:
-                    snap = datetime.datetime.fromtimestamp(t, TZ_ITALIA).strftime("%Y/%m/%d %H:%M:00")
-                    candele.append({
-                        "snapshotTime": snap,
-                        "openPrice": {"bid": float(o), "ask": float(o), "lastTraded": None},
-                        "highPrice": {"bid": float(h), "ask": float(h), "lastTraded": None},
-                        "lowPrice": {"bid": float(l), "ask": float(l), "lastTraded": None},
-                        "closePrice": {"bid": float(c), "ask": float(c), "lastTraded": None}
-                    })
-            if tf == "HOUR_4" and candele:
-                candele = aggrega_candele_multitf(candele, "HOUR", "HOUR_4")
-            if tf == "MINUTE_10" and candele:
-                candele = aggrega_candele_multitf(candele, "MINUTE_5", "MINUTE_10")
-            return candele[-limit:] if limit else candele
-    except Exception:
-        pass
-    return []
+    return list(candele_locali) + [synth_candle]
 
 def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
@@ -687,20 +628,6 @@ def carica_candele_locali(nome, tf, px_live=None):
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if len(data) >= 55 and is_valid_candele(data, tf):
-                    # Controllo freschezza dati: se lo storico locale è più vecchio di 2 ore, recupera da Yahoo
-                    last_t = data[-1].get("snapshotTime", "")
-                    try:
-                        last_dt = datetime.datetime.strptime(last_t, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
-                        if (now_it() - last_dt).total_seconds() > 7200 and not is_weekend_active():
-                            c_yh = scarica_candele_yahoo(nome, tf, limit=100)
-                            if c_yh and len(c_yh) >= 55:
-                                salva_candele_locali(nome, tf, c_yh)
-                                print_log(nome, f"🔄 Storico {tf} sincronizzato da feed continuo Yahoo (colmato gap).")
-                                return c_yh
-                    except Exception:
-                        pass
-                    if px_live and isinstance(px_live, (int, float)):
-                        return allinea_candele_live(data, nome, tf, px_live)
                     return data
         except Exception:
             pass
@@ -713,12 +640,11 @@ def carica_candele_locali(nome, tf, px_live=None):
                 with open(alt_path, "r", encoding="utf-8") as f:
                     d = json.load(f)
                     if len(d) >= 55 and is_valid_candele(d, tf):
-                        if px_live and isinstance(px_live, (int, float)):
-                            d = allinea_candele_live(d, nome, tf, px_live)
                         salva_candele_locali(nome, tf, d)
                         return d
             except Exception:
                 pass
+
 
     # 3. Aggregazione da timeframe minori a maggiori
     tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
@@ -1621,123 +1547,83 @@ def esegui_ciclo_trend():
                     processa_eventi_engine(nome, engine, live_events, epic, valuta, size_i, headers, dec, auto_restart, dati)
 
         # -------------------------------------------------------------
-        # FASE 2: TIMING FINE CANDELA (Registrazione candele e calcolo KJ sempre attivi dalle 22:00)
+        # FASE 2: TIMING FINE CANDELA (Accumulo candele da tick streaming IG)
         # -------------------------------------------------------------
         has_no_core = (engine.pm.core_position is None) if (engine and hasattr(engine, 'pm')) else True
         needs_start = dati.get("needs_manual_start", False) or (is_attivo and has_no_core and not dati.get("posizioni_core") and direzione in ("LONG", "SHORT"))
         
+        # Nel weekend (mercati chiusi fino a domenica 21:45), nessuna candela chiude
+        if is_weekend_active():
+            continue
+
+        live_px = prezzi_live.get(nome)
+        if not live_px or not isinstance(live_px, (int, float)):
+            continue
+
+        candele_locali = carica_candele_locali(nome, tf)
+        if not candele_locali and not needs_start:
+            continue
+
         now_t = now_it()
         min_tf = TF_MAP.get(tf, 5)
         min_tot = now_t.hour * 60 + now_t.minute
         offset = 60 if min_tf in (60, 240, 1440) else 0
-        is_candle_boundary = (min_tot - offset) % min_tf == 0
-        is_just_closed = is_candle_boundary and now_t.second < 25
-        
-        if not is_just_closed and not needs_start:
-            continue
-        
-        # Nel weekend (mercati chiusi fino a domenica 21:45), nessuna candela chiude e nessuna chiamata IG
-        if is_weekend_active():
+        boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
+        curr_snap = now_t.replace(hour=(boundary_min // 60) % 24, minute=boundary_min % 60, second=0).strftime("%Y/%m/%d %H:%M:00")
+
+        # Tracker tick live per formare e chiudere le candele OHLC (0 chiamate API storiche IG)
+        tracker = LIVE_OHLC_TRACKER.get((nome, tf))
+        is_candle_just_closed = False
+
+        if not tracker:
+            LIVE_OHLC_TRACKER[(nome, tf)] = {
+                "snap": curr_snap,
+                "open": live_px,
+                "high": live_px,
+                "low": live_px,
+                "close": live_px
+            }
+        elif tracker["snap"] != curr_snap:
+            # Una candela si è appena conclusa al passaggio del periodo!
+            is_candle_just_closed = True
+            closed_snap = tracker["snap"]
+            closed_candle_dict = {
+                "snapshotTime": closed_snap,
+                "openPrice": {"bid": tracker["open"], "ask": tracker["open"], "lastTraded": None},
+                "highPrice": {"bid": tracker["high"], "ask": tracker["high"], "lastTraded": None},
+                "lowPrice": {"bid": tracker["low"], "ask": tracker["low"], "lastTraded": None},
+                "closePrice": {"bid": tracker["close"], "ask": tracker["close"], "lastTraded": None}
+            }
+            # Reset tracker per la nuova candela che si apre adesso
+            LIVE_OHLC_TRACKER[(nome, tf)] = {
+                "snap": curr_snap,
+                "open": live_px,
+                "high": live_px,
+                "low": live_px,
+                "close": live_px
+            }
+            
+            # Ammonticchia nello storico locale se non già presente
+            existing_snaps = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
+            if closed_snap not in existing_snaps:
+                candele_locali.append(closed_candle_dict)
+                # Mantieni finestra mobile (ultime 300 candele)
+                if len(candele_locali) > 300:
+                    candele_locali = candele_locali[-300:]
+                salva_candele_locali(nome, tf, candele_locali)
+                print_log(nome, f"🕯️ Candela ({tf}) CHIUSA su IG: {closed_snap} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
+        else:
+            # Candela in corso: aggiorna High, Low e Close
+            tracker["high"] = max(tracker["high"], live_px)
+            tracker["low"] = min(tracker["low"], live_px)
+            tracker["close"] = live_px
+
+        if not is_candle_just_closed and not needs_start:
             continue
 
-        candele_locali = carica_candele_locali(nome, tf, px_live=prezzi_live.get(nome))
-        
-        # 1. Recupero candela appena chiusa da IG (RIGOROSAMENTE limit=2 per non sforare mai la quota)
-        limite_download = 2
-        boundary_id = f"{nome}_{tf}_{min_tot // min_tf}"
-        
-        prices = []
-        if LAST_FETCH_BOUNDARY.get(nome) != boundary_id and is_just_closed:
-            LAST_FETCH_BOUNDARY[nome] = boundary_id
-            
-            # COORDINAMENTO MULTI-POD (PVC CONDIVISA):
-            # Se siamo su DANY o BONGIOLO, attendiamo 4-8 secondi per dare precedenza al pod FIORDOK
-            if "DANY" in NOME_CONTO: time.sleep(4)
-            elif "BONGIOLO" in NOME_CONTO: time.sleep(8)
-            
-            # Ricontrolla se nel frattempo FIORDOK (o un altro pod) ha già scaricato e salvato la candela
-            cand_check = carica_candele_locali(nome, tf, px_live=None)
-            if cand_check and len(cand_check) >= 55:
-                # Controlla se l'ultima candela è già quella dell'orario appena chiuso
-                last_snap = cand_check[-1].get("snapshotTime", "")
-                boundary_min = (min_tot // min_tf) * min_tf
-                expected_snap = now_t.replace(hour=boundary_min // 60, minute=boundary_min % 60, second=0).strftime("%Y/%m/%d %H:%M:00")
-                if last_snap == expected_snap:
-                    candele_locali = cand_check
-                    # Candela già aggiornata dall'altro pod: 0 chiamate API consumate!
-                    prices = []
-                else:
-                    prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
-            else:
-                prices = scarica_candele(epic, tf, limit=limite_download, headers=headers)
-        
-        if prices == "QUOTA_ESAURITA" or not prices or not isinstance(prices, list) or len(prices) < 2:
-            # Fallback 1: Recupero candele chiuse da feed continuo Yahoo Finance (0 API IG consumate)
-            c_yh = scarica_candele_yahoo(nome, tf, limit=5)
-            if c_yh and len(c_yh) >= 2:
-                prices = c_yh
-            # Fallback 2: Chiusura della candela da tick/prezzo live se API in ritardo o quota
-            elif len(candele_locali) >= 55 and is_just_closed:
-                live_px = prezzi_live.get(nome)
-                if live_px and isinstance(live_px, (int, float)):
-                    boundary_min = (min_tot // min_tf) * min_tf
-                    b_h = boundary_min // 60
-                    b_m = boundary_min % 60
-                    snap_synth = now_t.replace(hour=b_h, minute=b_m, second=0).strftime("%Y/%m/%d %H:%M:00")
-                    snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
-                    if snap_synth not in snap_esistenti:
-                        last_c = candele_locali[-1]
-                        prev_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
-                        synth_candle = {
-                            "snapshotTime": snap_synth,
-                            "openPrice": {"bid": prev_close, "ask": prev_close, "lastTraded": None},
-                            "highPrice": {"bid": max(prev_close, live_px), "ask": max(prev_close, live_px), "lastTraded": None},
-                            "lowPrice": {"bid": min(prev_close, live_px), "ask": min(prev_close, live_px), "lastTraded": None},
-                            "closePrice": {"bid": live_px, "ask": live_px, "lastTraded": None}
-                        }
-                        candele_locali.append(synth_candle)
-                        salva_candele_locali(nome, tf, candele_locali)
-                        print_log(nome, f"🕯️ Candela ({tf}) registrata da streaming live IG: {snap_synth} a {live_px:.5f}.")
-            prices = []
-                
-        # Unione e aggiornamento del buffer locale delle candele (NON SI CANCELLA MAI NULLA)
-        if prices and isinstance(prices, list) and len(prices) >= 2:
-            snap_esistenti = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
-                
-            for pr in prices[:-1]: # tutte le chiuse tranne l'ancora aperta
-                st = pr.get("snapshotTime")
-                if st and st not in snap_esistenti:
-                    # Verifica che i prezzi non siano nulli o negativi (glitch API IG)
-                    try:
-                        b_o, a_o = pr['openPrice']['bid'], pr['openPrice']['ask']
-                        b_h, a_h = pr['highPrice']['bid'], pr['highPrice']['ask']
-                        b_l, a_l = pr['lowPrice']['bid'], pr['lowPrice']['ask']
-                        b_c, a_c = pr['closePrice']['bid'], pr['closePrice']['ask']
-                        if all(v is not None and 0 < v < 1e8 for v in [b_o, a_o, b_h, a_h, b_l, a_l, b_c, a_c]):
-                            candele_locali.append(pr)
-                            snap_esistenti.add(st)
-                    except Exception:
-                        pass
-            salva_candele_locali(nome, tf, candele_locali)
-            
-        if not candele_locali and not needs_start:
-            print_log(nome, "⚠️ Dati candele non ancora sufficienti.")
-            continue
-            
-        # 2. Controllo Timestamp Lock
-        last_closed_candle = candele_locali[-1] if candele_locali else {}
-        snapshot_time = last_closed_candle.get("snapshotTime", "")
-        saved_candle_time = dati.get("last_candle_time", "")
-        
-        if snapshot_time and snapshot_time == saved_candle_time and not needs_start:
-            continue
-            
-        if is_just_closed:
-            print_log(nome, f"DEBUG: Nuova candela chiusa rilevata ({tf}). Snapshot: {snapshot_time}")
-        
-        # Seed dello storico (tutte le candele chiuse TRANNE l'ultima se è fine candela, o tutte se manual start)
+        # Seed dello storico (tutte le candele chiuse TRANNE l'ultima se è fine candela appena chiusa)
         storic_candles = []
-        subset = candele_locali[:-1] if (is_just_closed and len(candele_locali) > 1) else candele_locali
+        subset = candele_locali[:-1] if (is_candle_just_closed and len(candele_locali) > 1) else candele_locali
         for pr in subset: 
             try:
                 bid_o, ask_o = pr['openPrice']['bid'], pr['openPrice']['ask']
