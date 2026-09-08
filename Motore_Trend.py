@@ -872,6 +872,7 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
             lbl = tf_labels[tf]
             candele = carica_candele_locali(nome, tf, px_live=px)
             kj = calcola_kj55_da_candele(candele, periods=55)
+            tk = calcola_kj55_da_candele(candele, periods=21)
             if kj is not None:
                 diff_pts = px - kj
                 dist_pips = round(abs(diff_pts) / mult)
@@ -880,6 +881,7 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                 
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": kj,
+                    "tk": tk,
                     "dist_pips": int(dist_pips),
                     "dir": dir_pos,
                     "vicino": is_vicino

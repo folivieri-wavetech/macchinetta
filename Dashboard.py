@@ -558,6 +558,29 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
     except Exception as e:
         return False, str(e), []
 
+def carica_radar_trend_dash(conto=None):
+    """Carica i dati freschi da radar_trend.json come Unica Fonte di Verità per KJ e TK."""
+    candidates = []
+    if conto:
+        candidates.append(os.path.join(conto, "radar_trend.json"))
+        candidates.append(os.path.join("..", conto, "radar_trend.json"))
+    for c_alt in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_REALE", "DANY_REALE", "BONGIOLO_REALE", "."]:
+        candidates.append(os.path.join(c_alt, "radar_trend.json"))
+        candidates.append(os.path.join("..", c_alt, "radar_trend.json"))
+        
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    rad = d.get("radar_trend", {})
+                    ts = d.get("radar_trend_ts")
+                    if rad:
+                        return rad, ts
+            except Exception:
+                pass
+    return {}, None
+
 @st.dialog("Configurazione Avvio Sincrono Multiconto", width="large")
 def dialog_sync_start(conto_partenza, nome_strumento):
     conti_disponibili = [d for d in os.listdir(".") if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
@@ -710,11 +733,21 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     sz_r = mem_r.get("size", 4)
     
     # Controllo di coerenza Kijun per la gamba Trend
-    c_loc_d = carica_candele_locali_dash(conto_t, nome_strumento, tf_scelto)
-    kj_dialog = calcola_kj55_da_candele_dash(c_loc_d, periods=55)
+    tf_map_d = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+    tf_badge_d = tf_map_d.get(tf_scelto, "H1")
+    
+    rad_d, _ = carica_radar_trend_dash(conto_t)
+    kj_dialog = None
+    if rad_d and nome_strumento in rad_d:
+        kj_dialog = rad_d[nome_strumento].get("timeframes", {}).get(tf_badge_d, {}).get("kj")
+        
     st_t = leggi_stato_sistema(conto_t)
     px_live_dialog = st_t.get("prezzi_live", {}).get(nome_strumento)
     dec_d = CONFIG_STRUMENTI.get(nome_strumento, {}).get("decimali", 2)
+    
+    if kj_dialog is None:
+        c_loc_d = carica_candele_locali_dash(conto_t, nome_strumento, tf_scelto, px_live=px_live_dialog)
+        kj_dialog = calcola_kj55_da_candele_dash(c_loc_d, periods=55)
     
     blocco_multiconto = False
     msg_blocco_multi = ""
@@ -1370,9 +1403,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
                         pl = st_d.get("prezzi_live", {})
                         if pl:
                             prezzi_live.update(pl)
-                        if not radar_data and st_d.get("radar_trend"):
-                            radar_data = st_d.get("radar_trend", {})
-                            ts_aggiornamento = st_d.get("radar_trend_ts")
                 except Exception:
                     pass
                     
@@ -2994,15 +3024,7 @@ else:
 
 
 
-                radar_data = stato.get("radar_trend", {})
-                if not radar_data:
-                    r_file = os.path.join(conto_selezionato, "radar_trend.json")
-                    if os.path.exists(r_file):
-                        try:
-                            with open(r_file, "r", encoding="utf-8") as f_rf:
-                                radar_data = json.load(f_rf).get("radar_trend", {})
-                        except Exception:
-                            pass
+                radar_data, _ = carica_radar_trend_dash(conto_selezionato)
 
                 def crea_riquadro_trend(nome, def_body=10, def_size=3, def_size_max=5, def_scala=1):
                     with st.container(border=True):
@@ -3033,18 +3055,21 @@ else:
                             bid = prezzi_bid_ask.get(nome, {}).get("bid", "-")
                             ask = prezzi_bid_ask.get(nome, {}).get("ask", "-")
                             
-                            # Allineamento dinamico Kijun (KJ55) con Radar Trend per il timeframe selezionato
+                            # Allineamento dinamico Kijun (KJ55) e Tenkan (TK21) con Radar Trend per il timeframe selezionato
                             current_kj = None
+                            current_tk = None
                             if radar_data and nome in radar_data:
-                                current_kj = radar_data[nome].get("timeframes", {}).get(tf_badge, {}).get("kj")
+                                tf_info = radar_data[nome].get("timeframes", {}).get(tf_badge, {})
+                                current_kj = tf_info.get("kj")
+                                current_tk = tf_info.get("tk")
                             
                             px_ref = bid if isinstance(bid, (int, float)) else (ask if isinstance(ask, (int, float)) else None)
-                            if current_kj is None:
+                            if current_kj is None or current_tk is None:
                                 candele_loc = carica_candele_locali_dash(conto_selezionato, nome, tf_selected, px_live=px_ref)
-                                current_kj = calcola_kj55_da_candele_dash(candele_loc, periods=55)
-                                
-                            candele_loc = carica_candele_locali_dash(conto_selezionato, nome, tf_selected, px_live=px_ref)
-                            current_tk = calcola_kj55_da_candele_dash(candele_loc, periods=21)
+                                if current_kj is None:
+                                    current_kj = calcola_kj55_da_candele_dash(candele_loc, periods=55)
+                                if current_tk is None:
+                                    current_tk = calcola_kj55_da_candele_dash(candele_loc, periods=21)
                             
                             dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                             kj_str = f"{current_kj:.{dec}f}" if current_kj is not None else "-"
