@@ -603,6 +603,15 @@ def dialog_sync_start(conto_partenza, nome_strumento):
     mem_l = carica_memoria(conto_l).get(nome_strumento, {})
     mem_s = carica_memoria(conto_s).get(nome_strumento, {})
     
+    if mem_l.get("attivo", False) or mem_s.get("attivo", False):
+        msg_l = f"- **{conto_l}** risulta già ATTIVO.\n" if mem_l.get("attivo", False) else ""
+        msg_s = f"- **{conto_s}** risulta già ATTIVO.\n" if mem_s.get("attivo", False) else ""
+        st.error(f"⚠️ **ATTENZIONE: Strumento già occupato!**\n\nPrima di avviare il Sincrono devi spegnere e chiudere {nome_strumento} sui conti selezionati per sistemare il portafoglio:\n{msg_l}{msg_s}")
+        if st.button("❌ ANNULLA", key=f"sync_annulla_occ_{nome_strumento}"):
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+        return
+    
     p_l = (mem_l.get("tp", def_tp), mem_l.get("opp", def_opp), mem_l.get("dts", def_dts), mem_l.get("size", 4))
     p_s = (mem_s.get("tp", def_tp), mem_s.get("opp", def_opp), mem_s.get("dts", def_dts), mem_s.get("size", 4))
     
@@ -677,6 +686,15 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     # Info parametri di entrambi i conti
     mem_t = carica_memoria(conto_t).get(nome_strumento, {})
     mem_r = carica_memoria(conto_r).get(nome_strumento, {})
+    
+    if mem_t.get("attivo", False) or mem_r.get("attivo", False):
+        msg_t = f"- **{conto_t}** risulta già ATTIVO.\n" if mem_t.get("attivo", False) else ""
+        msg_r = f"- **{conto_r}** risulta già ATTIVO.\n" if mem_r.get("attivo", False) else ""
+        st.error(f"⚠️ **ATTENZIONE: Strumento già occupato!**\n\nPrima di avviare il Multiconto Trend-Range devi spegnere e chiudere {nome_strumento} sui conti selezionati per sistemare il portafoglio:\n{msg_t}{msg_r}")
+        if st.button("❌ ANNULLA", key=f"synct_annulla_occ_{nome_strumento}"):
+            st.session_state[f"sync_trend_open_{nome_strumento}"] = False
+            st.rerun()
+        return
     
     sz_t = mem_t.get("size", 3)
     szm_t = mem_t.get("size_max", 5)
