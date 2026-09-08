@@ -393,8 +393,9 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
         stato_c_lbl = "Chiusa"
 
     col_oro = "#FFD700"
-    segno_c = "+" if pnl_c > 0 else ""
-    line1_html = f"<div style='color: {col_oro}; font-weight: normal;'>Core [{dir_c}] [{stato_c_lbl}]: {segno_c}{pnl_c:.0f} €</div>"
+    segno_c = "+" if pnl_c >= 0.5 else ""
+    col_c = "#00E676" if pnl_c >= 0.5 else ("#FA8072" if pnl_c <= -0.5 else "#cccccc")
+    line1_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Core [{dir_c}] [{stato_c_lbl}]:</span> <span style='color: {col_c}; font-weight: normal;'>{segno_c}{pnl_c:.0f} €</span></div>"
 
     # 2. Incr. Chiusi [n1]: +-yyyy €
     tot_inc_c = 0.0
@@ -405,8 +406,9 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
             if m_inc:
                 tot_inc_c += float(m_inc.group(1).replace(",", "."))
                 n_inc_c += 1
-    segno_ic = "+" if tot_inc_c > 0 else ""
-    line2_html = f"<div style='color: {col_oro}; font-weight: normal;'>Incr. Chiusi [{n_inc_c}]: {segno_ic}{tot_inc_c:.0f} €</div>"
+    segno_ic = "+" if tot_inc_c >= 0.5 else ""
+    col_ic = "#00E676" if tot_inc_c >= 0.5 else ("#FA8072" if tot_inc_c <= -0.5 else "#cccccc")
+    line2_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Incr. Chiusi [{n_inc_c}]:</span> <span style='color: {col_ic}; font-weight: normal;'>{segno_ic}{tot_inc_c:.0f} €</span></div>"
 
     # 3. Incr. Aperti [n2]: +-zzzz €
     tot_inc_a = 0.0
@@ -418,8 +420,9 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
         if px and c_mult > 0:
             pts_i = (px - e_i)/c_mult if dir_i == "LONG" else (e_i - px)/c_mult
             tot_inc_a += (pts_i * sz_i * c_valore_punto * c_rate)
-    segno_ia = "+" if tot_inc_a > 0 else ""
-    line3_html = f"<div style='color: {col_oro}; font-weight: normal;'>Incr. Aperti [{n_inc_a}]: {segno_ia}{tot_inc_a:.0f} €</div>"
+    segno_ia = "+" if tot_inc_a >= 0.5 else ""
+    col_ia = "#00E676" if tot_inc_a >= 0.5 else ("#FA8072" if tot_inc_a <= -0.5 else "#cccccc")
+    line3_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Incr. Aperti [{n_inc_a}]:</span> <span style='color: {col_ia}; font-weight: normal;'>{segno_ia}{tot_inc_a:.0f} €</span></div>"
 
     # 4. Box Sintesi + Linea Divisoria
     box_sintesi_html = f"""
