@@ -2202,7 +2202,7 @@ else:
                         lvl = float(p['position']['level'])
                         
                         dt_utc = datetime.strptime(p['position']['createdDateUTC'], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                        data_str = dt_utc.astimezone().strftime("%d/%m/%y %H:%M")
+                        data_str = dt_utc.astimezone(TZ_ITALIA).strftime("%d/%m/%y %H:%M")
                         
                         s_str = ""
                         l_str = ""
@@ -2910,7 +2910,7 @@ else:
                                 if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help="Chiude tutto e resetta a zero", width="stretch"):
                                     pl = prezzi_live.get(nome, "")
                                     vecchio_wip = dati_salvati.get("storico_wip", [])
-                                    vecchio_wip.append(f"[{datetime.now().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
+                                    vecchio_wip.append(f"[{now_it().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
                                     memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
@@ -3139,7 +3139,7 @@ else:
                             with c_stop:
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
                                     st.session_state[err_key] = ""
-                                    ora_str = datetime.now().strftime("%d/%m %H:%M:%S")
+                                    ora_str = now_it().strftime("%d/%m %H:%M:%S")
                                     ok_ig, msg_ig, rimaste = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
                                     storico = dati_salvati.get("storico_wip_trend", [])
                                     if ok_ig:
