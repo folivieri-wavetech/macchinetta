@@ -2792,8 +2792,6 @@ else:
                         elif tipo_strategia == "TREND" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**.")
                         elif not stato_attivo:
-                            if tipo_strategia == "TREND":
-                                st.info("ℹ️ Asset impostato su **TREND**. Per avviarlo in Trend usa la scheda **📈 Trend**, oppure premi sotto per convertirlo e avviarlo in **Range**.")
                             msg_err = dati_salvati.get("msg_manuale") or ("Errore avvio" if dati_salvati.get("errore_avvio") else ("Errore ripristino" if dati_salvati.get("errore_ripristino") else ""))
                             if msg_err:
                                 st.error(f"🛑 **Allarme/Sospensione Rilevata:** {msg_err}")
