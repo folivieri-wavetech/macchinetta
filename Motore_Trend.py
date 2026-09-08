@@ -576,19 +576,46 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
     m_dest = TF_MAP.get(tf_dest, 60)
     if m_dest <= m_src:
         return []
-    ratio = max(1, m_dest // m_src)
-    res = []
-    for i in range(0, len(candele_src), ratio):
-        chunk = candele_src[i:i+ratio]
-        if not chunk:
+    # Raggruppa le candele sorgente in base al boundary esatto del timeframe destinazione
+    groups = {}
+    for c in candele_src:
+        st_str = c.get("snapshotTime")
+        if not st_str:
             continue
+        dt = None
+        for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M:00", "%Y-%m-%d %H:%M:%S"):
+            try:
+                dt = datetime.datetime.strptime(st_str, fmt)
+                break
+            except Exception:
+                pass
+        if not dt:
+            continue
+        offset = 60 if m_dest in (60, 240, 1440) else 0
+        min_tot = dt.hour * 60 + dt.minute
+        boundary_min = ((min_tot - offset) // m_dest) * m_dest + offset
+        base_dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        target_dt = base_dt + datetime.timedelta(minutes=boundary_min)
+        target_snap = target_dt.strftime("%Y/%m/%d %H:%M:00")
+        
+        if target_snap not in groups:
+            groups[target_snap] = []
+        groups[target_snap].append(c)
+
+    res = []
+    for snap_key in sorted(groups.keys()):
+        chunk = groups[snap_key]
         try:
+            o_bid = float(chunk[0].get('openPrice', {}).get('bid', chunk[0].get('open', 0)))
             h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
             l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
+            c_bid = float(chunk[-1].get('closePrice', {}).get('bid', chunk[-1].get('close', 0)))
             res.append({
-                "snapshotTime": chunk[0].get("snapshotTime"),
-                "highPrice": {"bid": h_bid, "ask": h_bid},
-                "lowPrice": {"bid": l_bid, "ask": l_bid}
+                "snapshotTime": snap_key,
+                "openPrice": {"bid": o_bid, "ask": o_bid, "lastTraded": None},
+                "highPrice": {"bid": h_bid, "ask": h_bid, "lastTraded": None},
+                "lowPrice": {"bid": l_bid, "ask": l_bid, "lastTraded": None},
+                "closePrice": {"bid": c_bid, "ask": c_bid, "lastTraded": None}
             })
         except Exception:
             pass
@@ -606,9 +633,8 @@ def allinea_candele_live(candele_locali, nome, tf, px_live):
     offset = 60 if min_tf in (60, 240, 1440) else 0
     min_tot = now_t.hour * 60 + now_t.minute
     boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
-    b_h = (boundary_min // 60) % 24
-    b_m = boundary_min % 60
-    target_dt = now_t.replace(hour=b_h, minute=b_m, second=0, microsecond=0)
+    base_dt = now_t.replace(hour=0, minute=0, second=0, microsecond=0)
+    target_dt = base_dt + datetime.timedelta(minutes=boundary_min)
     
     try:
         last_t_str = candele_locali[-1].get("snapshotTime")
@@ -945,9 +971,12 @@ def aggiorna_candele_live_globale(prezzi_live):
             
         for tf in ["MINUTE_5", "HOUR", "HOUR_4", "DAY"]:
             min_tf = TF_MAP.get(tf, 5)
+            # REGOLA FERREA H4: Chiusure rigorosamente alle 01:00, 05:00, 09:00, 13:00, 17:00, 21:00 ora italiana
             offset = 60 if min_tf in (60, 240, 1440) else 0
             boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
-            curr_snap = now_t.replace(hour=(boundary_min // 60) % 24, minute=boundary_min % 60, second=0).strftime("%Y/%m/%d %H:%M:00")
+            base_dt = now_t.replace(hour=0, minute=0, second=0, microsecond=0)
+            curr_dt = base_dt + datetime.timedelta(minutes=boundary_min)
+            curr_snap = curr_dt.strftime("%Y/%m/%d %H:%M:00")
             
             tracker = LIVE_OHLC_TRACKER.get((nome, tf))
             if not tracker:
@@ -968,6 +997,24 @@ def aggiorna_candele_live_globale(prezzi_live):
                     "lowPrice": {"bid": tracker["low"], "ask": tracker["low"], "lastTraded": None},
                     "closePrice": {"bid": tracker["close"], "ask": tracker["close"], "lastTraded": None}
                 }
+                
+                # Arricchimento per HOUR_4: unisci e consolida con le candele H1 orarie già chiuse
+                if tf == "HOUR_4":
+                    try:
+                        c_h1 = carica_candele_locali(nome, "HOUR")
+                        h1_match = [c for c in c_h1 if c.get("snapshotTime") and closed_snap <= c["snapshotTime"] < curr_snap]
+                        if h1_match:
+                            o_val = float(h1_match[0]["openPrice"]["bid"])
+                            h_val = max(max(float(c["highPrice"]["bid"]) for c in h1_match), tracker["high"])
+                            l_val = min(min(float(c["lowPrice"]["bid"]) for c in h1_match), tracker["low"])
+                            c_val = float(h1_match[-1]["closePrice"]["bid"]) if h1_match[-1].get("closePrice") else tracker["close"]
+                            closed_candle_dict["openPrice"] = {"bid": o_val, "ask": o_val, "lastTraded": None}
+                            closed_candle_dict["highPrice"] = {"bid": h_val, "ask": h_val, "lastTraded": None}
+                            closed_candle_dict["lowPrice"] = {"bid": l_val, "ask": l_val, "lastTraded": None}
+                            closed_candle_dict["closePrice"] = {"bid": c_val, "ask": c_val, "lastTraded": None}
+                    except Exception:
+                        pass
+
                 # Reset tracker per la nuova candela che si apre adesso
                 LIVE_OHLC_TRACKER[(nome, tf)] = {
                     "snap": curr_snap,
@@ -985,8 +1032,9 @@ def aggiorna_candele_live_globale(prezzi_live):
                     if len(c_loc) > 60:
                         c_loc = c_loc[-60:]
                     salva_candele_locali(nome, tf, c_loc)
-                    if tf == "MINUTE_5":
-                        print_log(nome, f"🕯️ Candela ({tf}) CHIUSA su IG: {closed_snap} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
+                
+                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D1" if tf == "DAY" else "M5"))
+                print_log(nome, f"🕯️ Candela ({tf_lbl}) CHIUSA: {closed_snap} (alle {now_t.strftime('%H:%M')} ora italiana) | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
                 candele_chiuse[(nome, tf)] = closed_candle_dict
             else:
                 # Aggiorna candela in corso

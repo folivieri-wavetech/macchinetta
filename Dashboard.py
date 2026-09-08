@@ -1258,19 +1258,45 @@ def aggrega_candele_dash(candele_src, tf_src, tf_dest):
     m_dest = tf_mins.get(tf_dest, 60)
     if m_dest <= m_src:
         return []
-    ratio = max(1, m_dest // m_src)
-    res = []
-    for i in range(0, len(candele_src), ratio):
-        chunk = candele_src[i:i+ratio]
-        if not chunk:
+    groups = {}
+    for c in candele_src:
+        st_str = c.get("snapshotTime")
+        if not st_str:
             continue
+        dt = None
+        for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M:00", "%Y-%m-%d %H:%M:%S"):
+            try:
+                dt = datetime.strptime(st_str, fmt)
+                break
+            except Exception:
+                pass
+        if not dt:
+            continue
+        offset = 60 if m_dest in (60, 240, 1440) else 0
+        min_tot = dt.hour * 60 + dt.minute
+        boundary_min = ((min_tot - offset) // m_dest) * m_dest + offset
+        base_dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        target_dt = base_dt + timedelta(minutes=boundary_min)
+        target_snap = target_dt.strftime("%Y/%m/%d %H:%M:00")
+        
+        if target_snap not in groups:
+            groups[target_snap] = []
+        groups[target_snap].append(c)
+
+    res = []
+    for snap_key in sorted(groups.keys()):
+        chunk = groups[snap_key]
         try:
+            o_bid = float(chunk[0].get('openPrice', {}).get('bid', chunk[0].get('open', 0)))
             h_bid = max(float(c.get('highPrice', {}).get('bid', c.get('high', 0))) for c in chunk)
             l_bid = min(float(c.get('lowPrice', {}).get('bid', c.get('low', 0))) for c in chunk)
+            c_bid = float(chunk[-1].get('closePrice', {}).get('bid', chunk[-1].get('close', 0)))
             res.append({
-                "snapshotTime": chunk[0].get("snapshotTime"),
-                "highPrice": {"bid": h_bid, "ask": h_bid},
-                "lowPrice": {"bid": l_bid, "ask": l_bid}
+                "snapshotTime": snap_key,
+                "openPrice": {"bid": o_bid, "ask": o_bid, "lastTraded": None},
+                "highPrice": {"bid": h_bid, "ask": h_bid, "lastTraded": None},
+                "lowPrice": {"bid": l_bid, "ask": l_bid, "lastTraded": None},
+                "closePrice": {"bid": c_bid, "ask": c_bid, "lastTraded": None}
             })
         except Exception:
             pass
@@ -1290,9 +1316,8 @@ def allinea_candele_live_dash(candele_locali, nome, tf, px_live):
     offset = 60 if min_tf in (60, 240, 1440) else 0
     min_tot = now_t.hour * 60 + now_t.minute
     boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
-    b_h = (boundary_min // 60) % 24
-    b_m = boundary_min % 60
-    target_dt = now_t.replace(hour=b_h, minute=b_m, second=0, microsecond=0)
+    base_dt = now_t.replace(hour=0, minute=0, second=0, microsecond=0)
+    target_dt = base_dt + timedelta(minutes=boundary_min)
     
     try:
         last_t_str = candele_locali[-1].get("snapshotTime")
