@@ -1514,6 +1514,28 @@ def esegui_ciclo_trend():
                             engine.pm.increments.append(pos_i_obj)
                             print_log(nome, f"🛡️ Riconciliazione IG: Riagganciato incremento {dir_i_str} ({sz_i_val}) a {lvl_i_val} [ID: {t_id}]")
                             storico_aggiornato = True
+                    
+                    # Salvaguardia size_max: se la size totale eccede size_max, chiudi immediatamente l'incremento più redditizio
+                    sz_max_val = float(dati.get("size_max", 10) or 10)
+                    dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
+                    valuta_c = CONFIG_STRUMENTI.get(nome, {}).get("valuta", "USD")
+                    while engine.pm.total_active_size() > sz_max_val and len(engine.pm.increments) > 0:
+                        px_cur = px_live if (px_live and isinstance(px_live, (int, float))) else engine.pm.increments[0].entry_price
+                        best = engine.pm.force_close_best_increment(px_cur)
+                        if best and best.ticket:
+                            dir_c = "SELL" if best.direction == "LONG" else "BUY"
+                            chiudi_parziale(nome, best.ticket, dir_c, best.size, headers, etichetta="[FIFO_SIZE_MAX]")
+                            raw_d = best.pnl
+                            rate_c = get_eur_rate(valuta_c, prezzi_live)
+                            pnl_eur = (raw_d / mult) * valore_punto * rate_c
+                            pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
+                            msg = f"➖ FIFO SizeMax Incr ({best.size}) a {px_cur:.{dec}f}{pnl_str}"
+                            storico.append(f"[{ora_str}] {msg}")
+                            print_log(nome, f"🛡️ Salvaguardia SizeMax: {msg}")
+                            invia_notifica(f"➖ FIFO SIZEMAX {nome}", msg, "heavy_minus_sign")
+                            storico_aggiornato = True
+                        else:
+                            break
             
             # CASO B: Nessuna posizione aperta su IG per questo strumento ma il motore pensa di essere in trade
             elif not pos_ig_strum and engine.is_running:
