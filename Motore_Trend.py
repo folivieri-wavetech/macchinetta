@@ -716,16 +716,16 @@ def salva_quota_ig(allowance_dict):
 def salva_candele_locali(nome, tf, candele_list):
     fpath = get_file_candele(nome, tf)
     try:
-        buffer_100 = candele_list[-100:]
+        buffer_60 = candele_list[-60:]
         with open(fpath, "w", encoding="utf-8") as f:
-            json.dump(buffer_100, f, indent=2)
+            json.dump(buffer_60, f, indent=2)
     except Exception as e:
         print_log(nome, f"Errore salvataggio candele locali: {e}")
 
 # --- FUNZIONI CORE ---
-def scarica_candele(epic, timeframe, limit=2, headers=None):
-    # REGOLA FERREA: MAI richiedere più di 2 candele per nessun motivo (budget quota IG blindato)
-    limit = min(int(limit or 2), 2)
+def scarica_candele(epic, timeframe, limit=60, headers=None):
+    # REGOLA FERREA: MAI richiedere più di 60 candele per nessun motivo (budget quota IG blindato)
+    limit = min(int(limit or 60), 60)
     
     # CIRCUIT BREAKER: se la quota residua nota scende sotto 500 punti, stop chiamate preventivo
     rem_quota = get_remaining_quota_ig()
@@ -1607,9 +1607,9 @@ def esegui_ciclo_trend():
             existing_snaps = set(c.get("snapshotTime") for c in candele_locali if "snapshotTime" in c)
             if closed_snap not in existing_snaps:
                 candele_locali.append(closed_candle_dict)
-                # Mantieni finestra mobile (ultime 300 candele)
-                if len(candele_locali) > 300:
-                    candele_locali = candele_locali[-300:]
+                # Mantieni finestra mobile fissa (ultime 60 candele: 55 storiche + margine)
+                if len(candele_locali) > 60:
+                    candele_locali = candele_locali[-60:]
                 salva_candele_locali(nome, tf, candele_locali)
                 print_log(nome, f"🕯️ Candela ({tf}) CHIUSA su IG: {closed_snap} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
         else:
