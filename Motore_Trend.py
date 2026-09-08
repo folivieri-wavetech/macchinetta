@@ -1641,6 +1641,7 @@ def esegui_ciclo_trend():
         kj_val = engine._calculate_donchian(engine.config.get("kj_periods", 55))
         
         # Salva SEMPRE tk, kj e il timestamp della candela
+        snapshot_time = candele_locali[-1].get("snapshotTime", "") if candele_locali else ""
         aggiorna_memoria(nome, {
             "current_tk": tk_val, 
             "current_kj": kj_val,
