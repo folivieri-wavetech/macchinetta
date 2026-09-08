@@ -1347,7 +1347,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
             <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
                 <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
                 <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
-                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trade</b>: Posizione già a mercato</div>
+                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trend</b>: Posizione già a mercato</div>
             </div>
             """)
         with col_radar_btn:
@@ -1504,7 +1504,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
                     title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
                     kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TRADE</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
 
                 if kj_v is None or dist_p is None:
                     return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
