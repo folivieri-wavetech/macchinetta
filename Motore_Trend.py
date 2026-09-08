@@ -1794,6 +1794,37 @@ def esegui_ciclo_trend():
                     pass
             px_start = px_live if (px_live and isinstance(px_live, (int, float))) else closed_close
             
+            # Controllo di sicurezza vincolante Kijun:
+            # SHORT consentito SOLO se px_start <= kj_val
+            # LONG consentito SOLO se px_start >= kj_val
+            if kj_val is not None and px_start:
+                if direzione == "SHORT" and px_start > kj_val:
+                    msg_blocco = f"🛑 Avvio SHORT BLOCCATO: Prezzo ({px_start:.{dec}f}) > Kijun ({kj_val:.{dec}f}). Operazione non consentita."
+                    print_log(nome, msg_blocco)
+                    invia_notifica(f"🛑 AVVIO BLOCCATO {format_tf_label(tf)}", f"[{nome}] {msg_blocco}", "alert")
+                    engine.reset()
+                    aggiorna_memoria(nome, {
+                        "attivo": False, 
+                        "stato": "FLAT", 
+                        "errore_avvio": True, 
+                        "needs_manual_start": False, 
+                        "msg_manuale": msg_blocco
+                    })
+                    continue
+                elif direzione == "LONG" and px_start < kj_val:
+                    msg_blocco = f"🛑 Avvio LONG BLOCCATO: Prezzo ({px_start:.{dec}f}) < Kijun ({kj_val:.{dec}f}). Operazione non consentita."
+                    print_log(nome, msg_blocco)
+                    invia_notifica(f"🛑 AVVIO BLOCCATO {format_tf_label(tf)}", f"[{nome}] {msg_blocco}", "alert")
+                    engine.reset()
+                    aggiorna_memoria(nome, {
+                        "attivo": False, 
+                        "stato": "FLAT", 
+                        "errore_avvio": True, 
+                        "needs_manual_start": False, 
+                        "msg_manuale": msg_blocco
+                    })
+                    continue
+
             pos = engine.start(px_start, direzione)
             ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, direzione, size_i, headers, dec, etichetta="[CORE]")
             if ok:

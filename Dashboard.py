@@ -709,6 +709,26 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     dts_r = mem_r.get("dts", def_dts)
     sz_r = mem_r.get("size", 4)
     
+    # Controllo di coerenza Kijun per la gamba Trend
+    c_loc_d = carica_candele_locali_dash(conto_t, nome_strumento, tf_scelto)
+    kj_dialog = calcola_kj55_da_candele_dash(c_loc_d, periods=55)
+    st_t = leggi_stato_sistema(conto_t)
+    px_live_dialog = st_t.get("prezzi_live", {}).get(nome_strumento)
+    dec_d = CONFIG_STRUMENTI.get(nome_strumento, {}).get("decimali", 2)
+    
+    blocco_multiconto = False
+    msg_blocco_multi = ""
+    if kj_dialog is not None and px_live_dialog is not None and isinstance(px_live_dialog, (int, float)):
+        if dir_trend == "SHORT" and px_live_dialog > kj_dialog:
+            blocco_multiconto = True
+            msg_blocco_multi = f"🛑 **Blocco Kijun ({tf_options[tf_scelto]}):** Impossibile avviare la gamba Trend in **SHORT** perché il Prezzo Live ({px_live_dialog:.{dec_d}f}) si trova sopra la Kijun ({kj_dialog:.{dec_d}f})."
+        elif dir_trend == "LONG" and px_live_dialog < kj_dialog:
+            blocco_multiconto = True
+            msg_blocco_multi = f"🛑 **Blocco Kijun ({tf_options[tf_scelto]}):** Impossibile avviare la gamba Trend in **LONG** perché il Prezzo Live ({px_live_dialog:.{dec_d}f}) si trova sotto la Kijun ({kj_dialog:.{dec_d}f})."
+            
+    if blocco_multiconto:
+        st.error(msg_blocco_multi)
+    
     st.markdown("---")
     col_info_t, col_info_r = st.columns(2)
     with col_info_t:
@@ -718,7 +738,9 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
         
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
-        if st.button("⚡ CONFERMA AVVIO MULTICONTO", type="primary", use_container_width=True, key=f"synct_conf_{nome_strumento}"):
+        if st.button("⚡ CONFERMA AVVIO MULTICONTO", type="primary", use_container_width=True, key=f"synct_conf_{nome_strumento}", disabled=blocco_multiconto):
+            if blocco_multiconto:
+                st.rerun()
             full_mem_t = carica_memoria(conto_t)
             full_mem_r = carica_memoria(conto_r)
             
@@ -3064,6 +3086,15 @@ else:
                         if err_key in st.session_state and st.session_state[err_key]:
                             st.error(st.session_state[err_key])
 
+                        msg_err_trend = dati_salvati.get("msg_manuale") or ("Errore avvio Trend" if dati_salvati.get("errore_avvio") else "")
+                        if msg_err_trend and not stato_attivo:
+                            st.error(f"🛑 **Allarme/Blocco Rilevato:** {msg_err_trend}")
+                            if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_T_{conto_selezionato}_{nome}", width="stretch"):
+                                memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.session_state[err_key] = ""
+                                st.rerun()
+
                         px_live = None
                         try:
                             if bid != "-" and ask != "-":
@@ -3071,12 +3102,25 @@ else:
                         except Exception:
                             pass
 
+                        is_long_bloccato = (current_kj is not None and px_live is not None and px_live < current_kj)
+                        is_short_bloccato = (current_kj is not None and px_live is not None and px_live > current_kj)
+
                         if tipo_strategia == "RANGE" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
                         elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
+                            if current_kj is not None and px_live is not None:
+                                if is_short_bloccato:
+                                    st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}):</b> Consentito solo <b>LONG</b> (SHORT bloccato da Kijun).</div>", unsafe_allow_html=True)
+                                elif is_long_bloccato:
+                                    st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}):</b> Consentito solo <b>SHORT</b> (LONG bloccato da Kijun).</div>", unsafe_allow_html=True)
+
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
-                                if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch"):
+                                help_l = f"Bloccato: Live ({px_live:.{dec}f}) < KJ ({current_kj:.{dec}f})" if is_long_bloccato else None
+                                if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=is_long_bloccato, help=help_l):
+                                    if is_long_bloccato:
+                                        st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare LONG! Il prezzo Live ({px_live:.{dec}f}) si trova sotto la Kijun ({current_kj:.{dec}f}). Per andare LONG il prezzo deve trovarsi sopra la Kijun."
+                                        st.rerun()
                                     st.session_state[err_key] = ""
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
@@ -3102,7 +3146,11 @@ else:
                                     st.session_state.target_tab = "Trend"
                                     st.rerun()
                             with c_btn2:
-                                if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch"):
+                                help_s = f"Bloccato: Live ({px_live:.{dec}f}) > KJ ({current_kj:.{dec}f})" if is_short_bloccato else None
+                                if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=is_short_bloccato, help=help_s):
+                                    if is_short_bloccato:
+                                        st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare SHORT! Il prezzo Live ({px_live:.{dec}f}) si trova sopra la Kijun ({current_kj:.{dec}f}). Per andare SHORT il prezzo deve trovarsi sotto la Kijun."
+                                        st.rerun()
                                     st.session_state[err_key] = ""
                                     memoria_attuale[nome] = {
                                         **dati_salvati, 
