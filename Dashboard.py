@@ -622,7 +622,39 @@ def carica_radar_trend_dash(conto=None):
                 pass
     return {}, None
 
+CACHE_ULTIMI_KJ_FILE = "cache_ultimi_rilevamenti_kj.json"
+
+def carica_cache_ultimi_kj(conto=None):
+    candidates = []
+    if conto:
+        candidates.append(os.path.join(conto, CACHE_ULTIMI_KJ_FILE))
+        candidates.append(os.path.join("..", conto, CACHE_ULTIMI_KJ_FILE))
+    for c_alt in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_REALE", "DANY_REALE", "BONGIOLO_REALE", "."]:
+        candidates.append(os.path.join(c_alt, CACHE_ULTIMI_KJ_FILE))
+        candidates.append(os.path.join("..", c_alt, CACHE_ULTIMI_KJ_FILE))
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if isinstance(d, dict) and d:
+                        return d
+            except Exception:
+                pass
+    return {}
+
+def salva_cache_ultimi_kj(conto, cache):
+    target = os.path.join(conto, CACHE_ULTIMI_KJ_FILE) if conto else CACHE_ULTIMI_KJ_FILE
+    try:
+        tmp = f"{target}.tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cache, f, indent=2)
+        os.replace(tmp, target)
+    except Exception:
+        pass
+
 @st.dialog("Configurazione Avvio Sincrono Multiconto", width="large")
+
 def dialog_sync_start(conto_partenza, nome_strumento):
     conti_disponibili = [d for d in os.listdir(".") if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
     if len(conti_disponibili) < 2:
@@ -3971,6 +4003,16 @@ else:
                     ]
                     timeframes_kj = ["M5", "H1", "H4", "D1"]
                     radar_cached_kj, _ = carica_radar_trend_dash(conto_selezionato)
+                    cache_kj = carica_cache_ultimi_kj(conto_selezionato)
+                    cache_modificata = False
+                    
+                    tf_codes_map = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
+                    tf_deltas_map = {
+                        "M5": timedelta(minutes=5),
+                        "H1": timedelta(hours=1),
+                        "H4": timedelta(hours=4),
+                        "D1": timedelta(days=1)
+                    }
                     
                     blocchi_html = []
                     for idx_s, s_nome in enumerate(tutti_strumenti_kj):
@@ -3979,18 +4021,75 @@ else:
                         righe_strum_html = []
                         
                         for tf in timeframes_kj:
+                            tf_info = radar_cached_kj.get(s_nome, {}).get("timeframes", {}).get(tf, {})
+                            kj_val = tf_info.get("kj")
+                            tk_val = tf_info.get("tk")
+                            kj_str = f"{kj_val:.{dec_s}f}" if isinstance(kj_val, (int, float)) else "-"
+                            tk_str = f"{tk_val:.{dec_s}f}" if isinstance(tk_val, (int, float)) else "-"
+                            
+                            # 1. Cerca nella console live recente (ultime 500 righe)
                             line_match = None
                             for r in reversed_lines:
                                 if f"[{s_nome}]" in r and "Candela" in r:
-                                    if f"[{tf}]" in r or f"({tf})" in r or (tf == "D1" and ("[D]" in r or "(D)" in r or "DAY" in r)):
+                                    if f"[{tf}]" in r or f"({tf})" in r or (tf == "D1" and ("[D]" in r or "[D1]" in r or "(D)" in r or "(D1)" in r or "DAY" in r)):
                                         line_match = r
+                                        if tf == "D1" and "Candela [D]" in line_match:
+                                            line_match = line_match.replace("Candela [D]", "Candela [D1]")
                                         break
+                            
+                            # Se trovata nel log recente con dati completi (O: H: L: C:), aggiorna cache
+                            if line_match and "O:" in line_match:
+                                if "KJ:" not in line_match and kj_str != "-":
+                                    line_match += f" | KJ: {kj_str}"
+                                if "TK:" not in line_match and tk_str != "-":
+                                    line_match += f" TK: {tk_str}"
+                                if s_nome not in cache_kj:
+                                    cache_kj[s_nome] = {}
+                                if cache_kj[s_nome].get(tf) != line_match:
+                                    cache_kj[s_nome][tf] = line_match
+                                    cache_modificata = True
+                            
+                            # 2. Se non presente nel log recente (es. H4 o D1 usciti dal buffer), recupera dalla cache persistente
+                            if not line_match or "O:" not in line_match:
+                                cached_line = cache_kj.get(s_nome, {}).get(tf)
+                                if cached_line and "O:" in cached_line:
+                                    line_match = cached_line
+                                    # Sincronizza KJ e TK se mancanti
+                                    if "KJ:" not in line_match and kj_str != "-":
+                                        line_match += f" | KJ: {kj_str}"
+                                    if "TK:" not in line_match and tk_str != "-":
+                                        line_match += f" TK: {tk_str}"
+                            
+                            # 3. Se non in cache (o privo di OHLC), ricostruisci dall'ultimo storico candele chiuso su disco
+                            if not line_match or "O:" not in line_match:
+                                tf_code = tf_codes_map.get(tf, tf)
+                                tf_delta = tf_deltas_map.get(tf, timedelta(minutes=5))
+                                candele_loc = carica_candele_locali_dash(conto_selezionato, s_nome, tf_code)
+                                if candele_loc and len(candele_loc) > 0:
+                                    last_c = candele_loc[-1]
+                                    st_str = last_c.get("snapshotTime", "")
+                                    try:
+                                        dt = datetime.strptime(st_str, "%Y/%m/%d %H:%M:%S") + tf_delta
+                                        ore_str = dt.strftime("%H:%M")
+                                        ts_str = dt.strftime("%H:%M:%S")
+                                    except Exception:
+                                        ore_str = "--:--"
+                                        ts_str = "--:--:--"
+                                    
+                                    o_v = last_c.get("openPrice", {}).get("bid")
+                                    h_v = last_c.get("highPrice", {}).get("bid")
+                                    l_v = last_c.get("lowPrice", {}).get("bid")
+                                    c_v = last_c.get("closePrice", {}).get("bid")
+                                    
+                                    if o_v is not None and h_v is not None and l_v is not None and c_v is not None:
+                                        line_match = f"[{ts_str}] [{s_nome}] 🕯️ Candela [{tf}] ore {ore_str} | O: {o_v:.{dec_s}f} H: {h_v:.{dec_s}f} L: {l_v:.{dec_s}f} C: {c_v:.{dec_s}f} | KJ: {kj_str} TK: {tk_str}"
+                                        if s_nome not in cache_kj:
+                                            cache_kj[s_nome] = {}
+                                        cache_kj[s_nome][tf] = line_match
+                                        cache_modificata = True
+                            
+                            # 4. Fallback estremo solo se non vi è alcuna candela registrata
                             if not line_match:
-                                tf_info = radar_cached_kj.get(s_nome, {}).get("timeframes", {}).get(tf, {})
-                                kj_val = tf_info.get("kj")
-                                tk_val = tf_info.get("tk")
-                                kj_str = f"{kj_val:.{dec_s}f}" if isinstance(kj_val, (int, float)) else "-"
-                                tk_str = f"{tk_val:.{dec_s}f}" if isinstance(tk_val, (int, float)) else "-"
                                 line_match = f"[--:--:--] [{s_nome}] 🕯️ Candela [{tf}] | KJ: {kj_str} TK: {tk_str}"
                             
                             # Formattazione per terminal box
@@ -4029,6 +4128,9 @@ else:
                         if idx_s < len(tutti_strumenti_kj) - 1:
                             blocco_str += "<div style='border-bottom: 1px solid rgba(255,255,255,0.12); margin: 6px 0;'></div>"
                         blocchi_html.append(blocco_str)
+                    
+                    if cache_modificata:
+                        salva_cache_ultimi_kj(conto_selezionato, cache_kj)
                     
                     contenuto_kj_box = "".join(blocchi_html)
                     st.markdown(f"""

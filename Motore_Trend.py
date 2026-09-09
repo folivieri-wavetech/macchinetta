@@ -224,6 +224,24 @@ def print_log(strumento, messaggio):
     except Exception:
         pass
 
+CACHE_ULTIMI_KJ_FILE = "cache_ultimi_rilevamenti_kj.json"
+
+def aggiorna_cache_ultimo_kj_motore(nome, tf_lbl, riga):
+    try:
+        data = {}
+        if os.path.exists(CACHE_ULTIMI_KJ_FILE):
+            with open(CACHE_ULTIMI_KJ_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        if nome not in data:
+            data[nome] = {}
+        data[nome][tf_lbl] = riga
+        tmp = f"{CACHE_ULTIMI_KJ_FILE}.tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, CACHE_ULTIMI_KJ_FILE)
+    except Exception:
+        pass
+
 def get_eur_rate(valuta, prezzi):
     if valuta == "EUR":
         return 1.0
@@ -1064,7 +1082,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                         c_loc = c_loc[-60:]
                     salva_candele_locali(nome, tf, c_loc)
                 
-                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D" if tf == "DAY" else "M5"))
+                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D1" if tf == "DAY" else "M5"))
                 dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                 kj_agg = calcola_kj55_da_candele(c_loc, periods=55)
                 tk_agg = calcola_kj55_da_candele(c_loc, periods=21)
@@ -1080,8 +1098,15 @@ def aggiorna_candele_live_globale(prezzi_live):
                 h_val = closed_candle_dict['highPrice']['bid']
                 l_val = closed_candle_dict['lowPrice']['bid']
                 c_val = closed_candle_dict['closePrice']['bid']
-                print_log(nome, f"🕯️ Candela [{tf_lbl}] ore {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{kj_tk_str}")
+                riga_log_candela = f"🕯️ Candela [{tf_lbl}] ore {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{kj_tk_str}"
+                print_log(nome, riga_log_candela)
                 candele_chiuse[(nome, tf)] = closed_candle_dict
+                try:
+                    riga_persistente = f"[{now_t.strftime('%H:%M:%S')}] [{nome}] {riga_log_candela}"
+                    aggiorna_cache_ultimo_kj_motore(nome, tf_lbl, riga_persistente)
+                except Exception:
+                    pass
+
             else:
                 # Aggiorna candela in corso
                 tracker["high"] = max(tracker["high"], live_px)
