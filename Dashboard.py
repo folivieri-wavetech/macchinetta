@@ -1475,7 +1475,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
 
     col_radar_info, col_radar_btn = st.columns([5, 1.2])
     with col_radar_info:
-        st.markdown(f"""
+        st.html(f"""
         <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
         <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
         <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
@@ -1483,7 +1483,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
             <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
             <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trend</b>: Posizione già a mercato</div>
         </div>
-        """, unsafe_allow_html=True)
+        """)
     with col_radar_btn:
         st.markdown("""
         <style>
@@ -1679,7 +1679,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
         """
     
     html_table += "</tbody></table>"
-    st.markdown(html_table, unsafe_allow_html=True)
+    st.html(html_table)
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
