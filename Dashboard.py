@@ -3749,53 +3749,159 @@ else:
                 except FileNotFoundError:
                     reversed_lines = [f"> In attesa di connessione col Motore per {conto_selezionato}..."]
                 
-                righe_html = []
+                def render_terminal_box(lista_righe, empty_msg="Nessun evento registrato in questa categoria."):
+                    if not lista_righe:
+                        st.markdown(f"<div style='color: #64748b; padding: 12px; font-style: italic;'>{empty_msg}</div>", unsafe_allow_html=True)
+                        return
+                    righe_html = []
+                    for riga in lista_righe:
+                        # Abbreviazione formato candela esteso se presente nello storico
+                        riga = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"Candela [\1] ore \2", riga)
+                        riga_esc = riga.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                        # Evidenziazione pulita timestamp e strumento
+                        riga_fmt = re.sub(
+                            r"^(\[(?:\d{1,2}/\d{1,2}\s+)?\d{2}:\d{2}:\d{2}\])",
+                            r"<span style='color: #64748b; font-weight: 500;'>\1</span>",
+                            riga_esc
+                        )
+                        riga_fmt = re.sub(
+                            r"(</span>\s*)(\[[A-Za-z0-9_/\s\.\-]+\])",
+                            r"\1<span style='color: #38bdf8; font-weight: 600;'>\2</span>",
+                            riga_fmt
+                        )
+                        # Evidenziazione timeframe candela
+                        riga_fmt = re.sub(
+                            r"(\[(?:M5|H1|H4|D|D1|MINUTE_5|HOUR|HOUR_4|DAY)\])",
+                            r"<span style='color: #fb923c; font-weight: 600;'>\1</span>",
+                            riga_fmt
+                        )
+                        riga_fmt = re.sub(
+                            r"(\[PnL:\s*\+[^\]]+\])",
+                            r"<span style='color: #4ade80; font-weight: 600;'>\1</span>",
+                            riga_fmt
+                        )
+                        riga_fmt = re.sub(
+                            r"(\[PnL:\s*\-[^\]]+\])",
+                            r"<span style='color: #f87171; font-weight: 600;'>\1</span>",
+                            riga_fmt
+                        )
+                        riga_fmt = re.sub(
+                            r"(KJ(?:55)?:\s*[0-9\.]+)",
+                            r"<span style='color: #FFFF00; font-weight: 600;'>\1</span>",
+                            riga_fmt
+                        )
+                        riga_fmt = re.sub(
+                            r"(TK:\s*[0-9\.]+)",
+                            r"<span style='color: #00d2ff; font-weight: 600;'>\1</span>",
+                            riga_fmt
+                        )
+                        righe_html.append(f"<div style='padding: 1px 0;'>{riga_fmt}</div>")
+                    
+                    logs_content = "".join(righe_html)
+                    st.html(f"""
+                        <div style='
+                            background-color: #0f172a; 
+                            color: #e2e8f0; 
+                            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+                            font-size: 0.80rem; 
+                            padding: 8px 12px; 
+                            border-radius: 6px; 
+                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            max-height: 520px; 
+                            overflow-y: auto;
+                            overflow-x: auto;
+                            line-height: 1.25;
+                            white-space: nowrap;
+                        '>
+                            {logs_content}
+                        </div>
+                    """)
+
+                # Suddivisione in categorie
+                candele_lines = []
+                entrate_lines = []
+                chiusure_lines = []
+                varie_lines = []
+
                 for riga in reversed_lines:
-                    # Abbreviazione formato candela esteso se presente nello storico
-                    riga = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"Candela [\1] chiusa alle \2", riga)
-                    riga_esc = riga.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                    # Evidenziazione pulita timestamp e strumento
-                    riga_fmt = re.sub(
-                        r"^(\[(?:\d{1,2}/\d{1,2}\s+)?\d{2}:\d{2}:\d{2}\])",
-                        r"<span style='color: #64748b; font-weight: 500;'>\1</span>",
-                        riga_esc
-                    )
-                    riga_fmt = re.sub(
-                        r"(</span>\s*)(\[[A-Za-z0-9_/\s\.\-]+\])",
-                        r"\1<span style='color: #38bdf8; font-weight: 600;'>\2</span>",
-                        riga_fmt
-                    )
-                    riga_fmt = re.sub(
-                        r"(\[PnL:\s*\+[^\]]+\])",
-                        r"<span style='color: #4ade80; font-weight: 600;'>\1</span>",
-                        riga_fmt
-                    )
-                    riga_fmt = re.sub(
-                        r"(\[PnL:\s*\-[^\]]+\])",
-                        r"<span style='color: #f87171; font-weight: 600;'>\1</span>",
-                        riga_fmt
-                    )
-                    righe_html.append(f"<div style='padding: 1px 0;'>{riga_fmt}</div>")
-                
-                logs_content = "".join(righe_html)
-                st.html(f"""
-                    <div style='
-                        background-color: #0f172a; 
-                        color: #e2e8f0; 
-                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
-                        font-size: 0.80rem; 
-                        padding: 8px 12px; 
-                        border-radius: 6px; 
-                        border: 1px solid rgba(255, 255, 255, 0.08);
-                        max-height: 520px; 
-                        overflow-y: auto;
-                        overflow-x: auto;
-                        line-height: 1.25;
-                        white-space: nowrap;
-                    '>
-                        {logs_content}
-                    </div>
-                """)
+                    r_up = riga.upper()
+                    # 1. Candele chiuse
+                    if "CANDELA" in r_up:
+                        candele_lines.append(riga)
+                    # 2. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.)
+                    elif any(k in r_up for k in [
+                        "CHIUSURA", "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
+                        "FIFO INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE KJ",
+                        "CHIUSO IN PROFITTO", "CHIUSO IN STOP LOSS", "CHIUSO IN LOSS", 
+                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI",
+                        "PULIZIA [TICKET2]"
+                    ]):
+                        chiusure_lines.append(riga)
+                    # 3. Possibili entrate (segnali Radar e ordini di ingresso/restart/reverse)
+                    elif any(k in r_up for k in [
+                        "POSSIBILE ENTRATA", "RADAR", "OPEN CORE", "OPEN INCR", 
+                        "PRE-FLIGHT CHECK", "ENTRATA A MERCATO", "PIAZZAMENTO SAT1", 
+                        "INSERISCO [SAT2]", "INSERISCO ORDINE [TICKET", "FLIP DEL [TICKET",
+                        "ORDINE OVERGAIN", "ORDINE OVERLOSS", "GRIGLIA ACCETTATA",
+                        "REVERSE", "RESTART CORE", "RESTART LONG", "RESTART SHORT"
+                    ]):
+                        entrate_lines.append(riga)
+                    # 4. Varie (sistema, connessioni, rate limit, rollover, controlli tecnici)
+                    else:
+                        varie_lines.append(riga)
+
+                sub_tabs = st.tabs([
+                    "📋 Tutti", 
+                    "🕯️ Candele chiuse", 
+                    "🎯 Possibili entrate", 
+                    "🛑 Chiusure", 
+                    "⚙️ Varie"
+                ], key=f"subtabs_console_{conto_selezionato}")
+
+                tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_varie = sub_tabs
+
+                with tab_sub_tutti:
+                    st.caption(f"Mostrando tutti gli eventi ({len(reversed_lines)} righe)")
+                    render_terminal_box(reversed_lines)
+
+                with tab_sub_candele:
+                    col_tf, col_info = st.columns([3, 7])
+                    with col_tf:
+                        tf_sel = st.selectbox(
+                            "Filtra Timeframe:",
+                            ["Tutti", "M5", "H1", "H4", "D"],
+                            key=f"sel_tf_candele_{conto_selezionato}"
+                        )
+
+                    if tf_sel == "Tutti":
+                        candele_filtrate = candele_lines
+                    elif tf_sel == "M5":
+                        candele_filtrate = [r for r in candele_lines if "[M5]" in r.upper() or "(M5)" in r.upper() or "MINUTE_5" in r.upper()]
+                    elif tf_sel == "H1":
+                        candele_filtrate = [r for r in candele_lines if "[H1]" in r.upper() or "(H1)" in r.upper() or "HOUR]" in r.upper() or "HOUR_1" in r.upper()]
+                    elif tf_sel == "H4":
+                        candele_filtrate = [r for r in candele_lines if "[H4]" in r.upper() or "(H4)" in r.upper() or "HOUR_4" in r.upper()]
+                    elif tf_sel == "D":
+                        candele_filtrate = [r for r in candele_lines if "[D]" in r.upper() or "[D1]" in r.upper() or "(D)" in r.upper() or "(D1)" in r.upper() or "DAY" in r.upper()]
+                    else:
+                        candele_filtrate = candele_lines
+
+                    with col_info:
+                        st.markdown(f"<div style='padding-top: 28px; color: #888; font-size: 0.82rem;'>Candele mostrate: <b>{len(candele_filtrate)}</b> (su {len(candele_lines)} chiuse totali)</div>", unsafe_allow_html=True)
+
+                    render_terminal_box(candele_filtrate, empty_msg=f"Nessuna candela chiusa registrata per il Timeframe '{tf_sel}'.")
+
+                with tab_sub_entrate:
+                    st.caption(f"Eventi segnali / entrate a mercato: {len(entrate_lines)}")
+                    render_terminal_box(entrate_lines, empty_msg="Nessuna possibile entrata o ordine registrato di recente.")
+
+                with tab_sub_chiusure:
+                    st.caption(f"Eventi uscite / chiusure / stop: {len(chiusure_lines)}")
+                    render_terminal_box(chiusure_lines, empty_msg="Nessuna chiusura o stop registrato di recente.")
+
+                with tab_sub_varie:
+                    st.caption(f"Eventi operativi e di sistema: {len(varie_lines)}")
+                    render_terminal_box(varie_lines, empty_msg="Nessun evento vario registrato di recente.")
             
             renderizza_console()
 

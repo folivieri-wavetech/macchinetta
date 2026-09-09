@@ -215,8 +215,8 @@ def print_log(strumento, messaggio):
             with open(CONSOLE_LOG_FILE, "r", encoding="utf-8") as f:
                 righe = f.readlines()
         righe.append(riga + "\n")
-        if len(righe) > 100:
-            righe = righe[-100:]
+        if len(righe) > 500:
+            righe = righe[-500:]
         with open(CONSOLE_LOG_FILE, "w", encoding="utf-8") as f:
             f.writelines(righe)
     except Exception:
@@ -858,7 +858,7 @@ def calcola_kj55_da_candele(candele_list, periods=55):
                     valid.append((vh, vl))
             except (ValueError, TypeError):
                 pass
-    if not valid or len(valid) < periods:
+    if not valid:
         return None
     highest = max(v[0] for v in valid)
     lowest = min(v[1] for v in valid)
@@ -1033,8 +1033,23 @@ def aggiorna_candele_live_globale(prezzi_live):
                         c_loc = c_loc[-60:]
                     salva_candele_locali(nome, tf, c_loc)
                 
-                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D1" if tf == "DAY" else "M5"))
-                print_log(nome, f"🕯️ Candela [{tf_lbl}] chiusa alle {now_t.strftime('%H:%M')} | O: {closed_candle_dict['openPrice']['bid']:.5f} H: {closed_candle_dict['highPrice']['bid']:.5f} L: {closed_candle_dict['lowPrice']['bid']:.5f} C: {closed_candle_dict['closePrice']['bid']:.5f}")
+                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D" if tf == "DAY" else "M5"))
+                dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
+                kj_agg = calcola_kj55_da_candele(c_loc, periods=55)
+                tk_agg = calcola_kj55_da_candele(c_loc, periods=21)
+                kj_tk_str = ""
+                if kj_agg is not None and tk_agg is not None:
+                    kj_tk_str = f" | KJ: {kj_agg:.{dec}f} TK: {tk_agg:.{dec}f}"
+                elif kj_agg is not None:
+                    kj_tk_str = f" | KJ: {kj_agg:.{dec}f}"
+                elif tk_agg is not None:
+                    kj_tk_str = f" | TK: {tk_agg:.{dec}f}"
+                
+                o_val = closed_candle_dict['openPrice']['bid']
+                h_val = closed_candle_dict['highPrice']['bid']
+                l_val = closed_candle_dict['lowPrice']['bid']
+                c_val = closed_candle_dict['closePrice']['bid']
+                print_log(nome, f"🕯️ Candela [{tf_lbl}] ore {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{kj_tk_str}")
                 candele_chiuse[(nome, tf)] = closed_candle_dict
             else:
                 # Aggiorna candela in corso
@@ -1181,18 +1196,23 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     invia_notifica(f"🎯 TP INCR {tf_label}", f"[{nome}] {msg}", "dart")
                 elif is_bancomat:
                     msg = f"💰 Bancomat ({sz}){px_str}{pnl_str}"
+                    print_log(nome, msg)
                     invia_notifica(f"💰 BANCOMAT {tf_label}", f"[{nome}] {msg}", "moneybag")
                 elif tipo == 'fifo_close':
                     msg = f"➖ FIFO Incr ({sz}){px_str}{pnl_str}"
+                    print_log(nome, msg)
                     invia_notifica(f"➖ FIFO INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increment_closed':
                     msg = f"➖ Close Incr ({sz}){px_str}{pnl_str}"
+                    print_log(nome, msg)
                     invia_notifica(f"➖ CLOSE INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increments_cleared':
                     msg = f"🛑 Stop TK: Close Incr ({sz}){px_str}{pnl_str}"
+                    print_log(nome, msg)
                     invia_notifica(f"🛑 STOP TK {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 else:
                     msg = f"➖ Close Core ({sz}){px_str}{pnl_str}"
+                    print_log(nome, msg)
                     invia_notifica(f"➖ CLOSE CORE {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
