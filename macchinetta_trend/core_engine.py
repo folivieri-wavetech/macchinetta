@@ -42,6 +42,8 @@ class CoreEngine:
         self.current_kj = None
         self.trailing_sl_incr = None # Trailing SL a 20 pip da Close per tutti gli incrementi (dist TK >= 20 pip)
         self.trailing_sl_core = None # Trailing SL a 40 pip da Close per la Core (dist KJ >= 40 pip)
+        self.signal_candle_active = False # True se una candela ha chiuso oltre KJ senza prendere il paracadute
+        self.signal_stop_price = None     # Livello di stop confermato (Minimo - 5p per LONG, Massimo + 5p per SHORT)
         
     def reset(self):
         """Resetta lo stato della macchinetta."""
@@ -52,6 +54,8 @@ class CoreEngine:
         self.signal_candles_elapsed = 0
         self.trailing_sl_incr = None
         self.trailing_sl_core = None
+        self.signal_candle_active = False
+        self.signal_stop_price = None
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -63,9 +67,12 @@ class CoreEngine:
         self.is_running = True
         self.current_direction = direction
         self.retracement_start_price = None
+        self.signal_candle_active = False
+        self.signal_stop_price = None
         pos = self.pm.open_core(current_price, self.config.get("size_i"), direction)
         print(f"START: Eseguita Core a Mercato {direction} a Prezzo={current_price}")
         return pos
+
 
     def _calculate_donchian(self, periods):
         """Calcola la mediana (Max+Min)/2 degli ultimi N periodi (candele)."""
@@ -132,24 +139,41 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            sl_core_base = kj # A fine candela: Stop Core a rottura Kijun (0 buffer)
-            effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
-            if c_close < effective_sl_core:
-                # Sotto lo Stop Core (KJ a fine candela o Trailing SL Core): Chiude tutto e passa in FLAT
+            # 1. Chiusura Trailing SL Core a fine candela se attivo
+            if self.trailing_sl_core is not None and c_close < self.trailing_sl_core:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
+                self.signal_candle_active = False
+                self.signal_stop_price = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                reason = "close_below_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_below_kj"
-                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT"})
-                
+                events.append({"type": "reversal", "reason": "close_below_trailing_sl_core", "new_direction": "FLAT"})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
-                # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare SHORT
-                
+            elif c_close < kj:
+                # 2. Chiusura sotto Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Minimo - 5 pip
+                stop_livello = closed_candle.low - (5 * pip_val)
+                if self.signal_candle_active and self.signal_stop_price is not None:
+                    self.signal_stop_price = min(self.signal_stop_price, stop_livello)
+                else:
+                    self.signal_candle_active = True
+                    self.signal_stop_price = stop_livello
+                events.append({
+                    "type": "signal_candle_kj",
+                    "direction": "LONG",
+                    "stop_price": self.signal_stop_price,
+                    "candle_low": closed_candle.low,
+                    "kj": kj
+                })
             else:
+                # 3. c_close >= kj: prezzo rientrato sopra Kijun, eventuale Candela Segnale azzerata
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+
+            if self.current_direction == "LONG":
                 # Aggiornamento Trailing SL Core da Close (SOLO M5 se core_trailing_pips è attivo)
+
                 if core_trailing_pips is not None:
                     dist_kj = c_close - kj
                     if dist_kj >= (core_trailing_pips * pip_val):
@@ -237,24 +261,41 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            sl_core_base = kj # A fine candela: Stop Core a rottura Kijun (0 buffer)
-            effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
-            if c_close > effective_sl_core:
-                # Sopra lo Stop Core (KJ a fine candela o Trailing SL Core): Chiude tutto e passa in FLAT
+            # 1. Chiusura Trailing SL Core a fine candela se attivo
+            if self.trailing_sl_core is not None and c_close > self.trailing_sl_core:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
+                self.signal_candle_active = False
+                self.signal_stop_price = None
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                reason = "close_above_trailing_sl_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "close_above_kj"
-                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT"})
-                
+                events.append({"type": "reversal", "reason": "close_above_trailing_sl_core", "new_direction": "FLAT"})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
-                # Non esegue return, così può eventualmente valutare subito se ci sono le condizioni per entrare LONG
-                
+            elif c_close > kj:
+                # 2. Chiusura sopra Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Massimo + 5 pip
+                stop_livello = closed_candle.high + (5 * pip_val)
+                if self.signal_candle_active and self.signal_stop_price is not None:
+                    self.signal_stop_price = max(self.signal_stop_price, stop_livello)
+                else:
+                    self.signal_candle_active = True
+                    self.signal_stop_price = stop_livello
+                events.append({
+                    "type": "signal_candle_kj",
+                    "direction": "SHORT",
+                    "stop_price": self.signal_stop_price,
+                    "candle_high": closed_candle.high,
+                    "kj": kj
+                })
             else:
+                # 3. c_close <= kj: prezzo rientrato sotto Kijun, eventuale Candela Segnale azzerata
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+
+            if self.current_direction == "SHORT":
                 # Aggiornamento Trailing SL Core da Close (SOLO M5 se core_trailing_pips è attivo)
+
                 if core_trailing_pips is not None:
                     dist_kj = kj - c_close
                     if dist_kj >= (core_trailing_pips * pip_val):
@@ -412,6 +453,8 @@ class CoreEngine:
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
+                self.signal_candle_active = False
+                self.signal_stop_price = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
@@ -420,7 +463,22 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Loss Incrementi: TK - 10 pip o Trailing SL a 20 pip (il più alto / restrittivo)
+            # 2. Stop Conferma Candela Segnale (Minimo - 5 pip)
+            if self.signal_candle_active and self.signal_stop_price is not None:
+                if current_price <= self.signal_stop_price:
+                    self.trailing_sl_core = None
+                    self.trailing_sl_incr = None
+                    self.signal_candle_active = False
+                    self.signal_stop_price = None
+                    events.extend(self.pm.close_all_increments(current_price))
+                    ev = self.pm.close_core(current_price)
+                    if ev: events.append(ev)
+                    events.append({"type": "reversal", "reason": "live_stop_kj_break_min", "new_direction": "FLAT", "price": current_price})
+                    self.current_direction = "FLAT"
+                    self.retracement_start_price = None
+                    return events
+
+            # 3. Stop Loss Incrementi: TK - 10 pip o Trailing SL a 20 pip (il più alto / restrittivo)
             sl_incr_base = tk - (10 * pip_val)
             effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price <= effective_sl_incr:
@@ -432,7 +490,7 @@ class CoreEngine:
                     events.append({"type": "increments_cleared", "reason": reason, "price": current_price})
                 self.retracement_start_price = None
 
-            # 3. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+            # 4. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
                 tp_target_delta = incr_tp_pips * pip_val
@@ -461,6 +519,8 @@ class CoreEngine:
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
+                self.signal_candle_active = False
+                self.signal_stop_price = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
@@ -469,7 +529,22 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Loss Incrementi: TK + 10 pip o Trailing SL a 20 pip (il più basso / restrittivo)
+            # 2. Stop Conferma Candela Segnale (Massimo + 5 pip)
+            if self.signal_candle_active and self.signal_stop_price is not None:
+                if current_price >= self.signal_stop_price:
+                    self.trailing_sl_core = None
+                    self.trailing_sl_incr = None
+                    self.signal_candle_active = False
+                    self.signal_stop_price = None
+                    events.extend(self.pm.close_all_increments(current_price))
+                    ev = self.pm.close_core(current_price)
+                    if ev: events.append(ev)
+                    events.append({"type": "reversal", "reason": "live_stop_kj_break_max", "new_direction": "FLAT", "price": current_price})
+                    self.current_direction = "FLAT"
+                    self.retracement_start_price = None
+                    return events
+
+            # 3. Stop Loss Incrementi: TK + 10 pip o Trailing SL a 20 pip (il più basso / restrittivo)
             sl_incr_base = tk + (10 * pip_val)
             effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price >= effective_sl_incr:
@@ -481,7 +556,8 @@ class CoreEngine:
                     events.append({"type": "increments_cleared", "reason": reason, "price": current_price})
                 self.retracement_start_price = None
 
-            # 3. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+            # 4. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
                 tp_target_delta = incr_tp_pips * pip_val

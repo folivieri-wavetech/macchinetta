@@ -71,12 +71,22 @@ CONFIG_STRUMENTI = {
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
     "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1}
+    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1},
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1}
 }
 
+def pips_to_price(nome, pips):
+    """Restituisce il delta di prezzo corrispondente a N pips reali per lo strumento."""
+    mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+    return pips * mult
+
+def format_price_ig(nome, price):
+    """Arrotonda e formatta il prezzo esattamente con i decimali richiesti da IG."""
+    dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
+    return round(float(price), dec)
 
 def invia_notifica(titolo, messaggio, tags="rotating_light"):
+
     topic = config.get("NTFY_TOPIC")
     if topic:
         try:
@@ -1239,11 +1249,24 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 reversal_ev = next((e for e in events if e.get('type') == 'reversal'), None)
                 if tipo == 'core_closed' and reversal_ev:
                     r_reason = reversal_ev.get("reason", "")
-                    tag_motivo = "Trailing Core" if "trailing" in r_reason else ("Paracadute KJ" if "live_stop" in r_reason else "Stop KJ")
+                    if "trailing" in r_reason:
+                        tag_motivo = "Trailing Core"
+                        tag_title = "TRAILING CORE"
+                    elif "live_stop_kj_break_min" in r_reason:
+                        tag_motivo = "Stop KJ (Break Min -5p)"
+                        tag_title = "STOP KJ (BREAK MIN)"
+                    elif "live_stop_kj_break_max" in r_reason:
+                        tag_motivo = "Stop KJ (Break Max +5p)"
+                        tag_title = "STOP KJ (BREAK MAX)"
+                    elif "live_stop" in r_reason:
+                        tag_motivo = "Paracadute KJ"
+                        tag_title = "PARACADUTE KJ"
+                    else:
+                        tag_motivo = "Stop KJ"
+                        tag_title = "STOP KJ"
                     core_close_summary = f"🛑 {tag_motivo} ({sz}){pnl_str}"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     if not has_auto_start:
-                        tag_title = "PARACADUTE KJ" if "live_stop" in r_reason else "STOP KJ"
                         invia_notifica(f"🛑 {tag_title} {tf_label}", f"[{nome}] {msg}", "warning")
                 elif tipo == 'tp_increment':
                     tp_p = ev.get('tp_pips', 20)
@@ -1273,6 +1296,17 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
         
+        elif tipo == 'signal_candle_kj':
+            dir_s = ev.get('direction')
+            stop_px = ev.get('stop_price')
+            c_ext = ev.get('candle_low') if dir_s == "LONG" else ev.get('candle_high')
+            ext_lbl = "Minimo" if dir_s == "LONG" else "Massimo"
+            sign_str = "-5p" if dir_s == "LONG" else "+5p"
+            msg_sig = f"⚠️ Candela chiusa oltre KJ. Candela Segnale attiva: Stop confermato a {stop_px:.{dec}f} ({ext_lbl} {c_ext:.{dec}f} {sign_str})"
+            print_log(nome, msg_sig)
+            storico.append(f"[{ora_str}] {msg_sig}")
+            ha_fatto_eventi = True
+
         elif tipo == 'reversal':
             new_d = ev.get("new_direction", "FLAT")
             reason_str = ev.get("reason", "")
@@ -1280,7 +1314,14 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             
             # Se la Core è già stata registrata con il relativo motivo e passaggio a FLAT, evitiamo il doppio messaggio
             if not has_core_in_events and not has_auto_start:
-                tag_motivo = "Stop KJ" if "live_stop" in reason_str else "Kijun"
+                if "break_min" in reason_str:
+                    tag_motivo = "Stop KJ (Break Min -5p)"
+                elif "break_max" in reason_str:
+                    tag_motivo = "Stop KJ (Break Max +5p)"
+                elif "live_stop" in reason_str:
+                    tag_motivo = "Paracadute KJ"
+                else:
+                    tag_motivo = "Stop KJ"
                 msg = f"🛑 {tag_motivo} ➡️ {new_d}"
                 print_log(nome, msg)
                 invia_notifica(f"🛑 REVERSAL {tf_label}", f"[{nome}] {msg}", "warning")
@@ -1289,11 +1330,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 
             pulisci_posizioni_epic(nome, epic, headers)
             if not auto_restart:
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None, "signal_candle_active": False, "signal_stop_price": None})
                 engine.reset()
                 print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
             else:
-                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None})
+                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None, "signal_candle_active": False, "signal_stop_price": None})
             
     # Salvataggio posizioni aggiornate
     if engine.is_running:
@@ -1303,8 +1344,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             "posizioni_core": core_dict, 
             "posizioni_incr": incr_dict,
             "trailing_sl_incr": engine.trailing_sl_incr,
-            "trailing_sl_core": engine.trailing_sl_core
+            "trailing_sl_core": engine.trailing_sl_core,
+            "signal_candle_active": getattr(engine, "signal_candle_active", False),
+            "signal_stop_price": getattr(engine, "signal_stop_price", None)
         }
+
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
             update_data["storico_wip_trend"] = storico
@@ -1599,8 +1643,11 @@ def esegui_ciclo_trend():
                     pos.ticket = i_d.get("ticket")
                 engine.trailing_sl_incr = dati.get("trailing_sl_incr")
                 engine.trailing_sl_core = dati.get("trailing_sl_core")
+                engine.signal_candle_active = dati.get("signal_candle_active", False)
+                engine.signal_stop_price = dati.get("signal_stop_price")
                 engine.current_tk = dati.get("current_tk")
                 engine.current_kj = dati.get("current_kj")
+
                 
                 # Inizializzazione rapida al boot dall'ultima candela locale se i trailing non sono ancora in memoria
                 c_loc = carica_candele_locali(nome, tf)
@@ -1792,8 +1839,11 @@ def esegui_ciclo_trend():
                     "posizioni_incr": incr_dict,
                     "trailing_sl_core": engine.trailing_sl_core,
                     "trailing_sl_incr": engine.trailing_sl_incr,
+                    "signal_candle_active": getattr(engine, "signal_candle_active", False),
+                    "signal_stop_price": getattr(engine, "signal_stop_price", None),
                     "storico_wip_trend": storico[-30:]
                 }
+
                 if engine.pm.core_position:
                     up_dict["stato"] = engine.pm.core_position.direction
                     up_dict["direzione"] = engine.pm.core_position.direction
@@ -1880,8 +1930,11 @@ def esegui_ciclo_trend():
         aggiorna_memoria(nome, {
             "current_tk": tk_val, 
             "current_kj": kj_val,
+            "signal_candle_active": getattr(engine, "signal_candle_active", False),
+            "signal_stop_price": getattr(engine, "signal_stop_price", None),
             "last_candle_time": snapshot_time
         })
+
         
         # -------------------------------------------------------------
         # PROTEZIONE SPREAD ROLLOVER: Candele e KJ calcolate regolarmente,
