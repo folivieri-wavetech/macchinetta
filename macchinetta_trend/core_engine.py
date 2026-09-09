@@ -214,7 +214,7 @@ class CoreEngine:
                 incr_tp_pips = self._get_increment_tp_pips()
                 if incr_tp_pips and len(self.pm.increments) > 0:
                     tp_target_delta = incr_tp_pips * pip_val
-                    inc_to_close = [p for p in self.pm.increments if (c_close - p.entry_price) >= tp_target_delta]
+                    inc_to_close = [p for p in self.pm.increments if (c_close - p.entry_price) >= (tp_target_delta - 1e-7)]
                     for inc in inc_to_close:
                         inc.close(exec_price)
                         self.pm.increments.remove(inc)
@@ -233,9 +233,9 @@ class CoreEngine:
 
                 # --- INGRESSI INCREMENTO LONG ---
                 # Candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
-                if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val):
+                if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val + 1e-7):
                     # Candela rossa di almeno 1 pip su tutti i TF
-                    if (closed_candle.open - closed_candle.close) >= (1 * pip_val):
+                    if (closed_candle.open - closed_candle.close) >= (1 * pip_val - 1e-7):
                         entry_price = exec_price
                         scala = int(self.config.get("scala", 1) or 1)
                         while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
@@ -336,7 +336,7 @@ class CoreEngine:
                 incr_tp_pips = self._get_increment_tp_pips()
                 if incr_tp_pips and len(self.pm.increments) > 0:
                     tp_target_delta = incr_tp_pips * pip_val
-                    inc_to_close = [p for p in self.pm.increments if (p.entry_price - c_close) >= tp_target_delta]
+                    inc_to_close = [p for p in self.pm.increments if (p.entry_price - c_close) >= (tp_target_delta - 1e-7)]
                     for inc in inc_to_close:
                         inc.close(exec_price)
                         self.pm.increments.remove(inc)
@@ -355,9 +355,9 @@ class CoreEngine:
 
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
-                if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val):
+                if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val + 1e-7):
                     # Candela verde di almeno 1 pip su tutti i TF
-                    if (closed_candle.close - closed_candle.open) >= (1 * pip_val):
+                    if (closed_candle.close - closed_candle.open) >= (1 * pip_val - 1e-7):
                         entry_price = exec_price
                         scala = int(self.config.get("scala", 1) or 1)
                         while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
@@ -449,7 +449,7 @@ class CoreEngine:
             # 1. Stop Loss Core Intracandela (Paracadute): KJ - 20 pip o Trailing SL Core (su M5 se più restrittivo)
             sl_core_base = kj - (20 * pip_val)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
-            if current_price <= effective_sl_core:
+            if current_price <= (effective_sl_core + 1e-7):
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
@@ -465,7 +465,7 @@ class CoreEngine:
 
             # 2. Stop Conferma Candela Segnale (Minimo - 5 pip)
             if self.signal_candle_active and self.signal_stop_price is not None:
-                if current_price <= self.signal_stop_price:
+                if current_price <= (self.signal_stop_price + 1e-7):
                     self.trailing_sl_core = None
                     self.trailing_sl_incr = None
                     self.signal_candle_active = False
@@ -481,7 +481,7 @@ class CoreEngine:
             # 3. Stop Loss Incrementi: TK - 10 pip o Trailing SL a 20 pip (il più alto / restrittivo)
             sl_incr_base = tk - (10 * pip_val)
             effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
-            if len(self.pm.increments) > 0 and current_price <= effective_sl_incr:
+            if len(self.pm.increments) > 0 and current_price <= (effective_sl_incr + 1e-7):
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
                 self.trailing_sl_incr = None
                 chiusure_inc = self.pm.close_all_increments(current_price)
@@ -494,7 +494,7 @@ class CoreEngine:
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
                 tp_target_delta = incr_tp_pips * pip_val
-                inc_to_close = [p for p in self.pm.increments if (current_price - p.entry_price) >= tp_target_delta]
+                inc_to_close = [p for p in self.pm.increments if (current_price - p.entry_price) >= (tp_target_delta - 1e-7)]
                 for inc in inc_to_close:
                     inc.close(current_price)
                     self.pm.increments.remove(inc)
@@ -515,7 +515,7 @@ class CoreEngine:
             # 1. Stop Loss Core Intracandela (Paracadute): KJ + 20 pip o Trailing SL Core (su M5 se più restrittivo)
             sl_core_base = kj + (20 * pip_val)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
-            if current_price >= effective_sl_core:
+            if current_price >= (effective_sl_core - 1e-7):
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
@@ -531,7 +531,7 @@ class CoreEngine:
 
             # 2. Stop Conferma Candela Segnale (Massimo + 5 pip)
             if self.signal_candle_active and self.signal_stop_price is not None:
-                if current_price >= self.signal_stop_price:
+                if current_price >= (self.signal_stop_price - 1e-7):
                     self.trailing_sl_core = None
                     self.trailing_sl_incr = None
                     self.signal_candle_active = False
@@ -547,7 +547,7 @@ class CoreEngine:
             # 3. Stop Loss Incrementi: TK + 10 pip o Trailing SL a 20 pip (il più basso / restrittivo)
             sl_incr_base = tk + (10 * pip_val)
             effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
-            if len(self.pm.increments) > 0 and current_price >= effective_sl_incr:
+            if len(self.pm.increments) > 0 and current_price >= (effective_sl_incr - 1e-7):
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
                 self.trailing_sl_incr = None
                 chiusure_inc = self.pm.close_all_increments(current_price)
@@ -561,7 +561,7 @@ class CoreEngine:
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
                 tp_target_delta = incr_tp_pips * pip_val
-                inc_to_close = [p for p in self.pm.increments if (p.entry_price - current_price) >= tp_target_delta]
+                inc_to_close = [p for p in self.pm.increments if (p.entry_price - current_price) >= (tp_target_delta - 1e-7)]
                 for inc in inc_to_close:
                     inc.close(current_price)
                     self.pm.increments.remove(inc)

@@ -2364,14 +2364,19 @@ else:
                             is_core_subrow = (p in core_positions)
                             if is_core_subrow:
                                 trailing_sl_core = memoria_attuale.get(nome, {}).get("trailing_sl_core")
+                                signal_active = memoria_attuale.get(nome, {}).get("signal_candle_active", False)
+                                signal_stop = memoria_attuale.get(nome, {}).get("signal_stop_price")
                                 kj_val = memoria_attuale.get(nome, {}).get("current_kj")
                                 pip_val = c.get("moltiplicatore", 0.0001)
-                                if trailing_sl_core is not None:
+                                if signal_active and signal_stop is not None:
+                                    sl_core = signal_stop
+                                    title_core = "Stop Candela Segnale (Min/Max +- 5 pip confermato)"
+                                elif trailing_sl_core is not None:
                                     sl_core = trailing_sl_core
-                                    title_core = "Trailing SL Core (+-40 pip da Close | dist KJ >= 40 pip)"
+                                    title_core = "Trailing SL Core (+-20 pip da Close)"
                                 elif kj_val is not None:
-                                    sl_core = (kj_val - (5 * pip_val)) if dir == 'BUY' else (kj_val + (5 * pip_val))
-                                    title_core = "Stop Core (KJ +- 5 pip)"
+                                    sl_core = (kj_val - (20 * pip_val)) if dir == 'BUY' else (kj_val + (20 * pip_val))
+                                    title_core = "Paracadute KJ (KJ +- 20 pip)"
                                 else:
                                     sl_core = None
                                 
@@ -2395,8 +2400,8 @@ else:
                                     sl_display = trailing_sl_incr
                                     title_info = "Trailing SL (+-20 pip da Close | dist TK >= 20 pip)"
                                 elif tk_val is not None:
-                                    sl_display = (tk_val - (5 * pip_val)) if dir == 'BUY' else (tk_val + (5 * pip_val))
-                                    title_info = "Stop TK (+-5 pip)"
+                                    sl_display = (tk_val - (10 * pip_val)) if dir == 'BUY' else (tk_val + (10 * pip_val))
+                                    title_info = "Stop TK (+-10 pip intracandela / TK a chiusura)"
                                 else:
                                     sl_display = None
                                 
