@@ -3856,7 +3856,7 @@ else:
                     "🎯 Possibili entrate", 
                     "🛑 Chiusure", 
                     "⚙️ Varie"
-                ], key=f"subtabs_console_{conto_selezionato}")
+                ])
 
                 tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_varie = sub_tabs
 
