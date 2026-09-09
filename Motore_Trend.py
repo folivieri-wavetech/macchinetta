@@ -194,13 +194,15 @@ def verifica_notifiche_sistema_transizioni():
         )
 
     # 5. Alert Quota Storica IG se in esaurimento (controllo centralizzato)
+    # Notifica SOLO quando la quota sta scendendo (fascia 500-1000). 
+    # Quando è < 500 o già azzerata a 0, il Circuit Breaker è già attivo e non si inviano alert ripetuti in attesa del reset domenicale.
     rem_quota = get_remaining_quota_ig()
-    if rem_quota < 1000:
+    if 500 <= rem_quota < 1000:
         chiave = f"quota_ig_warning_{now_t.strftime('%Y_%m_%d')}"
         invia_notifica_sistema(
             chiave,
             "DATI IG IN ESAURIMENTO",
-            "Attivazione protezione automatica",
+            f"Quota residua: {rem_quota}. Attivazione protezione automatica",
             tags="warning",
             cooldown_sec=43200
         )
