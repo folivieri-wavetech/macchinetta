@@ -369,11 +369,13 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     c_valuta = c_cfg.get("valuta", "USD")
     c_rate = get_eur_rate(c_valuta, prezzi_live)
 
-    # 1. Core [LONG/SHORT] [Aperta/Chiusa]: +-xxxx €
+    # 1. Core [size] [Aperta/Chiusa]: +-xxxx €
+    sz_core = None
     if pos_core:
         c_p = pos_core[0]
         e_c = float(c_p.get("entry", 0))
         sz_c = float(c_p.get("size", 1))
+        sz_core = int(sz_c) if sz_c == int(sz_c) else sz_c
         dir_c = c_p.get("direction", dir_t or "LONG")
         if px and c_mult > 0:
             pts_c = (px - e_c)/c_mult if dir_c == "LONG" else (e_c - px)/c_mult
@@ -382,20 +384,29 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
             pnl_c = 0.0
         stato_c_lbl = "Aperta"
     else:
-        dir_c = dir_t if dir_t else "-"
         pnl_c = 0.0
         for r in (storico or []):
-            if any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core")):
+            if any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core", "Reverse")):
+                m_sz = re.search(r"Core\s*\(([^)]+)\)", r)
+                if m_sz:
+                    try:
+                        v_sz = float(m_sz.group(1))
+                        sz_core = int(v_sz) if v_sz == int(v_sz) else v_sz
+                    except Exception:
+                        sz_core = m_sz.group(1)
                 m_c = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", r)
                 if m_c:
                     pnl_c = float(m_c.group(1).replace(",", "."))
                     break
+        if sz_core is None:
+            sz_def = float(dati_inst.get("size_i", 1))
+            sz_core = int(sz_def) if sz_def == int(sz_def) else sz_def
         stato_c_lbl = "Chiusa"
 
     col_oro = "#FFD700"
     segno_c = "+" if pnl_c >= 0.5 else ""
     col_c = "#00E676" if pnl_c >= 0.5 else ("#FA8072" if pnl_c <= -0.5 else "#cccccc")
-    line1_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Core [{dir_c}] [{stato_c_lbl}]:</span> <span style='color: {col_c}; font-weight: normal;'>{segno_c}{pnl_c:.0f} €</span></div>"
+    line1_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Core [{sz_core}] [{stato_c_lbl}]:</span> <span style='color: {col_c}; font-weight: normal;'>{segno_c}{pnl_c:.0f} €</span></div>"
 
     # 2. Incr. Chiusi [n1]: +-yyyy €
     tot_inc_c = 0.0
