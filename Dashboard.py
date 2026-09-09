@@ -443,7 +443,7 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     col_ia = "#00E676" if tot_inc_a >= 0.5 else ("#FA8072" if tot_inc_a <= -0.5 else "#cccccc")
     line3_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Incr. Aperti [{n_inc_a}]:</span> <span style='color: {col_ia}; font-weight: normal;'>{segno_ia}{tot_inc_a:.0f} €</span></div>"
 
-    # 4. Rendimento % sul Margine Impiegato (Opzione B)
+    # 4. Totale PnL Ciclo e Rendimento % sul Margine Impiegato (Opzione B)
     try:
         sz_c_val = float(sz_core)
     except Exception:
@@ -452,6 +452,10 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     tot_contratti = sz_c_val + sz_inc_c + sz_inc_a
     margine_totale = tot_contratti * margine_u
     tot_pnl_ciclo = pnl_c + tot_inc_c + tot_inc_a
+
+    segno_tot = "+" if tot_pnl_ciclo >= 0.5 else ""
+    col_tot = "#00E676" if tot_pnl_ciclo >= 0.5 else ("#FA8072" if tot_pnl_ciclo <= -0.5 else "#cccccc")
+    line_tot_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Totale:</span> <span style='color: {col_tot}; font-weight: normal;'>{segno_tot}{tot_pnl_ciclo:.0f} €</span></div>"
 
     rendimento_pct = (tot_pnl_ciclo / margine_totale * 100.0) if margine_totale > 0 else 0.0
     segno_rend = "+" if rendimento_pct >= 0.005 else ""
@@ -465,6 +469,7 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
         {line1_html}
         {line2_html}
         {line3_html}
+        {line_tot_html}
         {line4_html}
     </div>
     <div style='letter-spacing: 2px; color: rgba(255,255,255,0.3); text-align: center; margin-bottom: 12px; font-weight: bold; font-size: 0.9rem;'>================================================</div>
@@ -3152,8 +3157,6 @@ else:
                                 }
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
-                            if st.button("📋 WIP", key=f"WIP_T_{conto_selezionato}_{nome}", width="stretch"):
-                                mostra_diario_wip_trend(nome, dati_salvati.get("storico_wip_trend", []), conto=conto_selezionato)
 
                         c_r1, c_r2, c_r3, c_r4 = st.columns(4)
                         with c_r1:
