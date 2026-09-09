@@ -411,22 +411,30 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     # 2. Incr. Chiusi [n1]: +-yyyy €
     tot_inc_c = 0.0
     n_inc_c = 0
+    sz_inc_c = 0.0
     for r in (storico or []):
         if not any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core")):
             m_inc = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", r)
             if m_inc:
                 tot_inc_c += float(m_inc.group(1).replace(",", "."))
                 n_inc_c += 1
+                m_sz_i = re.search(r"(?:Incr|Bancomat|FIFO)\s*(?:\([^)]+\)\s*)?\((\d+(?:\.\d+)?)\)", r)
+                if m_sz_i:
+                    sz_inc_c += float(m_sz_i.group(1))
+                else:
+                    sz_inc_c += float(dati_inst.get("size_i", 1))
     segno_ic = "+" if tot_inc_c >= 0.5 else ""
     col_ic = "#00E676" if tot_inc_c >= 0.5 else ("#FA8072" if tot_inc_c <= -0.5 else "#cccccc")
     line2_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Incr. Chiusi [{n_inc_c}]:</span> <span style='color: {col_ic}; font-weight: normal;'>{segno_ic}{tot_inc_c:.0f} €</span></div>"
 
     # 3. Incr. Aperti [n2]: +-zzzz €
     tot_inc_a = 0.0
+    sz_inc_a = 0.0
     n_inc_a = len(pos_incr)
     for ip in pos_incr:
         e_i = float(ip.get("entry", 0))
         sz_i = float(ip.get("size", 1))
+        sz_inc_a += sz_i
         dir_i = ip.get("direction", dir_t or "LONG")
         if px and c_mult > 0:
             pts_i = (px - e_i)/c_mult if dir_i == "LONG" else (e_i - px)/c_mult
@@ -435,12 +443,29 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     col_ia = "#00E676" if tot_inc_a >= 0.5 else ("#FA8072" if tot_inc_a <= -0.5 else "#cccccc")
     line3_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Incr. Aperti [{n_inc_a}]:</span> <span style='color: {col_ia}; font-weight: normal;'>{segno_ia}{tot_inc_a:.0f} €</span></div>"
 
-    # 4. Box Sintesi + Linea Divisoria
+    # 4. Rendimento % sul Margine Impiegato (Opzione B)
+    try:
+        sz_c_val = float(sz_core)
+    except Exception:
+        sz_c_val = float(dati_inst.get("size_i", 1))
+    margine_u = float(c_cfg.get("margine_unitario", 300))
+    tot_contratti = sz_c_val + sz_inc_c + sz_inc_a
+    margine_totale = tot_contratti * margine_u
+    tot_pnl_ciclo = pnl_c + tot_inc_c + tot_inc_a
+
+    rendimento_pct = (tot_pnl_ciclo / margine_totale * 100.0) if margine_totale > 0 else 0.0
+    segno_rend = "+" if rendimento_pct >= 0.005 else ""
+    col_rend = "#00E676" if rendimento_pct >= 0.005 else ("#FA8072" if rendimento_pct <= -0.005 else "#cccccc")
+    margine_fmt = f"{margine_totale:,.0f}".replace(",", ".")
+    line4_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Rendimento:</span> <span style='color: {col_rend}; font-weight: normal;'>{segno_rend}{rendimento_pct:.2f}%</span> <span style='color: #888; font-size: 0.85rem;'>(su {margine_fmt} €)</span></div>"
+
+    # Box Sintesi + Linea Divisoria
     box_sintesi_html = f"""
     <div style='background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 10px 14px; font-family: monospace; font-size: 0.95rem; line-height: 1.6; margin-bottom: 8px;'>
         {line1_html}
         {line2_html}
         {line3_html}
+        {line4_html}
     </div>
     <div style='letter-spacing: 2px; color: rgba(255,255,255,0.3); text-align: center; margin-bottom: 12px; font-weight: bold; font-size: 0.9rem;'>================================================</div>
     """
