@@ -523,7 +523,7 @@ def get_file_candele(nome, tf):
     clean = nome.replace("/", "_").replace(" ", "_")
     return f"candele_{clean}_{tf}.json"
 
-def is_valid_candele(data, tf=None):
+def is_valid_candele(data, tf=None, check_freshness=True):
     if not data or len(data) < 2:
         return False
     try:
@@ -555,8 +555,8 @@ def is_valid_candele(data, tf=None):
                 if expected_min >= 1440 and delta_m < 720:
                     return False
                     
-            # Controllo freschezza ultima candela (evita di accettare cache ferme a ore/giorni fa)
-            if not is_weekend_active():
+            # Controllo freschezza ultima candela (solo se richiesto esplicitamente)
+            if check_freshness and not is_weekend_active():
                 st_last = data[-1].get('snapshotTime')
                 if st_last:
                     for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M:00", "%Y-%m-%d %H:%M:%S"):
@@ -664,10 +664,10 @@ def allinea_candele_live(candele_locali, nome, tf, px_live):
     return list(candele_locali) + [synth_candle]
 
 def carica_candele_locali(nome, tf, px_live=None):
-    # Se presente in cache locale in memoria e valida, usa subito la cache senza toccare il disco
+    # Se presente in cache locale in memoria e valida (almeno 55 barre), usa subito la cache senza toccare il disco
     if (nome, tf) in LOCAL_CANDELE_CACHE:
         cached = LOCAL_CANDELE_CACHE[(nome, tf)]
-        if len(cached) >= 55 and is_valid_candele(cached, tf):
+        if len(cached) >= 55 and is_valid_candele(cached, tf, check_freshness=False):
             if px_live and isinstance(px_live, (int, float)):
                 return allinea_candele_live(cached, nome, tf, px_live)
             return cached
@@ -675,32 +675,37 @@ def carica_candele_locali(nome, tf, px_live=None):
     clean = nome.replace("/", "_").replace(" ", "_")
     fpath = get_file_candele(nome, tf)
     
-    # 1. Controlla prima il file specifico locale (se ha almeno 55 barre ed è valido per il tf)
+    # 1. Controlla prima il file specifico locale
+    local_data = []
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if len(data) >= 55 and is_valid_candele(data, tf):
-                    LOCAL_CANDELE_CACHE[(nome, tf)] = data[-60:]
-                    if px_live and isinstance(px_live, (int, float)):
-                        return allinea_candele_live(data, nome, tf, px_live)
-                    return data
+                if isinstance(data, list) and is_valid_candele(data, tf, check_freshness=False):
+                    local_data = data
+                    if len(data) >= 55:
+                        LOCAL_CANDELE_CACHE[(nome, tf)] = data[-60:]
+                        if px_live and isinstance(px_live, (int, float)):
+                            return allinea_candele_live(data, nome, tf, px_live)
+                        return data
         except Exception:
             pass
             
     # 2. Cerca across accounts (se ha almeno 55 barre ed è valido per il tf)
-    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
+    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "Logs_e_Cache"]:
         alt_path = os.path.join("..", altro, f"candele_{clean}_{tf}.json")
         if os.path.exists(alt_path):
             try:
                 with open(alt_path, "r", encoding="utf-8") as f:
                     d = json.load(f)
-                    if len(d) >= 55 and is_valid_candele(d, tf):
+                    if len(d) >= 55 and is_valid_candele(d, tf, check_freshness=False):
                         salva_candele_locali(nome, tf, d)
+                        LOCAL_CANDELE_CACHE[(nome, tf)] = d[-60:]
+                        if px_live and isinstance(px_live, (int, float)):
+                            return allinea_candele_live(d, nome, tf, px_live)
                         return d
             except Exception:
                 pass
-
 
     # 3. Aggregazione da timeframe minori a maggiori
     tf_order = ["MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
@@ -708,23 +713,46 @@ def carica_candele_locali(nome, tf, px_live=None):
         if tf_try == tf or TF_MAP.get(tf_try, 0) >= TF_MAP.get(tf, 0):
             continue
         fname = f"candele_{clean}_{tf_try}.json"
-        for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "."]:
+        for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", ".", "Logs_e_Cache"]:
             alt_path = os.path.join("..", altro, fname) if altro != "." else fname
             if os.path.exists(alt_path):
                 try:
                     with open(alt_path, "r", encoding="utf-8") as f:
                         d = json.load(f)
-                        if is_valid_candele(d, tf_try):
+                        if is_valid_candele(d, tf_try, check_freshness=False):
                             c_agg = aggrega_candele_multitf(d, tf_try, tf)
-                            if is_valid_candele(c_agg, tf):
+                            # Se abbiamo storico locale precedente, FONDILO (merge) invece di sovrascrivere!
+                            if local_data:
+                                snaps = {c.get("snapshotTime"): c for c in local_data if c.get("snapshotTime")}
+                                for c in c_agg:
+                                    s = c.get("snapshotTime")
+                                    if s:
+                                        snaps[s] = c
+                                merged = sorted(snaps.values(), key=lambda x: x.get("snapshotTime", ""))[-60:]
+                                if len(merged) >= 55 and is_valid_candele(merged, tf, check_freshness=False):
+                                    if px_live and isinstance(px_live, (int, float)):
+                                        merged = allinea_candele_live(merged, nome, tf, px_live)
+                                    salva_candele_locali(nome, tf, merged)
+                                    LOCAL_CANDELE_CACHE[(nome, tf)] = merged[-60:]
+                                    return merged
+                            # Se non c'è storico locale, accetta l'aggregazione SOLO se ha almeno 55 candele!
+                            elif len(c_agg) >= 55 and is_valid_candele(c_agg, tf, check_freshness=False):
                                 if px_live and isinstance(px_live, (int, float)):
                                     c_agg = allinea_candele_live(c_agg, nome, tf, px_live)
                                 salva_candele_locali(nome, tf, c_agg)
+                                LOCAL_CANDELE_CACHE[(nome, tf)] = c_agg[-60:]
                                 return c_agg
                 except Exception:
                     pass
-                    
-    # 4. Nessun fallback sintetico completo, lasciamo che il motore identifichi il buco e scarichi da IG
+
+    # 4. Fallback: se local_data esiste (anche se con meno di 55 barre), usalo piuttosto che inventare dati
+    if local_data:
+        LOCAL_CANDELE_CACHE[(nome, tf)] = local_data[-60:]
+        if px_live and isinstance(px_live, (int, float)):
+            return allinea_candele_live(local_data, nome, tf, px_live)
+        return local_data
+
+    # 5. Ultima ratio: solo se non c'è assolutamente nessun dato
     if px_live and isinstance(px_live, (int, float)):
         res = []
         now_dt = now_it()
@@ -860,7 +888,8 @@ def calcola_kj55_da_candele(candele_list, periods=55):
                     valid.append((vh, vl))
             except (ValueError, TypeError):
                 pass
-    if not valid:
+    min_needed = min(periods, 20)
+    if not valid or len(valid) < min_needed:
         return None
     highest = max(v[0] for v in valid)
     lowest = min(v[1] for v in valid)
