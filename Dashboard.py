@@ -1437,248 +1437,249 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
     return []
 
 def renderizza_schermata_radar(conto_selezionato=None):
-    @st.fragment(run_every=15)
-    def renderizza_radar_body():
-        radar_data = {}
-        ts_aggiornamento = None
-        prezzi_live = {}
+    radar_data = {}
+    ts_aggiornamento = None
+    prezzi_live = {}
+    
+    accs = get_accounts()
+    if conto_selezionato and conto_selezionato not in accs:
+        accs = [conto_selezionato] + accs
         
-        accs = get_accounts()
-        if conto_selezionato and conto_selezionato not in accs:
-            accs = [conto_selezionato] + accs
-            
-        for c_dir in accs:
-            r_file = os.path.join(c_dir, "radar_trend.json")
-            if os.path.exists(r_file):
-                try:
-                    with open(r_file, "r", encoding="utf-8") as f_rf:
-                        rf_d = json.load(f_rf)
-                        d_r = rf_d.get("radar_trend", {})
-                        ts_r = rf_d.get("radar_trend_ts")
-                        if d_r:
-                            radar_data.update(d_r)
-                            if not ts_aggiornamento or (ts_r and ts_r > ts_aggiornamento):
-                                ts_aggiornamento = ts_r
-                except Exception:
-                    pass
-            st_file = os.path.join(c_dir, STATO_SISTEMA)
-            if os.path.exists(st_file):
-                try:
-                    with open(st_file, "r", encoding="utf-8") as f_st:
-                        st_d = json.load(f_st)
-                        pl = st_d.get("prezzi_live", {})
-                        if pl:
-                            prezzi_live.update(pl)
-                except Exception:
-                    pass
-                    
-        if not ts_aggiornamento:
-            ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
+    for c_dir in accs:
+        r_file = os.path.join(c_dir, "radar_trend.json")
+        if os.path.exists(r_file):
+            try:
+                with open(r_file, "r", encoding="utf-8") as f_rf:
+                    rf_d = json.load(f_rf)
+                    d_r = rf_d.get("radar_trend", {})
+                    ts_r = rf_d.get("radar_trend_ts")
+                    if d_r:
+                        radar_data.update(d_r)
+                        if not ts_aggiornamento or (ts_r and ts_r > ts_aggiornamento):
+                            ts_aggiornamento = ts_r
+            except Exception:
+                pass
+        st_file = os.path.join(c_dir, STATO_SISTEMA)
+        if os.path.exists(st_file):
+            try:
+                with open(st_file, "r", encoding="utf-8") as f_st:
+                    st_d = json.load(f_st)
+                    pl = st_d.get("prezzi_live", {})
+                    if pl:
+                        prezzi_live.update(pl)
+            except Exception:
+                pass
+                
+    if not ts_aggiornamento:
+        ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
 
-        col_radar_info, col_radar_btn = st.columns([5, 1.2])
-        with col_radar_info:
-            st.html(f"""
-            <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
-            <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
-            <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
-                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
-                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
-                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trend</b>: Posizione già a mercato</div>
-            </div>
-            """)
-        with col_radar_btn:
-            st.markdown("""
-            <style>
-            div.st-key-btn_radar_nav_trend button {
-                background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
-                color: #ffffff !important;
-                border: 1px solid #60a5fa !important;
-                font-weight: bold !important;
-                font-size: 0.85rem !important;
-                border-radius: 6px !important;
-                padding: 6px 14px !important;
-                margin-top: 10px !important;
-                box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35) !important;
-                transition: all 0.2s ease-in-out !important;
-            }
-            div.st-key-btn_radar_nav_trend button:hover {
-                background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
-                border-color: #93c5fd !important;
-                box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6) !important;
-                transform: translateY(-1px);
-            }
-            </style>
-            """, unsafe_allow_html=True)
+    col_radar_info, col_radar_btn = st.columns([5, 1.2])
+    with col_radar_info:
+        st.markdown(f"""
+        <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
+        <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (M5, H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
+        <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
+            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
+            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
+            <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trend</b>: Posizione già a mercato</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_radar_btn:
+        st.markdown("""
+        <style>
+        div.st-key-btn_radar_nav_trend button, div.st-key-btn_radar_refresh button {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid #60a5fa !important;
+            font-weight: bold !important;
+            font-size: 0.85rem !important;
+            border-radius: 6px !important;
+            padding: 6px 14px !important;
+            margin-top: 10px !important;
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35) !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        div.st-key-btn_radar_nav_trend button:hover, div.st-key-btn_radar_refresh button:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+            border-color: #93c5fd !important;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6) !important;
+            transform: translateY(-1px);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        c_rf, c_tr = st.columns(2)
+        with c_rf:
+            if st.button("🔄 Aggiorna", key="btn_radar_refresh", use_container_width=True):
+                st.rerun()
+        with c_tr:
             if st.button("📈 TREND", key="btn_radar_nav_trend", use_container_width=True):
                 st.session_state.vista_sidebar = "CONTO"
                 st.session_state.target_tab = "Trend"
                 st.rerun()
 
-        tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-        tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
+    tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+    tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
+    
+    html_table = """
+    <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem;'>
+        <thead>
+            <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
+                <th style='padding: 6px 8px; text-align: center; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
+                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Live</th>
+                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>M5</th>
+                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1</th>
+                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4</th>
+                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>D1</th>
+                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Stato Trend</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for idx, s_nome in enumerate(tutti_strumenti):
+        cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
+        dec = cfg_s.get("decimali", 2)
+        mult = cfg_s.get("moltiplicatore", 0.0001)
+        px = prezzi_live.get(s_nome)
         
-        html_table = """
-        <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem;'>
-            <thead>
-                <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
-                    <th style='padding: 6px 8px; text-align: center; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Live</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>M5</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>D1</th>
-                    <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Stato Trend</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        info_r = radar_data.get(s_nome, {})
+        tf_dict = info_r.get("timeframes", {})
         
-        for idx, s_nome in enumerate(tutti_strumenti):
-            cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
-            dec = cfg_s.get("decimali", 2)
-            mult = cfg_s.get("moltiplicatore", 0.0001)
-            px = prezzi_live.get(s_nome)
-            
-            info_r = radar_data.get(s_nome, {})
-            tf_dict = info_r.get("timeframes", {})
-            
-            # Raccogli tutti i trade attivi per questo strumento su tutti i conti/timeframe
-            trades_tf = {}
-            
-            check_dirs = [conto_selezionato] + [d for d in accs if d != conto_selezionato] if conto_selezionato else accs
-            for c_dir in check_dirs:
-                if not c_dir: continue
-                mem_c = carica_memoria(c_dir)
-                mem_s = mem_c.get(s_nome, {})
-                if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
-                    tf_a = mem_s.get("timeframe", "HOUR")
-                    tf_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
-                    if tf_lbl not in trades_tf:
-                        pos_c = mem_s.get("posizioni_core", [])
-                        pos_i = mem_s.get("posizioni_incr", [])
-                        tot_pnl_pts = 0.0
-                        has_pos = False
-                        
-                        if px and isinstance(px, (int, float)):
-                            for pc in pos_c:
-                                e_px = pc.get("entry")
-                                sz = pc.get("size", 1)
-                                d_pos = pc.get("direction", mem_s.get("stato"))
-                                if e_px and isinstance(e_px, (int, float)) and e_px > 0:
-                                    has_pos = True
-                                    diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
-                                    tot_pnl_pts += (diff / mult) * sz
-                            for pi in pos_i:
-                                e_px = pi.get("entry")
-                                sz = pi.get("size", 1)
-                                d_pos = pi.get("direction", mem_s.get("stato"))
-                                if e_px and isinstance(e_px, (int, float)) and e_px > 0:
-                                    has_pos = True
-                                    diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
-                                    tot_pnl_pts += (diff / mult) * sz
-                        
-                        is_profit = (tot_pnl_pts >= 0) if has_pos else True
-                        
-                        trades_tf[tf_lbl] = {
-                            "stato": mem_s.get("stato"),
-                            "conto": c_dir.replace("_DEMO", "").replace("_REALE", ""),
-                            "is_profit": is_profit,
-                            "pnl_pts": tot_pnl_pts
-                        }
-            
-            if trades_tf:
-                pills = []
-                for tf_k in ["M5", "H1", "H4", "D1"]:
-                    if tf_k in trades_tf:
-                        t_info = trades_tf[tf_k]
-                        st_dir = t_info["stato"]
-                        ct_name = t_info["conto"]
-                        is_profit = t_info.get("is_profit", True)
-                        pnl_pts = t_info.get("pnl_pts", 0.0)
-                        pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
-                        
-                        col_bg = "rgba(34, 197, 94, 0.2)" if is_profit else "rgba(239, 68, 68, 0.2)"
-                        col_bdr = "#22c55e" if is_profit else "#ef4444"
-                        col_txt = "#4ade80" if is_profit else "#f87171"
-                        icon_d = "🟢" if is_profit else "🔴"
-                        tag_d = "L" if st_dir == "LONG" else "S"
-                        pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt'>{icon_d} {tf_k} ({tag_d})</span>")
-                badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
-            else:
-                badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
-            
-            px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
-            
-            def format_radar_cell(lbl_key):
-                t_data = tf_dict.get(lbl_key, {})
-                kj_v = t_data.get("kj")
-                dist_p = t_data.get("dist_pips")
-                dir_p = t_data.get("dir", "-")
-                vicino = t_data.get("vicino", False)
-                
-                if kj_v is None and px and isinstance(px, (int, float)):
-                    tf_code = tf_map_code.get(lbl_key, "HOUR")
-                    candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
-                    kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
-                    if kj_c is not None:
-                        kj_v = kj_c
-                        diff_pts = px - kj_v
-                        dist_p = round(abs(diff_pts) / mult)
-                        dir_p = "Possibile Entrata"
-                        vicino = (dist_p <= 15)
-
-                is_current_tf_trade = (lbl_key in trades_tf)
-                
-                if is_current_tf_trade:
-                    t_info = trades_tf[lbl_key]
-                    st_val = t_info["stato"]
-                    ct_val = t_info["conto"]
+        # Raccogli tutti i trade attivi per questo strumento su tutti i conti/timeframe
+        trades_tf = {}
+        
+        check_dirs = [conto_selezionato] + [d for d in accs if d != conto_selezionato] if conto_selezionato else accs
+        for c_dir in check_dirs:
+            if not c_dir: continue
+            mem_c = carica_memoria(c_dir)
+            mem_s = mem_c.get(s_nome, {})
+            if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
+                tf_a = mem_s.get("timeframe", "HOUR")
+                tf_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
+                if tf_lbl not in trades_tf:
+                    pos_c = mem_s.get("posizioni_core", [])
+                    pos_i = mem_s.get("posizioni_incr", [])
+                    tot_pnl_pts = 0.0
+                    has_pos = False
+                    
+                    if px and isinstance(px, (int, float)):
+                        for pc in pos_c:
+                            e_px = pc.get("entry")
+                            sz = pc.get("size", 1)
+                            d_pos = pc.get("direction", mem_s.get("stato"))
+                            if e_px and isinstance(e_px, (int, float)) and e_px > 0:
+                                has_pos = True
+                                diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
+                                tot_pnl_pts += (diff / mult) * sz
+                        for pi in pos_i:
+                            e_px = pi.get("entry")
+                            sz = pi.get("size", 1)
+                            d_pos = pi.get("direction", mem_s.get("stato"))
+                            if e_px and isinstance(e_px, (int, float)) and e_px > 0:
+                                has_pos = True
+                                diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
+                                tot_pnl_pts += (diff / mult) * sz
+                    
+                    is_profit = (tot_pnl_pts >= 0) if has_pos else True
+                    
+                    trades_tf[tf_lbl] = {
+                        "stato": mem_s.get("stato"),
+                        "conto": c_dir.replace("_DEMO", "").replace("_REALE", ""),
+                        "is_profit": is_profit,
+                        "pnl_pts": tot_pnl_pts
+                    }
+        
+        if trades_tf:
+            pills = []
+            for tf_k in ["M5", "H1", "H4", "D1"]:
+                if tf_k in trades_tf:
+                    t_info = trades_tf[tf_k]
+                    st_dir = t_info["stato"]
+                    ct_name = t_info["conto"]
                     is_profit = t_info.get("is_profit", True)
                     pnl_pts = t_info.get("pnl_pts", 0.0)
-                    col_dir_tr = "#4ade80" if is_profit else "#f87171"
-                    icon_dir = "🟢" if is_profit else "🔴"
                     pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
-                    title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
-                    kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
-                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
-
-                if kj_v is None or dist_p is None:
-                    return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
                     
-                kj_formatted = f"{kj_v:.{dec}f}"
-                dist_int = int(round(dist_p))
-                dir_label = "Possibile Entrata"
-                col_gold = "#fbbf24" # Giallo oro
-                
-                if vicino:
-                    bg_cell = "rgba(251, 191, 36, 0.2)"
-                    bdr_cell = "#f59e0b"
-                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_gold}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_gold}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
-                else:
-                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
-
-            c_m5 = format_radar_cell("M5")
-            c_h1 = format_radar_cell("H1")
-            c_h4 = format_radar_cell("H4")
-            c_d1 = format_radar_cell("D1")
+                    col_bg = "rgba(34, 197, 94, 0.2)" if is_profit else "rgba(239, 68, 68, 0.2)"
+                    col_bdr = "#22c55e" if is_profit else "#ef4444"
+                    col_txt = "#4ade80" if is_profit else "#f87171"
+                    icon_d = "🟢" if is_profit else "🔴"
+                    tag_d = "L" if st_dir == "LONG" else "S"
+                    pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt'>{icon_d} {tf_k} ({tag_d})</span>")
+            badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
+        else:
+            badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
+        
+        px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
+        
+        def format_radar_cell(lbl_key):
+            t_data = tf_dict.get(lbl_key, {})
+            kj_v = t_data.get("kj")
+            dist_p = t_data.get("dist_pips")
+            dir_p = t_data.get("dir", "-")
+            vicino = t_data.get("vicino", False)
             
-            bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
-            html_table += f"""
-            <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
-                <td style='padding: 3px 8px; font-weight: bold; font-size: 0.76rem;'>{formatta_mercato_con_bandiere(s_nome)}</td>
-                <td style='padding: 3px 6px; text-align: center; color: #00E676; font-size: 0.76rem;'>{px_str}</td>
-                <td style='padding: 2px 4px;'>{c_m5}</td>
-                <td style='padding: 2px 4px;'>{c_h1}</td>
-                <td style='padding: 2px 4px;'>{c_h4}</td>
-                <td style='padding: 2px 4px;'>{c_d1}</td>
-                <td style='padding: 3px 6px; text-align: center;'>{badge_stato}</td>
-            </tr>
-            """
+            if kj_v is None and px and isinstance(px, (int, float)):
+                tf_code = tf_map_code.get(lbl_key, "HOUR")
+                candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
+                kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
+                if kj_c is not None:
+                    kj_v = kj_c
+                    diff_pts = px - kj_v
+                    dist_p = round(abs(diff_pts) / mult)
+                    dir_p = "Possibile Entrata"
+                    vicino = (dist_p <= 15)
+
+            is_current_tf_trade = (lbl_key in trades_tf)
+            
+            if is_current_tf_trade:
+                t_info = trades_tf[lbl_key]
+                st_val = t_info["stato"]
+                ct_val = t_info["conto"]
+                is_profit = t_info.get("is_profit", True)
+                pnl_pts = t_info.get("pnl_pts", 0.0)
+                col_dir_tr = "#4ade80" if is_profit else "#f87171"
+                icon_dir = "🟢" if is_profit else "🔴"
+                pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
+                title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
+                kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
+                return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
+
+            if kj_v is None or dist_p is None:
+                return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
+                
+            kj_formatted = f"{kj_v:.{dec}f}"
+            dist_int = int(round(dist_p))
+            dir_label = "Possibile Entrata"
+            col_gold = "#fbbf24" # Giallo oro
+            
+            if vicino:
+                bg_cell = "rgba(251, 191, 36, 0.2)"
+                bdr_cell = "#f59e0b"
+                return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_gold}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_gold}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
+            else:
+                return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
+
+        c_m5 = format_radar_cell("M5")
+        c_h1 = format_radar_cell("H1")
+        c_h4 = format_radar_cell("H4")
+        c_d1 = format_radar_cell("D1")
         
-        html_table += "</tbody></table>"
-        st.html(html_table)
-        
-    renderizza_radar_body()
+        bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
+        html_table += f"""
+        <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
+            <td style='padding: 3px 8px; font-weight: bold; font-size: 0.76rem;'>{formatta_mercato_con_bandiere(s_nome)}</td>
+            <td style='padding: 3px 6px; text-align: center; color: #00E676; font-size: 0.76rem;'>{px_str}</td>
+            <td style='padding: 2px 4px;'>{c_m5}</td>
+            <td style='padding: 2px 4px;'>{c_h1}</td>
+            <td style='padding: 2px 4px;'>{c_h4}</td>
+            <td style='padding: 2px 4px;'>{c_d1}</td>
+            <td style='padding: 3px 6px; text-align: center;'>{badge_stato}</td>
+        </tr>
+        """
+    
+    html_table += "</tbody></table>"
+    st.markdown(html_table, unsafe_allow_html=True)
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -1961,7 +1962,7 @@ else:
             st.markdown("<div style='margin-top: 15px; margin-bottom: 5px;'></div>", unsafe_allow_html=True)
             is_radar_sel = (st.session_state.get("vista_sidebar", "CONTO") == "RADAR")
             if st.button("📡 RADAR TREND", key="btn_radar_sidebar", type="primary" if is_radar_sel else "secondary", use_container_width=True):
-                st.session_state.vista_sidebar = "RADAR"
+                st.session_state.vista_sidebar = "CONTO" if is_radar_sel else "RADAR"
                 st.rerun()
 
         renderizza_sidebar_stats()
@@ -3774,10 +3775,12 @@ else:
     if tab_console is not None:
         with tab_console:
 
-            @st.fragment(run_every=2)
+            @st.fragment(run_every=4)
             def renderizza_console():
+                if st.session_state.get("vista_sidebar", "CONTO") == "RADAR":
+                    return
                 st.markdown("### 💻 Terminale di Bordo (Live)")
-                st.markdown("Monitoraggio in tempo reale del Motore. Auto-aggiornamento ogni 2 secondi.")
+                st.markdown("Monitoraggio in tempo reale del Motore. Auto-aggiornamento ogni 4 secondi.")
             
                 try:
                     path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
@@ -3894,10 +3897,31 @@ else:
                     "🕯️ Candele chiuse", 
                     "🎯 Possibili entrate", 
                     "🛑 Chiusure", 
+                    "📊 KJ55-TK21",
                     "⚙️ Varie"
                 ])
 
-                tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_varie = sub_tabs
+                tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_kj, tab_sub_varie = sub_tabs
+
+                components.html("""
+                    <script>
+                    setTimeout(function() {
+                        try {
+                            const tabButtons = window.parent.document.querySelectorAll('div[data-testid="stTabs"] button[role="tab"]');
+                            for (let b of tabButtons) {
+                                if (b.innerText && b.innerText.includes("KJ55-TK21")) {
+                                    const tabList = b.closest('div[role="tablist"]');
+                                    if (tabList && !tabList.dataset.kjDefaultApplied) {
+                                        tabList.dataset.kjDefaultApplied = "true";
+                                        b.click();
+                                    }
+                                    break;
+                                }
+                            }
+                        } catch(e) {}
+                    }, 60);
+                    </script>
+                """, height=0, width=0)
 
                 with tab_sub_tutti:
                     st.caption(f"Mostrando tutti gli eventi ({len(reversed_lines)} righe)")
@@ -3937,6 +3961,94 @@ else:
                 with tab_sub_chiusure:
                     st.caption(f"Eventi uscite / chiusure / stop: {len(chiusure_lines)}")
                     render_terminal_box(chiusure_lines, empty_msg="Nessuna chiusura o stop registrato di recente.")
+
+                with tab_sub_kj:
+                    st.caption("Ultimo rilevamento Kijun (KJ55) e Tenkan (TK21) su tutti gli strumenti (4 Timeframe ciascuno - 40 righe)")
+                    
+                    tutti_strumenti_kj = [
+                        "AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", 
+                        "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"
+                    ]
+                    timeframes_kj = ["M5", "H1", "H4", "D1"]
+                    radar_cached_kj, _ = carica_radar_trend_dash(conto_selezionato)
+                    
+                    blocchi_html = []
+                    for idx_s, s_nome in enumerate(tutti_strumenti_kj):
+                        cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
+                        dec_s = cfg_s.get("decimali", 2)
+                        righe_strum_html = []
+                        
+                        for tf in timeframes_kj:
+                            line_match = None
+                            for r in reversed_lines:
+                                if f"[{s_nome}]" in r and "Candela" in r:
+                                    if f"[{tf}]" in r or f"({tf})" in r or (tf == "D1" and ("[D]" in r or "(D)" in r or "DAY" in r)):
+                                        line_match = r
+                                        break
+                            if not line_match:
+                                tf_info = radar_cached_kj.get(s_nome, {}).get("timeframes", {}).get(tf, {})
+                                kj_val = tf_info.get("kj")
+                                tk_val = tf_info.get("tk")
+                                kj_str = f"{kj_val:.{dec_s}f}" if isinstance(kj_val, (int, float)) else "-"
+                                tk_str = f"{tk_val:.{dec_s}f}" if isinstance(tk_val, (int, float)) else "-"
+                                line_match = f"[--:--:--] [{s_nome}] 🕯️ Candela [{tf}] | KJ: {kj_str} TK: {tk_str}"
+                            
+                            # Formattazione per terminal box
+                            line_match = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"Candela [\1] ore \2", line_match)
+                            riga_esc = line_match.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                            riga_fmt = re.sub(
+                                r"^(\[(?:\d{1,2}/\d{1,2}\s+)?\d{2}:\d{2}:\d{2}|\[--:--:--\])",
+                                r"<span style='color: #64748b; font-weight: 500;'>\1</span>",
+                                riga_esc
+                            )
+                            riga_fmt = re.sub(
+                                r"(</span>\s*)(\[[A-Za-z0-9_/\s\.\-]+\])",
+                                r"\1<span style='color: #38bdf8; font-weight: 600;'>\2</span>",
+                                riga_fmt
+                            )
+                            riga_fmt = re.sub(
+                                r"(\[(?:M5|H1|H4|D|D1|MINUTE_5|HOUR|HOUR_4|DAY)\])",
+                                r"<span style='color: #fb923c; font-weight: 600;'>\1</span>",
+                                riga_fmt
+                            )
+                            # KJ in giallo puro (#FFFF00, non oro)
+                            riga_fmt = re.sub(
+                                r"(KJ(?:55)?:\s*[0-9\.\-]+)",
+                                r"<span style='color: #FFFF00; font-weight: 600;'>\1</span>",
+                                riga_fmt
+                            )
+                            # TK in azzurro (#00d2ff)
+                            riga_fmt = re.sub(
+                                r"(TK:\s*[0-9\.\-]+)",
+                                r"<span style='color: #00d2ff; font-weight: 600;'>\1</span>",
+                                riga_fmt
+                            )
+                            righe_strum_html.append(f"<div style='padding: 1px 0;'>{riga_fmt}</div>")
+                        
+                        blocco_str = "".join(righe_strum_html)
+                        if idx_s < len(tutti_strumenti_kj) - 1:
+                            blocco_str += "<div style='border-bottom: 1px solid rgba(255,255,255,0.12); margin: 6px 0;'></div>"
+                        blocchi_html.append(blocco_str)
+                    
+                    contenuto_kj_box = "".join(blocchi_html)
+                    st.markdown(f"""
+                        <div style='
+                            background-color: #0f172a; 
+                            color: #e2e8f0; 
+                            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+                            font-size: 0.80rem; 
+                            padding: 10px 14px; 
+                            border-radius: 6px; 
+                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            max-height: 540px; 
+                            overflow-y: auto;
+                            overflow-x: auto;
+                            line-height: 1.35;
+                            white-space: nowrap;
+                        '>
+                            {contenuto_kj_box}
+                        </div>
+                    """, unsafe_allow_html=True)
 
                 with tab_sub_varie:
                     st.caption(f"Eventi operativi e di sistema: {len(varie_lines)}")
