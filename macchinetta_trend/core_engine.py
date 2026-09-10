@@ -257,23 +257,29 @@ class CoreEngine:
                     # Candela rossa di almeno 1 pip su tutti i TF
                     if (closed_candle.open - closed_candle.close) >= (1 * pip_val - 1e-7):
                         entry_price = exec_price
-                        scala = int(self.config.get("scala", 1) or 1)
-                        while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
-                            best = self.pm.force_close_best_increment(entry_price)
-                            if best:
-                                events.append({
-                                    "type": "fifo_close", 
-                                    "pnl": best.pnl, 
-                                    "price": entry_price, 
-                                    "ticket": best.ticket, 
-                                    "size": best.size,
-                                    "direction": "LONG"
-                                })
-                            else:
-                                break
-                        pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
-                        events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
-                        self.retracement_start_price = None
+                        # REGOLA OPZIONE B: Distanza minima di almeno 10 pip da qualsiasi incremento attivo a mercato
+                        min_dist_incr = 10 * pip_val
+                        troppo_vicino = any(abs(entry_price - inc.entry_price) < (min_dist_incr - 1e-7) for inc in self.pm.increments)
+                        if troppo_vicino:
+                            self.retracement_start_price = None
+                        else:
+                            scala = int(self.config.get("scala", 1) or 1)
+                            while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
+                                best = self.pm.force_close_best_increment(entry_price)
+                                if best:
+                                    events.append({
+                                        "type": "fifo_close", 
+                                        "pnl": best.pnl, 
+                                        "price": entry_price, 
+                                        "ticket": best.ticket, 
+                                        "size": best.size,
+                                        "direction": "LONG"
+                                    })
+                                else:
+                                    break
+                            pos = self.pm.open_increment(entry_price, size=scala, direction="LONG")
+                            events.append({"type": "increment_opened", "price": entry_price, "direction": "LONG", "position": pos})
+                            self.retracement_start_price = None
                     else:
                         self.retracement_start_price = None # Ritracciamento interrotto da candela verde
                 else:
@@ -398,23 +404,29 @@ class CoreEngine:
                     # Candela verde di almeno 1 pip su tutti i TF
                     if (closed_candle.close - closed_candle.open) >= (1 * pip_val - 1e-7):
                         entry_price = exec_price
-                        scala = int(self.config.get("scala", 1) or 1)
-                        while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
-                            best = self.pm.force_close_best_increment(entry_price)
-                            if best:
-                                events.append({
-                                    "type": "fifo_close", 
-                                    "pnl": best.pnl, 
-                                    "price": entry_price, 
-                                    "ticket": best.ticket, 
-                                    "size": best.size,
-                                    "direction": "SHORT"
-                                })
-                            else:
-                                break
-                        pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
-                        events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
-                        self.retracement_start_price = None
+                        # REGOLA OPZIONE B: Distanza minima di almeno 10 pip da qualsiasi incremento attivo a mercato
+                        min_dist_incr = 10 * pip_val
+                        troppo_vicino = any(abs(entry_price - inc.entry_price) < (min_dist_incr - 1e-7) for inc in self.pm.increments)
+                        if troppo_vicino:
+                            self.retracement_start_price = None
+                        else:
+                            scala = int(self.config.get("scala", 1) or 1)
+                            while self.pm.total_active_size() + scala > size_max and len(self.pm.increments) > 0:
+                                best = self.pm.force_close_best_increment(entry_price)
+                                if best:
+                                    events.append({
+                                        "type": "fifo_close", 
+                                        "pnl": best.pnl, 
+                                        "price": entry_price, 
+                                        "ticket": best.ticket, 
+                                        "size": best.size,
+                                        "direction": "SHORT"
+                                    })
+                                else:
+                                    break
+                            pos = self.pm.open_increment(entry_price, size=scala, direction="SHORT")
+                            events.append({"type": "increment_opened", "price": entry_price, "direction": "SHORT", "position": pos})
+                            self.retracement_start_price = None
                     else:
                         self.retracement_start_price = None # Ritracciamento interrotto da candela rossa
                 else:
@@ -485,8 +497,8 @@ class CoreEngine:
         pip_val = self.config.get("pip_value") or 0.0001
         
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 20 pip o Trailing SL Core (su M5 se più restrittivo)
-            sl_core_base = kj - (20 * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip o Trailing SL Core (su M5 se più restrittivo)
+            sl_core_base = kj - (15 * pip_val)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price <= (effective_sl_core + 1e-7):
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
@@ -521,8 +533,8 @@ class CoreEngine:
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi Intracandela (Paracadute TK): TK - 20 pip o Trailing SL a 20 pip
-            sl_incr_base = tk - (20 * pip_val)
+            # 3. Stop Loss Incrementi Intracandela (Paracadute TK): TK - 15 pip o Trailing SL a 20 pip
+            sl_incr_base = tk - (15 * pip_val)
             effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price <= (effective_sl_incr + 1e-7):
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
@@ -569,8 +581,8 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 20 pip o Trailing SL Core (su M5 se più restrittivo)
-            sl_core_base = kj + (20 * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip o Trailing SL Core (su M5 se più restrittivo)
+            sl_core_base = kj + (15 * pip_val)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price >= (effective_sl_core - 1e-7):
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
@@ -605,8 +617,8 @@ class CoreEngine:
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi Intracandela (Paracadute TK): TK + 20 pip o Trailing SL a 20 pip
-            sl_incr_base = tk + (20 * pip_val)
+            # 3. Stop Loss Incrementi Intracandela (Paracadute TK): TK + 15 pip o Trailing SL a 20 pip
+            sl_incr_base = tk + (15 * pip_val)
             effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price >= (effective_sl_incr - 1e-7):
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
