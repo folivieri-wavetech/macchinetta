@@ -35,14 +35,15 @@ import Sistema.auth_manager as auth_manager
 CONFIG_STRUMENTI = {
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "margine_unitario": 310},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 210},
-    "EUR/USD": {"epic": "CS.D.EURUSD.CEBM.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 335},
+    "EUR/JPY": {"epic": "CS.D.EURJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350},
     "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 400},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 300},
     "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1, "margine_unitario": 290},
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400}
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400},
+    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 300}
 }
 
 
@@ -153,8 +154,12 @@ def formatta_eur(valore_str):
 def get_eur_rate(valuta, prezzi):
     if valuta == "EUR": return 1.0
     eur_usd = prezzi.get("EUR/USD")
+    eur_jpy = prezzi.get("EUR/JPY")
+    usd_jpy = prezzi.get("USD/JPY")
     gbp_usd = prezzi.get("GBP/USD")
-    if not eur_usd:
+    if not eur_usd and eur_jpy and usd_jpy:
+        eur_usd = eur_jpy / usd_jpy
+    elif not eur_usd:
         eur_gbp = prezzi.get("EUR/GBP")
         if eur_gbp and gbp_usd:
             eur_usd = eur_gbp * gbp_usd
@@ -172,7 +177,7 @@ def get_eur_rate(valuta, prezzi):
         usd_chf = prezzi.get("USD/CHF")
         if usd_chf: return 1.0 / (eur_usd * usd_chf)
     if valuta == "JPY":
-        usd_jpy = prezzi.get("USD/JPY")
+        if eur_jpy: return 1.0 / eur_jpy
         if usd_jpy: return 1.0 / (eur_usd * usd_jpy)
     if valuta == "NZD":
         usd_cad = prezzi.get("USD/CAD")
@@ -668,7 +673,7 @@ def dialog_sync_start(conto_partenza, nome_strumento):
     mem_partenza = carica_memoria(conto_partenza)
     dati_partenza = mem_partenza.get(nome_strumento, {})
     
-    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash"]
+    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash", "Oil - US Crude"]
     def_tp = 100 if is_asset else 50
     def_opp = 20 if is_asset else 10
     def_dts = 10 if is_asset else 5
@@ -797,7 +802,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     szm_t = mem_t.get("size_max", 5)
     sc_t = mem_t.get("scala", 1)
     
-    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash"]
+    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash", "Oil - US Crude"]
     def_tp = 100 if is_asset else 50
     def_opp = 20 if is_asset else 10
     def_dts = 10 if is_asset else 5
@@ -1550,7 +1555,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 st.session_state.target_tab = "Trend"
                 st.rerun()
 
-    tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+    tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
     tf_map_code = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
     
     html_table = """
@@ -2575,7 +2580,7 @@ else:
                 c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
                 st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 
                 for nome in strumenti_ordinati:
@@ -2589,7 +2594,7 @@ else:
                     stato_display = stato.replace("OverGain", "OG").replace("OverLoss", "OL")
                     
                     if is_attivo and isinstance(prezzo, (int, float)):
-                        mult = 1 if nome in ["Spot Gold", "US 500 Cash", "Ethereum"] else (0.01 if "JPY" in nome else 0.0001)
+                        mult = 1 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude", "Ethereum"] else (0.01 if "JPY" in nome else 0.0001)
                         if stato == "FASE_1 + Micro":
                             dir_core = dati.get("direzione")
                             base = dati.get("prezzo_base")
@@ -2716,7 +2721,7 @@ else:
                 stato_sys = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato_sys.get("prezzi_live", {})
                 
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 
                 st.html("""
@@ -3100,14 +3105,14 @@ else:
                                 else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
                             else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
 
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
-                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
+                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else (50, 10, 5) ), 4)
                     with c2:
                         if i + 1 < len(tutti_strumenti):
-                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else (50, 10, 5) ), 4)
+                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else (50, 10, 5) ), 4)
 
             renderizza_dati_live()
 
@@ -3364,7 +3369,7 @@ else:
                         
 
 
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
@@ -3383,7 +3388,7 @@ else:
 
             col1, col2, col3 = st.columns(3)
             with col1:
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
                 r_nome = st.selectbox("1. Seleziona Strumento", tutti_strumenti)
             with col2:
                 r_fase = st.selectbox("2. Seleziona Fase", ["FASE 1", "FASE 2", "FASE 3"])
@@ -4011,11 +4016,11 @@ else:
                     render_terminal_box(chiusure_lines, empty_msg="Nessuna chiusura o stop registrato di recente.")
 
                 with tab_sub_kj:
-                    st.caption("Ultimo rilevamento Kijun (KJ55) e Tenkan (TK21) su tutti gli strumenti (3 Timeframe ciascuno - 30 righe)")
+                    st.caption("Ultimo rilevamento Kijun (KJ55) e Tenkan (TK21) su tutti gli strumenti (3 Timeframe ciascuno - 33 righe)")
                     
                     tutti_strumenti_kj = [
-                        "AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", 
-                        "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"
+                        "AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", 
+                        "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"
                     ]
                     timeframes_kj = ["H1", "H4", "D1"]
                     radar_cached_kj, _ = carica_radar_trend_dash(conto_selezionato)

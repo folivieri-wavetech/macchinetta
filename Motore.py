@@ -108,14 +108,15 @@ def invia_notifica(titolo, messaggio, tags="rotating_light"):
 CONFIG_STRUMENTI = {
     "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
     "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "EUR/USD": {"epic": "CS.D.EURUSD.CEBM.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
+    "EUR/JPY": {"epic": "CS.D.EURJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
     "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
     "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
     "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
     "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1}
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1, "decimali": 2, "valuta": "EUR", "valore_punto": 1},
+    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1}
 }
 
 # --- STATO GLOBALE ---
@@ -152,9 +153,13 @@ def get_eur_rate(valuta, prezzi):
         return 1.0
         
     eur_usd = prezzi.get("EUR/USD")
+    eur_jpy = prezzi.get("EUR/JPY")
+    usd_jpy = prezzi.get("USD/JPY")
     gbp_usd = prezzi.get("GBP/USD")
     
-    if not eur_usd:
+    if not eur_usd and eur_jpy and usd_jpy:
+        eur_usd = eur_jpy / usd_jpy
+    elif not eur_usd:
         eur_gbp = prezzi.get("EUR/GBP")
         if eur_gbp and gbp_usd:
             eur_usd = eur_gbp * gbp_usd
@@ -174,7 +179,7 @@ def get_eur_rate(valuta, prezzi):
         usd_chf = prezzi.get("USD/CHF")
         if usd_chf: return 1.0 / (eur_usd * usd_chf)
     if valuta == "JPY":
-        usd_jpy = prezzi.get("USD/JPY")
+        if eur_jpy: return 1.0 / eur_jpy
         if usd_jpy: return 1.0 / (eur_usd * usd_jpy)
     if valuta == "NZD":
         usd_cad = prezzi.get("USD/CAD")
