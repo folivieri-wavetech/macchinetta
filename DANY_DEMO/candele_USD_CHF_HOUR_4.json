@@ -1,1382 +1,1502 @@
 [
   {
-    "snapshotTime": "2026/08/25 16:00:00",
+    "snapshotTime": "2026/08/28 13:00:00",
+    "snapshotTimeUTC": "2026-08-28T11:00:00",
     "openPrice": {
-      "bid": 0.8023099899291992,
-      "ask": 0.8023099899291992,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8031600117683411,
-      "ask": 0.8031600117683411,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8019199967384338,
-      "ask": 0.8019199967384338,
+      "bid": 0.80312,
+      "ask": 0.80327,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8019999861717224,
-      "ask": 0.8019999861717224,
+      "bid": 0.80698,
+      "ask": 0.80713,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80845,
+      "ask": 0.8086,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80257,
+      "ask": 0.80281,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 10001
   },
   {
-    "snapshotTime": "2026/08/25 20:00:00",
+    "snapshotTime": "2026/08/28 17:00:00",
+    "snapshotTimeUTC": "2026-08-28T15:00:00",
     "openPrice": {
-      "bid": 0.8019999861717224,
-      "ask": 0.8019999861717224,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.802299976348877,
-      "ask": 0.802299976348877,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8005499839782715,
-      "ask": 0.8005499839782715,
+      "bid": 0.80695,
+      "ask": 0.8071,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.801010012626648,
-      "ask": 0.801010012626648,
+      "bid": 0.80961,
+      "ask": 0.80976,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80973,
+      "ask": 0.80988,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80679,
+      "ask": 0.80694,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 8189
   },
   {
-    "snapshotTime": "2026/08/26 00:00:00",
+    "snapshotTime": "2026/08/28 21:00:00",
+    "snapshotTimeUTC": "2026-08-28T19:00:00",
     "openPrice": {
-      "bid": 0.8009300231933594,
-      "ask": 0.8009300231933594,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8022699952125549,
-      "ask": 0.8022699952125549,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8007299900054932,
-      "ask": 0.8007299900054932,
+      "bid": 0.80964,
+      "ask": 0.80979,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8021199703216553,
-      "ask": 0.8021199703216553,
+      "bid": 0.80864,
+      "ask": 0.80946,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.8098,
+      "ask": 0.80997,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80848,
+      "ask": 0.80908,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 2006
   },
   {
-    "snapshotTime": "2026/08/26 04:00:00",
+    "snapshotTime": "2026/08/30 21:00:00",
+    "snapshotTimeUTC": "2026-08-30T19:00:00",
     "openPrice": {
-      "bid": 0.8021199703216553,
-      "ask": 0.8021199703216553,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.803600013256073,
-      "ask": 0.803600013256073,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8016300201416016,
-      "ask": 0.8016300201416016,
+      "bid": 0.80852,
+      "ask": 0.80962,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8033499717712402,
-      "ask": 0.8033499717712402,
+      "bid": 0.80901,
+      "ask": 0.80925,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80943,
+      "ask": 0.80998,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80812,
+      "ask": 0.80909,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 1054
   },
   {
-    "snapshotTime": "2026/08/26 08:00:00",
+    "snapshotTime": "2026/08/31 01:00:00",
+    "snapshotTimeUTC": "2026-08-30T23:00:00",
     "openPrice": {
-      "bid": 0.8033300042152405,
-      "ask": 0.8033300042152405,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8041499853134155,
-      "ask": 0.8041499853134155,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8028200268745422,
-      "ask": 0.8028200268745422,
+      "bid": 0.80899,
+      "ask": 0.80923,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8039000034332275,
-      "ask": 0.8039000034332275,
+      "bid": 0.80846,
+      "ask": 0.8087,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80915,
+      "ask": 0.80938,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80809,
+      "ask": 0.80833,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 4378
   },
   {
-    "snapshotTime": "2026/08/26 12:00:00",
+    "snapshotTime": "2026/08/31 05:00:00",
+    "snapshotTimeUTC": "2026-08-31T03:00:00",
     "openPrice": {
-      "bid": 0.8039299845695496,
-      "ask": 0.8039299845695496,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8055199980735779,
-      "ask": 0.8055199980735779,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8033000230789185,
-      "ask": 0.8033000230789185,
+      "bid": 0.80844,
+      "ask": 0.80868,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8055099844932556,
-      "ask": 0.8055099844932556,
+      "bid": 0.80871,
+      "ask": 0.80886,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80958,
+      "ask": 0.80981,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80844,
+      "ask": 0.80868,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9665
   },
   {
-    "snapshotTime": "2026/08/26 16:00:00",
+    "snapshotTime": "2026/08/31 09:00:00",
+    "snapshotTimeUTC": "2026-08-31T07:00:00",
     "openPrice": {
-      "bid": 0.8054800033569336,
-      "ask": 0.8054800033569336,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8062700033187866,
-      "ask": 0.8062700033187866,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8050699830055237,
-      "ask": 0.8050699830055237,
+      "bid": 0.80869,
+      "ask": 0.80884,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8052800297737122,
-      "ask": 0.8052800297737122,
+      "bid": 0.80861,
+      "ask": 0.80876,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80903,
+      "ask": 0.80918,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80729,
+      "ask": 0.80751,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5162
   },
   {
-    "snapshotTime": "2026/08/26 20:00:00",
+    "snapshotTime": "2026/08/31 13:00:00",
+    "snapshotTimeUTC": "2026-08-31T11:00:00",
     "openPrice": {
-      "bid": 0.8052800297737122,
-      "ask": 0.8052800297737122,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8056399822235107,
-      "ask": 0.8056399822235107,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8033400177955627,
-      "ask": 0.8033400177955627,
+      "bid": 0.8086,
+      "ask": 0.80875,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8048700094223022,
-      "ask": 0.8048700094223022,
+      "bid": 0.80808,
+      "ask": 0.80823,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80886,
+      "ask": 0.80901,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80684,
+      "ask": 0.80699,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 7757
   },
   {
-    "snapshotTime": "2026/08/27 00:00:00",
+    "snapshotTime": "2026/08/31 17:00:00",
+    "snapshotTimeUTC": "2026-08-31T15:00:00",
     "openPrice": {
-      "bid": 0.80485999584198,
-      "ask": 0.80485999584198,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.805429995059967,
-      "ask": 0.805429995059967,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8044099807739258,
-      "ask": 0.8044099807739258,
+      "bid": 0.80809,
+      "ask": 0.80824,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8051999807357788,
-      "ask": 0.8051999807357788,
+      "bid": 0.80813,
+      "ask": 0.80828,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80862,
+      "ask": 0.80877,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80769,
+      "ask": 0.80788,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 4588
   },
   {
-    "snapshotTime": "2026/08/27 04:00:00",
+    "snapshotTime": "2026/08/31 21:00:00",
+    "snapshotTimeUTC": "2026-08-31T19:00:00",
     "openPrice": {
-      "bid": 0.8051999807357788,
-      "ask": 0.8051999807357788,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8058000206947327,
-      "ask": 0.8058000206947327,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8051000237464905,
-      "ask": 0.8051000237464905,
+      "bid": 0.8081,
+      "ask": 0.80825,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8056100010871887,
-      "ask": 0.8056100010871887,
+      "bid": 0.80844,
+      "ask": 0.80868,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80848,
+      "ask": 0.80884,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80701,
+      "ask": 0.80808,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 2021
   },
   {
-    "snapshotTime": "2026/08/27 08:00:00",
+    "snapshotTime": "2026/09/01 01:00:00",
+    "snapshotTimeUTC": "2026-08-31T23:00:00",
     "openPrice": {
-      "bid": 0.8056100010871887,
-      "ask": 0.8056100010871887,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8061299920082092,
-      "ask": 0.8061299920082092,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8053399920463562,
-      "ask": 0.8053399920463562,
+      "bid": 0.80836,
+      "ask": 0.8086,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8059200048446655,
-      "ask": 0.8059200048446655,
+      "bid": 0.80927,
+      "ask": 0.80942,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80953,
+      "ask": 0.8097,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80766,
+      "ask": 0.8079,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 2839
   },
   {
-    "snapshotTime": "2026/08/27 12:00:00",
+    "snapshotTime": "2026/09/01 05:00:00",
+    "snapshotTimeUTC": "2026-09-01T03:00:00",
     "openPrice": {
-      "bid": 0.8059200048446655,
-      "ask": 0.8059200048446655,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8061400055885315,
-      "ask": 0.8061400055885315,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8029199838638306,
-      "ask": 0.8029199838638306,
+      "bid": 0.80928,
+      "ask": 0.80943,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8039799928665161,
-      "ask": 0.8039799928665161,
+      "bid": 0.80925,
+      "ask": 0.8094,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80995,
+      "ask": 0.81016,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80908,
+      "ask": 0.80923,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9468
   },
   {
-    "snapshotTime": "2026/08/27 16:00:00",
+    "snapshotTime": "2026/09/01 09:00:00",
+    "snapshotTimeUTC": "2026-09-01T07:00:00",
     "openPrice": {
-      "bid": 0.8039799928665161,
-      "ask": 0.8039799928665161,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8044000267982483,
-      "ask": 0.8044000267982483,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8033400177955627,
-      "ask": 0.8033400177955627,
+      "bid": 0.80926,
+      "ask": 0.80941,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8042700290679932,
-      "ask": 0.8042700290679932,
+      "bid": 0.81005,
+      "ask": 0.8102,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81082,
+      "ask": 0.81097,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80906,
+      "ask": 0.80921,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5651
   },
   {
-    "snapshotTime": "2026/08/27 20:00:00",
+    "snapshotTime": "2026/09/01 13:00:00",
+    "snapshotTimeUTC": "2026-09-01T11:00:00",
     "openPrice": {
-      "bid": 0.8042500019073486,
-      "ask": 0.8042500019073486,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8045200109481812,
-      "ask": 0.8045200109481812,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8027399778366089,
-      "ask": 0.8027399778366089,
+      "bid": 0.81006,
+      "ask": 0.81021,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8030099868774414,
-      "ask": 0.8030099868774414,
+      "bid": 0.81203,
+      "ask": 0.81218,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81214,
+      "ask": 0.81229,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80944,
+      "ask": 0.80959,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 8500
   },
   {
-    "snapshotTime": "2026/08/28 00:00:00",
+    "snapshotTime": "2026/09/01 17:00:00",
+    "snapshotTimeUTC": "2026-09-01T15:00:00",
     "openPrice": {
-      "bid": 0.8037400245666504,
-      "ask": 0.8037400245666504,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8044400215148926,
-      "ask": 0.8044400215148926,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8028900027275085,
-      "ask": 0.8028900027275085,
+      "bid": 0.812,
+      "ask": 0.81215,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8044099807739258,
-      "ask": 0.8044099807739258,
+      "bid": 0.81177,
+      "ask": 0.81192,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81246,
+      "ask": 0.81261,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81122,
+      "ask": 0.81137,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 8967
   },
   {
-    "snapshotTime": "2026/08/28 04:00:00",
+    "snapshotTime": "2026/09/01 21:00:00",
+    "snapshotTimeUTC": "2026-09-01T19:00:00",
     "openPrice": {
-      "bid": 0.804390013217926,
-      "ask": 0.804390013217926,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8052999973297119,
-      "ask": 0.8052999973297119,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8041899800300598,
-      "ask": 0.8041899800300598,
+      "bid": 0.81176,
+      "ask": 0.81191,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8051400184631348,
-      "ask": 0.8051400184631348,
+      "bid": 0.81159,
+      "ask": 0.81183,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81194,
+      "ask": 0.81259,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81074,
+      "ask": 0.81143,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5494
   },
   {
-    "snapshotTime": "2026/08/28 08:00:00",
+    "snapshotTime": "2026/09/02 01:00:00",
+    "snapshotTimeUTC": "2026-09-01T23:00:00",
     "openPrice": {
-      "bid": 0.8051300048828125,
-      "ask": 0.8051300048828125,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8053399920463562,
-      "ask": 0.8053399920463562,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8036900162696838,
-      "ask": 0.8036900162696838,
+      "bid": 0.81158,
+      "ask": 0.81182,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8041499853134155,
-      "ask": 0.8041499853134155,
+      "bid": 0.81258,
+      "ask": 0.81273,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81336,
+      "ask": 0.8136,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81138,
+      "ask": 0.81162,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 7253
   },
   {
-    "snapshotTime": "2026/08/28 12:00:00",
+    "snapshotTime": "2026/09/02 05:00:00",
+    "snapshotTimeUTC": "2026-09-02T03:00:00",
     "openPrice": {
-      "bid": 0.8041099905967712,
-      "ask": 0.8041099905967712,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8048200011253357,
-      "ask": 0.8048200011253357,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8031700253486633,
-      "ask": 0.8031700253486633,
+      "bid": 0.81257,
+      "ask": 0.81272,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8045700192451477,
-      "ask": 0.8045700192451477,
+      "bid": 0.81324,
+      "ask": 0.81339,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81346,
+      "ask": 0.81365,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.8119,
+      "ask": 0.81214,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 11017
   },
   {
-    "snapshotTime": "2026/08/28 16:00:00",
+    "snapshotTime": "2026/09/02 09:00:00",
+    "snapshotTimeUTC": "2026-09-02T07:00:00",
     "openPrice": {
-      "bid": 0.8046799898147583,
-      "ask": 0.8046799898147583,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8097500205039978,
-      "ask": 0.8097500205039978,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8024100065231323,
-      "ask": 0.8024100065231323,
+      "bid": 0.81321,
+      "ask": 0.81336,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8096200227737427,
-      "ask": 0.8096200227737427,
+      "bid": 0.81497,
+      "ask": 0.81512,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81563,
+      "ask": 0.81578,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81275,
+      "ask": 0.8129,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9837
   },
   {
-    "snapshotTime": "2026/08/28 20:00:00",
+    "snapshotTime": "2026/09/02 13:00:00",
+    "snapshotTimeUTC": "2026-09-02T11:00:00",
     "openPrice": {
-      "bid": 0.8096200227737427,
-      "ask": 0.8096200227737427,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8098400235176086,
-      "ask": 0.8098400235176086,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8088600039482117,
-      "ask": 0.8088600039482117,
+      "bid": 0.815,
+      "ask": 0.81515,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8093000054359436,
-      "ask": 0.8093000054359436,
+      "bid": 0.81286,
+      "ask": 0.81301,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81531,
+      "ask": 0.81546,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81156,
+      "ask": 0.81172,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 12009
   },
   {
-    "snapshotTime": "2026/08/31 00:00:00",
+    "snapshotTime": "2026/09/02 17:00:00",
+    "snapshotTimeUTC": "2026-09-02T15:00:00",
     "openPrice": {
-      "bid": 0.8091800212860107,
-      "ask": 0.8091800212860107,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8094000220298767,
-      "ask": 0.8094000220298767,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8083099722862244,
-      "ask": 0.8083099722862244,
+      "bid": 0.81287,
+      "ask": 0.81302,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8085299730300903,
-      "ask": 0.8085299730300903,
+      "bid": 0.81328,
+      "ask": 0.81343,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81347,
+      "ask": 0.81362,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81239,
+      "ask": 0.81254,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9481
   },
   {
-    "snapshotTime": "2026/08/31 04:00:00",
+    "snapshotTime": "2026/09/02 21:00:00",
+    "snapshotTimeUTC": "2026-09-02T19:00:00",
     "openPrice": {
-      "bid": 0.8085299730300903,
-      "ask": 0.8085299730300903,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8096100091934204,
-      "ask": 0.8096100091934204,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8082200288772583,
-      "ask": 0.8082200288772583,
+      "bid": 0.8133,
+      "ask": 0.81345,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8091999888420105,
-      "ask": 0.8091999888420105,
+      "bid": 0.81284,
+      "ask": 0.81308,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81339,
+      "ask": 0.81426,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81148,
+      "ask": 0.81263,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5558
   },
   {
-    "snapshotTime": "2026/08/31 08:00:00",
+    "snapshotTime": "2026/09/03 01:00:00",
+    "snapshotTimeUTC": "2026-09-02T23:00:00",
     "openPrice": {
-      "bid": 0.8092399835586548,
-      "ask": 0.8092399835586548,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8096399903297424,
-      "ask": 0.8096399903297424,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.807449996471405,
-      "ask": 0.807449996471405,
+      "bid": 0.81285,
+      "ask": 0.81309,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8084800243377686,
-      "ask": 0.8084800243377686,
+      "bid": 0.81225,
+      "ask": 0.8124,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81314,
+      "ask": 0.81338,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81188,
+      "ask": 0.81203,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 8224
   },
   {
-    "snapshotTime": "2026/08/31 12:00:00",
+    "snapshotTime": "2026/09/03 05:00:00",
+    "snapshotTimeUTC": "2026-09-03T03:00:00",
     "openPrice": {
-      "bid": 0.8084800243377686,
-      "ask": 0.8084800243377686,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8090599775314331,
-      "ask": 0.8090599775314331,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8079900145530701,
-      "ask": 0.8079900145530701,
+      "bid": 0.81224,
+      "ask": 0.81239,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8082200288772583,
-      "ask": 0.8082200288772583,
+      "bid": 0.80977,
+      "ask": 0.81001,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81229,
+      "ask": 0.81244,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80835,
+      "ask": 0.8085,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 12169
   },
   {
-    "snapshotTime": "2026/08/31 16:00:00",
+    "snapshotTime": "2026/09/03 09:00:00",
+    "snapshotTimeUTC": "2026-09-03T07:00:00",
     "openPrice": {
-      "bid": 0.8082500100135803,
-      "ask": 0.8082500100135803,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8087800145149231,
-      "ask": 0.8087800145149231,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8068299889564514,
-      "ask": 0.8068299889564514,
+      "bid": 0.80979,
+      "ask": 0.81003,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8080599904060364,
-      "ask": 0.8080599904060364,
+      "bid": 0.80918,
+      "ask": 0.80933,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81002,
+      "ask": 0.81017,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.8083,
+      "ask": 0.80845,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 12953
   },
   {
-    "snapshotTime": "2026/08/31 20:00:00",
+    "snapshotTime": "2026/09/03 13:00:00",
+    "snapshotTimeUTC": "2026-09-03T11:00:00",
     "openPrice": {
-      "bid": 0.8080499768257141,
-      "ask": 0.8080499768257141,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8085500001907349,
-      "ask": 0.8085500001907349,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8065999746322632,
-      "ask": 0.8065999746322632,
+      "bid": 0.80917,
+      "ask": 0.80932,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8079299926757812,
-      "ask": 0.8079299926757812,
+      "bid": 0.80874,
+      "ask": 0.80889,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80963,
+      "ask": 0.80978,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80618,
+      "ask": 0.80633,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 13970
   },
   {
-    "snapshotTime": "2026/09/01 00:00:00",
+    "snapshotTime": "2026/09/03 17:00:00",
+    "snapshotTimeUTC": "2026-09-03T15:00:00",
     "openPrice": {
-      "bid": 0.8079699873924255,
-      "ask": 0.8079699873924255,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8095300197601318,
-      "ask": 0.8095300197601318,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8078299760818481,
-      "ask": 0.8078299760818481,
+      "bid": 0.80873,
+      "ask": 0.80888,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8093100190162659,
-      "ask": 0.8093100190162659,
+      "bid": 0.80673,
+      "ask": 0.80688,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80885,
+      "ask": 0.809,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80517,
+      "ask": 0.80532,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 10382
   },
   {
-    "snapshotTime": "2026/09/01 04:00:00",
+    "snapshotTime": "2026/09/03 21:00:00",
+    "snapshotTimeUTC": "2026-09-03T19:00:00",
     "openPrice": {
-      "bid": 0.8093100190162659,
-      "ask": 0.8093100190162659,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8100000023841858,
-      "ask": 0.8100000023841858,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8090599775314331,
-      "ask": 0.8090599775314331,
+      "bid": 0.80675,
+      "ask": 0.8069,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8093199729919434,
-      "ask": 0.8093199729919434,
+      "bid": 0.80791,
+      "ask": 0.80815,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80793,
+      "ask": 0.80838,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80668,
+      "ask": 0.80683,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5220
   },
   {
-    "snapshotTime": "2026/09/01 08:00:00",
+    "snapshotTime": "2026/09/04 01:00:00",
+    "snapshotTimeUTC": "2026-09-03T23:00:00",
     "openPrice": {
-      "bid": 0.8093199729919434,
-      "ask": 0.8093199729919434,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8108999729156494,
-      "ask": 0.8108999729156494,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8091199994087219,
-      "ask": 0.8091199994087219,
+      "bid": 0.8079,
+      "ask": 0.80814,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8098499774932861,
-      "ask": 0.8098499774932861,
+      "bid": 0.80781,
+      "ask": 0.80805,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80799,
+      "ask": 0.80818,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80722,
+      "ask": 0.80739,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 7494
   },
   {
-    "snapshotTime": "2026/09/01 12:00:00",
+    "snapshotTime": "2026/09/04 05:00:00",
+    "snapshotTimeUTC": "2026-09-04T03:00:00",
     "openPrice": {
-      "bid": 0.8098499774932861,
-      "ask": 0.8098499774932861,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8106200098991394,
-      "ask": 0.8106200098991394,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8094499707221985,
-      "ask": 0.8094499707221985,
+      "bid": 0.80782,
+      "ask": 0.80806,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8098000288009644,
-      "ask": 0.8098000288009644,
+      "bid": 0.80789,
+      "ask": 0.80804,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80837,
+      "ask": 0.80852,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80728,
+      "ask": 0.80743,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 10305
   },
   {
-    "snapshotTime": "2026/09/01 16:00:00",
+    "snapshotTime": "2026/09/04 09:00:00",
+    "snapshotTimeUTC": "2026-09-04T07:00:00",
     "openPrice": {
-      "bid": 0.8097699880599976,
-      "ask": 0.8097699880599976,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8125,
-      "ask": 0.8125,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8095499873161316,
-      "ask": 0.8095499873161316,
+      "bid": 0.8079,
+      "ask": 0.80805,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8122599720954895,
-      "ask": 0.8122599720954895,
+      "bid": 0.80916,
+      "ask": 0.80931,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80958,
+      "ask": 0.80973,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80779,
+      "ask": 0.80794,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 8199
   },
   {
-    "snapshotTime": "2026/09/01 20:00:00",
+    "snapshotTime": "2026/09/04 13:00:00",
+    "snapshotTimeUTC": "2026-09-04T11:00:00",
     "openPrice": {
-      "bid": 0.8122299909591675,
-      "ask": 0.8122299909591675,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8123000264167786,
-      "ask": 0.8123000264167786,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8105999827384949,
-      "ask": 0.8105999827384949,
+      "bid": 0.80914,
+      "ask": 0.80929,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8112900257110596,
-      "ask": 0.8112900257110596,
+      "bid": 0.81008,
+      "ask": 0.81023,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81255,
+      "ask": 0.8127,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80785,
+      "ask": 0.80834,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 14232
   },
   {
-    "snapshotTime": "2026/09/02 00:00:00",
+    "snapshotTime": "2026/09/04 17:00:00",
+    "snapshotTimeUTC": "2026-09-04T15:00:00",
     "openPrice": {
-      "bid": 0.8111199736595154,
-      "ask": 0.8111199736595154,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8131999969482422,
-      "ask": 0.8131999969482422,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8106200098991394,
-      "ask": 0.8106200098991394,
+      "bid": 0.81006,
+      "ask": 0.81021,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8128700256347656,
-      "ask": 0.8128700256347656,
+      "bid": 0.81023,
+      "ask": 0.81038,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81035,
+      "ask": 0.8105,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80888,
+      "ask": 0.80903,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 6480
   },
   {
-    "snapshotTime": "2026/09/02 04:00:00",
+    "snapshotTime": "2026/09/04 21:00:00",
+    "snapshotTimeUTC": "2026-09-04T19:00:00",
     "openPrice": {
-      "bid": 0.8128700256347656,
-      "ask": 0.8128700256347656,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.813510000705719,
-      "ask": 0.813510000705719,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8124099969863892,
-      "ask": 0.8124099969863892,
+      "bid": 0.81022,
+      "ask": 0.81037,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8128200173377991,
-      "ask": 0.8128200173377991,
+      "bid": 0.80969,
+      "ask": 0.81067,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81023,
+      "ask": 0.81069,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80953,
+      "ask": 0.80968,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 1643
   },
   {
-    "snapshotTime": "2026/09/02 08:00:00",
+    "snapshotTime": "2026/09/06 21:00:00",
+    "snapshotTimeUTC": "2026-09-06T19:00:00",
     "openPrice": {
-      "bid": 0.8128200173377991,
-      "ask": 0.8128200173377991,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8151299953460693,
-      "ask": 0.8151299953460693,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8121100068092346,
-      "ask": 0.8121100068092346,
+      "bid": 0.80942,
+      "ask": 0.81052,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8150799870491028,
-      "ask": 0.8150799870491028,
+      "bid": 0.80987,
+      "ask": 0.81002,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81018,
+      "ask": 0.81102,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80933,
+      "ask": 0.81002,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 307
   },
   {
-    "snapshotTime": "2026/09/02 12:00:00",
+    "snapshotTime": "2026/09/07 01:00:00",
+    "snapshotTimeUTC": "2026-09-06T23:00:00",
     "openPrice": {
-      "bid": 0.8150500059127808,
-      "ask": 0.8150500059127808,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8156700134277344,
-      "ask": 0.8156700134277344,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8116199970245361,
-      "ask": 0.8116199970245361,
+      "bid": 0.80989,
+      "ask": 0.81004,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8117499947547913,
-      "ask": 0.8117499947547913,
+      "bid": 0.81075,
+      "ask": 0.8109,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81093,
+      "ask": 0.81113,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80923,
+      "ask": 0.80946,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 3336
   },
   {
-    "snapshotTime": "2026/09/02 16:00:00",
+    "snapshotTime": "2026/09/07 05:00:00",
+    "snapshotTimeUTC": "2026-09-07T03:00:00",
     "openPrice": {
-      "bid": 0.8117499947547913,
-      "ask": 0.8117499947547913,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8135700225830078,
-      "ask": 0.8135700225830078,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8117499947547913,
-      "ask": 0.8117499947547913,
+      "bid": 0.81073,
+      "ask": 0.81088,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8132799863815308,
-      "ask": 0.8132799863815308,
+      "bid": 0.81025,
+      "ask": 0.8104,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81083,
+      "ask": 0.81099,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80981,
+      "ask": 0.80996,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9567
   },
   {
-    "snapshotTime": "2026/09/02 20:00:00",
+    "snapshotTime": "2026/09/07 09:00:00",
+    "snapshotTimeUTC": "2026-09-07T07:00:00",
     "openPrice": {
-      "bid": 0.8132699728012085,
-      "ask": 0.8132699728012085,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8134999871253967,
-      "ask": 0.8134999871253967,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8113999962806702,
-      "ask": 0.8113999962806702,
+      "bid": 0.81024,
+      "ask": 0.81039,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8123999834060669,
-      "ask": 0.8123999834060669,
+      "bid": 0.80872,
+      "ask": 0.80887,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81075,
+      "ask": 0.81091,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80838,
+      "ask": 0.80853,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 6807
   },
   {
-    "snapshotTime": "2026/09/03 00:00:00",
+    "snapshotTime": "2026/09/07 13:00:00",
+    "snapshotTimeUTC": "2026-09-07T11:00:00",
     "openPrice": {
-      "bid": 0.8123999834060669,
-      "ask": 0.8123999834060669,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8131300210952759,
-      "ask": 0.8131300210952759,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8121799826622009,
-      "ask": 0.8121799826622009,
+      "bid": 0.80871,
+      "ask": 0.80886,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8128700256347656,
-      "ask": 0.8128700256347656,
+      "bid": 0.8089,
+      "ask": 0.80905,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80949,
+      "ask": 0.80964,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80848,
+      "ask": 0.80863,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5227
   },
   {
-    "snapshotTime": "2026/09/03 04:00:00",
+    "snapshotTime": "2026/09/07 17:00:00",
+    "snapshotTimeUTC": "2026-09-07T15:00:00",
     "openPrice": {
-      "bid": 0.8128700256347656,
-      "ask": 0.8128700256347656,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8129299879074097,
-      "ask": 0.8129299879074097,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.811020016670227,
-      "ask": 0.811020016670227,
+      "bid": 0.80888,
+      "ask": 0.80903,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8113399744033813,
-      "ask": 0.8113399744033813,
+      "bid": 0.80941,
+      "ask": 0.80956,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80948,
+      "ask": 0.80963,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80861,
+      "ask": 0.80876,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 2681
   },
   {
-    "snapshotTime": "2026/09/03 08:00:00",
+    "snapshotTime": "2026/09/07 21:00:00",
+    "snapshotTimeUTC": "2026-09-07T19:00:00",
     "openPrice": {
-      "bid": 0.8113399744033813,
-      "ask": 0.8113399744033813,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8115000128746033,
-      "ask": 0.8115000128746033,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8083099722862244,
-      "ask": 0.8083099722862244,
+      "bid": 0.80943,
+      "ask": 0.80958,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8094300031661987,
-      "ask": 0.8094300031661987,
+      "bid": 0.80924,
+      "ask": 0.80948,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.8096,
+      "ask": 0.81034,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80867,
+      "ask": 0.80942,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 1113
   },
   {
-    "snapshotTime": "2026/09/03 12:00:00",
+    "snapshotTime": "2026/09/08 01:00:00",
+    "snapshotTimeUTC": "2026-09-07T23:00:00",
     "openPrice": {
-      "bid": 0.8094599843025208,
-      "ask": 0.8094599843025208,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8098499774932861,
-      "ask": 0.8098499774932861,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8061500191688538,
-      "ask": 0.8061500191688538,
+      "bid": 0.80923,
+      "ask": 0.80947,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8070700168609619,
-      "ask": 0.8070700168609619,
+      "bid": 0.80933,
+      "ask": 0.80948,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80935,
+      "ask": 0.80955,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80816,
+      "ask": 0.80831,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5718
   },
   {
-    "snapshotTime": "2026/09/03 16:00:00",
+    "snapshotTime": "2026/09/08 05:00:00",
+    "snapshotTimeUTC": "2026-09-08T03:00:00",
     "openPrice": {
-      "bid": 0.8070999979972839,
-      "ask": 0.8070999979972839,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8096399903297424,
-      "ask": 0.8096399903297424,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8051699995994568,
-      "ask": 0.8051699995994568,
+      "bid": 0.80934,
+      "ask": 0.80949,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8066499829292297,
-      "ask": 0.8066499829292297,
+      "bid": 0.81001,
+      "ask": 0.81016,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81001,
+      "ask": 0.81016,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80763,
+      "ask": 0.80778,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 12009
   },
   {
-    "snapshotTime": "2026/09/03 20:00:00",
+    "snapshotTime": "2026/09/08 09:00:00",
+    "snapshotTimeUTC": "2026-09-08T07:00:00",
     "openPrice": {
-      "bid": 0.8066499829292297,
-      "ask": 0.8066499829292297,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8077399730682373,
-      "ask": 0.8077399730682373,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8055999875068665,
-      "ask": 0.8055999875068665,
+      "bid": 0.80997,
+      "ask": 0.81012,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8063600063323975,
-      "ask": 0.8063600063323975,
+      "bid": 0.81168,
+      "ask": 0.81183,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81204,
+      "ask": 0.81219,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80979,
+      "ask": 0.80994,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 7466
   },
   {
-    "snapshotTime": "2026/09/04 00:00:00",
+    "snapshotTime": "2026/09/08 13:00:00",
+    "snapshotTimeUTC": "2026-09-08T11:00:00",
     "openPrice": {
-      "bid": 0.8063600063323975,
-      "ask": 0.8063600063323975,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8080400228500366,
-      "ask": 0.8080400228500366,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8063200116157532,
-      "ask": 0.8063200116157532,
+      "bid": 0.81165,
+      "ask": 0.8118,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8076900243759155,
-      "ask": 0.8076900243759155,
+      "bid": 0.80834,
+      "ask": 0.80849,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.812,
+      "ask": 0.81215,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80807,
+      "ask": 0.80822,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 28664
   },
   {
-    "snapshotTime": "2026/09/04 04:00:00",
+    "snapshotTime": "2026/09/08 17:00:00",
+    "snapshotTimeUTC": "2026-09-08T15:00:00",
     "openPrice": {
-      "bid": 0.807669997215271,
-      "ask": 0.807669997215271,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8084999918937683,
-      "ask": 0.8084999918937683,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8073499798774719,
-      "ask": 0.8073499798774719,
+      "bid": 0.80835,
+      "ask": 0.8085,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8077499866485596,
-      "ask": 0.8077499866485596,
+      "bid": 0.80899,
+      "ask": 0.80914,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80971,
+      "ask": 0.80986,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80801,
+      "ask": 0.80816,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5788
   },
   {
-    "snapshotTime": "2026/09/04 08:00:00",
+    "snapshotTime": "2026/09/08 21:00:00",
+    "snapshotTimeUTC": "2026-09-08T19:00:00",
     "openPrice": {
-      "bid": 0.8077499866485596,
-      "ask": 0.8077499866485596,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.809660017490387,
-      "ask": 0.809660017490387,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8073700070381165,
-      "ask": 0.8073700070381165,
+      "bid": 0.809,
+      "ask": 0.80915,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8095999956130981,
-      "ask": 0.8095999956130981,
+      "bid": 0.80931,
+      "ask": 0.80955,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.8098,
+      "ask": 0.81011,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80858,
+      "ask": 0.80893,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 3835
   },
   {
-    "snapshotTime": "2026/09/04 12:00:00",
+    "snapshotTime": "2026/09/09 01:00:00",
+    "snapshotTimeUTC": "2026-09-08T23:00:00",
     "openPrice": {
-      "bid": 0.8095999956130981,
-      "ask": 0.8095999956130981,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8126400113105774,
-      "ask": 0.8126400113105774,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8079800009727478,
-      "ask": 0.8079800009727478,
+      "bid": 0.80932,
+      "ask": 0.80956,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.810259997844696,
-      "ask": 0.810259997844696,
+      "bid": 0.80915,
+      "ask": 0.8093,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80953,
+      "ask": 0.80977,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80844,
+      "ask": 0.80868,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 7313
   },
   {
-    "snapshotTime": "2026/09/04 16:00:00",
+    "snapshotTime": "2026/09/09 05:00:00",
+    "snapshotTimeUTC": "2026-09-09T03:00:00",
     "openPrice": {
-      "bid": 0.8102800250053406,
-      "ask": 0.8102800250053406,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8108999729156494,
-      "ask": 0.8108999729156494,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8089699745178223,
-      "ask": 0.8089699745178223,
+      "bid": 0.80916,
+      "ask": 0.80931,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8100100159645081,
-      "ask": 0.8100100159645081,
+      "bid": 0.80825,
+      "ask": 0.8084,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80927,
+      "ask": 0.80942,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80765,
+      "ask": 0.8078,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9716
   },
   {
-    "snapshotTime": "2026/09/04 20:00:00",
+    "snapshotTime": "2026/09/09 09:00:00",
+    "snapshotTimeUTC": "2026-09-09T07:00:00",
     "openPrice": {
-      "bid": 0.8100100159645081,
-      "ask": 0.8100100159645081,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8103700280189514,
-      "ask": 0.8103700280189514,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8090000152587891,
-      "ask": 0.8090000152587891,
+      "bid": 0.80821,
+      "ask": 0.80836,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8090000152587891,
-      "ask": 0.8090000152587891,
+      "bid": 0.80934,
+      "ask": 0.80949,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81064,
+      "ask": 0.81079,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80776,
+      "ask": 0.80791,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9259
   },
   {
-    "snapshotTime": "2026/09/07 00:00:00",
+    "snapshotTime": "2026/09/09 13:00:00",
+    "snapshotTimeUTC": "2026-09-09T11:00:00",
     "openPrice": {
-      "bid": 0.8099799752235413,
-      "ask": 0.8099799752235413,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8103299736976624,
-      "ask": 0.8103299736976624,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8093900084495544,
-      "ask": 0.8093900084495544,
+      "bid": 0.80935,
+      "ask": 0.8095,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8102499842643738,
-      "ask": 0.8102499842643738,
+      "bid": 0.80761,
+      "ask": 0.80776,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.80936,
+      "ask": 0.80951,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80663,
+      "ask": 0.80678,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9544
   },
   {
-    "snapshotTime": "2026/09/07 04:00:00",
+    "snapshotTime": "2026/09/09 17:00:00",
+    "snapshotTimeUTC": "2026-09-09T15:00:00",
     "openPrice": {
-      "bid": 0.8102499842643738,
-      "ask": 0.8102499842643738,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8109999895095825,
-      "ask": 0.8109999895095825,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8101900219917297,
-      "ask": 0.8101900219917297,
+      "bid": 0.8076,
+      "ask": 0.80775,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8103799819946289,
-      "ask": 0.8103799819946289,
+      "bid": 0.81029,
+      "ask": 0.81044,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81094,
+      "ask": 0.81109,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80725,
+      "ask": 0.8074,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 11778
   },
   {
-    "snapshotTime": "2026/09/07 08:00:00",
+    "snapshotTime": "2026/09/09 21:00:00",
+    "snapshotTimeUTC": "2026-09-09T19:00:00",
     "openPrice": {
-      "bid": 0.8103700280189514,
-      "ask": 0.8103700280189514,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8109099864959717,
-      "ask": 0.8109099864959717,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.808430016040802,
-      "ask": 0.808430016040802,
+      "bid": 0.81028,
+      "ask": 0.81043,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8089600205421448,
-      "ask": 0.8089600205421448,
+      "bid": 0.80942,
+      "ask": 0.80966,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81063,
+      "ask": 0.81079,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80918,
+      "ask": 0.80957,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 5168
   },
   {
-    "snapshotTime": "2026/09/07 12:00:00",
+    "snapshotTime": "2026/09/10 01:00:00",
+    "snapshotTimeUTC": "2026-09-09T23:00:00",
     "openPrice": {
-      "bid": 0.8089600205421448,
-      "ask": 0.8089600205421448,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8095600008964539,
-      "ask": 0.8095600008964539,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8084200024604797,
-      "ask": 0.8084200024604797,
+      "bid": 0.8094,
+      "ask": 0.80964,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8087999820709229,
-      "ask": 0.8087999820709229,
+      "bid": 0.80882,
+      "ask": 0.80897,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81033,
+      "ask": 0.81054,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.8086,
+      "ask": 0.80875,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 7085
   },
   {
-    "snapshotTime": "2026/09/07 16:00:00",
+    "snapshotTime": "2026/09/10 05:00:00",
+    "snapshotTimeUTC": "2026-09-10T03:00:00",
     "openPrice": {
-      "bid": 0.8088200092315674,
-      "ask": 0.8088200092315674,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8094000220298767,
-      "ask": 0.8094000220298767,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8084800243377686,
-      "ask": 0.8084800243377686,
+      "bid": 0.8088,
+      "ask": 0.80895,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8093199729919434,
-      "ask": 0.8093199729919434,
+      "bid": 0.80876,
+      "ask": 0.80891,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.8092,
+      "ask": 0.80935,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.8083,
+      "ask": 0.80845,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9824
   },
   {
-    "snapshotTime": "2026/09/07 20:00:00",
+    "snapshotTime": "2026/09/10 09:00:00",
+    "snapshotTimeUTC": "2026-09-10T07:00:00",
     "openPrice": {
-      "bid": 0.8092799782752991,
-      "ask": 0.8092799782752991,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8096399903297424,
-      "ask": 0.8096399903297424,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8083500266075134,
-      "ask": 0.8083500266075134,
+      "bid": 0.80877,
+      "ask": 0.80892,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8090999722480774,
-      "ask": 0.8090999722480774,
+      "bid": 0.81115,
+      "ask": 0.8113,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81155,
+      "ask": 0.8117,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.80872,
+      "ask": 0.80887,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 9145
   },
   {
-    "snapshotTime": "2026/09/08 00:00:00",
+    "snapshotTime": "2026/09/10 13:00:00",
+    "snapshotTimeUTC": "2026-09-10T11:00:00",
     "openPrice": {
-      "bid": 0.8090299963951111,
-      "ask": 0.8090299963951111,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8094199895858765,
-      "ask": 0.8094199895858765,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8084099888801575,
-      "ask": 0.8084099888801575,
+      "bid": 0.81114,
+      "ask": 0.81129,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8084099888801575,
-      "ask": 0.8084099888801575,
+      "bid": 0.81111,
+      "ask": 0.81126,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.8146,
+      "ask": 0.81475,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81103,
+      "ask": 0.81118,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 13992
   },
   {
-    "snapshotTime": "2026/09/08 04:00:00",
+    "snapshotTime": "2026/09/10 17:00:00",
+    "snapshotTimeUTC": "2026-09-10T15:00:00",
     "openPrice": {
-      "bid": 0.808430016040802,
-      "ask": 0.808430016040802,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8095999956130981,
-      "ask": 0.8095999956130981,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8082399964332581,
-      "ask": 0.8082399964332581,
+      "bid": 0.81113,
+      "ask": 0.81128,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8084200024604797,
-      "ask": 0.8084200024604797,
+      "bid": 0.81273,
+      "ask": 0.81288,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81318,
+      "ask": 0.81333,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81069,
+      "ask": 0.81084,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 11188
   },
   {
-    "snapshotTime": "2026/09/08 08:00:00",
+    "snapshotTime": "2026/09/10 21:00:00",
+    "snapshotTimeUTC": "2026-09-10T19:00:00",
     "openPrice": {
-      "bid": 0.808430016040802,
-      "ask": 0.808430016040802,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8120599985122681,
-      "ask": 0.8120599985122681,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8077099919319153,
-      "ask": 0.8077099919319153,
+      "bid": 0.81274,
+      "ask": 0.81289,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8111900091171265,
-      "ask": 0.8111900091171265,
+      "bid": 0.81299,
+      "ask": 0.81323,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81353,
+      "ask": 0.81403,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81223,
+      "ask": 0.81285,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 6234
   },
   {
-    "snapshotTime": "2026/09/08 12:00:00",
+    "snapshotTime": "2026/09/11 01:00:00",
+    "snapshotTimeUTC": "2026-09-10T23:00:00",
     "openPrice": {
-      "bid": 0.8111900091171265,
-      "ask": 0.8111900091171265,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 0.8119999766349792,
-      "ask": 0.8119999766349792,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 0.8103700280189514,
-      "ask": 0.8103700280189514,
+      "bid": 0.81297,
+      "ask": 0.81321,
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 0.8104599714279175,
-      "ask": 0.8104599714279175,
+      "bid": 0.813,
+      "ask": 0.81315,
       "lastTraded": null
-    }
+    },
+    "highPrice": {
+      "bid": 0.81308,
+      "ask": 0.81332,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 0.81272,
+      "ask": 0.81296,
+      "lastTraded": null
+    },
+    "lastTradedVolume": 336
   }
 ]
