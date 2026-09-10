@@ -72,6 +72,16 @@ config = dotenv_values(".env")
 DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
 ULTIMI_PREZZI_MERCATO = {}
 
+# --- TRACKER E COOLDOWN DEI TENTATIVI (REGOLA FERREA MAX 5 TENTATIVI) ---
+COOLDOWN_OPERAZIONI = {}
+
+def is_operazione_in_cooldown(tipo_op, id_chiave):
+    t_scadenza = COOLDOWN_OPERAZIONI.get((tipo_op, str(id_chiave)), 0)
+    return time.time() < t_scadenza
+
+def attiva_cooldown_operazione(tipo_op, id_chiave, durata_sec=300):
+    COOLDOWN_OPERAZIONI[(tipo_op, str(id_chiave))] = time.time() + durata_sec
+
 # --- GESTIONE NOTIFICHE PUSH (NTFY) ---
 def to_market_dir(d):
     if not d: return ""
@@ -614,7 +624,13 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
     if stop_lvl is not None:
         p["stopLevel"] = formatta_numero(stop_lvl, dec)
     
-    for tentativo in range(4): 
+    id_op = f"{nome_strumento}_{etichetta}_{direzione}"
+    if is_operazione_in_cooldown("ORDINE_MERCATO", id_op):
+        print_log(nome_strumento, f"⏳ [COOLDOWN] Operazione {etichetta} {direzione} temporaneamente sospesa dopo 5 fallimenti precedenti.")
+        return False, None, None
+
+    MAX_TENTATIVI = 5
+    for tentativo in range(1, MAX_TENTATIVI + 1): 
         try:
             r = ig_api_request('POST', f"{BASE_URL}/positions/otc", headers, payload=p, timeout=10, logger_func=print_log)
             if r and r.status_code == 200:
@@ -633,8 +649,9 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                             p.pop("stopLevel", None)
                             time.sleep(2)
                             continue
-                        print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
-                        time.sleep(20)
+                        if tentativo < MAX_TENTATIVI:
+                            print_log(nome_strumento, f"⏳ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Fallito. Pausa 10s...")
+                            time.sleep(10)
                         continue
                     if isinstance(confirm_data, dict):
                         if confirm_data.get("level") is not None:
@@ -663,18 +680,17 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                 return True, real_level, deal_id
 
             else:
-                if r.status_code == 403 and "exceeded-api-key" in r.text:
-                    print_log(nome_strumento, f"⏳ Rate Limit API (403). Pausa 30s...")
-                    time.sleep(30)
-                else:
-                    print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {r.text}")
-                    print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
-                    time.sleep(20)
+                msg_err = r.text if r else "Nessuna risposta"
+                if tentativo < MAX_TENTATIVI:
+                    print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Rifiuto API {etichetta} {direzione}: {msg_err}. Pausa 10s...")
+                    time.sleep(10)
         except Exception as e:
-            print_log(nome_strumento, f"⚠️ Eccezione Rete su {etichetta} {direzione}: {e}")
-            print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
-            time.sleep(20)
+            if tentativo < MAX_TENTATIVI:
+                print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Eccezione Rete {etichetta} {direzione}: {e}. Pausa 10s...")
+                time.sleep(10)
             
+    print_log(nome_strumento, f"🛑 [TENTATIVI (5)] 5 tentativi per invio ordine a mercato {etichetta} {direzione} non andati a buon fine. Operazione interrotta.")
+    attiva_cooldown_operazione("ORDINE_MERCATO", id_op, durata_sec=300)
     return False, None, None
 
 def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello, tipo, lim, stop, headers, dec, etichetta="[ORDINE]", prezzo_ref=None):
@@ -730,7 +746,13 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
     headers_req = headers.copy()
     headers_req["Version"] = "2"
     
-    for tentativo in range(4): 
+    id_op = f"{nome_strumento}_{etichetta}_{p.get('type')}_{direzione}"
+    if is_operazione_in_cooldown("ORDINE_PENDENTE", id_op):
+        print_log(nome_strumento, f"⏳ [COOLDOWN] Inserimento {etichetta} temporaneamente sospeso dopo 5 fallimenti precedenti.")
+        return False
+
+    MAX_TENTATIVI = 5
+    for tentativo in range(1, MAX_TENTATIVI + 1): 
         try:
             r = ig_api_request('POST', f"{BASE_URL}/workingorders/otc", headers_req, payload=p, timeout=10, logger_func=print_log)
             if r and r.status_code == 200:
@@ -741,7 +763,7 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
                         motivo_str = str(motivo).upper()
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {p['type']} {direzione}: {motivo}")
                         
-                        # Fallback 1: Rimuove TP/SL agganciati (se presenti) per superare vincoli di spread/distanza IG
+                        # Fallback 1: Rimuove TP/SL agganciati per superare vincoli IG
                         if ("ATTACHED" in motivo_str or "LEVEL_ERROR" in motivo_str or "DISTANCE" in motivo_str or "LIMIT_ORDER" in motivo_str or "STOP_ORDER" in motivo_str) and ("limitLevel" in p or "stopLevel" in p or "limitDistance" in p or "stopDistance" in p):
                             print_log(nome_strumento, f"🔄 Rimozione TP/SL agganciati per superare vincolo IG e ri-tentativo {etichetta} pulito...")
                             p.pop("limitLevel", None)
@@ -751,39 +773,39 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
                             time.sleep(2)
                             continue
                             
-                        # Fallback 2: Inversione tipo ordine (LIMIT <-> STOP) se rifiutato per tipo livello non corrispondente
+                        # Fallback 2: Inversione tipo ordine (LIMIT <-> STOP)
                         if "LEVEL_ERROR" in motivo_str or "TYPE" in motivo_str:
                             p["type"] = "STOP" if p["type"] == "LIMIT" else "LIMIT"
                             print_log(nome_strumento, f"🔄 Switch tipo ordine a {p['type']} per conformità prezzo IG e ri-tentativo...")
                             time.sleep(2)
                             continue
                             
-                        print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
-                        time.sleep(20)
+                        if tentativo < MAX_TENTATIVI:
+                            print_log(nome_strumento, f"⏳ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Fallito. Pausa 10s...")
+                            time.sleep(10)
                         continue
                 print_log(nome_strumento, f"✅ {etichetta} inserito con successo.")
                 return True
             else:
-                if r.status_code == 403 and "exceeded-api-key" in r.text:
-                    print_log(nome_strumento, f"⏳ Rate Limit API (403). Pausa 30s...")
-                    time.sleep(30)
-                else:
-                    print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {r.text}")
-                    err_txt = r.text.upper()
-                    if ("ATTACHED" in err_txt or "LEVEL" in err_txt) and ("limitLevel" in p or "stopLevel" in p):
-                        p.pop("limitLevel", None)
-                        p.pop("stopLevel", None)
-                        p.pop("limitDistance", None)
-                        p.pop("stopDistance", None)
-                        time.sleep(2)
-                        continue
-                    print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
-                    time.sleep(20)
+                msg_err = r.text if r else "Nessuna risposta"
+                err_txt = msg_err.upper()
+                if ("ATTACHED" in err_txt or "LEVEL" in err_txt) and ("limitLevel" in p or "stopLevel" in p):
+                    p.pop("limitLevel", None)
+                    p.pop("stopLevel", None)
+                    p.pop("limitDistance", None)
+                    p.pop("stopDistance", None)
+                    time.sleep(2)
+                    continue
+                if tentativo < MAX_TENTATIVI:
+                    print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Rifiuto API {etichetta} {direzione}: {msg_err}. Pausa 10s...")
+                    time.sleep(10)
         except Exception as e:
-            print_log(nome_strumento, f"⚠️ Eccezione Rete su {etichetta} {direzione}: {e}")
-            print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s per assestamento server...")
-            time.sleep(20)
+            if tentativo < MAX_TENTATIVI:
+                print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Eccezione Rete {etichetta} {direzione}: {e}. Pausa 10s...")
+                time.sleep(10)
             
+    print_log(nome_strumento, f"🛑 [TENTATIVI (5)] 5 tentativi per inserimento ordine pendente {etichetta} non andati a buon fine. Operazione interrotta.")
+    attiva_cooldown_operazione("ORDINE_PENDENTE", id_op, durata_sec=300)
     return False
     
 def chiudi_parziale(nome_strumento, dealId, epic, dir_chiusura, size, valuta, headers, etichetta="[POSIZIONE]"):
@@ -799,7 +821,12 @@ def chiudi_parziale(nome_strumento, dealId, epic, dir_chiusura, size, valuta, he
         "orderType": "MARKET"
     }
     
-    for tentativo in range(4):
+    id_op = f"DEAL_{dealId}"
+    if is_operazione_in_cooldown("CHIUSURA", id_op):
+        return False
+
+    MAX_TENTATIVI = 5
+    for tentativo in range(1, MAX_TENTATIVI + 1):
         try:
             r = ig_api_request('POST', f"{BASE_URL}/positions/otc", h, payload=p, timeout=10, logger_func=print_log)
             if r and r.status_code == 200: 
@@ -807,12 +834,16 @@ def chiudi_parziale(nome_strumento, dealId, epic, dir_chiusura, size, valuta, he
                 return True
             else:
                 msg_err = r.text if r else "Nessuna risposta"
-                print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {msg_err}")
-                time.sleep(2)
+                if tentativo < MAX_TENTATIVI:
+                    print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Errore Chiusura {etichetta} ({dealId}): {msg_err}")
+                    time.sleep(2)
         except Exception as e:
-            print_log(nome_strumento, f"⚠️ Eccezione su Chiusura {etichetta}: {e}")
-            time.sleep(2)
+            if tentativo < MAX_TENTATIVI:
+                print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Eccezione su Chiusura {etichetta}: {e}")
+                time.sleep(2)
             
+    print_log(nome_strumento, f"🛑 [TENTATIVI (5)] 5 tentativi per chiusura posizione {etichetta} ({dealId}) non andati a buon fine. Operazione interrotta per sicurezza.")
+    attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=600)
     return False
 
 def aggiorna_stop_posizione(deal_id, stop_level, headers):
@@ -976,9 +1007,16 @@ def esegui_motore():
         if DEV_MODE:
             print_log("SISTEMA", "🔧 [DEV MODE ATTIVA] - Connessione IG bypassata. Modalità offline.")
         else:
+            tentativi_login = 0
             while not verifica_token_ig(): 
-                print_log("SISTEMA", "❌ Accesso fallito. Riprovo tra 30 secondi...")
-                time.sleep(30)
+                tentativi_login += 1
+                if tentativi_login >= 5:
+                    msg_fail = "🛑 [TENTATIVI (5)] 5 tentativi di login IG non andati a buon fine. Arresto di sicurezza del Motore per evitare overflow chiamate."
+                    print_log("SISTEMA", msg_fail)
+                    invia_notifica(f"💀 ARRESTO SICUREZZA: {NOME_CONTO}", msg_fail, "skull")
+                    sys.exit(1)
+                print_log("SISTEMA", f"⚠️ [TENTATIVO {tentativi_login}/5] Accesso fallito. Riprovo tra 10 secondi...")
+                time.sleep(10)
                 
             print_log("SISTEMA", "✅ Connesso a IG con successo!")
 

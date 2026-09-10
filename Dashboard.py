@@ -3903,14 +3903,22 @@ else:
                 candele_lines = []
                 entrate_lines = []
                 chiusure_lines = []
+                tentativi_lines = []
                 varie_lines = []
 
                 for riga in reversed_lines:
                     r_up = riga.upper()
-                    # 1. Candele chiuse
+                    # 1. Tentativi ripetuti e falliti (problematiche API IG)
+                    if any(k in r_up for k in [
+                        "TENTATIV", "RETRY", "CIRCUIT BREAKER", "FALLIT", "NON ANDAT", 
+                        "RI-TENTATIV", "RATE LIMIT", "RIFIUTO API", "403", "BACKOFF", "ATTESA 20S"
+                    ]):
+                        tentativi_lines.append(riga)
+
+                    # 2. Candele chiuse
                     if "CANDELA" in r_up:
                         candele_lines.append(riga)
-                    # 2. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.)
+                    # 3. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.)
                     elif any(k in r_up for k in [
                         "CHIUSURA", "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
                         "FIFO INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE KJ",
@@ -3919,7 +3927,7 @@ else:
                         "PULIZIA [TICKET2]"
                     ]):
                         chiusure_lines.append(riga)
-                    # 3. Possibili entrate (segnali Radar e ordini di ingresso/restart/reverse)
+                    # 4. Possibili entrate (segnali Radar e ordini di ingresso/restart/reverse)
                     elif any(k in r_up for k in [
                         "POSSIBILE ENTRATA", "RADAR", "OPEN CORE", "OPEN INCR", 
                         "PRE-FLIGHT CHECK", "ENTRATA A MERCATO", "PIAZZAMENTO SAT1", 
@@ -3928,7 +3936,7 @@ else:
                         "REVERSE", "RESTART CORE", "RESTART LONG", "RESTART SHORT"
                     ]):
                         entrate_lines.append(riga)
-                    # 4. Varie (sistema, connessioni, rate limit, rollover, controlli tecnici)
+                    # 5. Varie (sistema, connessioni, rollover, controlli tecnici)
                     else:
                         varie_lines.append(riga)
 
@@ -3938,10 +3946,11 @@ else:
                     "🎯 Possibili entrate", 
                     "🛑 Chiusure", 
                     "📊 KJ55-TK21",
+                    "🔁 Tentativi (5)",
                     "⚙️ Varie"
                 ])
 
-                tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_kj, tab_sub_varie = sub_tabs
+                tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_kj, tab_sub_tentativi, tab_sub_varie = sub_tabs
 
                 components.html("""
                     <script>
@@ -4156,6 +4165,16 @@ else:
                             {contenuto_kj_box}
                         </div>
                     """, unsafe_allow_html=True)
+
+                with tab_sub_tentativi:
+                    tentativi_bloccati = [r for r in tentativi_lines if ("5 TENTATIVI" in r.upper() or "NON ANDATI A BUON FINE" in r.upper() or "CIRCUIT BREAKER" in r.upper() or "ARRESTO" in r.upper())]
+                    st.caption(f"Registro tentativi ripetuti e problematiche API IG (Regola ferrea: max 5 tentativi) — {len(tentativi_lines)} eventi")
+                    if tentativi_bloccati:
+                        st.error(f"🛑 Rilevate **{len(tentativi_bloccati)}** operazioni critiche che hanno raggiunto il limite massimo di 5 tentativi falliti e sono state interrotte per sicurezza.")
+                    render_terminal_box(
+                        tentativi_lines, 
+                        empty_msg="✅ Nessuna problematica di tentativi ripetuti o falliti: tutte le chiamate ad IG sono andate a buon fine entro i limiti di sicurezza."
+                    )
 
                 with tab_sub_varie:
                     st.caption(f"Eventi operativi e di sistema: {len(varie_lines)}")

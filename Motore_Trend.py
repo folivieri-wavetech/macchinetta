@@ -49,6 +49,17 @@ LIVE_OHLC_TRACKER = {}
 LOCAL_CANDELE_CACHE = {}
 LAST_RADAR_SCAN = 0
 
+# --- TRACKER E COOLDOWN DEI TENTATIVI (REGOLA FERREA MAX 5 TENTATIVI) ---
+COOLDOWN_OPERAZIONI = {}
+CANDLE_FAILURES = {}
+
+def is_operazione_in_cooldown(tipo_op, id_chiave):
+    t_scadenza = COOLDOWN_OPERAZIONI.get((tipo_op, str(id_chiave)), 0)
+    return time.time() < t_scadenza
+
+def attiva_cooldown_operazione(tipo_op, id_chiave, durata_sec=300):
+    COOLDOWN_OPERAZIONI[(tipo_op, str(id_chiave))] = time.time() + durata_sec
+
 if len(sys.argv) < 2:
     print("🚨 ERRORE: Devi specificare il nome della cartella del conto all'avvio!")
     sys.exit()
@@ -343,7 +354,13 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
     if limit_lvl is not None: p["limitLevel"] = formatta_numero(limit_lvl, dec)
     if stop_lvl is not None: p["stopLevel"] = formatta_numero(stop_lvl, dec)
     
-    for tentativo in range(3): 
+    id_op = f"{nome_strumento}_{etichetta}_{direzione}"
+    if is_operazione_in_cooldown("ORDINE_MERCATO", id_op):
+        print_log(nome_strumento, f"⏳ [COOLDOWN] Operazione {etichetta} {direzione} temporaneamente sospesa dopo 5 fallimenti precedenti.")
+        return False, None, None
+
+    MAX_TENTATIVI = 5
+    for tentativo in range(1, MAX_TENTATIVI + 1): 
         try:
             r = ig_api_request('POST', f"{BASE_URL}/positions/otc", headers, payload=p, timeout=10, logger_func=print_log)
             if r and r.status_code == 200:
@@ -354,7 +371,8 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                     accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
                     if not accettato:
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {direzione}: {confirm_data}")
-                        time.sleep(1.5)
+                        if tentativo < MAX_TENTATIVI:
+                            time.sleep(3.0)
                         continue
                     if isinstance(confirm_data, dict):
                         if confirm_data.get("level") is not None: real_level = float(confirm_data.get("level"))
@@ -377,22 +395,31 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                 return True, real_level, deal_id
             else:
                 resp_txt = r.text if r else "Nessuna risposta"
-                print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {resp_txt}")
+                if tentativo < MAX_TENTATIVI:
+                    print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Rifiuto API {etichetta} {direzione}: {resp_txt}")
+                    time.sleep(3.0)
         except Exception as e:
-            print_log(nome_strumento, f"⚠️ Eccezione Rete su {etichetta} {direzione}: {e}")
+            if tentativo < MAX_TENTATIVI:
+                print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Eccezione Rete su {etichetta} {direzione}: {e}")
+                time.sleep(3.0)
             
-        time.sleep(2.0)
-            
+    print_log(nome_strumento, f"🛑 [TENTATIVI (5)] 5 tentativi per invio ordine a mercato {etichetta} {direzione} non andati a buon fine. Operazione interrotta.")
+    attiva_cooldown_operazione("ORDINE_MERCATO", id_op, durata_sec=300)
     return False, None, None
 
 def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichetta="[POSIZIONE]"):
+    id_op = f"DEAL_{dealId}"
+    if is_operazione_in_cooldown("CHIUSURA", id_op):
+        return False
+
     h = headers.copy()
     h["Version"] = "1"
     h["_method"] = "DELETE"
     size_str = str(int(size)) if float(size).is_integer() else str(size)
     p = {"dealId": dealId, "direction": dir_chiusura, "size": size_str, "orderType": "MARKET"}
     
-    for tentativo in range(3):
+    MAX_TENTATIVI = 5
+    for tentativo in range(1, MAX_TENTATIVI + 1):
         try:
             r = ig_api_request('POST', f"{BASE_URL}/positions/otc", h, payload=p, timeout=10, logger_func=print_log)
             if r and r.status_code == 200:
@@ -404,7 +431,9 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
                         if "POSITION_NOT_FOUND" in reason or "deal-not-found" in reason:
                             print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): posizione già chiusa su IG.")
                             return True
-                        print_log(nome_strumento, f"⚠️ [IG REJECT] Chiusura {etichetta}: {confirm_data}")
+                        if tentativo < MAX_TENTATIVI:
+                            print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] [IG REJECT] Chiusura {etichetta}: {confirm_data}")
+                            time.sleep(2.0)
                     else:
                         print_log(nome_strumento, f"✅ Chiusura {etichetta} eseguita con successo.")
                         return True
@@ -416,12 +445,16 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
                 if r and r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt):
                     print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): già liquidata su IG.")
                     return True
-                print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {resp_txt}")
+                if tentativo < MAX_TENTATIVI:
+                    print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Errore Chiusura {etichetta} ({dealId}): {resp_txt}")
+                    time.sleep(2.0)
         except Exception as e:
-            print_log(nome_strumento, f"⚠️ Eccezione su Chiusura {etichetta}: {e}")
+            if tentativo < MAX_TENTATIVI:
+                print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Eccezione su Chiusura {etichetta}: {e}")
+                time.sleep(2.0)
             
-        time.sleep(2.0)
-            
+    print_log(nome_strumento, f"🛑 [TENTATIVI (5)] 5 tentativi per chiusura posizione {etichetta} ({dealId}) non andati a buon fine. Operazione interrotta per sicurezza.")
+    attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=600)
     return False
 
 def conta_posizioni_aperte_epic(epic, headers):
@@ -783,12 +816,17 @@ def scarica_candele(epic, timeframe, limit=60, headers=None):
         print_log("SISTEMA", f"🛑 CIRCUIT BREAKER ATTIVO: Quota residua dati storici IG ({rem_quota}) inferiore a 500. Chiamata bloccata a monte.")
         return "QUOTA_ESAURITA"
 
+    k_candle = (epic, timeframe)
+    if is_operazione_in_cooldown("CANDELE", f"{epic}_{timeframe}"):
+        return []
+
     h = headers.copy()
     h["Version"] = "3"
     url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
     try:
         r = ig_api_request("GET", url, headers=h, timeout=12, logger_func=print_log)
         if r is not None and r.status_code == 200:
+            CANDLE_FAILURES[k_candle] = 0
             dati = r.json()
             # Tracciamento ufficiale quota IG
             allowance = dati.get("allowance")
@@ -799,11 +837,23 @@ def scarica_candele(epic, timeframe, limit=60, headers=None):
             salva_quota_ig({"remainingAllowance": 0, "status": "QUOTA_ESAURITA"})
             return "QUOTA_ESAURITA"
         else:
-            if r is not None:
-                print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
+            CANDLE_FAILURES[k_candle] = CANDLE_FAILURES.get(k_candle, 0) + 1
+            if CANDLE_FAILURES[k_candle] >= 5:
+                print_log("SISTEMA", f"🛑 [TENTATIVI (5)] 5 tentativi per download candele {epic} ({timeframe}) non andati a buon fine. Pausa 15 minuti.")
+                attiva_cooldown_operazione("CANDELE", f"{epic}_{timeframe}", durata_sec=900)
+                CANDLE_FAILURES[k_candle] = 0
+            else:
+                if r is not None:
+                    print_log("SISTEMA", f"⚠️ [TENTATIVO {CANDLE_FAILURES[k_candle]}/5] Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
             return []
     except Exception as e:
-        print_log("SISTEMA", f"Errore fetching prezzi {epic}: {e}")
+        CANDLE_FAILURES[k_candle] = CANDLE_FAILURES.get(k_candle, 0) + 1
+        if CANDLE_FAILURES[k_candle] >= 5:
+            print_log("SISTEMA", f"🛑 [TENTATIVI (5)] 5 tentativi per download candele {epic} ({timeframe}) non andati a buon fine. Pausa 15 minuti.")
+            attiva_cooldown_operazione("CANDELE", f"{epic}_{timeframe}", durata_sec=900)
+            CANDLE_FAILURES[k_candle] = 0
+        else:
+            print_log("SISTEMA", f"⚠️ [TENTATIVO {CANDLE_FAILURES[k_candle]}/5] Errore fetching prezzi {epic}: {e}")
         return []
 
 def aggiorna_memoria(nome, update_dict):
