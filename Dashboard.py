@@ -43,7 +43,7 @@ CONFIG_STRUMENTI = {
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220},
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400},
-    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 300}
+    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 900}
 }
 
 
