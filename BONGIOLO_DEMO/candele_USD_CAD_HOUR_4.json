@@ -1483,13 +1483,13 @@
       "lastTraded": null
     },
     "closePrice": {
-      "bid": 1.38349,
-      "ask": 1.38362,
+      "bid": 1.38359,
+      "ask": 1.3838,
       "lastTraded": null
     },
     "highPrice": {
-      "bid": 1.38357,
-      "ask": 1.38371,
+      "bid": 1.3837,
+      "ask": 1.38388,
       "lastTraded": null
     },
     "lowPrice": {
@@ -1497,6 +1497,6 @@
       "ask": 1.38347,
       "lastTraded": null
     },
-    "lastTradedVolume": 325
+    "lastTradedVolume": 756
   }
 ]

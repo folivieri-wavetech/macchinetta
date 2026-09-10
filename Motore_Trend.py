@@ -70,6 +70,10 @@ if not os.path.isdir(NOME_CONTO):
     sys.exit()
 
 os.chdir(NOME_CONTO)
+if ".." not in sys.path:
+    sys.path.insert(0, "..")
+if "/data" not in sys.path:
+    sys.path.insert(0, "/data")
 BASE_URL = "https://api.ig.com/gateway/deal" if "_REALE" in NOME_CONTO.upper() else "https://demo-api.ig.com/gateway/deal"
 config = dotenv_values(".env")
 
@@ -2068,4 +2072,11 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Errore ciclo Trend: {e}")
             traceback.print_exc()
+
+        try:
+            from Sistema.sync_settimanale import controlla_schedulazione_settimanale
+            controlla_schedulazione_settimanale(NOME_CONTO)
+        except Exception:
+            pass
+
         time.sleep(2.0)
