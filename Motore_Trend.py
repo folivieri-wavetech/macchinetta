@@ -4,6 +4,7 @@ import os
 import requests
 import traceback
 import datetime
+from ig_request_manager import ig_api_request, rate_limiter
 from datetime import timedelta
 import sys
 import socket
@@ -302,47 +303,7 @@ def ottieni_headers_ig():
     except Exception: return None
 
 # --- FUNZIONI API IG E RATE LIMITER ---
-from collections import deque
-import threading
-
-class IGRateLimiter:
-    """
-    Gatekeeper centralizzato per prevenire rate-limiting / ingolfamento su IG API.
-    - Spaziatura minima di 1.2s tra chiamate consecutive.
-    - Tetto massimo a finestra mobile: max 25 richieste ogni 60 secondi.
-    """
-    def __init__(self, min_interval=1.2, max_per_minute=25):
-        self.min_interval = min_interval
-        self.max_per_minute = max_per_minute
-        self.last_call_time = 0.0
-        self.call_history = deque()
-        self.lock = threading.Lock()
-        
-    def acquire(self):
-        with self.lock:
-            now = time.time()
-            
-            # 1. Pulizia chiamate più vecchie di 60 secondi
-            while self.call_history and (now - self.call_history[0]) > 60.0:
-                self.call_history.popleft()
-                
-            # 2. Controllo tetto massimo al minuto
-            if len(self.call_history) >= self.max_per_minute:
-                attesa_quota = 60.0 - (now - self.call_history[0]) + 0.1
-                if attesa_quota > 0:
-                    time.sleep(attesa_quota)
-                    now = time.time()
-                    
-            # 3. Spaziatura minima di respiro
-            diff = now - self.last_call_time
-            if diff < self.min_interval:
-                time.sleep(self.min_interval - diff)
-                now = time.time()
-                
-            self.last_call_time = now
-            self.call_history.append(now)
-
-ig_rate_limiter = IGRateLimiter(min_interval=1.2, max_per_minute=25)
+ig_rate_limiter = rate_limiter
 
 def formatta_numero(valore, dec):
     if valore is None: return None
@@ -352,32 +313,16 @@ def formatta_numero(valore, dec):
 def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=4):
     headers_req = headers.copy()
     headers_req["Version"] = "2"
-    for _ in range(max_retries):
-        ig_rate_limiter.acquire()
-        try:
-            if metodo.upper() == 'GET':
-                r = requests.get(url, headers=headers_req, timeout=10)
-            elif metodo.upper() == 'DELETE':
-                r = requests.delete(url, headers=headers_req, timeout=10)
-            else:
-                r = requests.post(url, headers=headers_req, json=payload, timeout=10)
-            
-            if r.status_code == 403 and "exceeded-api-key" in r.text:
-                time.sleep(15)
-                continue
-            return r
-        except Exception:
-            time.sleep(1.0)
-    return None
+    return ig_api_request(metodo, url, headers_req, payload=payload, timeout=10, logger_func=print_log)
 
 def verifica_conferma_deal(deal_ref, headers):
     h_conf = headers.copy()
     h_conf["Version"] = "1"
     for _ in range(3): 
         try:
-            ig_rate_limiter.acquire()
-            r = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=h_conf, timeout=10)
-            if r.status_code == 200:
+            time.sleep(1.0)
+            r = ig_api_request('GET', f"{BASE_URL}/confirms/{deal_ref}", h_conf, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200:
                 data = r.json()
                 if data.get("dealStatus") == "ACCEPTED":
                     return True, data
@@ -385,7 +330,6 @@ def verifica_conferma_deal(deal_ref, headers):
                     return False, data.get("reason", "Unknown")
         except Exception:
             pass
-        time.sleep(0.5)
     return True, {}
 
 def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers, dec, limit_lvl=None, stop_lvl=None, etichetta="[ORDINE]"):
@@ -399,12 +343,10 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
     if limit_lvl is not None: p["limitLevel"] = formatta_numero(limit_lvl, dec)
     if stop_lvl is not None: p["stopLevel"] = formatta_numero(stop_lvl, dec)
     
-    backoffs = [1.0, 2.0, 3.0]
-    for tentativo in range(len(backoffs) + 1): 
-        ig_rate_limiter.acquire()
+    for tentativo in range(3): 
         try:
-            r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=p, timeout=10)
-            if r.status_code == 200:
+            r = ig_api_request('POST', f"{BASE_URL}/positions/otc", headers, payload=p, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
                 real_level = None
                 deal_id = None
@@ -412,8 +354,7 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                     accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
                     if not accettato:
                         print_log(nome_strumento, f"❌ [IG REJECT] {etichetta} {direzione}: {confirm_data}")
-                        if tentativo < len(backoffs):
-                            time.sleep(backoffs[tentativo])
+                        time.sleep(1.5)
                         continue
                     if isinstance(confirm_data, dict):
                         if confirm_data.get("level") is not None: real_level = float(confirm_data.get("level"))
@@ -421,9 +362,8 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
 
                 if real_level is None:
                     try:
-                        time.sleep(0.5)
-                        ig_rate_limiter.acquire()
-                        resp_p = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
+                        time.sleep(1.0)
+                        resp_p = ig_api_request('GET', f"{BASE_URL}/positions", headers, timeout=10, logger_func=print_log)
                         if resp_p and resp_p.status_code == 200:
                             p_list = [pos for pos in resp_p.json().get('positions', []) if pos['market']['epic'] == epic and pos['position']['direction'] == dir_ig and abs(float(pos['position']['size']) - float(size)) < 0.001]
                             if p_list:
@@ -436,17 +376,12 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                 print_log(nome_strumento, f"✅ {etichetta} eseguito con successo{livello_log}.")
                 return True, real_level, deal_id
             else:
-                resp_txt = r.text
-                if r.status_code == 403 and "exceeded-api-key" in resp_txt:
-                    print_log(nome_strumento, f"🛑 Rate limit IG superato, attesa salvavita 15s...")
-                    time.sleep(15)
-                else:
-                    print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {resp_txt}")
+                resp_txt = r.text if r else "Nessuna risposta"
+                print_log(nome_strumento, f"⚠️ Rifiuto API {etichetta} {direzione}: {resp_txt}")
         except Exception as e:
             print_log(nome_strumento, f"⚠️ Eccezione Rete su {etichetta} {direzione}: {e}")
             
-        if tentativo < len(backoffs):
-            time.sleep(backoffs[tentativo])
+        time.sleep(2.0)
             
     return False, None, None
 
@@ -457,12 +392,10 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
     size_str = str(int(size)) if float(size).is_integer() else str(size)
     p = {"dealId": dealId, "direction": dir_chiusura, "size": size_str, "orderType": "MARKET"}
     
-    backoffs = [1.0, 2.0, 3.0]
-    for tentativo in range(len(backoffs) + 1):
-        ig_rate_limiter.acquire()
+    for tentativo in range(3):
         try:
-            r = requests.post(f"{BASE_URL}/positions/otc", headers=h, json=p, timeout=10)
-            if r.status_code == 200:
+            r = ig_api_request('POST', f"{BASE_URL}/positions/otc", h, payload=p, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
                 if deal_ref:
                     accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
@@ -479,28 +412,22 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
                     print_log(nome_strumento, f"✅ Chiusura {etichetta} inviata.")
                     return True
             else:
-                resp_txt = r.text
-                if r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt):
+                resp_txt = r.text if r else "Nessuna risposta"
+                if r and r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt):
                     print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): già liquidata su IG.")
                     return True
-                if r.status_code == 403 and "exceeded-api-key" in resp_txt:
-                    print_log(nome_strumento, f"🛑 Rate limit IG superato, attesa salvavita 15s...")
-                    time.sleep(15)
-                else:
-                    print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {resp_txt}")
+                print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {resp_txt}")
         except Exception as e:
             print_log(nome_strumento, f"⚠️ Eccezione su Chiusura {etichetta}: {e}")
             
-        if tentativo < len(backoffs):
-            time.sleep(backoffs[tentativo])
+        time.sleep(2.0)
             
     return False
 
 def conta_posizioni_aperte_epic(epic, headers):
     """Conta quante posizioni reali sono attualmente aperte su IG per questo epic."""
     try:
-        ig_rate_limiter.acquire()
-        r = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
+        r = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=10, logger_func=print_log)
         if r and r.status_code == 200:
             pos = [p for p in r.json().get('positions', []) if p['market']['epic'] == epic]
             return len(pos)
@@ -509,10 +436,9 @@ def conta_posizioni_aperte_epic(epic, headers):
     return 0
 
 def pulisci_posizioni_epic(nome, epic, headers):
-    """Chiude tutte le posizioni aperte per quell'epic su IG con pacing anti-ingolfamento."""
+    """Chiude le posizioni aperte per quell'epic su IG con pacing anti-ingolfamento."""
     try:
-        ig_rate_limiter.acquire()
-        r = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=10)
+        r = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=10, logger_func=print_log)
         if r and r.status_code == 200:
             pos_list = [p for p in r.json().get('positions', []) if p.get('market', {}).get('epic') == epic]
             for p in pos_list:
@@ -854,36 +780,31 @@ def scarica_candele(epic, timeframe, limit=60, headers=None):
     # CIRCUIT BREAKER: se la quota residua nota scende sotto 500 punti, stop chiamate preventivo
     rem_quota = get_remaining_quota_ig()
     if rem_quota < 500:
-        print_log("SISTEMA", f"🛑 CIRCUIT BREAKER ATTIVO: Quota residua IG ({rem_quota}) inferiore a 500. Chiamata bloccata a monte.")
+        print_log("SISTEMA", f"🛑 CIRCUIT BREAKER ATTIVO: Quota residua dati storici IG ({rem_quota}) inferiore a 500. Chiamata bloccata a monte.")
         return "QUOTA_ESAURITA"
 
     h = headers.copy()
     h["Version"] = "3"
-    for _ in range(2):
-        try:
-            ig_rate_limiter.acquire()
-            url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
-            r = requests.get(url, headers=h, timeout=10)
-            if r.status_code == 200:
-                dati = r.json()
-                # Tracciamento ufficiale quota IG
-                allowance = dati.get("allowance")
-                if allowance and isinstance(allowance, dict):
-                    salva_quota_ig(allowance)
-                return dati.get('prices', [])
-            elif r.status_code == 403 and "exceeded-api-key" in r.text:
-                time.sleep(2.5)
-                continue
-            else:
-                if r.status_code == 403 and ("historical-data-allowance" in r.text or "exceeded-account-allowance" in r.text or "exceeded-allowance" in r.text or "error.public-api.exceeded" in r.text):
-                    salva_quota_ig({"remainingAllowance": 0, "status": "QUOTA_ESAURITA"})
-                    return "QUOTA_ESAURITA"
+    url = f"{BASE_URL}/prices/{epic}?resolution={timeframe}&max={limit}&pageSize=0"
+    try:
+        r = ig_api_request("GET", url, headers=h, timeout=12, logger_func=print_log)
+        if r is not None and r.status_code == 200:
+            dati = r.json()
+            # Tracciamento ufficiale quota IG
+            allowance = dati.get("allowance")
+            if allowance and isinstance(allowance, dict):
+                salva_quota_ig(allowance)
+            return dati.get('prices', [])
+        elif r is not None and r.status_code == 403 and "historical-data-allowance" in r.text:
+            salva_quota_ig({"remainingAllowance": 0, "status": "QUOTA_ESAURITA"})
+            return "QUOTA_ESAURITA"
+        else:
+            if r is not None:
                 print_log("SISTEMA", f"Errore IG fetching prezzi {epic}: {r.status_code} {r.text}")
-                return []
-        except Exception as e:
-            print_log("SISTEMA", f"Errore fetching prezzi {epic}: {e}")
-            time.sleep(1.0)
-    return []
+            return []
+    except Exception as e:
+        print_log("SISTEMA", f"Errore fetching prezzi {epic}: {e}")
+        return []
 
 def aggiorna_memoria(nome, update_dict):
     try:
@@ -1487,8 +1408,8 @@ def esegui_ciclo_trend():
         
     if not has_pos_live_data or not posizioni_live_ig:
         try:
-            r_pos = requests.get(f"{BASE_URL}/positions", headers=headers, timeout=5)
-            if r_pos.status_code == 200:
+            r_pos = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=8, logger_func=print_log)
+            if r_pos is not None and r_pos.status_code == 200:
                 posizioni_live_ig = r_pos.json().get('positions', [])
                 has_pos_live_data = True
         except Exception:
@@ -1517,14 +1438,23 @@ def esegui_ciclo_trend():
         candele_locali = carica_candele_locali(nome, tf)
 
         if not is_attivo:
-            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria o su IG, ripuliscile e chiudi su IG
+            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria o da chiudere per Trend, ripuliscile
             pos_core = dati.get("posizioni_core", [])
             pos_incr = dati.get("posizioni_incr", [])
             da_chiudere = dati.get("da_chiudere_a_riapertura", False) or (stato_corrente == "IN_ATTESA_CHIUSURA")
             
-            pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic] if has_pos_live_data else []
+            # REGOLE FERREE:
+            # Trend deve considerare SOLO ED ESCLUSIVAMENTE ticket che appartengono alle sue posizioni core o incr!
+            # NON deve MAI toccare o chiudere posizioni generiche su IG che appartengono al motore RANGE!
+            trend_tickets = set()
+            for p in (pos_core + pos_incr):
+                t_id = p.get("ticket")
+                if t_id:
+                    trend_tickets.add(t_id)
             
-            if pos_ig_strum or pos_core or pos_incr or da_chiudere:
+            if trend_tickets or da_chiudere:
+                pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic and p.get('position', {}).get('dealId') in trend_tickets] if has_pos_live_data else []
+                
                 m_status = "TRADEABLE"
                 if pos_ig_strum:
                     m_status = pos_ig_strum[0].get('market', {}).get('marketStatus', 'TRADEABLE')
@@ -1541,40 +1471,20 @@ def esegui_ciclo_trend():
                         "da_chiudere_a_riapertura": True,
                         "msg_manuale": f"⚠️ Mercato {m_status} su IG. La posizione verrà chiusa automaticamente appena il mercato torna TRADEABLE."
                     }
-                    if pos_ig_strum and not pos_core:
-                        p0 = pos_ig_strum[0].get('position', {})
-                        d_str = "LONG" if p0.get('direction') == "BUY" else "SHORT"
-                        up_pend["posizioni_core"] = [{
-                            "entry": float(p0.get('level', 0.0)),
-                            "size": float(p0.get('size', size_i)),
-                            "ticket": p0.get('dealId'),
-                            "direction": d_str,
-                            "tipo": "core"
-                        }]
-                        up_pend["direzione"] = d_str
                     aggiorna_memoria(nome, up_pend)
                     continue
 
-                print_log(nome, f"Motore spento o in attesa chiusura. Verifica liquidazione su IG...")
+                print_log(nome, f"Motore Trend spento o in attesa chiusura. Verifica liquidazione posizioni Trend su IG...")
                 
-                # Costruisci l'elenco delle posizioni da chiudere dando priorità assoluta ai dealId live su IG
+                # Costruisci l'elenco delle posizioni Trend da chiudere
                 tickets_da_chiudere = []
-                if pos_ig_strum:
-                    for p_ig in pos_ig_strum:
-                        pos_info = p_ig.get('position', {})
-                        t_id = pos_info.get('dealId')
-                        d_ig = pos_info.get('direction', 'BUY')
-                        sz_ig = pos_info.get('size', size_i)
-                        dir_c = "SELL" if d_ig in ("BUY", "LONG") else "BUY"
-                        tickets_da_chiudere.append((t_id, dir_c, sz_ig, "[IG_LIVE]"))
-                else:
-                    for p in (pos_core + pos_incr):
-                        t_id = p.get("ticket")
-                        if t_id:
-                            dir_c = "SELL" if p.get("direction") == "LONG" else "BUY"
-                            sz = p.get("size", size_i)
-                            tipo_pos = p.get("tipo", "core")
-                            tickets_da_chiudere.append((t_id, dir_c, sz, f"[{tipo_pos.upper()}]"))
+                for p in (pos_core + pos_incr):
+                    t_id = p.get("ticket")
+                    if t_id:
+                        dir_c = "SELL" if p.get("direction") == "LONG" else "BUY"
+                        sz = p.get("size", size_i)
+                        tipo_pos = p.get("tipo", "core")
+                        tickets_da_chiudere.append((t_id, dir_c, sz, f"[{tipo_pos.upper()}]"))
                 
                 tutti_chiusi = True
                 if tickets_da_chiudere:

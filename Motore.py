@@ -4,6 +4,7 @@ import os
 import requests
 import traceback
 import datetime
+from ig_request_manager import ig_api_request, rate_limiter
 try:
     from zoneinfo import ZoneInfo
     TZ_ITALIA = ZoneInfo("Europe/Rome")
@@ -469,42 +470,24 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
     except Exception:
         pass
 
-def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=6):
+def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=4):
     headers_req = headers.copy()
     headers_req["Version"] = "2"
-    
-    for _ in range(max_retries):
-        try:
-            if metodo.upper() == 'GET':
-                r = requests.get(url, headers=headers_req, timeout=10)
-            elif metodo.upper() == 'DELETE':
-                r = requests.delete(url, headers=headers_req, timeout=10)
-            else:
-                r = requests.post(url, headers=headers_req, json=payload, timeout=10)
-            
-            if r.status_code == 403 and "exceeded-api-key" in r.text:
-                print_log("SISTEMA", "⏳ Rate Limit API (403) rilevato. Pausa 30s...")
-                time.sleep(30)
-                continue
-                
-            return r
-        except Exception:
-            time.sleep(1.5)
-            
-    return None
+    return ig_api_request(metodo, url, headers_req, payload=payload, timeout=10, logger_func=print_log)
 
 def esegui_login_ig():
     h = {"X-IG-API-KEY": config.get("IG_API_KEY"), "Version": "2", "Content-Type": "application/json"}
     p = {"identifier": config.get("IG_USERNAME"), "password": config.get("IG_PASSWORD")}
     
     try:
-        r = requests.post(f"{BASE_URL}/session", headers=h, json=p, timeout=10)
+        r = ig_api_request('POST', f"{BASE_URL}/session", h, payload=p, timeout=10, logger_func=print_log)
         if r and r.status_code == 200:
             with open(FILE_TOKEN, "w") as f:
                 json.dump({"CST": r.headers.get('CST'), "X-SECURITY-TOKEN": r.headers.get('X-SECURITY-TOKEN')}, f)
             return True
         else:
-            print_log("SISTEMA", f"⚠️ IG Rifiuta Login: {r.status_code} - {r.text}")
+            msg = f"{r.status_code} - {r.text}" if r else "Nessuna risposta"
+            print_log("SISTEMA", f"⚠️ IG Rifiuta Login: {msg}")
             return False
     except Exception as e:
         print_log("SISTEMA", f"⚠️ Errore Rete al Login: {e}")
@@ -517,62 +500,53 @@ def ottieni_dati_mercati_batch(h):
     h_batch["Version"] = "1"
     risultato = {}
     
-    for _ in range(3):
-        try:
-            r = requests.get(f"{BASE_URL}/markets?epics={epics_str}", headers=h_batch, timeout=10)
-            if r.status_code == 403 and "exceeded-api-key" in r.text:
-                print_log("SISTEMA", "⏳ Rate Limit API (403) su Mercati Batch. Pausa 30s...")
-                time.sleep(30)
-                continue
+    r = ig_api_request('GET', f"{BASE_URL}/markets?epics={epics_str}", h_batch, timeout=10, logger_func=print_log)
+    if not r or r.status_code != 200:
+        h_batch["Version"] = "2"
+        r = ig_api_request('GET', f"{BASE_URL}/markets?epics={epics_str}", h_batch, timeout=10, logger_func=print_log)
+    
+    if r and r.status_code == 200:
+        markets = r.json().get("marketDetails", [])
+        for m in markets:
+            epic_resp = m.get("instrument", {}).get("epic")
+            bid = m.get("snapshot", {}).get("bid")
+            ask = m.get("snapshot", {}).get("offer")
+            status = m.get("snapshot", {}).get("marketStatus")
+            min_dist = m.get("dealingRules", {}).get("minNormalStopOrLimitDistance", {}).get("value", 0)
             
-            if r.status_code != 200:
-                h_batch["Version"] = "2" if h_batch["Version"] == "1" else "1"
-                r = requests.get(f"{BASE_URL}/markets?epics={epics_str}", headers=h_batch, timeout=10)
-            
-            if r.status_code == 200:
-                markets = r.json().get("marketDetails", [])
-                for m in markets:
-                    epic_resp = m.get("instrument", {}).get("epic")
-                    bid = m.get("snapshot", {}).get("bid")
-                    ask = m.get("snapshot", {}).get("offer")
-                    status = m.get("snapshot", {}).get("marketStatus")
-                    min_dist = m.get("dealingRules", {}).get("minNormalStopOrLimitDistance", {}).get("value", 0)
-                    
-                    if epic_resp and bid is not None and ask is not None:
-                        try:
-                            f_bid = float(bid)
-                            f_ask = float(ask)
-                            if f_bid <= 0 or f_ask <= 0 or f_bid > 1_000_000 or f_ask > 1_000_000:
+            if epic_resp and bid is not None and ask is not None:
+                try:
+                    f_bid = float(bid)
+                    f_ask = float(ask)
+                    if f_bid <= 0 or f_ask <= 0 or f_bid > 1_000_000 or f_ask > 1_000_000:
+                        continue
+                    nome = next((n for n, c in CONFIG_STRUMENTI.items() if c["epic"] == epic_resp), None)
+                    if nome:
+                        dec = CONFIG_STRUMENTI[nome]["decimali"]
+                        cur_px = round((f_bid + f_ask) / 2, dec)
+                        prev_px = ULTIMI_PREZZI_MERCATO.get(nome)
+                        if prev_px is not None and prev_px > 0:
+                            if abs(cur_px - prev_px) / prev_px > 0.20:
+                                print_log("SISTEMA", f"⚠️ Tick anomalo rifiutato su {nome}: {cur_px} vs prec {prev_px}")
                                 continue
-                            nome = next((n for n, c in CONFIG_STRUMENTI.items() if c["epic"] == epic_resp), None)
-                            if nome:
-                                dec = CONFIG_STRUMENTI[nome]["decimali"]
-                                cur_px = round((f_bid + f_ask) / 2, dec)
-                                prev_px = ULTIMI_PREZZI_MERCATO.get(nome)
-                                if prev_px is not None and prev_px > 0:
-                                    if abs(cur_px - prev_px) / prev_px > 0.20:
-                                        print_log("SISTEMA", f"⚠️ Tick anomalo rifiutato su {nome}: {cur_px} vs prec {prev_px}")
-                                        continue
-                                risultato[nome] = {
-                                    "bid": round(f_bid, dec),
-                                    "ask": round(f_ask, dec),
-                                    "status": status,
-                                    "min_dist": min_dist
-                                }
-                        except Exception:
-                            continue
-                return risultato
-        except Exception:
-            time.sleep(1.5)
-            
+                        risultato[nome] = {
+                            "bid": round(f_bid, dec),
+                            "ask": round(f_ask, dec),
+                            "status": status,
+                            "min_dist": min_dist
+                        }
+                except Exception:
+                    continue
+        return risultato
+        
     return risultato
 
 def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=None):
     try:
         h_conti = h.copy()
         h_conti["Version"] = "1"
-        r = requests.get(f"{BASE_URL}/accounts", headers=h_conti, timeout=10)
-        if r.status_code == 200:
+        r = ig_api_request("GET", f"{BASE_URL}/accounts", headers=h_conti, timeout=10, logger_func=print_log)
+        if r is not None and r.status_code == 200:
             dati = r.json()
             il_mio_conto = dati['accounts'][0]
             
@@ -594,7 +568,7 @@ def verifica_token_ig():
         token_dati = json.load(f)
         
     h = {"X-IG-API-KEY": config.get("IG_API_KEY"), "CST": token_dati.get("CST"), "X-SECURITY-TOKEN": token_dati.get("X-SECURITY-TOKEN"), "Version": "1", "Accept": "application/json"}
-    r = requests.get(f"{BASE_URL}/accounts", headers=h, timeout=10)
+    r = ig_api_request('GET', f"{BASE_URL}/accounts", h, timeout=10, logger_func=print_log)
     
     if r and r.status_code == 200:
         return True
@@ -607,9 +581,9 @@ def verifica_conferma_deal(deal_ref, headers):
     
     for _ in range(5): 
         try:
-            time.sleep(2) 
-            r = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=h_conf, timeout=10)
-            if r.status_code == 200:
+            time.sleep(1.5) 
+            r = ig_api_request('GET', f"{BASE_URL}/confirms/{deal_ref}", h_conf, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200:
                 data = r.json()
                 if data.get("dealStatus") == "ACCEPTED":
                     return True, data
@@ -642,8 +616,8 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
     
     for tentativo in range(4): 
         try:
-            r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=p, timeout=10)
-            if r.status_code == 200:
+            r = ig_api_request('POST', f"{BASE_URL}/positions/otc", headers, payload=p, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
                 real_level = None
                 deal_id = None
@@ -758,8 +732,8 @@ def invia_ordine_pendente(nome_strumento, epic, valuta, direzione, size, livello
     
     for tentativo in range(4): 
         try:
-            r = requests.post(f"{BASE_URL}/workingorders/otc", headers=headers_req, json=p, timeout=10)
-            if r.status_code == 200:
+            r = ig_api_request('POST', f"{BASE_URL}/workingorders/otc", headers_req, payload=p, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
                 if deal_ref:
                     accettato, motivo = verifica_conferma_deal(deal_ref, headers_req)
@@ -827,22 +801,17 @@ def chiudi_parziale(nome_strumento, dealId, epic, dir_chiusura, size, valuta, he
     
     for tentativo in range(4):
         try:
-            r = requests.post(f"{BASE_URL}/positions/otc", headers=h, json=p, timeout=10)
-            if r.status_code == 200: 
+            r = ig_api_request('POST', f"{BASE_URL}/positions/otc", h, payload=p, timeout=10, logger_func=print_log)
+            if r and r.status_code == 200: 
                 print_log(nome_strumento, f"✅ Chiusura posizione {etichetta} eseguita con successo.")
                 return True
             else:
-                if r.status_code == 403 and "exceeded-api-key" in r.text:
-                    print_log(nome_strumento, f"⏳ Rate Limit API (403). Pausa 30s...")
-                    time.sleep(30)
-                else:
-                    print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {r.text}")
-                    print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s...")
-                    time.sleep(20)
+                msg_err = r.text if r else "Nessuna risposta"
+                print_log(nome_strumento, f"⚠️ Errore Chiusura {etichetta} ({dealId}): {msg_err}")
+                time.sleep(2)
         except Exception as e:
             print_log(nome_strumento, f"⚠️ Eccezione su Chiusura {etichetta}: {e}")
-            print_log(nome_strumento, f"⏳ Tentativo {tentativo+1} fallito. Pausa 20s...")
-            time.sleep(20)
+            time.sleep(2)
             
     return False
 
@@ -854,13 +823,13 @@ def aggiorna_stop_posizione(deal_id, stop_level, headers):
     else:
         payload["stopLevel"] = None
     
-    # Non usiamo chiamata_api_sicura qui perché vogliamo il codice di stato nudo e crudo
     try:
-        r = requests.put(url, headers=headers, json=payload, timeout=10)
-        if r.status_code == 200:
+        r = ig_api_request('PUT', url, headers, payload=payload, timeout=10, logger_func=print_log)
+        if r and r.status_code == 200:
             return True
         else:
-            print(f"Errore aggiorna stop {deal_id}: {r.text}")
+            msg_err = r.text if r else "Nessuna risposta"
+            print(f"Errore aggiorna stop {deal_id}: {msg_err}")
             return False
     except Exception as e:
         print(f"Eccezione aggiorna_stop_posizione: {e}")
@@ -1103,7 +1072,7 @@ def esegui_motore():
                 distanze_minime[n] = v["min_dist"]
                 prezzi_bid_ask[n] = {"bid": v["bid"], "ask": v["ask"]}
             
-            if ora_attuale - ultimo_controllo_saldo >= 15:
+            if ora_attuale - ultimo_controllo_saldo >= 45:
                 ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
                 ultimo_controllo_saldo = ora_attuale
 
