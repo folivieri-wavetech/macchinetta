@@ -924,7 +924,7 @@ def calcola_kj55_da_candele(candele_list, periods=55):
     return (highest + lowest) / 2.0
 
 def aggiorna_radar_trend(prezzi_live, memoria_attuale):
-    """Scansiona tutti gli strumenti sui 4 TF (M5, H1, H4, D1) per calcolare la distanza da KJ55 e inviare alert di prossimità."""
+    """Scansiona tutti gli strumenti sui 3 TF (H1, H4, D1) per calcolare la distanza da KJ55 e inviare alert di prossimità."""
     if not prezzi_live:
         return
     global LAST_RADAR_SCAN
@@ -933,8 +933,8 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
         return
     LAST_RADAR_SCAN = now_ts
     radar_data = {}
-    tfs_radar = ["MINUTE_5", "HOUR", "HOUR_4", "DAY"]
-    tf_labels = {"MINUTE_5": "M5", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+    tfs_radar = ["HOUR", "HOUR_4", "DAY"]
+    tf_labels = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
     
     for nome, cfg in CONFIG_STRUMENTI.items():
         px = prezzi_live.get(nome)
@@ -989,8 +989,8 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                 }
         
         # Allineamento automatico continuo di current_kj e current_tk per il timeframe configurato dello strumento
-        tf_conf = dati_mem.get("timeframe", "MINUTE_5")
-        lbl_conf = tf_labels.get(tf_conf, "M5")
+        tf_conf = dati_mem.get("timeframe", "HOUR")
+        lbl_conf = tf_labels.get(tf_conf, "H1")
         kj_conf = radar_data[nome]["timeframes"].get(lbl_conf, {}).get("kj")
         if kj_conf is not None and (dati_mem.get("current_kj") != kj_conf):
             candele_conf = carica_candele_locali(nome, tf_conf, px_live=px)
@@ -1028,8 +1028,8 @@ def aggiorna_candele_live_globale(prezzi_live):
         if not live_px or not isinstance(live_px, (int, float)):
             continue
             
-        for tf in ["MINUTE_5", "HOUR", "HOUR_4", "DAY"]:
-            min_tf = TF_MAP.get(tf, 5)
+        for tf in ["HOUR", "HOUR_4", "DAY"]:
+            min_tf = TF_MAP.get(tf, 60)
             # REGOLA FERREA H4: Chiusure rigorosamente alle 01:00, 05:00, 09:00, 13:00, 17:00, 21:00 ora italiana
             offset = 60 if min_tf in (60, 240, 1440) else 0
             boundary_min = ((min_tot - offset) // min_tf) * min_tf + offset
@@ -1092,7 +1092,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                         c_loc = c_loc[-60:]
                     salva_candele_locali(nome, tf, c_loc)
                 
-                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else ("D1" if tf == "DAY" else "M5"))
+                tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else "D1")
                 dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                 kj_agg = calcola_kj55_da_candele(c_loc, periods=55)
                 tk_agg = calcola_kj55_da_candele(c_loc, periods=21)
@@ -1502,7 +1502,7 @@ def esegui_ciclo_trend():
         if not epic: continue
         
         # Recupera parametri
-        tf = dati.get("timeframe", "MINUTE_5")
+        tf = dati.get("timeframe", "HOUR")
         size_i = dati.get("size", 1)
         size_max = dati.get("size_max", 3)
         scala = int(dati.get("scala", 1) or 1)
@@ -1692,12 +1692,8 @@ def esegui_ciclo_trend():
                         c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
                         pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
                         
-                        # Trailing SL Core: SOLO M5 (20 pip), disattivato su H1, H4, D1
-                        tf_val = str(tf).upper()
-                        if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
-                            core_trailing_pips = 20
-                        else:
-                            core_trailing_pips = None
+                        # Trailing SL Core: disattivato su H1, H4, D1
+                        core_trailing_pips = None
 
                         if core_trailing_pips is not None and engine.trailing_sl_core is None and engine.current_kj is not None:
                             if stato_corrente == "SHORT":

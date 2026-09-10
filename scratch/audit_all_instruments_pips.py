@@ -78,14 +78,15 @@ def run_comprehensive_pip_audit():
     print("🧪 TEST SIMULATO DEL COMPORTAMENTO LIVE SU TUTTI I TIME FRAME:")
     
     test_cases = [
-        ("EUR/USD", 1.08500, "M5", "MINUTE_5", 20),
         ("EUR/USD", 1.08500, "H1", "HOUR", 30),
         ("EUR/USD", 1.08500, "H4", "HOUR_4", 40),
-        ("GBP/JPY", 207.800, "M5", "MINUTE_5", 20),
+        ("EUR/USD", 1.08500, "D1", "DAY", 50),
         ("GBP/JPY", 207.800, "H1", "HOUR", 30),
+        ("GBP/JPY", 207.800, "H4", "HOUR_4", 40),
         ("USD/JPY", 145.500, "H1", "HOUR", 30),
-        ("Spot Gold", 2500.00, "M5", "MINUTE_5", 20),
+        ("Spot Gold", 2500.00, "H1", "HOUR", 30),
         ("US 500 Cash", 5500.00, "H1", "HOUR", 30),
+        ("US 500 Cash", 5500.00, "H4", "HOUR_4", 40),
     ]
 
     for nome, base_px, tf_code, tf_val, exp_tp_pips in test_cases:

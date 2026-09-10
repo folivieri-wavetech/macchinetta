@@ -93,23 +93,18 @@ class CoreEngine:
         return (highest + lowest) / 2.0
 
     def _get_core_trailing_pips(self):
-        """Restituisce la distanza/offset in pip per il Trailing SL Core in base al Timeframe. SOLO M5 (20 pip)."""
-        tf_val = str(self.config.get("timeframe", "HOUR")).upper()
-        if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
-            return 20
+        """Restituisce la distanza/offset in pip per il Trailing SL Core in base al Timeframe."""
         return None
 
     def _get_increment_tp_pips(self):
         """Restituisce il target Take Profit in pip per gli incrementi in base al Timeframe."""
         tf_val = str(self.config.get("timeframe", "HOUR")).upper()
-        if "MINUTE_5" in tf_val or tf_val in ("M1", "M2", "M3", "M5", "M10", "M15"):
-            return 20
-        elif "HOUR_4" in tf_val or "H4" in tf_val:
+        if "HOUR_4" in tf_val or "H4" in tf_val:
             return 40
-        elif "HOUR" in tf_val or "H1" in tf_val:
-            return 30
+        elif "DAY" in tf_val or "D1" in tf_val:
+            return 50
         else:
-            return 30
+            return 30 # Default H1 (HOUR)
 
     def on_candle_close(self, closed_candle, next_open_price=None):
         """

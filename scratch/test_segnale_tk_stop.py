@@ -136,7 +136,7 @@ def test_short_tk_signal_and_break():
 def test_tp_and_trailing_still_work():
     print("=== TEST 5: TAKE PROFIT FISSO E TRAILING SL INCREMENTI ===")
     cfg = {
-        "size_i": 1, "size_max": 5, "scala": 1, "timeframe": "MINUTE_5",
+        "size_i": 1, "size_max": 5, "scala": 1, "timeframe": "HOUR",
         "pip_value": 0.0001
     }
     engine = CoreEngine(cfg)
@@ -145,11 +145,11 @@ def test_tp_and_trailing_still_work():
     engine.current_kj = 1.1950
     engine.pm.open_increment(1.2000, 1, "LONG")
 
-    # TP M5 = +20 pip = 1.2020
-    ev_tp = engine.check_live_stops(1.2020)
-    assert any(e.get("type") == "tp_increment" for e in ev_tp), "Take profit incremento a +20 pip non scattato!"
+    # TP H1 = +30 pip = 1.2030
+    ev_tp = engine.check_live_stops(1.2030)
+    assert any(e.get("type") == "tp_increment" for e in ev_tp), "Take profit incremento a +30 pip non scattato!"
     assert len(engine.pm.increments) == 0
-    print("[OK] Take profit fisso a +20 pip scatta regolarmente!\n")
+    print("[OK] Take profit fisso a +30 pip scatta regolarmente!\n")
 
 if __name__ == "__main__":
     test_long_tk_signal_and_break()

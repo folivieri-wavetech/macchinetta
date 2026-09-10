@@ -807,7 +807,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     sz_r = mem_r.get("size", 4)
     
     # Controllo di coerenza Kijun per la gamba Trend
-    tf_map_d = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+    tf_map_d = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
     tf_badge_d = tf_map_d.get(tf_scelto, "H1")
     
     rad_d, _ = carica_radar_trend_dash(conto_t)
@@ -1551,7 +1551,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 st.rerun()
 
     tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
-    tf_map_code = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
+    tf_map_code = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
     
     html_table = """
     <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem;'>
@@ -1559,7 +1559,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
             <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
                 <th style='padding: 6px 8px; text-align: center; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
                 <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Live</th>
-                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>M5</th>
                 <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1</th>
                 <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4</th>
                 <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>D1</th>
@@ -1624,7 +1623,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
         
         if trades_tf:
             pills = []
-            for tf_k in ["M5", "H1", "H4", "D1"]:
+            for tf_k in ["H1", "H4", "D1"]:
                 if tf_k in trades_tf:
                     t_info = trades_tf[tf_k]
                     st_dir = t_info["stato"]
@@ -1693,7 +1692,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
             else:
                 return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
 
-        c_m5 = format_radar_cell("M5")
         c_h1 = format_radar_cell("H1")
         c_h4 = format_radar_cell("H4")
         c_d1 = format_radar_cell("D1")
@@ -1703,7 +1701,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
         <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
             <td style='padding: 3px 8px; font-weight: bold; font-size: 0.76rem;'>{formatta_mercato_con_bandiere(s_nome)}</td>
             <td style='padding: 3px 6px; text-align: center; color: #00E676; font-size: 0.76rem;'>{px_str}</td>
-            <td style='padding: 2px 4px;'>{c_m5}</td>
             <td style='padding: 2px 4px;'>{c_h1}</td>
             <td style='padding: 2px 4px;'>{c_h4}</td>
             <td style='padding: 2px 4px;'>{c_d1}</td>
@@ -2092,7 +2089,7 @@ else:
                 tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
                 
                 if tipo_strategia == "TREND":
-                    tf_val = param_memoria.get("timeframe", "MINUTE_5")
+                    tf_val = param_memoria.get("timeframe", "HOUR")
                     tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                     tf_str = tf_map.get(tf_val, tf_val)
                     
@@ -2384,7 +2381,7 @@ else:
                                     s_str = f"<span style='color: #b0b0b0;' title='{title_core}'>{formatta_numero(sl_core, dec)}</span>"
                                 else:
                                     s_str = "-"
-                                tf_val = memoria_attuale.get(nome, {}).get("timeframe", "MINUTE_5")
+                                tf_val = memoria_attuale.get(nome, {}).get("timeframe", "HOUR")
                                 tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                                 tf_str = tf_map.get(tf_val, tf_val)
                                 dir_str = 'LONG' if dir == 'BUY' else 'SHORT'
@@ -2741,7 +2738,7 @@ else:
                         stato = dati.get("stato", "FLAT")
                         is_attivo = dati.get("attivo", False)
                         dir_t = dati.get("direzione", "")
-                        tf = dati.get("timeframe", "MINUTE_5")
+                        tf = dati.get("timeframe", "HOUR")
                         sz = dati.get("size", 1)
                         storico = dati.get("storico_wip_trend", [])
                         prezzo = prezzi_live.get(nome, "In aggiornamento...")
@@ -3143,16 +3140,16 @@ else:
                         stato_attivo = dati_salvati.get("attivo", False)
                         direzione = dati_salvati.get("direzione", "")
                         
-                        tf_val = dati_salvati.get("timeframe", "MINUTE_5")
+                        tf_val = dati_salvati.get("timeframe", "HOUR")
                         size_val = dati_salvati.get("size", def_size)
                         size_max_val = dati_salvati.get("size_max", def_size_max)
                         scala_val = dati_salvati.get("scala", def_scala)
                         auto_restart = dati_salvati.get("auto_restart", False)
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
                         
-                        tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+                        tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
                         tf_selected = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
-                        tf_badge = tf_map.get(tf_selected, "M5")
+                        tf_badge = tf_map.get(tf_selected, "H1")
                         
                         col_titolo, col_salva = st.columns([3, 1], vertical_alignment="center")
                         with col_titolo:
@@ -3204,7 +3201,7 @@ else:
 
                         c_r1, c_r2, c_r3, c_r4 = st.columns(4)
                         with c_r1:
-                            tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                            tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
                             tf_keys = list(tf_map.keys())
                             idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
                             st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
@@ -3975,14 +3972,12 @@ else:
                     with col_tf:
                         tf_sel = st.selectbox(
                             "Filtra Timeframe:",
-                            ["Tutti", "M5", "H1", "H4", "D"],
+                            ["Tutti", "H1", "H4", "D"],
                             key=f"sel_tf_candele_{conto_selezionato}"
                         )
 
                     if tf_sel == "Tutti":
                         candele_filtrate = candele_lines
-                    elif tf_sel == "M5":
-                        candele_filtrate = [r for r in candele_lines if "[M5]" in r.upper() or "(M5)" in r.upper() or "MINUTE_5" in r.upper()]
                     elif tf_sel == "H1":
                         candele_filtrate = [r for r in candele_lines if "[H1]" in r.upper() or "(H1)" in r.upper() or "HOUR]" in r.upper() or "HOUR_1" in r.upper()]
                     elif tf_sel == "H4":
@@ -4006,20 +4001,19 @@ else:
                     render_terminal_box(chiusure_lines, empty_msg="Nessuna chiusura o stop registrato di recente.")
 
                 with tab_sub_kj:
-                    st.caption("Ultimo rilevamento Kijun (KJ55) e Tenkan (TK21) su tutti gli strumenti (4 Timeframe ciascuno - 40 righe)")
+                    st.caption("Ultimo rilevamento Kijun (KJ55) e Tenkan (TK21) su tutti gli strumenti (3 Timeframe ciascuno - 30 righe)")
                     
                     tutti_strumenti_kj = [
                         "AUD/NZD", "CAD/JPY", "EUR/USD", "GBP/JPY", "GBP/USD", 
                         "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"
                     ]
-                    timeframes_kj = ["M5", "H1", "H4", "D1"]
+                    timeframes_kj = ["H1", "H4", "D1"]
                     radar_cached_kj, _ = carica_radar_trend_dash(conto_selezionato)
                     cache_kj = carica_cache_ultimi_kj(conto_selezionato)
                     cache_modificata = False
                     
-                    tf_codes_map = {"M5": "MINUTE_5", "H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
+                    tf_codes_map = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
                     tf_deltas_map = {
-                        "M5": timedelta(minutes=5),
                         "H1": timedelta(hours=1),
                         "H4": timedelta(hours=4),
                         "D1": timedelta(days=1)
