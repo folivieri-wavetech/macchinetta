@@ -43,7 +43,9 @@ class CoreEngine:
         self.trailing_sl_incr = None # Trailing SL a 20 pip da Close per tutti gli incrementi (dist TK >= 20 pip)
         self.trailing_sl_core = None # Trailing SL a 40 pip da Close per la Core (dist KJ >= 40 pip)
         self.signal_candle_active = False # True se una candela ha chiuso oltre KJ senza prendere il paracadute
-        self.signal_stop_price = None     # Livello di stop confermato (Minimo - 5p per LONG, Massimo + 5p per SHORT)
+        self.signal_stop_price = None     # Livello di stop confermato Core (Minimo - 5p per LONG, Massimo + 5p per SHORT)
+        self.signal_candle_tk_active = False # True se una candela ha chiuso oltre TK senza prendere il paracadute TK
+        self.signal_stop_price_tk = None     # Livello di stop confermato Incrementi (Minimo - 5p per LONG, Massimo + 5p per SHORT)
         
     def reset(self):
         """Resetta lo stato della macchinetta."""
@@ -56,6 +58,8 @@ class CoreEngine:
         self.trailing_sl_core = None
         self.signal_candle_active = False
         self.signal_stop_price = None
+        self.signal_candle_tk_active = False
+        self.signal_stop_price_tk = None
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -69,6 +73,8 @@ class CoreEngine:
         self.retracement_start_price = None
         self.signal_candle_active = False
         self.signal_stop_price = None
+        self.signal_candle_tk_active = False
+        self.signal_stop_price_tk = None
         pos = self.pm.open_core(current_price, self.config.get("size_i"), direction)
         print(f"START: Eseguita Core a Mercato {direction} a Prezzo={current_price}")
         return pos
@@ -183,21 +189,38 @@ class CoreEngine:
                         else:
                             self.trailing_sl_core = max(self.trailing_sl_core, nuovo_sl_core)
 
-                # Gestione Stop Loss Incrementi: TK a fine candela o Trailing SL (il più alto / restrittivo)
-                sl_incr_base = tk # A fine candela: Stop Incrementi a rottura Tenkan (0 buffer)
-                effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
-                
-                if len(self.pm.increments) > 0 and c_close < effective_sl_incr:
-                    reason = "close_below_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_below_tk"
-                    self.trailing_sl_incr = None
-                    chiusure_inc = self.pm.close_all_increments(exec_price)
-                    if chiusure_inc:
-                        events.extend(chiusure_inc)
-                        events.append({"type": "increments_cleared", "reason": reason})
-                    self.retracement_start_price = None
-                else:
-                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 20 pip (cricchetto che può solo salire)
-                    if len(self.pm.increments) > 0:
+                # Gestione Stop Loss Incrementi: Trailing SL o Candela Segnale TK
+                if len(self.pm.increments) > 0:
+                    if self.trailing_sl_incr is not None and c_close < self.trailing_sl_incr:
+                        # 1. Chiusura Trailing SL a fine candela se attivo
+                        self.trailing_sl_incr = None
+                        self.signal_candle_tk_active = False
+                        self.signal_stop_price_tk = None
+                        chiusure_inc = self.pm.close_all_increments(exec_price)
+                        if chiusure_inc:
+                            events.extend(chiusure_inc)
+                            events.append({"type": "increments_cleared", "reason": "close_below_trailing_sl"})
+                        self.retracement_start_price = None
+                    elif c_close < tk:
+                        # 2. Chiusura sotto Tenkan: Candela Segnale TK! Non chiude subito all'Open, imposta stop confermato a Minimo - 5 pip
+                        stop_livello_tk = closed_candle.low - (5 * pip_val)
+                        if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
+                            self.signal_stop_price_tk = min(self.signal_stop_price_tk, stop_livello_tk)
+                        else:
+                            self.signal_candle_tk_active = True
+                            self.signal_stop_price_tk = stop_livello_tk
+                        events.append({
+                            "type": "signal_candle_tk",
+                            "direction": "LONG",
+                            "stop_price": self.signal_stop_price_tk,
+                            "candle_low": closed_candle.low,
+                            "tk": tk
+                        })
+                    else:
+                        # 3. c_close >= tk: prezzo sopra Tenkan, eventuale Candela Segnale TK azzerata
+                        self.signal_candle_tk_active = False
+                        self.signal_stop_price_tk = None
+                        # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 20 pip (cricchetto che può solo salire)
                         dist_tk = c_close - tk
                         if dist_tk >= (20 * pip_val):
                             nuovo_sl = c_close - (20 * pip_val)
@@ -205,8 +228,10 @@ class CoreEngine:
                                 self.trailing_sl_incr = nuovo_sl
                             else:
                                 self.trailing_sl_incr = max(self.trailing_sl_incr, nuovo_sl)
-                    else:
-                        self.trailing_sl_incr = None
+                else:
+                    self.trailing_sl_incr = None
+                    self.signal_candle_tk_active = False
+                    self.signal_stop_price_tk = None
 
             has_cleared_increments_long = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "LONG" and not has_cleared_increments_long:
@@ -305,21 +330,38 @@ class CoreEngine:
                         else:
                             self.trailing_sl_core = min(self.trailing_sl_core, nuovo_sl_core)
 
-                # Gestione Stop Loss Incrementi: TK a fine candela o Trailing SL (il più basso / restrittivo)
-                sl_incr_base = tk # A fine candela: Stop Incrementi a rottura Tenkan (0 buffer)
-                effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
-                
-                if len(self.pm.increments) > 0 and c_close > effective_sl_incr:
-                    reason = "close_above_trailing_sl" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "close_above_tk"
-                    self.trailing_sl_incr = None
-                    chiusure_inc = self.pm.close_all_increments(exec_price)
-                    if chiusure_inc:
-                        events.extend(chiusure_inc)
-                        events.append({"type": "increments_cleared", "reason": reason})
-                    self.retracement_start_price = None
-                else:
-                    # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 20 pip (cricchetto che può solo scendere)
-                    if len(self.pm.increments) > 0:
+                # Gestione Stop Loss Incrementi: Trailing SL o Candela Segnale TK
+                if len(self.pm.increments) > 0:
+                    if self.trailing_sl_incr is not None and c_close > self.trailing_sl_incr:
+                        # 1. Chiusura Trailing SL a fine candela se attivo
+                        self.trailing_sl_incr = None
+                        self.signal_candle_tk_active = False
+                        self.signal_stop_price_tk = None
+                        chiusure_inc = self.pm.close_all_increments(exec_price)
+                        if chiusure_inc:
+                            events.extend(chiusure_inc)
+                            events.append({"type": "increments_cleared", "reason": "close_above_trailing_sl"})
+                        self.retracement_start_price = None
+                    elif c_close > tk:
+                        # 2. Chiusura sopra Tenkan: Candela Segnale TK! Non chiude subito all'Open, imposta stop confermato a Massimo + 5 pip
+                        stop_livello_tk = closed_candle.high + (5 * pip_val)
+                        if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
+                            self.signal_stop_price_tk = max(self.signal_stop_price_tk, stop_livello_tk)
+                        else:
+                            self.signal_candle_tk_active = True
+                            self.signal_stop_price_tk = stop_livello_tk
+                        events.append({
+                            "type": "signal_candle_tk",
+                            "direction": "SHORT",
+                            "stop_price": self.signal_stop_price_tk,
+                            "candle_high": closed_candle.high,
+                            "tk": tk
+                        })
+                    else:
+                        # 3. c_close <= tk: prezzo sotto Tenkan, eventuale Candela Segnale TK azzerata
+                        self.signal_candle_tk_active = False
+                        self.signal_stop_price_tk = None
+                        # Aggiornamento Trailing SL dinamico a 20 pip da Close se distanza da TK >= 20 pip (cricchetto che può solo scendere)
                         dist_tk = tk - c_close
                         if dist_tk >= (20 * pip_val):
                             nuovo_sl = c_close + (20 * pip_val)
@@ -327,8 +369,10 @@ class CoreEngine:
                                 self.trailing_sl_incr = nuovo_sl
                             else:
                                 self.trailing_sl_incr = min(self.trailing_sl_incr, nuovo_sl)
-                    else:
-                        self.trailing_sl_incr = None
+                else:
+                    self.trailing_sl_incr = None
+                    self.signal_candle_tk_active = False
+                    self.signal_stop_price_tk = None
 
             has_cleared_increments_short = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "SHORT" and not has_cleared_increments_short:
@@ -455,6 +499,8 @@ class CoreEngine:
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
                 self.signal_stop_price = None
+                self.signal_candle_tk_active = False
+                self.signal_stop_price_tk = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
@@ -463,13 +509,15 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Conferma Candela Segnale (Minimo - 5 pip)
+            # 2. Stop Conferma Candela Segnale Core (Minimo - 5 pip)
             if self.signal_candle_active and self.signal_stop_price is not None:
                 if current_price <= (self.signal_stop_price + 1e-7):
                     self.trailing_sl_core = None
                     self.trailing_sl_incr = None
                     self.signal_candle_active = False
                     self.signal_stop_price = None
+                    self.signal_candle_tk_active = False
+                    self.signal_stop_price_tk = None
                     events.extend(self.pm.close_all_increments(current_price))
                     ev = self.pm.close_core(current_price)
                     if ev: events.append(ev)
@@ -478,19 +526,33 @@ class CoreEngine:
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi: TK - 10 pip o Trailing SL a 20 pip (il più alto / restrittivo)
-            sl_incr_base = tk - (10 * pip_val)
+            # 3. Stop Loss Incrementi Intracandela (Paracadute TK): TK - 20 pip o Trailing SL a 20 pip
+            sl_incr_base = tk - (20 * pip_val)
             effective_sl_incr = max(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price <= (effective_sl_incr + 1e-7):
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
                 self.trailing_sl_incr = None
+                self.signal_candle_tk_active = False
+                self.signal_stop_price_tk = None
                 chiusure_inc = self.pm.close_all_increments(current_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
                     events.append({"type": "increments_cleared", "reason": reason, "price": current_price})
                 self.retracement_start_price = None
 
-            # 4. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+            # 4. Stop Conferma Candela Segnale TK (Minimo - 5 pip)
+            if len(self.pm.increments) > 0 and self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
+                if current_price <= (self.signal_stop_price_tk + 1e-7):
+                    self.trailing_sl_incr = None
+                    self.signal_candle_tk_active = False
+                    self.signal_stop_price_tk = None
+                    chiusure_inc = self.pm.close_all_increments(current_price)
+                    if chiusure_inc:
+                        events.extend(chiusure_inc)
+                        events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_min", "price": current_price})
+                    self.retracement_start_price = None
+
+            # 5. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
                 tp_target_delta = incr_tp_pips * pip_val
@@ -521,6 +583,8 @@ class CoreEngine:
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
                 self.signal_stop_price = None
+                self.signal_candle_tk_active = False
+                self.signal_stop_price_tk = None
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
@@ -529,13 +593,15 @@ class CoreEngine:
                 self.retracement_start_price = None
                 return events
 
-            # 2. Stop Conferma Candela Segnale (Massimo + 5 pip)
+            # 2. Stop Conferma Candela Segnale Core (Massimo + 5 pip)
             if self.signal_candle_active and self.signal_stop_price is not None:
                 if current_price >= (self.signal_stop_price - 1e-7):
                     self.trailing_sl_core = None
                     self.trailing_sl_incr = None
                     self.signal_candle_active = False
                     self.signal_stop_price = None
+                    self.signal_candle_tk_active = False
+                    self.signal_stop_price_tk = None
                     events.extend(self.pm.close_all_increments(current_price))
                     ev = self.pm.close_core(current_price)
                     if ev: events.append(ev)
@@ -544,19 +610,33 @@ class CoreEngine:
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi: TK + 10 pip o Trailing SL a 20 pip (il più basso / restrittivo)
-            sl_incr_base = tk + (10 * pip_val)
+            # 3. Stop Loss Incrementi Intracandela (Paracadute TK): TK + 20 pip o Trailing SL a 20 pip
+            sl_incr_base = tk + (20 * pip_val)
             effective_sl_incr = min(sl_incr_base, self.trailing_sl_incr) if self.trailing_sl_incr is not None else sl_incr_base
             if len(self.pm.increments) > 0 and current_price >= (effective_sl_incr - 1e-7):
                 reason = "live_stop_trailing" if (self.trailing_sl_incr is not None and effective_sl_incr == self.trailing_sl_incr) else "live_stop_tk"
                 self.trailing_sl_incr = None
+                self.signal_candle_tk_active = False
+                self.signal_stop_price_tk = None
                 chiusure_inc = self.pm.close_all_increments(current_price)
                 if chiusure_inc:
                     events.extend(chiusure_inc)
                     events.append({"type": "increments_cleared", "reason": reason, "price": current_price})
                 self.retracement_start_price = None
 
-            # 4. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+            # 4. Stop Conferma Candela Segnale TK (Massimo + 5 pip)
+            if len(self.pm.increments) > 0 and self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
+                if current_price >= (self.signal_stop_price_tk - 1e-7):
+                    self.trailing_sl_incr = None
+                    self.signal_candle_tk_active = False
+                    self.signal_stop_price_tk = None
+                    chiusure_inc = self.pm.close_all_increments(current_price)
+                    if chiusure_inc:
+                        events.extend(chiusure_inc)
+                        events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_max", "price": current_price})
+                    self.retracement_start_price = None
+
+            # 5. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
 
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:

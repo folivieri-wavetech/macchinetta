@@ -1286,9 +1286,24 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     print_log(nome, msg)
                     invia_notifica(f"➖ CLOSE INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increments_cleared':
-                    msg = f"🛑 Stop TK: Close Incr ({sz}){px_str}{pnl_str}"
+                    r_incr = ev.get("reason", "")
+                    if not r_incr:
+                        inc_ev = next((e for e in events if e.get('type') == 'increments_cleared' and e.get('reason')), None)
+                        if inc_ev:
+                            r_incr = inc_ev.get('reason', '')
+                    if "break_min" in r_incr:
+                        tag_tk = "Stop TK (Break Min -5p)"
+                    elif "break_max" in r_incr:
+                        tag_tk = "Stop TK (Break Max +5p)"
+                    elif "live_stop_tk" in r_incr:
+                        tag_tk = "Paracadute TK"
+                    elif "trailing" in r_incr:
+                        tag_tk = "Trailing TK"
+                    else:
+                        tag_tk = "Stop TK"
+                    msg = f"🛑 {tag_tk}: Close Incr ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"🛑 STOP TK {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    invia_notifica(f"🛑 {tag_tk.upper()} {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 else:
                     msg = f"➖ Close Core ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
@@ -1303,6 +1318,17 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             ext_lbl = "Minimo" if dir_s == "LONG" else "Massimo"
             sign_str = "-5p" if dir_s == "LONG" else "+5p"
             msg_sig = f"⚠️ Candela chiusa oltre KJ. Candela Segnale attiva: Stop confermato a {stop_px:.{dec}f} ({ext_lbl} {c_ext:.{dec}f} {sign_str})"
+            print_log(nome, msg_sig)
+            storico.append(f"[{ora_str}] {msg_sig}")
+            ha_fatto_eventi = True
+
+        elif tipo == 'signal_candle_tk':
+            dir_s = ev.get('direction')
+            stop_px = ev.get('stop_price')
+            c_ext = ev.get('candle_low') if dir_s == "LONG" else ev.get('candle_high')
+            ext_lbl = "Minimo" if dir_s == "LONG" else "Massimo"
+            sign_str = "-5p" if dir_s == "LONG" else "+5p"
+            msg_sig = f"⚠️ Candela chiusa oltre TK. Candela Segnale TK attiva: Stop incrementi a {stop_px:.{dec}f} ({ext_lbl} {c_ext:.{dec}f} {sign_str})"
             print_log(nome, msg_sig)
             storico.append(f"[{ora_str}] {msg_sig}")
             ha_fatto_eventi = True
@@ -1330,11 +1356,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 
             pulisci_posizioni_epic(nome, epic, headers)
             if not auto_restart:
-                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None, "signal_candle_active": False, "signal_stop_price": None})
+                aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None, "signal_candle_active": False, "signal_stop_price": None, "signal_candle_tk_active": False, "signal_stop_price_tk": None})
                 engine.reset()
                 print_log(nome, "💤 Auto-Restart disattivato. Macchina spenta.")
             else:
-                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None, "signal_candle_active": False, "signal_stop_price": None})
+                aggiorna_memoria(nome, {"stato": "FLAT", "direzione": "", "posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None, "signal_candle_active": False, "signal_stop_price": None, "signal_candle_tk_active": False, "signal_stop_price_tk": None})
             
     # Salvataggio posizioni aggiornate
     if engine.is_running:
@@ -1346,7 +1372,9 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             "trailing_sl_incr": engine.trailing_sl_incr,
             "trailing_sl_core": engine.trailing_sl_core,
             "signal_candle_active": getattr(engine, "signal_candle_active", False),
-            "signal_stop_price": getattr(engine, "signal_stop_price", None)
+            "signal_stop_price": getattr(engine, "signal_stop_price", None),
+            "signal_candle_tk_active": getattr(engine, "signal_candle_tk_active", False),
+            "signal_stop_price_tk": getattr(engine, "signal_stop_price_tk", None)
         }
 
         if ha_fatto_eventi:
@@ -1354,7 +1382,12 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             update_data["storico_wip_trend"] = storico
         aggiorna_memoria(nome, update_data)
     elif events and not auto_restart:
-        update_data_off = {"posizioni_core": [], "posizioni_incr": [], "trailing_sl_incr": None, "trailing_sl_core": None}
+        update_data_off = {
+            "posizioni_core": [], "posizioni_incr": [], 
+            "trailing_sl_incr": None, "trailing_sl_core": None,
+            "signal_candle_active": False, "signal_stop_price": None,
+            "signal_candle_tk_active": False, "signal_stop_price_tk": None
+        }
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
             update_data_off["storico_wip_trend"] = storico
@@ -1645,6 +1678,8 @@ def esegui_ciclo_trend():
                 engine.trailing_sl_core = dati.get("trailing_sl_core")
                 engine.signal_candle_active = dati.get("signal_candle_active", False)
                 engine.signal_stop_price = dati.get("signal_stop_price")
+                engine.signal_candle_tk_active = dati.get("signal_candle_tk_active", False)
+                engine.signal_stop_price_tk = dati.get("signal_stop_price_tk")
                 engine.current_tk = dati.get("current_tk")
                 engine.current_kj = dati.get("current_kj")
 

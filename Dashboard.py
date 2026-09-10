@@ -2393,15 +2393,20 @@ else:
                                 incr_idx = other_positions.index(p) + 1
                                 ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
                                 
+                                signal_tk_active = memoria_attuale.get(nome, {}).get("signal_candle_tk_active", False)
+                                signal_tk_stop = memoria_attuale.get(nome, {}).get("signal_stop_price_tk")
                                 trailing_sl_incr = memoria_attuale.get(nome, {}).get("trailing_sl_incr")
                                 tk_val = memoria_attuale.get(nome, {}).get("current_tk")
                                 pip_val = c.get("moltiplicatore", 0.0001)
-                                if trailing_sl_incr is not None:
+                                if signal_tk_active and signal_tk_stop is not None:
+                                    sl_display = signal_tk_stop
+                                    title_info = "Stop Candela Segnale TK (Min/Max +- 5 pip confermato)"
+                                elif trailing_sl_incr is not None:
                                     sl_display = trailing_sl_incr
                                     title_info = "Trailing SL (+-20 pip da Close | dist TK >= 20 pip)"
                                 elif tk_val is not None:
-                                    sl_display = (tk_val - (10 * pip_val)) if dir == 'BUY' else (tk_val + (10 * pip_val))
-                                    title_info = "Stop TK (+-10 pip intracandela / TK a chiusura)"
+                                    sl_display = (tk_val - (20 * pip_val)) if dir == 'BUY' else (tk_val + (20 * pip_val))
+                                    title_info = "Paracadute TK (TK +- 20 pip)"
                                 else:
                                     sl_display = None
                                 
