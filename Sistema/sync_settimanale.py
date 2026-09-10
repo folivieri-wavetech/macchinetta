@@ -210,7 +210,7 @@ def controlla_schedulazione_settimanale(nome_conto):
     Esegue lo scarico solo se:
     1. Il conto è FIORDOK_DEMO (gli altri conti leggono i file distribuiti su PVC).
     2. È Lunedì (weekday == 0).
-    3. L'orario è >= 06:00 italiane.
+    3. L'orario è >= 05:30 italiane (a metà barra per non interferire con il cambio candela H1 delle 06:00).
     4. Non è ancora stato eseguito per la settimana corrente.
     """
     global _LAST_CHECK_TS
@@ -223,8 +223,8 @@ def controlla_schedulazione_settimanale(nome_conto):
     _LAST_CHECK_TS = now_ts
 
     now = now_it()
-    # 0 = Lunedì
-    if now.weekday() == 0 and now.hour >= 6:
+    # 0 = Lunedì, ore >= 05:30 (neutro da chiusure candele H1)
+    if now.weekday() == 0 and (now.hour > 5 or (now.hour == 5 and now.minute >= 30)):
         chiave_settimana = f"{now.year}-W{now.isocalendar()[1]}"
         stato = leggi_stato_sync()
         if stato.get(chiave_settimana, {}).get("stato") != "SUCCESS":
@@ -235,6 +235,6 @@ if __name__ == "__main__":
         success, message = esegui_sync_candele(forza=True)
         print(f"Risultato (FORZATO): success={success}, msg={message}")
     else:
-        print("Verifica schedulazione settimanale (Lunedì ore 06:00)...")
+        print("Verifica schedulazione settimanale (Lunedì ore 05:30)...")
         controlla_schedulazione_settimanale("FIORDOK_DEMO")
         print("Controllo completato.")
