@@ -173,7 +173,7 @@ class CoreEngine:
                 self.signal_stop_price = None
 
             if self.current_direction == "LONG":
-                # Aggiornamento Trailing SL Core da Close (SOLO M5 se core_trailing_pips è attivo)
+                # Aggiornamento Trailing SL Core da Close (se core_trailing_pips è attivo)
 
                 if core_trailing_pips is not None:
                     dist_kj = c_close - kj
@@ -230,7 +230,7 @@ class CoreEngine:
 
             has_cleared_increments_long = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "LONG" and not has_cleared_increments_long:
-                # Take Profit Incrementi a fine candela: M5=+20 pip, H1=+30 pip, H4=+40 pip
+                # Take Profit Incrementi a fine candela: H1=+30 pip, H4=+40 pip, D1=+50 pip
                 incr_tp_pips = self._get_increment_tp_pips()
                 if incr_tp_pips and len(self.pm.increments) > 0:
                     tp_target_delta = incr_tp_pips * pip_val
@@ -320,7 +320,7 @@ class CoreEngine:
                 self.signal_stop_price = None
 
             if self.current_direction == "SHORT":
-                # Aggiornamento Trailing SL Core da Close (SOLO M5 se core_trailing_pips è attivo)
+                # Aggiornamento Trailing SL Core da Close (se core_trailing_pips è attivo)
 
                 if core_trailing_pips is not None:
                     dist_kj = kj - c_close
@@ -377,7 +377,7 @@ class CoreEngine:
 
             has_cleared_increments_short = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "SHORT" and not has_cleared_increments_short:
-                # Take Profit Incrementi a fine candela: M5=+20 pip, H1=+30 pip, H4=+40 pip
+                # Take Profit Incrementi a fine candela: H1=+30 pip, H4=+40 pip, D1=+50 pip
                 incr_tp_pips = self._get_increment_tp_pips()
                 if incr_tp_pips and len(self.pm.increments) > 0:
                     tp_target_delta = incr_tp_pips * pip_val
@@ -484,7 +484,7 @@ class CoreEngine:
         Valuta Stop Loss e Take Profit in tempo reale (intracandela):
         - Core: KJ +- 5 pip o Trailing SL Core
         - Incrementi Stop: TK +- 10 pip o Trailing SL Incr
-        - Incrementi Take Profit: +20 pip (M5), +30 pip (H1), +40 pip (H4)
+        - Incrementi Take Profit: +30 pip (H1), +40 pip (H4), +50 pip (D1)
         """
         events = []
         if not self.is_running or self.current_direction == "FLAT":
@@ -497,7 +497,7 @@ class CoreEngine:
         pip_val = self.config.get("pip_value") or 0.0001
         
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip o Trailing SL Core (su M5 se più restrittivo)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip o Trailing SL Core
             sl_core_base = kj - (15 * pip_val)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price <= (effective_sl_core + 1e-7):
@@ -559,7 +559,7 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_min", "price": current_price})
                     self.retracement_start_price = None
 
-            # 5. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+            # 5. Take Profit Incrementi (Live): H1=+30 pip, H4=+40 pip, D1=+50 pip dall'entry price
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
                 tp_target_delta = incr_tp_pips * pip_val
@@ -581,7 +581,7 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip o Trailing SL Core (su M5 se più restrittivo)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip o Trailing SL Core
             sl_core_base = kj + (15 * pip_val)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price >= (effective_sl_core - 1e-7):
@@ -643,7 +643,7 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_max", "price": current_price})
                     self.retracement_start_price = None
 
-            # 5. Take Profit Incrementi (Live): M5=+20 pip, H1=+30 pip, H4=+40 pip dall'entry price
+            # 5. Take Profit Incrementi (Live): H1=+30 pip, H4=+40 pip, D1=+50 pip dall'entry price
 
             incr_tp_pips = self._get_increment_tp_pips()
             if incr_tp_pips and len(self.pm.increments) > 0:
