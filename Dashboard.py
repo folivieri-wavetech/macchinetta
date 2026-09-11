@@ -3184,7 +3184,7 @@ else:
                         tf_selected = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
                         tf_badge = tf_map.get(tf_selected, "H1")
                         
-                        col_titolo, col_salva = st.columns([3, 1], vertical_alignment="center")
+                        col_titolo, col_salva = st.columns([4, 1], vertical_alignment="center")
                         with col_titolo:
                             auto_restart = st.checkbox("Auto-Restart", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
                             
@@ -3226,7 +3226,7 @@ else:
                             if current_kj is not None and px_live is not None:
                                 symb_comp = "&gt;" if px_live > current_kj else ("&lt;" if px_live < current_kj else "=")
                                 dir_comp = "LONG" if px_live > current_kj else ("SHORT" if px_live < current_kj else "NEUTRO")
-                                st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
@@ -3279,9 +3279,9 @@ else:
                         elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
                             if current_kj is not None and px_live is not None:
                                 if is_short_bloccato:
-                                    st.markdown(f"<div style='font-size: 0.85rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
                                 elif is_long_bloccato:
-                                    st.markdown(f"<div style='font-size: 0.85rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}): Direzione SHORT</b></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}): Direzione SHORT</b></div>", unsafe_allow_html=True)
 
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
