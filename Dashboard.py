@@ -1381,6 +1381,18 @@ def aggrega_candele_dash(candele_src, tf_src, tf_dest):
             pass
     return res
 
+def is_session_break_active_dash(nome, dt=None):
+    """
+    Ritorna True se lo strumento si trova nella pausa tecnica giornaliera a mercato chiuso (23:00 - 00:00 italiana, Lunedì-Giovedì).
+    Applicabile a Spot Gold (COMEX) e Oil - US Crude (NYMEX).
+    """
+    if nome not in ("Spot Gold", "Oil - US Crude"):
+        return False
+    ora = dt if dt else now_it()
+    if ora.weekday() in (0, 1, 2, 3) and ora.hour == 23:
+        return True
+    return False
+
 def allinea_candele_live_dash(candele_locali, nome, tf, px_live):
     if not candele_locali or not px_live or not isinstance(px_live, (int, float)):
         return candele_locali
@@ -1388,6 +1400,8 @@ def allinea_candele_live_dash(candele_locali, nome, tf, px_live):
     ora_dt = now_t.time()
     wd = now_t.weekday()
     if (wd == 4 and ora_dt >= time(23, 0)) or wd == 5 or (wd == 6 and ora_dt < time(21, 45)):
+        return candele_locali
+    if is_session_break_active_dash(nome, now_t):
         return candele_locali
         
     tf_mins = {'MINUTE_5': 5, 'MINUTE_15': 15, 'HOUR': 60, 'HOUR_4': 240, 'DAY': 1440}
@@ -1442,6 +1456,8 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                 with open(p, "r", encoding="utf-8") as f:
                     d = json.load(f)
                     if len(d) >= 55 and is_valid_candele_dash(d, tf):
+                        if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude"):
+                            d = [c for c in d if " 23:00:00" not in c.get("snapshotTime", "")]
                         if px_live and isinstance(px_live, (int, float)):
                             return allinea_candele_live_dash(d, nome, tf, px_live)
                         return d

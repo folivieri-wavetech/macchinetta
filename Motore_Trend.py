@@ -619,14 +619,30 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
             pass
     return res
 
+def is_session_break_active(nome, dt=None):
+    """
+    Ritorna True se lo strumento si trova nella pausa tecnica giornaliera a mercato chiuso (23:00 - 00:00 italiana, Lunedì-Giovedì).
+    Applicabile a Spot Gold (COMEX) e Oil - US Crude (NYMEX).
+    Il venerdì alle 23:00 scatta invece il weekend per tutti (gestito da is_weekend_active).
+    """
+    if nome not in ("Spot Gold", "Oil - US Crude"):
+        return False
+    ora = dt if dt else now_it()
+    # Lunedì (0), Martedì (1), Mercoledì (2), Giovedì (3) dalle 23:00 alle 23:59:59
+    if ora.weekday() in (0, 1, 2, 3) and ora.hour == 23:
+        return True
+    return False
+
 def allinea_candele_live(candele_locali, nome, tf, px_live):
     """Proietta il prezzo live per formare l'ombra della candela ATTUALE, senza inventare i buchi."""
     if not candele_locali or not px_live or not isinstance(px_live, (int, float)):
         return candele_locali
     if is_weekend_active():
         return candele_locali
-        
     now_t = now_it()
+    if is_session_break_active(nome, now_t):
+        return candele_locali
+        
     min_tf = TF_MAP.get(tf, 5)
     offset = 60 if min_tf in (60, 240, 1440) else 0
     min_tot = now_t.hour * 60 + now_t.minute
@@ -796,6 +812,9 @@ def salva_quota_ig(allowance_dict):
 def salva_candele_locali(nome, tf, candele_list):
     clean = nome.replace("/", "_").replace(" ", "_")
     fname = f"candele_{clean}_{tf}.json"
+    # REGOLA COMEX/NYMEX: Spot Gold e Oil - US Crude non hanno candela H1 alle 23:00
+    if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude"):
+        candele_list = [c for c in candele_list if " 23:00:00" not in c.get("snapshotTime", "")]
     buffer_60 = candele_list[-60:]
     LOCAL_CANDELE_CACHE[(nome, tf)] = buffer_60
     
@@ -1019,6 +1038,9 @@ def aggiorna_candele_live_globale(prezzi_live):
             
             tracker = LIVE_OHLC_TRACKER.get((nome, tf))
             if not tracker:
+                # Durante la pausa tecnica (23:00-00:00) per Spot Gold e Oil non aprire tracker H1
+                if tf == "HOUR" and is_session_break_active(nome, now_t):
+                    continue
                 LIVE_OHLC_TRACKER[(nome, tf)] = {
                     "snap": curr_snap,
                     "open": live_px,
@@ -1029,6 +1051,19 @@ def aggiorna_candele_live_globale(prezzi_live):
             elif tracker["snap"] != curr_snap:
                 # Candela conclusa al passaggio del boundary!
                 closed_snap = tracker["snap"]
+                
+                # REGOLA COMEX/NYMEX: Spot Gold e Oil - US Crude non hanno candela H1 alle 23:00
+                # Scarta la candela fake e reimposta il tracker sulla nuova candela (es. 00:00)
+                if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude") and " 23:00:00" in closed_snap:
+                    LIVE_OHLC_TRACKER[(nome, tf)] = {
+                        "snap": curr_snap,
+                        "open": live_px,
+                        "high": live_px,
+                        "low": live_px,
+                        "close": live_px
+                    }
+                    continue
+
                 closed_candle_dict = {
                     "snapshotTime": closed_snap,
                     "openPrice": {"bid": tracker["open"], "ask": tracker["open"], "lastTraded": None},
@@ -1098,6 +1133,9 @@ def aggiorna_candele_live_globale(prezzi_live):
                     pass
 
             else:
+                # Se siamo in session break per Gold o Oil, non tracciare tick a mercato chiuso
+                if tf == "HOUR" and is_session_break_active(nome, now_t):
+                    continue
                 # Aggiorna candela in corso
                 tracker["high"] = max(tracker["high"], live_px)
                 tracker["low"] = min(tracker["low"], live_px)
