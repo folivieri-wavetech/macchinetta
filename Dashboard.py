@@ -1567,166 +1567,185 @@ def renderizza_schermata_radar(conto_selezionato=None):
             st.session_state.target_tab = "Trend"
             st.rerun()
 
-    tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+    gruppi_tabelle = [
+        ("💱 Cross Forex", ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY"], "#38bdf8"),
+        ("🪙 Commodities & Indici (Spot Gold, US 500, Oil)", ["Spot Gold", "US 500 Cash", "Oil - US Crude"], "#f59e0b")
+    ]
     tf_map_code = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
     
-    html_table = """
-    <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem;'>
-        <thead>
-            <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
-                <th style='padding: 6px 8px; text-align: center; font-size: 0.74rem; text-transform: uppercase;'>Strumento</th>
-                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Live</th>
-                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H1</th>
-                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>H4</th>
-                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>D1</th>
-                <th style='padding: 6px 8px; font-size: 0.74rem; text-transform: uppercase;'>Stato Trend</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    for idx, s_nome in enumerate(tutti_strumenti):
-        cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
-        dec = cfg_s.get("decimali", 2)
-        mult = cfg_s.get("moltiplicatore", 0.0001)
-        px = prezzi_live.get(s_nome)
+    html_output = ""
+    for g_idx, (titolo_gruppo, lista_strumenti, col_titolo_gruppo) in enumerate(gruppi_tabelle):
+        margin_top = "0px" if g_idx == 0 else "14px"
+        html_table = f"""
+        <div style='margin-top: {margin_top}; margin-bottom: 5px; font-size: 0.78rem; font-weight: 700; color: {col_titolo_gruppo}; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;'>
+            {titolo_gruppo}
+        </div>
+        <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem; table-layout: fixed;'>
+            <colgroup>
+                <col style='width: 20%;'>
+                <col style='width: 12%;'>
+                <col style='width: 19%;'>
+                <col style='width: 19%;'>
+                <col style='width: 19%;'>
+                <col style='width: 11%;'>
+            </colgroup>
+            <thead>
+                <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
+                    <th style='padding: 5px 8px; text-align: center; font-size: 0.73rem; text-transform: uppercase;'>Strumento</th>
+                    <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>Live</th>
+                    <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>H1</th>
+                    <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>H4</th>
+                    <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>D1</th>
+                    <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>Stato Trend</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
         
-        info_r = radar_data.get(s_nome, {})
-        tf_dict = info_r.get("timeframes", {})
-        
-        # Raccogli tutti i trade attivi per questo strumento su tutti i conti/timeframe
-        trades_tf = {}
-        
-        check_dirs = [conto_selezionato] + [d for d in accs if d != conto_selezionato] if conto_selezionato else accs
-        for c_dir in check_dirs:
-            if not c_dir: continue
-            mem_c = carica_memoria(c_dir)
-            mem_s = mem_c.get(s_nome, {})
-            if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
-                tf_a = mem_s.get("timeframe", "HOUR")
-                tf_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
-                if tf_lbl not in trades_tf:
-                    pos_c = mem_s.get("posizioni_core", [])
-                    pos_i = mem_s.get("posizioni_incr", [])
-                    tot_pnl_pts = 0.0
-                    has_pos = False
-                    
-                    if px and isinstance(px, (int, float)):
-                        for pc in pos_c:
-                            e_px = pc.get("entry")
-                            sz = pc.get("size", 1)
-                            d_pos = pc.get("direction", mem_s.get("stato"))
-                            if e_px and isinstance(e_px, (int, float)) and e_px > 0:
-                                has_pos = True
-                                diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
-                                tot_pnl_pts += (diff / mult) * sz
-                        for pi in pos_i:
-                            e_px = pi.get("entry")
-                            sz = pi.get("size", 1)
-                            d_pos = pi.get("direction", mem_s.get("stato"))
-                            if e_px and isinstance(e_px, (int, float)) and e_px > 0:
-                                has_pos = True
-                                diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
-                                tot_pnl_pts += (diff / mult) * sz
-                    
-                    is_profit = (tot_pnl_pts >= 0) if has_pos else True
-                    
-                    trades_tf[tf_lbl] = {
-                        "stato": mem_s.get("stato"),
-                        "conto": c_dir.replace("_DEMO", "").replace("_REALE", ""),
-                        "is_profit": is_profit,
-                        "pnl_pts": tot_pnl_pts
-                    }
-        
-        if trades_tf:
-            pills = []
-            for tf_k in ["H1", "H4", "D1"]:
-                if tf_k in trades_tf:
-                    t_info = trades_tf[tf_k]
-                    st_dir = t_info["stato"]
-                    ct_name = t_info["conto"]
+        for idx, s_nome in enumerate(lista_strumenti):
+            cfg_s = CONFIG_STRUMENTI.get(s_nome, {})
+            dec = cfg_s.get("decimali", 2)
+            mult = cfg_s.get("moltiplicatore", 0.0001)
+            px = prezzi_live.get(s_nome)
+            
+            info_r = radar_data.get(s_nome, {})
+            tf_dict = info_r.get("timeframes", {})
+            
+            # Raccogli tutti i trade attivi per questo strumento su tutti i conti/timeframe
+            trades_tf = {}
+            
+            check_dirs = [conto_selezionato] + [d for d in accs if d != conto_selezionato] if conto_selezionato else accs
+            for c_dir in check_dirs:
+                if not c_dir: continue
+                mem_c = carica_memoria(c_dir)
+                mem_s = mem_c.get(s_nome, {})
+                if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
+                    tf_a = mem_s.get("timeframe", "HOUR")
+                    tf_lbl = "M5" if "MINUTE_5" in tf_a else ("H1" if "HOUR" in tf_a and "HOUR_4" not in tf_a else ("H4" if "HOUR_4" in tf_a else "D1"))
+                    if tf_lbl not in trades_tf:
+                        pos_c = mem_s.get("posizioni_core", [])
+                        pos_i = mem_s.get("posizioni_incr", [])
+                        tot_pnl_pts = 0.0
+                        has_pos = False
+                        
+                        if px and isinstance(px, (int, float)):
+                            for pc in pos_c:
+                                e_px = pc.get("entry")
+                                sz = pc.get("size", 1)
+                                d_pos = pc.get("direction", mem_s.get("stato"))
+                                if e_px and isinstance(e_px, (int, float)) and e_px > 0:
+                                    has_pos = True
+                                    diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
+                                    tot_pnl_pts += (diff / mult) * sz
+                            for pi in pos_i:
+                                e_px = pi.get("entry")
+                                sz = pi.get("size", 1)
+                                d_pos = pi.get("direction", mem_s.get("stato"))
+                                if e_px and isinstance(e_px, (int, float)) and e_px > 0:
+                                    has_pos = True
+                                    diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
+                                    tot_pnl_pts += (diff / mult) * sz
+                        
+                        is_profit = (tot_pnl_pts >= 0) if has_pos else True
+                        
+                        trades_tf[tf_lbl] = {
+                            "stato": mem_s.get("stato"),
+                            "conto": c_dir.replace("_DEMO", "").replace("_REALE", ""),
+                            "is_profit": is_profit,
+                            "pnl_pts": tot_pnl_pts
+                        }
+            
+            if trades_tf:
+                pills = []
+                for tf_k in ["H1", "H4", "D1"]:
+                    if tf_k in trades_tf:
+                        t_info = trades_tf[tf_k]
+                        st_dir = t_info["stato"]
+                        ct_name = t_info["conto"]
+                        is_profit = t_info.get("is_profit", True)
+                        pnl_pts = t_info.get("pnl_pts", 0.0)
+                        pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
+                        
+                        col_bg = "rgba(34, 197, 94, 0.2)" if is_profit else "rgba(239, 68, 68, 0.2)"
+                        col_bdr = "#22c55e" if is_profit else "#ef4444"
+                        col_txt = "#4ade80" if is_profit else "#f87171"
+                        icon_d = "🟢" if is_profit else "🔴"
+                        tag_d = "L" if st_dir == "LONG" else "S"
+                        pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt'>{icon_d} {tf_k} ({tag_d})</span>")
+                badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
+            else:
+                badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
+            
+            px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
+            
+            def format_radar_cell(lbl_key):
+                t_data = tf_dict.get(lbl_key, {})
+                kj_v = t_data.get("kj")
+                dist_p = t_data.get("dist_pips")
+                dir_p = t_data.get("dir", "-")
+                vicino = t_data.get("vicino", False)
+                
+                if kj_v is None and px and isinstance(px, (int, float)):
+                    tf_code = tf_map_code.get(lbl_key, "HOUR")
+                    candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
+                    kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
+                    if kj_c is not None:
+                        kj_v = kj_c
+                        diff_pts = px - kj_v
+                        dist_p = round(abs(diff_pts) / mult)
+                        dir_p = "Possibile Entrata"
+                        vicino = (dist_p <= 15)
+
+                is_current_tf_trade = (lbl_key in trades_tf)
+                
+                if is_current_tf_trade:
+                    t_info = trades_tf[lbl_key]
+                    st_val = t_info["stato"]
+                    ct_val = t_info["conto"]
                     is_profit = t_info.get("is_profit", True)
                     pnl_pts = t_info.get("pnl_pts", 0.0)
+                    col_dir_tr = "#4ade80" if is_profit else "#f87171"
+                    icon_dir = "🟢" if is_profit else "🔴"
                     pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
+                    title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
+                    kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
+                    return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
+
+                if kj_v is None or dist_p is None:
+                    return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
                     
-                    col_bg = "rgba(34, 197, 94, 0.2)" if is_profit else "rgba(239, 68, 68, 0.2)"
-                    col_bdr = "#22c55e" if is_profit else "#ef4444"
-                    col_txt = "#4ade80" if is_profit else "#f87171"
-                    icon_d = "🟢" if is_profit else "🔴"
-                    tag_d = "L" if st_dir == "LONG" else "S"
-                    pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt'>{icon_d} {tf_k} ({tag_d})</span>")
-            badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
-        else:
-            badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
-        
-        px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
-        
-        def format_radar_cell(lbl_key):
-            t_data = tf_dict.get(lbl_key, {})
-            kj_v = t_data.get("kj")
-            dist_p = t_data.get("dist_pips")
-            dir_p = t_data.get("dir", "-")
-            vicino = t_data.get("vicino", False)
-            
-            if kj_v is None and px and isinstance(px, (int, float)):
-                tf_code = tf_map_code.get(lbl_key, "HOUR")
-                candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
-                kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
-                if kj_c is not None:
-                    kj_v = kj_c
-                    diff_pts = px - kj_v
-                    dist_p = round(abs(diff_pts) / mult)
-                    dir_p = "Possibile Entrata"
-                    vicino = (dist_p <= 15)
-
-            is_current_tf_trade = (lbl_key in trades_tf)
-            
-            if is_current_tf_trade:
-                t_info = trades_tf[lbl_key]
-                st_val = t_info["stato"]
-                ct_val = t_info["conto"]
-                is_profit = t_info.get("is_profit", True)
-                pnl_pts = t_info.get("pnl_pts", 0.0)
-                col_dir_tr = "#4ade80" if is_profit else "#f87171"
-                icon_dir = "🟢" if is_profit else "🔴"
-                pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
-                title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
-                kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
-                return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
-
-            if kj_v is None or dist_p is None:
-                return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"
+                kj_formatted = f"{kj_v:.{dec}f}"
+                dist_int = int(round(dist_p))
+                dir_label = "Possibile Entrata"
+                col_gold = "#fbbf24" # Giallo oro
                 
-            kj_formatted = f"{kj_v:.{dec}f}"
-            dist_int = int(round(dist_p))
-            dir_label = "Possibile Entrata"
-            col_gold = "#fbbf24" # Giallo oro
-            
-            if vicino:
-                bg_cell = "rgba(251, 191, 36, 0.2)"
-                bdr_cell = "#f59e0b"
-                return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_gold}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_gold}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
-            else:
-                return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
+                if vicino:
+                    bg_cell = "rgba(251, 191, 36, 0.2)"
+                    bdr_cell = "#f59e0b"
+                    return f"<div style='background: {bg_cell}; border: 1px solid {bdr_cell}; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;'><b style='color: {col_gold}; font-size: 0.64rem;'>⚡ {dist_int} punti</b><br><span style='font-size:0.64rem; color:{col_gold}; font-weight:bold;'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
+                else:
+                    return f"<div style='text-align: center; color: #94a3b8; line-height: 1.15;'><span style='font-weight: bold; font-size: 0.64rem;'>{dist_int} punti</span><br><span style='font-size:0.64rem; color:{col_gold};'>{dir_label}</span><br><span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_formatted}</span></div>"
 
-        c_h1 = format_radar_cell("H1")
-        c_h4 = format_radar_cell("H4")
-        c_d1 = format_radar_cell("D1")
+            c_h1 = format_radar_cell("H1")
+            c_h4 = format_radar_cell("H4")
+            c_d1 = format_radar_cell("D1")
+            
+            bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
+            html_table += f"""
+            <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
+                <td style='padding: 3px 8px; font-weight: bold; font-size: 0.76rem;'>{formatta_mercato_con_bandiere(s_nome)}</td>
+                <td style='padding: 3px 6px; text-align: center; color: #00E676; font-size: 0.76rem;'>{px_str}</td>
+                <td style='padding: 2px 4px;'>{c_h1}</td>
+                <td style='padding: 2px 4px;'>{c_h4}</td>
+                <td style='padding: 2px 4px;'>{c_d1}</td>
+                <td style='padding: 3px 6px; text-align: center;'>{badge_stato}</td>
+            </tr>
+            """
         
-        bg_row = "#1e293b" if idx % 2 == 1 else "#0f172a"
-        html_table += f"""
-        <tr style='background: {bg_row}; border-bottom: 1px solid rgba(255,255,255,0.05);'>
-            <td style='padding: 3px 8px; font-weight: bold; font-size: 0.76rem;'>{formatta_mercato_con_bandiere(s_nome)}</td>
-            <td style='padding: 3px 6px; text-align: center; color: #00E676; font-size: 0.76rem;'>{px_str}</td>
-            <td style='padding: 2px 4px;'>{c_h1}</td>
-            <td style='padding: 2px 4px;'>{c_h4}</td>
-            <td style='padding: 2px 4px;'>{c_d1}</td>
-            <td style='padding: 3px 6px; text-align: center;'>{badge_stato}</td>
-        </tr>
-        """
+        html_table += "</tbody></table>"
+        html_output += html_table
     
-    html_table += "</tbody></table>"
-    st.html(html_table)
+    st.html(html_output)
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
