@@ -3940,7 +3940,7 @@ else:
                         tentativi_lines.append(riga)
 
                     # 2. Candele chiuse
-                    if "CANDELA" in r_up:
+                    if "CANDELA" in r_up or "🕯️" in riga:
                         candele_lines.append(riga)
                     # 3. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.)
                     elif any(k in r_up for k in [
@@ -4068,11 +4068,11 @@ else:
                             # 1. Cerca nella console live recente (ultime 500 righe)
                             line_match = None
                             for r in reversed_lines:
-                                if f"[{s_nome}]" in r and "Candela" in r:
+                                if f"[{s_nome}]" in r and ("Candela" in r or "🕯️" in r):
                                     if f"[{tf}]" in r or f"({tf})" in r or (tf == "D1" and ("[D]" in r or "[D1]" in r or "(D)" in r or "(D1)" in r or "DAY" in r)):
                                         line_match = r
-                                        if tf == "D1" and "Candela [D]" in line_match:
-                                            line_match = line_match.replace("Candela [D]", "Candela [D1]")
+                                        if tf == "D1" and "[D]" in line_match and "[D1]" not in line_match:
+                                            line_match = line_match.replace("[D]", "[D1]")
                                         break
                             
                             # Se trovata nel log recente con dati completi (O: H: L: C:), aggiorna cache
@@ -4120,7 +4120,7 @@ else:
                                     c_v = last_c.get("closePrice", {}).get("bid")
                                     
                                     if o_v is not None and h_v is not None and l_v is not None and c_v is not None:
-                                        line_match = f"[{ts_str}] [{s_nome}] 🕯️ Candela [{tf}] ore {ore_str} | O: {o_v:.{dec_s}f} H: {h_v:.{dec_s}f} L: {l_v:.{dec_s}f} C: {c_v:.{dec_s}f} | KJ: {kj_str} TK: {tk_str}"
+                                        line_match = f"[{ts_str}] [{s_nome}] 🕯️[{tf}]  {ore_str} | O: {o_v:.{dec_s}f} H: {h_v:.{dec_s}f} L: {l_v:.{dec_s}f} C: {c_v:.{dec_s}f} | KJ: {kj_str} TK: {tk_str}"
                                         if s_nome not in cache_kj:
                                             cache_kj[s_nome] = {}
                                         cache_kj[s_nome][tf] = line_match
@@ -4128,10 +4128,14 @@ else:
                             
                             # 4. Fallback estremo solo se non vi è alcuna candela registrata
                             if not line_match:
-                                line_match = f"[--:--:--] [{s_nome}] 🕯️ Candela [{tf}] | KJ: {kj_str} TK: {tk_str}"
+                                line_match = f"[--:--:--] [{s_nome}] 🕯️[{tf}] | KJ: {kj_str} TK: {tk_str}"
                             
-                            # Formattazione per terminal box
-                            line_match = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"Candela [\1] ore \2", line_match)
+                            # Formattazione per terminal box: rimozione della parola Candela e di ore
+                            line_match = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"[\1]  \2", line_match)
+                            line_match = re.sub(r"🕯️\s*Candela\s*(\[[^\]]+\])\s*(?:ore\s*)?", r"🕯️\1  ", line_match)
+                            line_match = re.sub(r"Candela\s*(\[[^\]]+\])\s*(?:ore\s*)?", r"\1  ", line_match)
+                            line_match = re.sub(r"(🕯️\[[^\]]+\])\s*ore\s+", r"\1  ", line_match)
+
                             riga_esc = line_match.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                             riga_fmt = re.sub(
                                 r"^(\[(?:\d{1,2}/\d{1,2}\s+)?\d{2}:\d{2}:\d{2}|\[--:--:--\])",

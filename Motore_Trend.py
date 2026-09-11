@@ -1088,7 +1088,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 h_val = closed_candle_dict['highPrice']['bid']
                 l_val = closed_candle_dict['lowPrice']['bid']
                 c_val = closed_candle_dict['closePrice']['bid']
-                riga_log_candela = f"🕯️ Candela [{tf_lbl}] ore {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{kj_tk_str}"
+                riga_log_candela = f"🕯️[{tf_lbl}]  {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{kj_tk_str}"
                 print_log(nome, riga_log_candela)
                 candele_chiuse[(nome, tf)] = closed_candle_dict
                 try:
