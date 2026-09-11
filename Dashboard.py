@@ -1548,8 +1548,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
             font-weight: bold !important;
             font-size: 0.85rem !important;
             border-radius: 6px !important;
-            padding: 6px 14px !important;
-            margin-top: 10px !important;
+            padding: 4px 10px !important;
             box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35) !important;
             transition: all 0.2s ease-in-out !important;
         }
@@ -1561,15 +1560,12 @@ def renderizza_schermata_radar(conto_selezionato=None):
         }
         </style>
         """, unsafe_allow_html=True)
-        c_rf, c_tr = st.columns(2)
-        with c_rf:
-            if st.button("🔄 Aggiorna", key="btn_radar_refresh", use_container_width=True):
-                st.rerun()
-        with c_tr:
-            if st.button("📈 TREND", key="btn_radar_nav_trend", use_container_width=True):
-                st.session_state.vista_sidebar = "CONTO"
-                st.session_state.target_tab = "Trend"
-                st.rerun()
+        if st.button("🔄 Aggiorna", key="btn_radar_refresh", use_container_width=True):
+            st.rerun()
+        if st.button("📈 TREND", key="btn_radar_nav_trend", use_container_width=True):
+            st.session_state.vista_sidebar = "CONTO"
+            st.session_state.target_tab = "Trend"
+            st.rerun()
 
     tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
     tf_map_code = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
