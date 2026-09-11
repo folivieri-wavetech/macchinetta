@@ -1,55 +1,5 @@
 [
   {
-    "snapshotTime": "2026/08/28 13:00:00",
-    "snapshotTimeUTC": "2026-08-28T11:00:00",
-    "openPrice": {
-      "bid": 185.957,
-      "ask": 185.972,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 185.73,
-      "ask": 185.745,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 185.975,
-      "ask": 185.99,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 185.42,
-      "ask": 185.435,
-      "lastTraded": null
-    },
-    "lastTradedVolume": 20463
-  },
-  {
-    "snapshotTime": "2026/08/28 17:00:00",
-    "snapshotTimeUTC": "2026-08-28T15:00:00",
-    "openPrice": {
-      "bid": 185.729,
-      "ask": 185.744,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 185.433,
-      "ask": 185.448,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 185.761,
-      "ask": 185.776,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 185.426,
-      "ask": 185.441,
-      "lastTraded": null
-    },
-    "lastTradedVolume": 18204
-  },
-  {
     "snapshotTime": "2026/08/28 21:00:00",
     "snapshotTimeUTC": "2026-08-28T19:00:00",
     "openPrice": {
@@ -1498,5 +1448,51 @@
       "lastTraded": null
     },
     "lastTradedVolume": 1655
+  },
+  {
+    "snapshotTime": "2026/09/11 21:00:00",
+    "openPrice": {
+      "bid": 179.3,
+      "ask": 179.3,
+      "lastTraded": null
+    },
+    "highPrice": {
+      "bid": 179.6,
+      "ask": 179.6,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 179.15,
+      "ask": 179.15,
+      "lastTraded": null
+    },
+    "closePrice": {
+      "bid": 179.48,
+      "ask": 179.48,
+      "lastTraded": null
+    }
+  },
+  {
+    "snapshotTime": "2026/09/13 21:00:00",
+    "openPrice": {
+      "bid": 181.5,
+      "ask": 181.5,
+      "lastTraded": null
+    },
+    "highPrice": {
+      "bid": 181.6,
+      "ask": 181.6,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 181.5,
+      "ask": 181.5,
+      "lastTraded": null
+    },
+    "closePrice": {
+      "bid": 181.6,
+      "ask": 181.6,
+      "lastTraded": null
+    }
   }
 ]

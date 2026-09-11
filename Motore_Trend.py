@@ -48,6 +48,8 @@ ULTIMO_LOG_ATTESA = {}
 LIVE_OHLC_TRACKER = {}
 LOCAL_CANDELE_CACHE = {}
 LAST_RADAR_SCAN = 0
+FRIDAY_23_CLOSED_DONE = set()
+LAST_SAFEGUARD_FRIDAY = 0
 
 # --- TRACKER E COOLDOWN DEI TENTATIVI (REGOLA FERREA MAX 5 TENTATIVI) ---
 COOLDOWN_OPERAZIONI = {}
@@ -922,6 +924,100 @@ def calcola_kj55_da_candele(candele_list, periods=55):
     lowest = min(v[1] for v in valid)
     return (highest + lowest) / 2.0
 
+def garantisce_candele_venerdi_chiuse(prezzi_live=None):
+    """
+    Safeguard per il fine settimana:
+    Se siamo nel weekend (venerdì dalle 23:00 in poi, sabato, o domenica prima della riapertura 21:58),
+    verifica che per tutti gli strumenti le candele H4 (21:00) e D1 di venerdì siano chiuse e salvate.
+    Se mancanti o non aggiornate al close delle 23:00, le consolida all'istante
+    dalle candele H1 del venerdì e aggiorna i file locali.
+    """
+    global LAST_SAFEGUARD_FRIDAY
+    ora = now_it()
+    wd = ora.weekday()
+    is_in_weekend = (wd == 4 and ora.hour >= 23) or (wd == 5) or (wd == 6 and ora.time() < datetime.time(21, 58))
+    if not is_in_weekend:
+        return
+
+    now_ts = time.time()
+    if LAST_SAFEGUARD_FRIDAY and (now_ts - LAST_SAFEGUARD_FRIDAY < 60):
+        return
+    LAST_SAFEGUARD_FRIDAY = now_ts
+
+    days_back = 0 if wd == 4 else (1 if wd == 5 else 2)
+    dt_venerdi = (ora - datetime.timedelta(days=days_back)).date()
+    str_venerdi = dt_venerdi.strftime("%Y/%m/%d")
+
+    for nome in CONFIG_STRUMENTI:
+        try:
+            c_h1 = carica_candele_locali(nome, "HOUR")
+            if not c_h1:
+                continue
+            h1_fri = [c for c in c_h1 if c.get("snapshotTime", "")[:10] == str_venerdi]
+            if not h1_fri:
+                continue
+
+            # 1. Verifica H4 venerdì 21:00
+            c_h4 = carica_candele_locali(nome, "HOUR_4")
+            h4_snap_target = f"{str_venerdi} 21:00:00"
+            has_h4_fri = any(c.get("snapshotTime") == h4_snap_target for c in c_h4)
+            if not has_h4_fri:
+                h1_for_h4 = [c for c in h1_fri if c.get("snapshotTime", "") >= h4_snap_target]
+                if h1_for_h4:
+                    o_val = float(h1_for_h4[0]["openPrice"]["bid"])
+                    h_val = max(float(c["highPrice"]["bid"]) for c in h1_for_h4)
+                    l_val = min(float(c["lowPrice"]["bid"]) for c in h1_for_h4)
+                    c_val = float(h1_for_h4[-1]["closePrice"]["bid"])
+                    dict_h4 = {
+                        "snapshotTime": h4_snap_target,
+                        "openPrice": {"bid": o_val, "ask": o_val, "lastTraded": None},
+                        "highPrice": {"bid": h_val, "ask": h_val, "lastTraded": None},
+                        "lowPrice": {"bid": l_val, "ask": l_val, "lastTraded": None},
+                        "closePrice": {"bid": c_val, "ask": c_val, "lastTraded": None}
+                    }
+                    c_h4.append(dict_h4)
+                    if len(c_h4) > 60:
+                        c_h4 = c_h4[-60:]
+                    salva_candele_locali(nome, "HOUR_4", c_h4)
+                    print_log(nome, f"🛡️ [SAFEGUARD] Consolidata candela mancante H4 venerdì 21:00: O={o_val} H={h_val} L={l_val} C={c_val}")
+
+            # 2. Verifica D1 venerdì
+            c_d1 = carica_candele_locali(nome, "DAY")
+            has_d1_fri = any(c.get("snapshotTime", "")[:10] == str_venerdi for c in c_d1)
+            last_fri_h1_close = float(h1_fri[-1]["closePrice"]["bid"])
+            need_update_d1 = not has_d1_fri
+            if has_d1_fri:
+                d1_entry = next(c for c in c_d1 if c.get("snapshotTime", "")[:10] == str_venerdi)
+                if abs(float(d1_entry.get("closePrice", {}).get("bid", 0)) - last_fri_h1_close) > 1e-5:
+                    need_update_d1 = True
+
+            if need_update_d1:
+                o_val = float(h1_fri[0]["openPrice"]["bid"])
+                h_val = max(float(c["highPrice"]["bid"]) for c in h1_fri)
+                l_val = min(float(c["lowPrice"]["bid"]) for c in h1_fri)
+                c_val = last_fri_h1_close
+                dict_d1 = {
+                    "snapshotTime": f"{str_venerdi} 00:00:00",
+                    "openPrice": {"bid": o_val, "ask": o_val, "lastTraded": None},
+                    "highPrice": {"bid": h_val, "ask": h_val, "lastTraded": None},
+                    "lowPrice": {"bid": l_val, "ask": l_val, "lastTraded": None},
+                    "closePrice": {"bid": c_val, "ask": c_val, "lastTraded": None}
+                }
+                found = False
+                for i_d, cd in enumerate(c_d1):
+                    if cd.get("snapshotTime", "")[:10] == str_venerdi:
+                        c_d1[i_d] = dict_d1
+                        found = True
+                        break
+                if not found:
+                    c_d1.append(dict_d1)
+                if len(c_d1) > 60:
+                    c_d1 = c_d1[-60:]
+                salva_candele_locali(nome, "DAY", c_d1)
+                print_log(nome, f"🛡️ [SAFEGUARD] Consolidata candela mancante D1 venerdì: O={o_val} H={h_val} L={l_val} C={c_val}")
+        except Exception as e_sg:
+            pass
+
 def aggiorna_radar_trend(prezzi_live, memoria_attuale):
     """Scansiona tutti gli strumenti sui 3 TF (H1, H4, D1) per calcolare la distanza da KJ55 e inviare alert di prossimità."""
     if not prezzi_live:
@@ -1021,6 +1117,7 @@ def aggiorna_candele_live_globale(prezzi_live):
     now_t = now_it()
     min_tot = now_t.hour * 60 + now_t.minute
     candele_chiuse = {}
+    is_venerdi_23 = (now_t.weekday() == 4 and now_t.hour == 23)
     
     for nome, cfg in CONFIG_STRUMENTI.items():
         live_px = prezzi_live.get(nome)
@@ -1028,6 +1125,10 @@ def aggiorna_candele_live_globale(prezzi_live):
             continue
             
         for tf in ["HOUR", "HOUR_4", "DAY"]:
+            # Se per questo strumento e timeframe la chiusura anticipata del venerdì sera è già avvenuta, salta
+            if is_venerdi_23 and (nome, tf, now_t.date()) in FRIDAY_23_CLOSED_DONE:
+                continue
+
             min_tf = TF_MAP.get(tf, 60)
             # REGOLA FERREA H4: Chiusure rigorosamente alle 01:00, 05:00, 09:00, 13:00, 17:00, 21:00 ora italiana
             offset = 60 if min_tf in (60, 240, 1440) else 0
@@ -1036,8 +1137,17 @@ def aggiorna_candele_live_globale(prezzi_live):
             curr_dt = base_dt + datetime.timedelta(minutes=boundary_min)
             curr_snap = curr_dt.strftime("%Y/%m/%d %H:%M:00")
             
+            # CHIUSURA WEEKEND VENERDÌ 23:00:
+            # Alle 23:00 del venerdì i mercati chiudono. Le candele H4 (delle 21:00) e D1 (del venerdì)
+            # devono chiudersi alle 23:00 come se fosse l'01:00 di sabato mattina.
+            if is_venerdi_23 and tf in ("HOUR_4", "DAY"):
+                curr_snap = f"{base_dt.strftime('%Y/%m/%d')} 23:00:00"
+            
             tracker = LIVE_OHLC_TRACKER.get((nome, tf))
             if not tracker:
+                # Durante la chiusura del venerdì non aprire tracker se non esistenti
+                if is_venerdi_23:
+                    continue
                 # Durante la pausa tecnica (23:00-00:00) per Spot Gold e Oil non aprire tracker H1
                 if tf == "HOUR" and is_session_break_active(nome, now_t):
                     continue
@@ -1054,7 +1164,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 
                 # REGOLA COMEX/NYMEX: Spot Gold e Oil - US Crude non hanno candela H1 alle 23:00
                 # Scarta la candela fake e reimposta il tracker sulla nuova candela (es. 00:00)
-                if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude") and " 23:00:00" in closed_snap:
+                if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude") and " 23:00:00" in closed_snap and not is_venerdi_23:
                     LIVE_OHLC_TRACKER[(nome, tf)] = {
                         "snap": curr_snap,
                         "open": live_px,
@@ -1089,23 +1199,53 @@ def aggiorna_candele_live_globale(prezzi_live):
                     except Exception:
                         pass
 
-                # Reset tracker per la nuova candela che si apre adesso
-                LIVE_OHLC_TRACKER[(nome, tf)] = {
-                    "snap": curr_snap,
-                    "open": live_px,
-                    "high": live_px,
-                    "low": live_px,
-                    "close": live_px
-                }
+                # Arricchimento per DAY: unisci e consolida con le candele H1 orarie del giorno
+                elif tf == "DAY":
+                    try:
+                        c_h1 = carica_candele_locali(nome, "HOUR")
+                        h1_match = [c for c in c_h1 if c.get("snapshotTime") and closed_snap <= c["snapshotTime"] < curr_snap]
+                        if h1_match:
+                            o_val = float(h1_match[0]["openPrice"]["bid"])
+                            h_val = max(max(float(c["highPrice"]["bid"]) for c in h1_match), tracker["high"])
+                            l_val = min(min(float(c["lowPrice"]["bid"]) for c in h1_match), tracker["low"])
+                            c_val = float(h1_match[-1]["closePrice"]["bid"]) if h1_match[-1].get("closePrice") else tracker["close"]
+                            closed_candle_dict["openPrice"] = {"bid": o_val, "ask": o_val, "lastTraded": None}
+                            closed_candle_dict["highPrice"] = {"bid": h_val, "ask": h_val, "lastTraded": None}
+                            closed_candle_dict["lowPrice"] = {"bid": l_val, "ask": l_val, "lastTraded": None}
+                            closed_candle_dict["closePrice"] = {"bid": c_val, "ask": c_val, "lastTraded": None}
+                            closed_candle_dict["snapshotTime"] = f"{closed_snap[:10]} 00:00:00"
+                    except Exception:
+                        pass
+
+                # Reset tracker per la nuova candela (o memorizzazione chiusura weekend)
+                if is_venerdi_23:
+                    FRIDAY_23_CLOSED_DONE.add((nome, tf, now_t.date()))
+                    LIVE_OHLC_TRACKER.pop((nome, tf), None)
+                else:
+                    LIVE_OHLC_TRACKER[(nome, tf)] = {
+                        "snap": curr_snap,
+                        "open": live_px,
+                        "high": live_px,
+                        "low": live_px,
+                        "close": live_px
+                    }
                 
-                # Aggiornamento storico locale (FIFO: mantieni sempre ultime 60 candele)
+                # Aggiornamento storico locale (FIFO: mantieni sempre ultime 60 candele, aggiornando se già presente)
                 c_loc = carica_candele_locali(nome, tf)
-                snaps = {c.get("snapshotTime") for c in c_loc if "snapshotTime" in c}
-                if closed_snap not in snaps:
+                target_snap_c = closed_candle_dict["snapshotTime"]
+                found_idx = None
+                for idx, c in enumerate(c_loc):
+                    st = c.get("snapshotTime", "")
+                    if st == target_snap_c or (tf == "DAY" and st[:10] == target_snap_c[:10]):
+                        found_idx = idx
+                        break
+                if found_idx is not None:
+                    c_loc[found_idx] = closed_candle_dict
+                else:
                     c_loc.append(closed_candle_dict)
-                    if len(c_loc) > 60:
-                        c_loc = c_loc[-60:]
-                    salva_candele_locali(nome, tf, c_loc)
+                if len(c_loc) > 60:
+                    c_loc = c_loc[-60:]
+                salva_candele_locali(nome, tf, c_loc)
                 
                 tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else "D1")
                 dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
@@ -1475,6 +1615,12 @@ def esegui_ciclo_trend():
     except Exception:
         pass
         
+    # Verifica e salvaguardia consolidamento venerdì sera se siamo a mercati chiusi
+    try:
+        garantisce_candele_venerdi_chiuse(prezzi_live)
+    except Exception:
+        pass
+
     # Aggiornamento continuo Radar Trend (calcolo distanze KJ55 su tutti i 4 TF a 0 API)
     # Eseguito SEMPRE anche a mercati chiusi per consentire il monitoraggio Dashboard
     try:

@@ -1476,27 +1476,25 @@
   },
   {
     "snapshotTime": "2026/09/11 00:00:00",
-    "snapshotTimeUTC": "2026-09-10T22:00:00",
     "openPrice": {
       "bid": 154.331,
-      "ask": 154.451,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 154.453,
-      "ask": 154.463,
+      "ask": 154.331,
       "lastTraded": null
     },
     "highPrice": {
       "bid": 154.526,
-      "ask": 154.542,
+      "ask": 154.526,
       "lastTraded": null
     },
     "lowPrice": {
       "bid": 154.33,
-      "ask": 154.367,
+      "ask": 154.33,
       "lastTraded": null
     },
-    "lastTradedVolume": 4294
+    "closePrice": {
+      "bid": 154.432,
+      "ask": 154.432,
+      "lastTraded": null
+    }
   }
 ]

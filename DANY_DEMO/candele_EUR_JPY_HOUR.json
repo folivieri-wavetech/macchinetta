@@ -1,105 +1,5 @@
 [
   {
-    "snapshotTime": "2026/09/08 14:00:00",
-    "snapshotTimeUTC": "2026-09-08T12:00:00",
-    "openPrice": {
-      "bid": 179.139,
-      "ask": 179.16,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 178.713,
-      "ask": 178.734,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 179.219,
-      "ask": 179.24,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 178.679,
-      "ask": 178.7,
-      "lastTraded": null
-    },
-    "lastTradedVolume": 8336
-  },
-  {
-    "snapshotTime": "2026/09/08 15:00:00",
-    "snapshotTimeUTC": "2026-09-08T13:00:00",
-    "openPrice": {
-      "bid": 178.712,
-      "ask": 178.733,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 178.763,
-      "ask": 178.778,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 178.905,
-      "ask": 178.926,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 178.627,
-      "ask": 178.648,
-      "lastTraded": null
-    },
-    "lastTradedVolume": 7204
-  },
-  {
-    "snapshotTime": "2026/09/08 16:00:00",
-    "snapshotTimeUTC": "2026-09-08T14:00:00",
-    "openPrice": {
-      "bid": 178.764,
-      "ask": 178.779,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 179.12,
-      "ask": 179.135,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 179.147,
-      "ask": 179.168,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 178.756,
-      "ask": 178.771,
-      "lastTraded": null
-    },
-    "lastTradedVolume": 6085
-  },
-  {
-    "snapshotTime": "2026/09/08 17:00:00",
-    "snapshotTimeUTC": "2026-09-08T15:00:00",
-    "openPrice": {
-      "bid": 179.121,
-      "ask": 179.136,
-      "lastTraded": null
-    },
-    "closePrice": {
-      "bid": 179.317,
-      "ask": 179.332,
-      "lastTraded": null
-    },
-    "highPrice": {
-      "bid": 179.383,
-      "ask": 179.401,
-      "lastTraded": null
-    },
-    "lowPrice": {
-      "bid": 179.118,
-      "ask": 179.133,
-      "lastTraded": null
-    },
-    "lastTradedVolume": 4190
-  },
-  {
     "snapshotTime": "2026/09/08 18:00:00",
     "snapshotTimeUTC": "2026-09-08T16:00:00",
     "openPrice": {
@@ -1498,5 +1398,97 @@
       "lastTraded": null
     },
     "lastTradedVolume": 1653
+  },
+  {
+    "snapshotTime": "2026/09/11 22:00:00",
+    "openPrice": {
+      "bid": 179.3,
+      "ask": 179.3,
+      "lastTraded": null
+    },
+    "highPrice": {
+      "bid": 179.55,
+      "ask": 179.55,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 179.25,
+      "ask": 179.25,
+      "lastTraded": null
+    },
+    "closePrice": {
+      "bid": 179.48,
+      "ask": 179.48,
+      "lastTraded": null
+    }
+  },
+  {
+    "snapshotTime": "2026/09/13 22:00:00",
+    "openPrice": {
+      "bid": 181.5,
+      "ask": 181.5,
+      "lastTraded": null
+    },
+    "highPrice": {
+      "bid": 181.5,
+      "ask": 181.5,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 181.5,
+      "ask": 181.5,
+      "lastTraded": null
+    },
+    "closePrice": {
+      "bid": 181.5,
+      "ask": 181.5,
+      "lastTraded": null
+    }
+  },
+  {
+    "snapshotTime": "2026/09/13 23:00:00",
+    "openPrice": {
+      "bid": 181.55,
+      "ask": 181.55,
+      "lastTraded": null
+    },
+    "highPrice": {
+      "bid": 181.55,
+      "ask": 181.55,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 181.55,
+      "ask": 181.55,
+      "lastTraded": null
+    },
+    "closePrice": {
+      "bid": 181.55,
+      "ask": 181.55,
+      "lastTraded": null
+    }
+  },
+  {
+    "snapshotTime": "2026/09/14 00:00:00",
+    "openPrice": {
+      "bid": 181.6,
+      "ask": 181.6,
+      "lastTraded": null
+    },
+    "highPrice": {
+      "bid": 181.6,
+      "ask": 181.6,
+      "lastTraded": null
+    },
+    "lowPrice": {
+      "bid": 181.6,
+      "ask": 181.6,
+      "lastTraded": null
+    },
+    "closePrice": {
+      "bid": 181.6,
+      "ask": 181.6,
+      "lastTraded": null
+    }
   }
 ]
