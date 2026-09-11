@@ -2023,15 +2023,27 @@ else:
             font-size: 0.75rem !important;
             min-width: 0 !important;
         }
+        /* Assicura visibilità continua per i pulsanti + e - degli stNumberInput */
+        div[data-testid="stNumberInput"] button {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        div[data-testid="stNumberInput"] button svg {
+            display: block !important;
+            visibility: visible !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "🛡️ Range", "📈 Trend", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_operativa, tab_trend, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📈 Sintesi Trend", "📈 Trend", "📋 Sintesi Range", "🛡️ Range", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_sintesi_trend, tab_trend, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📋 Sintesi Range", "📈 Sintesi Trend", "📄 Report"])
-        tab_portafoglio, tab_sintesi, tab_sintesi_trend, tab_report = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📈 Sintesi Trend", "📋 Sintesi Range", "📄 Report"])
+        tab_portafoglio, tab_sintesi_trend, tab_sintesi, tab_report = tabs
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
@@ -3183,11 +3195,22 @@ else:
                                 if current_tk is None:
                                     current_tk = calcola_kj55_da_candele_dash(candele_loc, periods=21)
                             
+                            px_live = None
+                            try:
+                                if bid != "-" and ask != "-":
+                                    px_live = (float(bid) + float(ask)) / 2.0
+                            except Exception:
+                                pass
+
                             dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                             kj_str = f"{current_kj:.{dec}f}" if current_kj is not None else "-"
                             tk_str = f"{current_tk:.{dec}f}" if current_tk is not None else "-"
                             st.markdown(f"<div style='font-size: 0.8rem; color: #aaa; margin-top:-10px; margin-bottom: 2px;'>Bid: {bid} | Ask: {ask}</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 6px;'><b style='color: #FFD700;'>🟡 Kijun ({tf_badge}):</b> <span style='color: #FFFF00; font-weight: 500;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan ({tf_badge}):</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.82rem; margin-bottom: 4px;'><b style='color: #FFD700;'>🟡 Kijun ({tf_badge}):</b> <span style='color: #FFFF00; font-weight: 500;'>{kj_str}</span> &nbsp;|&nbsp; <b style='color: #00BFFF;'>🔵 Tenkan ({tf_badge}):</b> <span style='color: #00BFFF;'>{tk_str}</span></div>", unsafe_allow_html=True)
+                            if current_kj is not None and px_live is not None:
+                                symb_comp = "&gt;" if px_live > current_kj else ("&lt;" if px_live < current_kj else "=")
+                                dir_comp = "LONG" if px_live > current_kj else ("SHORT" if px_live < current_kj else "NEUTRO")
+                                st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
@@ -3204,18 +3227,20 @@ else:
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
 
-                        c_r1, c_r2, c_r3, c_r4 = st.columns(4)
+                        c_r1, c_r2 = st.columns(2)
                         with c_r1:
                             tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
                             tf_keys = list(tf_map.keys())
                             idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
                             st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
                         with c_r2:
-                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, key=f"sz_{conto_selezionato}_{nome}")
+                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, format="%d", key=f"sz_{conto_selezionato}_{nome}")
+                        
+                        c_r3, c_r4 = st.columns(2)
                         with c_r3:
-                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, key=f"szm_{conto_selezionato}_{nome}")
+                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, format="%d", key=f"szm_{conto_selezionato}_{nome}")
                         with c_r4:
-                            st.number_input("Scala", value=int(scala_val), min_value=1, step=1, key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento")
+                            st.number_input("Scala", value=int(scala_val), min_value=1, step=1, format="%d", key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento")
                         
                         err_key = f"err_trend_{conto_selezionato}_{nome}"
                         if err_key in st.session_state and st.session_state[err_key]:
@@ -3230,13 +3255,6 @@ else:
                                 st.session_state[err_key] = ""
                                 st.rerun()
 
-                        px_live = None
-                        try:
-                            if bid != "-" and ask != "-":
-                                px_live = (float(bid) + float(ask)) / 2.0
-                        except Exception:
-                            pass
-
                         is_long_bloccato = (current_kj is not None and px_live is not None and px_live < current_kj)
                         is_short_bloccato = (current_kj is not None and px_live is not None and px_live > current_kj)
 
@@ -3245,9 +3263,9 @@ else:
                         elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
                             if current_kj is not None and px_live is not None:
                                 if is_short_bloccato:
-                                    st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}):</b> Consentito solo <b>LONG</b> (SHORT bloccato da Kijun).</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='font-size: 0.85rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
                                 elif is_long_bloccato:
-                                    st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}):</b> Consentito solo <b>SHORT</b> (LONG bloccato da Kijun).</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='font-size: 0.85rem; color: #FFA500; margin-bottom: 6px;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}): Direzione SHORT</b></div>", unsafe_allow_html=True)
 
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
