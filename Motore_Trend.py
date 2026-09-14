@@ -1862,20 +1862,7 @@ def esegui_ciclo_trend():
                                     aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
                                     print_log(nome, f"🎯 Trailing SL Core ({tf}) inizializzato a {engine.trailing_sl_core:.5f} (distanza KJ: {dist_kj/pip_val:.1f} pip)")
 
-                        # Trailing SL Incrementi: TK 20 / 20 (distanza TK >= 20 pip -> stop a 20 pip da Close)
-                        if engine.trailing_sl_incr is None and len(pos_incr) > 0 and engine.current_tk is not None:
-                            if stato_corrente == "SHORT":
-                                dist_tk = engine.current_tk - c_close
-                                if dist_tk >= (20 * pip_val):
-                                    engine.trailing_sl_incr = c_close + (20 * pip_val)
-                                    aggiorna_memoria(nome, {"trailing_sl_incr": engine.trailing_sl_incr})
-                                    print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
-                            elif stato_corrente == "LONG":
-                                dist_tk = c_close - engine.current_tk
-                                if dist_tk >= (20 * pip_val):
-                                    engine.trailing_sl_incr = c_close - (20 * pip_val)
-                                    aggiorna_memoria(nome, {"trailing_sl_incr": engine.trailing_sl_incr})
-                                    print_log(nome, f"🎯 Trailing SL incrementi inizializzato a {engine.trailing_sl_incr:.5f} (distanza TK: {dist_tk/pip_val:.1f} pip)")
+
                     except Exception:
                         pass
 
