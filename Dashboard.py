@@ -3273,7 +3273,7 @@ else:
 
                 if is_rollover_active():
                     msg_ora_roll_main = "21:58 - 00:15" if now_it().weekday() == 6 else "22:45 - 00:15"
-                    st.warning(f"🌙 **PAUSA ROLLOVER IN CORSO ({msg_ora_roll_main})**: Aperture Trend e ordini a mercato temporaneamente congelati per allargamento spread IG. Operatività regolare a partire dalle 00:15.")
+                    st.warning(f"🌙 **PAUSA ROLLOVER IN CORSO ({msg_ora_roll_main})**: operatività regolare a partire dalle 00:15.")
                 elif is_weekend_active():
                     st.info("🏖️ **MERCATI CHIUSI (WEEKEND)**: Avvii Trend e ordini a mercato sospesi fino all'apertura di domenica sera.")
 
