@@ -439,22 +439,26 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
                     accettato, confirm_data = verifica_conferma_deal(deal_ref, headers)
                     if not accettato:
                         reason = str(confirm_data)
-                        if "POSITION_NOT_FOUND" in reason or "deal-not-found" in reason:
+                        if "POSITION_NOT_FOUND" in reason or "deal-not-found" in reason or "POSITION_NOT_AVAILABLE_TO_CLOSE" in reason:
                             print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): posizione già chiusa su IG.")
+                            attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
                             return True
                         if tentativo < MAX_TENTATIVI:
                             print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] [IG REJECT] Chiusura {etichetta}: {confirm_data}")
                             time.sleep(2.0)
                     else:
                         print_log(nome_strumento, f"✅ Chiusura {etichetta} eseguita con successo.")
+                        attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
                         return True
                 else:
                     print_log(nome_strumento, f"✅ Chiusura {etichetta} inviata.")
+                    attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
                     return True
             else:
                 resp_txt = r.text if r else "Nessuna risposta"
-                if r and r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt):
+                if r and r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt or "POSITION_NOT_AVAILABLE_TO_CLOSE" in resp_txt):
                     print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): già liquidata su IG.")
+                    attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
                     return True
                 if tentativo < MAX_TENTATIVI:
                     print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Errore Chiusura {etichetta} ({dealId}): {resp_txt}")

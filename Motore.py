@@ -836,9 +836,14 @@ def chiudi_parziale(nome_strumento, dealId, epic, dir_chiusura, size, valuta, he
             r = ig_api_request('POST', f"{BASE_URL}/positions/otc", h, payload=p, timeout=10, logger_func=print_log)
             if r and r.status_code == 200: 
                 print_log(nome_strumento, f"✅ Chiusura posizione {etichetta} eseguita con successo.")
+                attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
                 return True
             else:
                 msg_err = r.text if r else "Nessuna risposta"
+                if "POSITION_NOT_FOUND" in msg_err or "POSITION_NOT_AVAILABLE_TO_CLOSE" in msg_err or "deal-not-found" in msg_err:
+                    print_log(nome_strumento, f"ℹ️ Chiusura posizione {etichetta} ({dealId}): già chiusa su IG.")
+                    attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
+                    return True
                 if tentativo < MAX_TENTATIVI:
                     print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Errore Chiusura {etichetta} ({dealId}): {msg_err}")
                     time.sleep(2)
