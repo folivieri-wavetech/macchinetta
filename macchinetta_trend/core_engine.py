@@ -200,8 +200,8 @@ class CoreEngine:
                 proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
 
                 if len(self.pm.increments) > 0:
-                    if proteggi_su_tk and c_close < tk:
-                        # Chiusura sotto Tenkan con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Minimo - 5 pip
+                    if proteggi_su_tk and c_close < (tk - 5 * pip_val - 1e-7):
+                        # Chiusura sotto Tenkan oltre tolleranza 5 pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Minimo - 5 pip
                         stop_livello_tk = closed_candle.low - (5 * pip_val)
                         if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                             self.signal_stop_price_tk = min(self.signal_stop_price_tk, stop_livello_tk)
@@ -216,7 +216,7 @@ class CoreEngine:
                             "tk": tk
                         })
                     else:
-                        # c_close >= tk oppure forbice stretta (<= soglia, respiro verso KJ): eventuale Candela Segnale TK azzerata
+                        # c_close in zona TK o sopra, oppure forbice stretta (<= soglia, respiro verso KJ): eventuale Candela Segnale TK azzerata
                         self.signal_candle_tk_active = False
                         self.signal_stop_price_tk = None
                 else:
@@ -247,8 +247,9 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
-                # Candela ha aperto sopra TK, close >= TK e distanza da TK <= 20 pip
-                if closed_candle.open > tk and c_close >= tk and (c_close - tk) <= (20 * pip_val + 1e-7):
+                # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sotto TK
+                tolleranza_tk = 5 * pip_val
+                if closed_candle.open > (tk - tolleranza_tk) and c_close >= (tk - tolleranza_tk - 1e-7) and (c_close - tk) <= (20 * pip_val + 1e-7):
                     # Candela rossa di almeno 1 pip su tutti i TF
                     if (closed_candle.open - closed_candle.close) >= (1 * pip_val - 1e-7):
                         entry_price = exec_price
@@ -332,8 +333,8 @@ class CoreEngine:
                 proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
 
                 if len(self.pm.increments) > 0:
-                    if proteggi_su_tk and c_close > tk:
-                        # Chiusura sopra Tenkan con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Massimo + 5 pip
+                    if proteggi_su_tk and c_close > (tk + 5 * pip_val + 1e-7):
+                        # Chiusura sopra Tenkan oltre tolleranza 5 pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Massimo + 5 pip
                         stop_livello_tk = closed_candle.high + (5 * pip_val)
                         if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                             self.signal_stop_price_tk = max(self.signal_stop_price_tk, stop_livello_tk)
@@ -348,7 +349,7 @@ class CoreEngine:
                             "tk": tk
                         })
                     else:
-                        # c_close <= tk oppure forbice stretta (<= soglia, respiro verso KJ): eventuale Candela Segnale TK azzerata
+                        # c_close in zona TK o sotto, oppure forbice stretta (<= soglia, respiro verso KJ): eventuale Candela Segnale TK azzerata
                         self.signal_candle_tk_active = False
                         self.signal_stop_price_tk = None
                 else:
@@ -379,8 +380,9 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
-                # Candela ha aperto sotto TK, close <= TK e distanza da TK <= 20 pip
-                if closed_candle.open < tk and c_close <= tk and (tk - c_close) <= (20 * pip_val + 1e-7):
+                # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sopra TK
+                tolleranza_tk = 5 * pip_val
+                if closed_candle.open < (tk + tolleranza_tk) and c_close <= (tk + tolleranza_tk + 1e-7) and (tk - c_close) <= (20 * pip_val + 1e-7):
                     # Candela verde di almeno 1 pip su tutti i TF
                     if (closed_candle.close - closed_candle.open) >= (1 * pip_val - 1e-7):
                         entry_price = exec_price
