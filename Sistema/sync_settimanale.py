@@ -118,21 +118,27 @@ def esegui_sync_candele(forza=False):
         return False, "Credenziali IG incomplete nel file .env"
 
     print(f"🔄 Avvio sincronizzazione settimanale candele (Settimana {chiave_settimana})...")
-    sess = requests.Session()
-    auth_resp = sess.post(
+    from ig_request_manager import ig_api_request
+
+    auth_payload = {"identifier": username, "password": password}
+    auth_headers = {
+        "X-IG-API-KEY": api_key,
+        "Version": "2",
+        "Content-Type": "application/json",
+        "Accept": "application/json; charset=UTF-8"
+    }
+
+    auth_resp = ig_api_request(
+        "POST",
         "https://demo-api.ig.com/gateway/deal/session",
-        json={"identifier": username, "password": password},
-        headers={
-            "X-IG-API-KEY": api_key,
-            "Version": "2",
-            "Content-Type": "application/json",
-            "Accept": "application/json; charset=UTF-8"
-        },
-        timeout=10
+        headers=auth_headers,
+        payload=auth_payload,
+        timeout=10,
+        logger_func=lambda tag, msg: print(f"[{tag}] {msg}")
     )
 
-    if auth_resp.status_code != 200:
-        msg_err = f"Autenticazione IG fallita: {auth_resp.status_code}"
+    if not auth_resp or auth_resp.status_code != 200:
+        msg_err = f"Autenticazione IG fallita: {auth_resp.status_code if auth_resp else 'Timeout/Errore'}"
         print(f"❌ {msg_err}")
         return False, msg_err
 
@@ -146,11 +152,11 @@ def esegui_sync_candele(forza=False):
         "Accept": "application/json; charset=UTF-8"
     }
 
-    # Circuit breaker: test chiamata singola
+    # Circuit breaker: test chiamata singola protetta da rate limiter
     test_url = "https://demo-api.ig.com/gateway/deal/prices/CS.D.GBPJPY.MINI.IP?resolution=HOUR&max=1"
-    test_r = sess.get(test_url, headers=req_headers, timeout=5)
-    if test_r.status_code == 403:
-        msg_err = "Circuit breaker: Quota IG esaurita (403), sincronizzazione annullata."
+    test_r = ig_api_request("GET", test_url, headers=req_headers, timeout=10, logger_func=lambda tag, msg: print(f"[{tag}] {msg}"))
+    if not test_r or test_r.status_code == 403:
+        msg_err = "Circuit breaker: Quota IG non disponibile (403), sincronizzazione annullata."
         print(f"🛑 {msg_err}")
         invia_ntfy("SYNC SETTIMANALE BLOCCATA", msg_err, "warning")
         return False, msg_err
@@ -170,8 +176,8 @@ def esegui_sync_candele(forza=False):
 
         for tf in TIMEFRAMES:
             url = f"https://demo-api.ig.com/gateway/deal/prices/{epic}?resolution={tf}&max=60&pageSize=0"
-            r = sess.get(url, headers=req_headers, timeout=10)
-            if r.status_code == 200:
+            r = ig_api_request("GET", url, headers=req_headers, timeout=10, logger_func=lambda tag, msg: print(f"[{tag}] {msg}"))
+            if r and r.status_code == 200:
                 prices = r.json().get("prices", [])
                 if len(prices) > 0:
                     fname = f"candele_{clean}_{tf}.json"
@@ -186,7 +192,8 @@ def esegui_sync_candele(forza=False):
                             os.replace(tmp, dest)
                         except Exception:
                             pass
-            time.sleep(0.5)
+            # Pausa prudenziale di 2.5s per evitare qualsiasi congestione con Motore
+            time.sleep(2.5)
 
     # Registra successo
     stato[chiave_settimana] = {

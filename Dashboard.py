@@ -528,10 +528,11 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
     h_v2 = h.copy()
     h_v2["VERSION"] = "2"
     
+    from ig_request_manager import ig_api_request
     try:
-        r = requests.get(f"{base_url}/positions", headers=h_v2, timeout=6)
-        if r.status_code != 200:
-            return False, f"Errore recupero posizioni IG ({r.status_code})", []
+        r = ig_api_request("GET", f"{base_url}/positions", headers=h_v2, timeout=8)
+        if not r or r.status_code != 200:
+            return False, f"Errore recupero posizioni IG ({r.status_code if r else 'Timeout'})", []
         
         pos_list = r.json().get("positions", [])
         chiusi = 0
@@ -570,16 +571,16 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
                         "size": str(int(size)) if float(size).is_integer() else str(size),
                         "orderType": "MARKET"
                     }
-                    r_c = requests.post(f"{base_url}/positions/otc", json=body, headers=h_del, timeout=8)
+                    r_c = ig_api_request("POST", f"{base_url}/positions/otc", headers=h_del, payload=body, timeout=10)
                     accettato = False
-                    if r_c.status_code == 200:
+                    if r_c and r_c.status_code == 200:
                         ref = r_c.json().get("dealReference")
                         if ref:
                             for _ in range(4):
-                                time.sleep(0.5)
+                                time.sleep(1.0)
                                 try:
-                                    r_conf = requests.get(f"{base_url}/confirms/{ref}", headers={"X-IG-API-KEY": h.get("X-IG-API-KEY"), "CST": h.get("CST"), "X-SECURITY-TOKEN": h.get("X-SECURITY-TOKEN"), "VERSION": "1"}, timeout=5)
-                                    if r_conf.status_code == 200:
+                                    r_conf = ig_api_request("GET", f"{base_url}/confirms/{ref}", headers={"X-IG-API-KEY": h.get("X-IG-API-KEY"), "CST": h.get("CST"), "X-SECURITY-TOKEN": h.get("X-SECURITY-TOKEN"), "VERSION": "1"}, timeout=5)
+                                    if r_conf and r_conf.status_code == 200:
                                         c_data = r_conf.json()
                                         if c_data.get("dealStatus") == "ACCEPTED":
                                             accettato = True
