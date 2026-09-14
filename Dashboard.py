@@ -764,6 +764,19 @@ def dialog_sync_start(conto_partenza, nome_strumento):
             st.rerun()
         return
         
+    if is_rollover_active():
+        st.error("🛑 Avvio disabilitato fino alle 00:15.")
+        if st.button("❌ ANNULLA", key=f"sync_annulla_roll_{nome_strumento}"):
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+        return
+    elif is_weekend_active():
+        st.error("🛑 Avvio disabilitato durante il Weekend (mercati chiusi).")
+        if st.button("❌ ANNULLA", key=f"sync_annulla_wkd_{nome_strumento}"):
+            st.session_state[f"sync_open_{nome_strumento}"] = False
+            st.rerun()
+        return
+
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
         if st.button("⚡ CONFERMA AVVIO SINCRONO", type="primary", use_container_width=True, key=f"sync_conf_{nome_strumento}"):
@@ -3156,18 +3169,41 @@ else:
                                     memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False, "errore_ripristino": False, "alert_falso_allarme": False}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
+                            is_roll_r = is_rollover_active()
+                            is_wkd_r = is_weekend_active()
+
+                            if is_roll_r:
+                                st.warning("🌙 Avvio disabilitato fino alle 00:15.")
+                            elif is_wkd_r:
+                                st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
+
+                            dis_btn_range = is_roll_r or is_wkd_r
+                            help_range = "Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None)
+
                             col_l, col_s = st.columns(2)
                             with col_l:
-                                if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch"):
+                                if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
+                                    if is_roll_r:
+                                        st.error("🛑 Avvio disabilitato fino alle 00:15.")
+                                        st.rerun()
+                                    if is_wkd_r:
+                                        st.error("🛑 Avvio disabilitato durante il Weekend.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with col_s:
-                                if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch"):
+                                if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
+                                    if is_roll_r:
+                                        st.error("🛑 Avvio disabilitato fino alle 00:15.")
+                                        st.rerun()
+                                    if is_wkd_r:
+                                        st.error("🛑 Avvio disabilitato durante il Weekend.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
-                            if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True):
+                            if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=dis_btn_range, help=help_range):
                                 st.session_state[f"sync_open_{nome}"] = True
                                 st.rerun()
                             
@@ -3475,7 +3511,15 @@ else:
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
-                                if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch"):
+                                is_stop_dis = is_roll or is_wkd
+                                stop_help = "Chiusura/STOP disabilitato fino alle 00:15." if is_roll else ("Chiusura/STOP disabilitato nel Weekend." if is_wkd else None)
+                                if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch", disabled=is_stop_dis, help=stop_help):
+                                    if is_roll:
+                                        st.session_state[err_key] = "🛑 Chiusura/STOP disabilitato fino alle 00:15."
+                                        st.rerun()
+                                    if is_wkd:
+                                        st.session_state[err_key] = "🛑 Chiusura/STOP disabilitato durante il Weekend."
+                                        st.rerun()
                                     st.session_state[err_key] = ""
                                     ora_str = now_it().strftime("%d/%m %H:%M:%S")
                                     ok_ig, msg_ig, rimaste = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
@@ -3513,7 +3557,9 @@ else:
                                 tf_display = tf_map.get(tf_val, tf_val)
                                 pos_c = dati_salvati.get("posizioni_core", [])
                                 pos_i = dati_salvati.get("posizioni_incr", [])
-                                if dati_salvati.get("da_chiudere_a_riapertura") or stato_corrente == "IN_ATTESA_CHIUSURA":
+                                if is_roll:
+                                    st.warning(f"🌙 STOP disabilitato fino alle 00:15 | {direzione} ({tf_display})")
+                                elif dati_salvati.get("da_chiudere_a_riapertura") or stato_corrente == "IN_ATTESA_CHIUSURA":
                                     st.error(f"🔴 STOP RICHIESTO (Mercato Sospeso/Chiuso) | Posizione {direzione} in attesa liquidazione")
                                 elif direzione in ("LONG", "SHORT") and (pos_c or pos_i):
                                     st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")

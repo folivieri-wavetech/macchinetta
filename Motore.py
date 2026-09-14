@@ -1443,6 +1443,12 @@ def esegui_motore():
                             aggiorna_memoria(nome, {"allarme_distanza": False}, log_wip=f"✅ [EVENTO]: Volatilità rientrata. Il limite di IG ({ig_min_dist}pt) permette ai tuoi parametri ({min_param_impostato}pt) di operare.")
 
                     if stato == "IN_ATTESA":
+                        if is_rollover_time:
+                            msg_blocco = "🛑 Avvio Range ANNULLATO: richiesta pervenuta durante la Pausa Rollover (22:45 - 00:15). Riprova alle 00:15."
+                            print_log(nome, msg_blocco)
+                            invia_notifica("🛑 AVVIO RESPINTO (ROLLOVER)", f"[{nome}] {msg_blocco}", "alert")
+                            aggiorna_memoria(nome, {"attivo": False, "stato": "IN_ATTESA", "direzione": "", "errore_avvio": True, "msg_manuale": "Avvio disabilitato fino alle 00:15."}, log_wip="🛑 [EVENTO]: Avvio Range annullato durante la Pausa Rollover.")
+                            continue
                         if bid and ask:
                             dir_core = param.get("direzione")
                             prezzo_base = round(float(ask if dir_core == "LONG" else bid), dec)
