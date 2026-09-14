@@ -3367,9 +3367,9 @@ else:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
                         elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
                             if is_roll:
-                                st.warning(f"🌙 **Pausa Rollover in corso ({msg_ora_roll}):** Avvio temporaneamente disabilitato per allargamento spread. Riprova alle 00:15.")
+                                st.warning("🌙 Avvio disabilitato fino alle 00:15.")
                             elif is_wkd:
-                                st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio temporaneamente disabilitato fino alla riapertura.")
+                                st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
                             elif current_kj is not None and px_live is not None:
                                 if is_kj_short_bloccato:
                                     st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
@@ -3379,7 +3379,7 @@ else:
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
                                 if is_roll:
-                                    help_l = f"Bloccato durante Pausa Rollover ({msg_ora_roll})"
+                                    help_l = "Avvio disabilitato fino alle 00:15."
                                 elif is_wkd:
                                     help_l = "Bloccato durante il Weekend (mercati chiusi)"
                                 elif is_kj_long_bloccato:
@@ -3389,7 +3389,7 @@ else:
 
                                 if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=is_long_bloccato, help=help_l):
                                     if is_roll:
-                                        st.session_state[err_key] = f"🛑 BLOCCATO: Impossibile avviare LONG durante la Pausa Rollover ({msg_ora_roll}) per spread elevati. Riprova alle 00:15."
+                                        st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
                                         st.rerun()
                                     if is_wkd:
                                         st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare LONG durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
@@ -3423,7 +3423,7 @@ else:
                                     st.rerun()
                             with c_btn2:
                                 if is_roll:
-                                    help_s = f"Bloccato durante Pausa Rollover ({msg_ora_roll})"
+                                    help_s = "Avvio disabilitato fino alle 00:15."
                                 elif is_wkd:
                                     help_s = "Bloccato durante il Weekend (mercati chiusi)"
                                 elif is_kj_short_bloccato:
@@ -3433,7 +3433,7 @@ else:
 
                                 if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=is_short_bloccato, help=help_s):
                                     if is_roll:
-                                        st.session_state[err_key] = f"🛑 BLOCCATO: Impossibile avviare SHORT durante la Pausa Rollover ({msg_ora_roll}) per spread elevati. Riprova alle 00:15."
+                                        st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
                                         st.rerun()
                                     if is_wkd:
                                         st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare SHORT durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
