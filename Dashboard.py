@@ -3144,8 +3144,6 @@ else:
                                 memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
-                        elif is_sosp_rollover:
-                            st.warning("🌙 **PAUSA NOTTURNA (ROLLOVER) ATTIVA.** Le funzioni sono bloccate e gli ordini pendenti rimossi temporaneamente per protezione dallo spread. Ripresa automatica alle 00:15.")
                         elif modalita_manuale:
                             st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
                             col_m1, col_m2 = st.columns(2, vertical_alignment="center")
