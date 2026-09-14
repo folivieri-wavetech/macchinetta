@@ -2063,6 +2063,19 @@ def esegui_ciclo_trend():
         
         # Nel weekend (mercati chiusi fino a domenica 21:45), nessuna candela chiude
         if is_weekend_active():
+            if dati.get("needs_manual_start", False):
+                msg_blocco = "🛑 Avvio Trend ANNULLATO: richiesta pervenuta durante il Weekend (mercati chiusi). Riprova domenica sera dopo le 23:00."
+                print_log(nome, msg_blocco)
+                invia_notifica("🛑 AVVIO RESPINTO (WEEKEND)", f"[{nome}] {msg_blocco}", "alert")
+                engine.reset()
+                aggiorna_memoria(nome, {
+                    "attivo": False,
+                    "stato": "FLAT",
+                    "direzione": "",
+                    "errore_avvio": True,
+                    "needs_manual_start": False,
+                    "msg_manuale": msg_blocco
+                })
             continue
 
         live_px = prezzi_live.get(nome)
@@ -2112,6 +2125,19 @@ def esegui_ciclo_trend():
         # ma aperture trade ed esecuzioni a mercato congelate fino alle 00:15
         # -------------------------------------------------------------
         if in_rollover:
+            if dati.get("needs_manual_start", False):
+                msg_blocco = "🛑 Avvio Trend ANNULLATO: richiesta pervenuta durante la Pausa Rollover (22:45 - 00:15). Operatività a mercato congelata per tutela spread IG. Riprova alle 00:15."
+                print_log(nome, msg_blocco)
+                invia_notifica("🛑 AVVIO RESPINTO (ROLLOVER)", f"[{nome}] {msg_blocco}", "alert")
+                engine.reset()
+                aggiorna_memoria(nome, {
+                    "attivo": False,
+                    "stato": "FLAT",
+                    "direzione": "",
+                    "errore_avvio": True,
+                    "needs_manual_start": False,
+                    "msg_manuale": msg_blocco
+                })
             continue
 
         pos_core = dati.get("posizioni_core", [])

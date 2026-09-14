@@ -9,7 +9,7 @@ import time
 import pandas as pd
 import requests
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time as dt_time
 try:
     from zoneinfo import ZoneInfo
     TZ_ITALIA = ZoneInfo("Europe/Rome")
@@ -18,6 +18,45 @@ except Exception:
 
 def now_it():
     return datetime.now(TZ_ITALIA)
+
+def is_rollover_active():
+    """
+    Ritorna True se siamo nella finestra di Rollover notturno / apertura domenica:
+    - Domenica sera: 21:58 - 23:59:59 (weekday 6)
+    - Lun-Gio sera: 22:45 - 23:59:59 (weekday 0, 1, 2, 3)
+    - Lun-Ven notte: 00:00 - 00:14:59 (weekday 0, 1, 2, 3, 4)
+    - Venerdì sera: 22:45 - 23:00:59 (weekday 4, freeze operatività prima del weekend)
+    """
+    ora = now_it()
+    t = ora.time()
+    wd = ora.weekday()
+    if wd == 6 and (dt_time(21, 58) <= t <= dt_time(23, 59, 59)):
+        return True
+    if wd in (0, 1, 2, 3) and (dt_time(22, 45) <= t <= dt_time(23, 59, 59)):
+        return True
+    if wd in (0, 1, 2, 3, 4) and (dt_time(0, 0) <= t <= dt_time(0, 14, 59)):
+        return True
+    if wd == 4 and (dt_time(22, 45) <= t <= dt_time(23, 0, 59)):
+        return True
+    return False
+
+def is_weekend_active():
+    """
+    Ritorna True se siamo nel weekend a mercati chiusi:
+    - Venerdì sera dalle 23:01 in poi (weekday 4, t >= 23:01)
+    - Sabato tutto il giorno (weekday 5)
+    - Domenica fino alle 21:57:59 (weekday 6, t < 21:58)
+    """
+    ora = now_it()
+    t = ora.time()
+    wd = ora.weekday()
+    if wd == 4 and t >= dt_time(23, 1):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < dt_time(21, 58):
+        return True
+    return False
 
 from dotenv import dotenv_values
 import plotly.graph_objects as go
@@ -831,7 +870,14 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     
     blocco_multiconto = False
     msg_blocco_multi = ""
-    if kj_dialog is not None and px_live_dialog is not None and isinstance(px_live_dialog, (int, float)):
+    if is_rollover_active():
+        blocco_multiconto = True
+        msg_ora_r = "21:58 - 00:15" if now_it().weekday() == 6 else "22:45 - 00:15"
+        msg_blocco_multi = f"🛑 **Blocco Pausa Rollover ({msg_ora_r}):** Impossibile avviare il Multiconto durante la pausa Rollover per tutela allargamento spread. Riprova alle 00:15."
+    elif is_weekend_active():
+        blocco_multiconto = True
+        msg_blocco_multi = "🛑 **Blocco Weekend:** Impossibile avviare il Multiconto durante il Weekend (mercati chiusi)."
+    elif kj_dialog is not None and px_live_dialog is not None and isinstance(px_live_dialog, (int, float)):
         if dir_trend == "SHORT" and px_live_dialog > kj_dialog:
             blocco_multiconto = True
             msg_blocco_multi = f"🛑 **Blocco Kijun ({tf_options[tf_scelto]}):** Impossibile avviare la gamba Trend in **SHORT** perché il Prezzo Live ({px_live_dialog:.{dec_d}f}) si trova sopra la Kijun ({kj_dialog:.{dec_d}f})."
@@ -2925,7 +2971,12 @@ else:
                                 str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
                             elif dati.get("needs_manual_start", False):
-                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(13,110,253,0.15); color: #0d6efd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🚀 AVVIO ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Esecuzione a mercato...</span></div>", unsafe_allow_html=True)
+                                if is_rollover_active():
+                                    c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🌙 IN ATTESA ROLLOVER ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Attesa fine Rollover 00:15...</span></div>", unsafe_allow_html=True)
+                                elif is_weekend_active():
+                                    c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🏖️ IN ATTESA WEEKEND ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Mercati chiusi...</span></div>", unsafe_allow_html=True)
+                                else:
+                                    c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(13,110,253,0.15); color: #0d6efd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🚀 AVVIO ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Esecuzione a mercato...</span></div>", unsafe_allow_html=True)
                             else:
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
@@ -3186,6 +3237,12 @@ else:
 
                 st.markdown("---")
 
+                if is_rollover_active():
+                    msg_ora_roll_main = "21:58 - 00:15" if now_it().weekday() == 6 else "22:45 - 00:15"
+                    st.warning(f"🌙 **PAUSA ROLLOVER IN CORSO ({msg_ora_roll_main})**: Aperture Trend e ordini a mercato temporaneamente congelati per allargamento spread IG. Operatività regolare a partire dalle 00:15.")
+                elif is_weekend_active():
+                    st.info("🏖️ **MERCATI CHIUSI (WEEKEND)**: Avvii Trend e ordini a mercato sospesi fino all'apertura di domenica sera.")
+
 
 
 
@@ -3297,23 +3354,47 @@ else:
                                 st.session_state[err_key] = ""
                                 st.rerun()
 
-                        is_long_bloccato = (current_kj is not None and px_live is not None and px_live < current_kj)
-                        is_short_bloccato = (current_kj is not None and px_live is not None and px_live > current_kj)
+                        is_roll = is_rollover_active()
+                        is_wkd = is_weekend_active()
+                        msg_ora_roll = "21:58 - 00:15" if now_it().weekday() == 6 else "22:45 - 00:15"
+
+                        is_kj_long_bloccato = (current_kj is not None and px_live is not None and px_live < current_kj)
+                        is_kj_short_bloccato = (current_kj is not None and px_live is not None and px_live > current_kj)
+                        is_long_bloccato = is_kj_long_bloccato or is_roll or is_wkd
+                        is_short_bloccato = is_kj_short_bloccato or is_roll or is_wkd
 
                         if tipo_strategia == "RANGE" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
                         elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
-                            if current_kj is not None and px_live is not None:
-                                if is_short_bloccato:
+                            if is_roll:
+                                st.warning(f"🌙 **Pausa Rollover in corso ({msg_ora_roll}):** Avvio temporaneamente disabilitato per allargamento spread. Riprova alle 00:15.")
+                            elif is_wkd:
+                                st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio temporaneamente disabilitato fino alla riapertura.")
+                            elif current_kj is not None and px_live is not None:
+                                if is_kj_short_bloccato:
                                     st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
-                                elif is_long_bloccato:
+                                elif is_kj_long_bloccato:
                                     st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}): Direzione SHORT</b></div>", unsafe_allow_html=True)
 
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
-                                help_l = f"Bloccato: Live ({px_live:.{dec}f}) < KJ ({current_kj:.{dec}f})" if is_long_bloccato else None
+                                if is_roll:
+                                    help_l = f"Bloccato durante Pausa Rollover ({msg_ora_roll})"
+                                elif is_wkd:
+                                    help_l = "Bloccato durante il Weekend (mercati chiusi)"
+                                elif is_kj_long_bloccato:
+                                    help_l = f"Bloccato: Live ({px_live:.{dec}f}) < KJ ({current_kj:.{dec}f})"
+                                else:
+                                    help_l = None
+
                                 if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=is_long_bloccato, help=help_l):
-                                    if is_long_bloccato:
+                                    if is_roll:
+                                        st.session_state[err_key] = f"🛑 BLOCCATO: Impossibile avviare LONG durante la Pausa Rollover ({msg_ora_roll}) per spread elevati. Riprova alle 00:15."
+                                        st.rerun()
+                                    if is_wkd:
+                                        st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare LONG durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
+                                        st.rerun()
+                                    if is_kj_long_bloccato:
                                         st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare LONG! Il prezzo Live ({px_live:.{dec}f}) si trova sotto la Kijun ({current_kj:.{dec}f}). Per andare LONG il prezzo deve trovarsi sopra la Kijun."
                                         st.rerun()
                                     st.session_state[err_key] = ""
@@ -3341,9 +3422,23 @@ else:
                                     st.session_state.target_tab = "Trend"
                                     st.rerun()
                             with c_btn2:
-                                help_s = f"Bloccato: Live ({px_live:.{dec}f}) > KJ ({current_kj:.{dec}f})" if is_short_bloccato else None
+                                if is_roll:
+                                    help_s = f"Bloccato durante Pausa Rollover ({msg_ora_roll})"
+                                elif is_wkd:
+                                    help_s = "Bloccato durante il Weekend (mercati chiusi)"
+                                elif is_kj_short_bloccato:
+                                    help_s = f"Bloccato: Live ({px_live:.{dec}f}) > KJ ({current_kj:.{dec}f})"
+                                else:
+                                    help_s = None
+
                                 if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=is_short_bloccato, help=help_s):
-                                    if is_short_bloccato:
+                                    if is_roll:
+                                        st.session_state[err_key] = f"🛑 BLOCCATO: Impossibile avviare SHORT durante la Pausa Rollover ({msg_ora_roll}) per spread elevati. Riprova alle 00:15."
+                                        st.rerun()
+                                    if is_wkd:
+                                        st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare SHORT durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
+                                        st.rerun()
+                                    if is_kj_short_bloccato:
                                         st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare SHORT! Il prezzo Live ({px_live:.{dec}f}) si trova sopra la Kijun ({current_kj:.{dec}f}). Per andare SHORT il prezzo deve trovarsi sotto la Kijun."
                                         st.rerun()
                                     st.session_state[err_key] = ""
@@ -3423,7 +3518,12 @@ else:
                                 elif direzione in ("LONG", "SHORT") and (pos_c or pos_i):
                                     st.success(f"🟢 ATTIVO TREND ({direzione}) | ({tf_display})")
                                 elif dati_salvati.get("needs_manual_start", False):
-                                    st.info(f"🚀 AVVIO IN CORSO ({direzione})...")
+                                    if is_roll:
+                                        st.warning(f"🌙 IN ATTESA FINE ROLLOVER (00:15) | ({direzione})")
+                                    elif is_wkd:
+                                        st.warning(f"🏖️ IN ATTESA WEEKEND | ({direzione})")
+                                    else:
+                                        st.info(f"🚀 AVVIO IN CORSO ({direzione})...")
                                 else:
                                     st.warning(f"⏳ FLAT | ({tf_display})")
                         
