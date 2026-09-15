@@ -1653,7 +1653,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
 
         col_radar_info, col_radar_btn = st.columns([5, 1.2])
         with col_radar_info:
-            st.html(f"""
+            st.markdown(f"""
             <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
             <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
             <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
@@ -1661,7 +1661,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
                 <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trend</b>: Posizione già a mercato</div>
             </div>
-            """)
+            """, unsafe_allow_html=True)
         with col_radar_btn:
             st.markdown("""
             <style>
@@ -1798,7 +1798,8 @@ def renderizza_schermata_radar(conto_selezionato=None):
                             col_txt = "#4ade80" if is_profit else "#f87171"
                             icon_d = "🟢" if is_profit else "🔴"
                             tag_d = "L" if st_dir == "LONG" else "S"
-                            pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt'>{icon_d} {tf_k} ({tag_d})</span>")
+                            title_p = f"Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt".replace("'", "&#39;")
+                            pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='{title_p}'>{icon_d} {tf_k} ({tag_d})</span>")
                     badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
                 else:
                     badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
@@ -1835,7 +1836,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                             col_dir_tr = "#4ade80" if is_profit else "#f87171"
                             icon_dir = "🟢" if is_profit else "🔴"
                             pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
-                            title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt"
+                            title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt".replace("'", "&#39;")
                             kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
                             return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
 
@@ -1875,7 +1876,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
             html_table += "</tbody></table>"
             html_output += html_table
         
-        st.html(html_output)
+        st.markdown(html_output, unsafe_allow_html=True)
     except Exception as err:
         st.error(f"⚠️ Errore rendering Radar Trend: {err}")
 
@@ -2163,12 +2164,13 @@ else:
         st.markdown("<div style='margin-top: 15px; margin-bottom: 5px;'></div>", unsafe_allow_html=True)
         is_radar_sel = (st.session_state.get("vista_sidebar", "CONTO") == "RADAR")
         if st.button("📡 RADAR TREND", key="btn_radar_sidebar", type="primary" if is_radar_sel else "secondary", use_container_width=True):
-            st.session_state.vista_sidebar = "CONTO" if is_radar_sel else "RADAR"
+            if is_radar_sel:
+                st.session_state.vista_sidebar = "CONTO"
+                st.session_state.target_tab = "Pfoglio"
+            else:
+                st.session_state.vista_sidebar = "RADAR"
+                st.session_state.target_tab = "Radar"
             st.rerun()
-
-    if st.session_state.get("vista_sidebar", "CONTO") == "RADAR":
-        renderizza_schermata_radar(conto_selezionato)
-        st.stop()
 
     ruolo = st.session_state.get("ruolo", "VIEWER")
     is_regista = (ruolo == "REGISTA")
@@ -2203,11 +2205,11 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📈 Sintesi Trend", "📈 Trend", "📋 Sintesi Range", "🛡️ Range", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_sintesi_trend, tab_trend, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Sintesi Trend", "📈 Trend", "📋 Sintesi Range", "🛡️ Range", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_radar, tab_sintesi_trend, tab_trend, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📈 Sintesi Trend", "📋 Sintesi Range", "📄 Report"])
-        tab_portafoglio, tab_sintesi_trend, tab_sintesi, tab_report = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Sintesi Trend", "📋 Sintesi Range", "📄 Report"])
+        tab_portafoglio, tab_radar, tab_sintesi_trend, tab_sintesi, tab_report = tabs
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
@@ -2220,7 +2222,12 @@ else:
                     for (let t of tabs) {{
                         const txt = (t.innerText || t.textContent || "").trim();
                         if ("{target_tab_to_open}" === "Trend") {{
-                            if (txt.includes("Trend") && !txt.includes("Sintesi")) {{
+                            if (txt.includes("Trend") && !txt.includes("Sintesi") && !txt.includes("Radar")) {{
+                                t.click();
+                                break;
+                            }}
+                        }} else if ("{target_tab_to_open}" === "Radar") {{
+                            if (txt.includes("Radar")) {{
                                 t.click();
                                 break;
                             }}
@@ -2232,7 +2239,7 @@ else:
                 }} catch(e) {{
                     console.error("Tab switch error:", e);
                 }}
-            }}, 150);
+            }}, 120);
             </script>
         """, height=0, width=0)
 
@@ -2691,6 +2698,12 @@ else:
             st.html(html_ord)
             
         renderizza_portafoglio()
+
+    with tab_radar:
+        @st.fragment(run_every=15)
+        def renderizza_tab_radar():
+            renderizza_schermata_radar(conto_selezionato)
+        renderizza_tab_radar()
 
     with tab_sintesi:
         @st.fragment(run_every=15)
