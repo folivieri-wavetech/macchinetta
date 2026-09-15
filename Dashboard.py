@@ -3137,15 +3137,21 @@ else:
                         errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
                         stato_corrente_disp = stato_corrente.replace("OverGain", "OG").replace("OverLoss", "OL")
                     
-                        tp_val = dati_salvati.get("tp")
-                        if tp_val is None or tp_val < 80:
-                            tp_val = tp_default
-                        opp_val = dati_salvati.get("opp")
-                        if opp_val is None:
-                            opp_val = opp_default
-                        dts_val = dati_salvati.get("dts")
-                        if dts_val is None:
-                            dts_val = dts_default
+                        if not stato_attivo:
+                            has_custom = dati_salvati.get("custom_override", False)
+                            if has_custom and dati_salvati.get("tp") and dati_salvati.get("tp") >= 80:
+                                tp_val = dati_salvati.get("tp")
+                                opp_val = dati_salvati.get("opp", int(round(tp_val / 4.0)))
+                                dts_val = dati_salvati.get("dts", int(round(tp_val / 8.0)))
+                            else:
+                                tp_val = tp_default
+                                opp_val = opp_default
+                                dts_val = dts_default
+                        else:
+                            tp_val = dati_salvati.get("tp", tp_default)
+                            opp_val = dati_salvati.get("opp", opp_default)
+                            dts_val = dati_salvati.get("dts", dts_default)
+
                         min_impostato = min(opp_val, dts_val, tp_val / 4)
                         min_richiesto_ig = distanze_minime.get(nome, 0)
                         is_distanza_pericolosa = min_richiesto_ig > 0 and min_impostato <= min_richiesto_ig
@@ -3167,6 +3173,7 @@ else:
                                     "opp": st.session_state.get(f"{conto_selezionato}_{nome}_opp", opp_val), 
                                     "dts": st.session_state.get(f"{conto_selezionato}_{nome}_dts", dts_val), 
                                     "size": st.session_state.get(f"{conto_selezionato}_{nome}_size", dati_salvati.get("size", size_default)),
+                                    "custom_override": True,
                                     "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""
                                 }
                                 salva_memoria(conto_selezionato, memoria_attuale)
@@ -3174,7 +3181,7 @@ else:
                             
                         with col_pulisci:
                             if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help="Forza pulizia su IG e resetta a zero", width="stretch"):
-                                memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "custom_override": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
                     
