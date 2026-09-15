@@ -246,8 +246,8 @@ def print_log(strumento, messaggio):
             with open(CONSOLE_LOG_FILE, "r", encoding="utf-8") as f:
                 righe = f.readlines()
         righe.append(riga + "\n")
-        if len(righe) > 500:
-            righe = righe[-500:]
+        if len(righe) > 1500:
+            righe = righe[-1500:]
         with open(CONSOLE_LOG_FILE, "w", encoding="utf-8") as f:
             f.writelines(righe)
     except Exception:
@@ -928,6 +928,42 @@ def calcola_kj55_da_candele(candele_list, periods=55):
     lowest = min(v[1] for v in valid)
     return (highest + lowest) / 2.0
 
+def calcola_atr_da_candele(candele_list, periods=21):
+    """Calcola l'ATR a 21 periodi (formula standard Wilder). Restituisce il valore in delta prezzo."""
+    if not candele_list or len(candele_list) < 2:
+        return None
+    trs = []
+    for i in range(1, len(candele_list)):
+        c_curr = candele_list[i]
+        c_prev = candele_list[i-1]
+        
+        def _get_val(c, field):
+            p = c.get(field)
+            if isinstance(p, dict):
+                return p.get('bid') or p.get('mid') or p.get('ask')
+            return p
+            
+        h = _get_val(c_curr, 'highPrice') or c_curr.get('high')
+        l = _get_val(c_curr, 'lowPrice') or c_curr.get('low')
+        prev_close = _get_val(c_prev, 'closePrice') or c_prev.get('close')
+        
+        if h is not None and l is not None and prev_close is not None:
+            try:
+                vh, vl, vpc = float(h), float(l), float(prev_close)
+                tr = max(vh - vl, abs(vh - vpc), abs(vl - vpc))
+                trs.append(tr)
+            except (ValueError, TypeError):
+                pass
+                
+    if len(trs) < min(periods, 10):
+        return None
+        
+    p_eff = min(periods, len(trs))
+    atr_wilder = sum(trs[:p_eff]) / float(p_eff)
+    for tr in trs[p_eff:]:
+        atr_wilder = (atr_wilder * (periods - 1) + tr) / float(periods)
+    return atr_wilder
+
 def garantisce_candele_venerdi_chiuse(prezzi_live=None):
     """
     Safeguard per il fine settimana:
@@ -1063,9 +1099,15 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                 dir_pos = "Possibile Entrata"
                 is_vicino = (dist_pips <= 15)
                 
+                atr_tf = calcola_atr_da_candele(candele, periods=21)
+                atr_pips_val = (atr_tf / mult) if atr_tf is not None else None
+                tp_suggerito = max(40, int(round(atr_pips_val / 10.0) * 10)) if atr_pips_val is not None else 40
+
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": kj,
                     "tk": tk,
+                    "atr21": round(atr_pips_val, 1) if atr_pips_val is not None else None,
+                    "tp": tp_suggerito,
                     "dist_pips": int(dist_pips),
                     "dir": dir_pos,
                     "vicino": is_vicino
@@ -1080,8 +1122,14 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                         RADAR_LAST_ALERT[k_alert] = now_ts
                         print_log("RADAR", f"📡 [{nome} {lbl}] {dir_pos} (distanza: {int(dist_pips)} punti, KJ55: {kj:.{dec}f})")
             else:
+                atr_tf = calcola_atr_da_candele(candele, periods=21)
+                atr_pips_val = (atr_tf / mult) if atr_tf is not None else None
+                tp_suggerito = max(40, int(round(atr_pips_val / 10.0) * 10)) if atr_pips_val is not None else 40
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": None,
+                    "tk": None,
+                    "atr21": round(atr_pips_val, 1) if atr_pips_val is not None else None,
+                    "tp": tp_suggerito,
                     "dist_pips": None,
                     "dir": "-",
                     "vicino": False
@@ -1255,6 +1303,13 @@ def aggiorna_candele_live_globale(prezzi_live):
                 dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                 kj_agg = calcola_kj55_da_candele(c_loc, periods=55)
                 tk_agg = calcola_kj55_da_candele(c_loc, periods=21)
+                atr_agg = calcola_atr_da_candele(c_loc, periods=21)
+                atr_str = ""
+                if atr_agg is not None:
+                    mult_strum = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                    atr_pips = atr_agg / mult_strum
+                    atr_str = f" | ATR21: {atr_pips:.1f}"
+
                 kj_tk_str = ""
                 if kj_agg is not None and tk_agg is not None:
                     kj_tk_str = f" | KJ: {kj_agg:.{dec}f} TK: {tk_agg:.{dec}f}"
@@ -1267,7 +1322,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 h_val = closed_candle_dict['highPrice']['bid']
                 l_val = closed_candle_dict['lowPrice']['bid']
                 c_val = closed_candle_dict['closePrice']['bid']
-                riga_log_candela = f"🕯️[{tf_lbl}]  {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{kj_tk_str}"
+                riga_log_candela = f"🕯️[{tf_lbl}]  {now_t.strftime('%H:%M')} | O: {o_val:.{dec}f} H: {h_val:.{dec}f} L: {l_val:.{dec}f} C: {c_val:.{dec}f}{atr_str}{kj_tk_str}"
                 print_log(nome, riga_log_candela)
                 candele_chiuse[(nome, tf)] = closed_candle_dict
                 try:

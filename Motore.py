@@ -134,8 +134,8 @@ def print_log(strumento, messaggio):
                 righe = f.readlines()
         righe.append(riga + "\n")
         
-        if len(righe) > 500:
-            righe = righe[-500:]
+        if len(righe) > 1500:
+            righe = righe[-1500:]
             
         with open(CONSOLE_LOG_FILE, "w", encoding="utf-8") as f:
             f.writelines(righe)

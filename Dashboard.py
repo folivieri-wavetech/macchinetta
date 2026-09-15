@@ -713,14 +713,17 @@ def dialog_sync_start(conto_partenza, nome_strumento):
     mem_partenza = carica_memoria(conto_partenza)
     dati_partenza = mem_partenza.get(nome_strumento, {})
     
-    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash", "Oil - US Crude"]
-    def_tp = 100 if is_asset else 50
-    def_opp = 20 if is_asset else 10
-    def_dts = 10 if is_asset else 5
+    def_tp, def_opp, def_dts = calcola_default_range_da_atr_dash(conto_partenza, nome_strumento)
     
-    tp_val = dati_partenza.get("tp", def_tp)
-    opp_val = dati_partenza.get("opp", def_opp)
-    dts_val = dati_partenza.get("dts", def_dts)
+    tp_val = dati_partenza.get("tp")
+    if tp_val is None or tp_val < 80:
+        tp_val = def_tp
+    opp_val = dati_partenza.get("opp")
+    if opp_val is None:
+        opp_val = def_opp
+    dts_val = dati_partenza.get("dts")
+    if dts_val is None:
+        dts_val = def_dts
     size_val = dati_partenza.get("size", 4)
     
     st.info(f"**Parametri di base (dal conto attuale):** TP = {tp_val} | OPP = {opp_val} | DTS = {dts_val} | Size = {size_val}")
@@ -855,13 +858,16 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     szm_t = mem_t.get("size_max", 5)
     sc_t = mem_t.get("scala", 1)
     
-    is_asset = nome_strumento in ["Spot Gold", "US 500 Cash", "Oil - US Crude"]
-    def_tp = 100 if is_asset else 50
-    def_opp = 20 if is_asset else 10
-    def_dts = 10 if is_asset else 5
-    tp_r = mem_r.get("tp", def_tp)
-    opp_r = mem_r.get("opp", def_opp)
-    dts_r = mem_r.get("dts", def_dts)
+    def_tp, def_opp, def_dts = calcola_default_range_da_atr_dash(conto_r, nome_strumento)
+    tp_r = mem_r.get("tp")
+    if tp_r is None or tp_r < 80:
+        tp_r = def_tp
+    opp_r = mem_r.get("opp")
+    if opp_r is None:
+        opp_r = def_opp
+    dts_r = mem_r.get("dts")
+    if dts_r is None:
+        dts_r = def_dts
     sz_r = mem_r.get("size", 4)
     
     # Controllo di coerenza Kijun per la gamba Trend
@@ -1549,6 +1555,60 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
     if px_live and isinstance(px_live, (int, float)):
         return [{"highPrice": {"bid": px_live, "ask": px_live}, "lowPrice": {"bid": px_live, "ask": px_live}}]
     return []
+
+def calcola_atr_da_candele_dash(candele_list, periods=21):
+    """Calcola l'ATR a 21 periodi (formula Wilder). Restituisce il valore in delta prezzo."""
+    if not candele_list or len(candele_list) < 2:
+        return None
+    trs = []
+    for i in range(1, len(candele_list)):
+        c_curr = candele_list[i]
+        c_prev = candele_list[i-1]
+        
+        def _get_val(c, field):
+            p = c.get(field)
+            if isinstance(p, dict):
+                return p.get('bid') or p.get('mid') or p.get('ask')
+            return p
+            
+        h = _get_val(c_curr, 'highPrice') or c_curr.get('high')
+        l = _get_val(c_curr, 'lowPrice') or c_curr.get('low')
+        prev_close = _get_val(c_prev, 'closePrice') or c_prev.get('close')
+        
+        if h is not None and l is not None and prev_close is not None:
+            try:
+                vh, vl, vpc = float(h), float(l), float(prev_close)
+                tr = max(vh - vl, abs(vh - vpc), abs(vl - vpc))
+                trs.append(tr)
+            except (ValueError, TypeError):
+                pass
+                
+    if len(trs) < min(periods, 10):
+        return None
+        
+    p_eff = min(periods, len(trs))
+    atr_wilder = sum(trs[:p_eff]) / float(p_eff)
+    for tr in trs[p_eff:]:
+        atr_wilder = (atr_wilder * (periods - 1) + tr) / float(periods)
+    return atr_wilder
+
+def calcola_default_range_da_atr_dash(conto, nome):
+    """Calcola TP, OPP, DTS consigliati per il Range usando ATR(21) Daily (D1) con step 20 e min 80."""
+    try:
+        candele_d1 = carica_candele_locali_dash(conto, nome, "DAY")
+        atr_d1 = calcola_atr_da_candele_dash(candele_d1, periods=21)
+        if atr_d1 is not None:
+            mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+            pips_d1 = atr_d1 / mult
+            tp_suggerito = max(80, int(round(pips_d1 / 20.0) * 20))
+        else:
+            tp_suggerito = 100 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else 80
+    except Exception:
+        tp_suggerito = 100 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else 80
+        
+    opp_suggerito = max(1, int(round(tp_suggerito / 4.0)))
+    dts_suggerito = max(1, int(round(tp_suggerito / 8.0)))
+    return tp_suggerito, opp_suggerito, dts_suggerito
 
 def renderizza_schermata_radar(conto_selezionato=None):
     try:
@@ -3077,7 +3137,15 @@ else:
                         errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
                         stato_corrente_disp = stato_corrente.replace("OverGain", "OG").replace("OverLoss", "OL")
                     
-                        tp_val, opp_val, dts_val = dati_salvati.get("tp", tp_default), dati_salvati.get("opp", opp_default), dati_salvati.get("dts", dts_default)
+                        tp_val = dati_salvati.get("tp")
+                        if tp_val is None or tp_val < 80:
+                            tp_val = tp_default
+                        opp_val = dati_salvati.get("opp")
+                        if opp_val is None:
+                            opp_val = opp_default
+                        dts_val = dati_salvati.get("dts")
+                        if dts_val is None:
+                            dts_val = dts_default
                         min_impostato = min(opp_val, dts_val, tp_val / 4)
                         min_richiesto_ig = distanze_minime.get(nome, 0)
                         is_distanza_pericolosa = min_richiesto_ig > 0 and min_impostato <= min_richiesto_ig
@@ -3131,11 +3199,11 @@ else:
                                 st.rerun()
                     
                         c_in1, c_in2 = st.columns(2)
-                        with c_in1: tp = st.number_input("TP", value=int(tp_val), step=5, format="%d", key=f"{conto_selezionato}_{nome}_tp")
-                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_opp")
+                        with c_in1: tp = st.number_input("TP", value=int(tp_val), min_value=80, step=20, format="%d", key=f"{conto_selezionato}_{nome}_tp")
+                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_opp")
                         
                         c_in3, c_in4 = st.columns(2)
-                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), step=1, format="%d", key=f"{conto_selezionato}_{nome}_dts")
+                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_dts")
                         with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
                     
                         if is_sospeso_wk:
@@ -3248,10 +3316,12 @@ else:
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
-                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else (50, 10, 5) ), 4)
+                        def_r1 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i])
+                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r1, 4)
                     with c2:
                         if i + 1 < len(tutti_strumenti):
-                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *( (100, 20, 10) if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else (50, 10, 5) ), 4)
+                            def_r2 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i+1])
+                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r2, 4)
 
             renderizza_dati_live()
 
@@ -3301,32 +3371,42 @@ else:
                         tf_selected = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
                         tf_badge = tf_map.get(tf_selected, "H1")
                         
+                        bid = prezzi_bid_ask.get(nome, {}).get("bid", "-")
+                        ask = prezzi_bid_ask.get(nome, {}).get("ask", "-")
+                        px_ref = bid if isinstance(bid, (int, float)) else (ask if isinstance(ask, (int, float)) else None)
+                        
+                        # Allineamento dinamico Kijun (KJ55), Tenkan (TK21) e ATR(21) con Radar Trend per il timeframe selezionato
+                        current_kj = None
+                        current_tk = None
+                        tp_calc_trend = None
+                        if radar_data and nome in radar_data:
+                            tf_info = radar_data[nome].get("timeframes", {}).get(tf_badge, {})
+                            current_kj = tf_info.get("kj")
+                            current_tk = tf_info.get("tk")
+                            tp_calc_trend = tf_info.get("tp")
+                        
+                        if current_kj is None or current_tk is None or tp_calc_trend is None:
+                            candele_loc = carica_candele_locali_dash(conto_selezionato, nome, tf_selected, px_live=px_ref)
+                            if current_kj is None:
+                                current_kj = calcola_kj55_da_candele_dash(candele_loc, periods=55)
+                            if current_tk is None:
+                                current_tk = calcola_kj55_da_candele_dash(candele_loc, periods=21)
+                            if tp_calc_trend is None:
+                                atr_tf = calcola_atr_da_candele_dash(candele_loc, periods=21)
+                                if atr_tf is not None:
+                                    mult_s = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                                    tp_calc_trend = max(40, int(round((atr_tf / mult_s) / 10.0) * 10))
+                                else:
+                                    tp_calc_trend = 40
+
                         col_titolo, col_salva = st.columns([4, 1], vertical_alignment="center")
                         with col_titolo:
                             auto_restart = st.checkbox("Auto-Restart", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
                             
                             badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
-                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
+                            tp_badge_str = f" <span style='color: #FFD700; font-size: 0.82rem; font-weight: bold; margin-left: 6px;'>(TP={tp_calc_trend})</span>"
+                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge + tp_badge_str)
                             st.markdown(titolo_html, unsafe_allow_html=True)
-                            
-                            bid = prezzi_bid_ask.get(nome, {}).get("bid", "-")
-                            ask = prezzi_bid_ask.get(nome, {}).get("ask", "-")
-                            
-                            # Allineamento dinamico Kijun (KJ55) e Tenkan (TK21) con Radar Trend per il timeframe selezionato
-                            current_kj = None
-                            current_tk = None
-                            if radar_data and nome in radar_data:
-                                tf_info = radar_data[nome].get("timeframes", {}).get(tf_badge, {})
-                                current_kj = tf_info.get("kj")
-                                current_tk = tf_info.get("tk")
-                            
-                            px_ref = bid if isinstance(bid, (int, float)) else (ask if isinstance(ask, (int, float)) else None)
-                            if current_kj is None or current_tk is None:
-                                candele_loc = carica_candele_locali_dash(conto_selezionato, nome, tf_selected, px_live=px_ref)
-                                if current_kj is None:
-                                    current_kj = calcola_kj55_da_candele_dash(candele_loc, periods=55)
-                                if current_tk is None:
-                                    current_tk = calcola_kj55_da_candele_dash(candele_loc, periods=21)
                             
                             px_live = None
                             try:
@@ -4084,6 +4164,11 @@ else:
                         riga_fmt = re.sub(
                             r"(TK:\s*[0-9\.]+)",
                             r"<span style='color: #00d2ff; font-weight: 600;'>\1</span>",
+                            riga_fmt
+                        )
+                        riga_fmt = re.sub(
+                            r"(ATR(?:21)?:\s*[0-9\.]+)",
+                            r"<span style='color: #c084fc; font-weight: 600;'>\1</span>",
                             riga_fmt
                         )
                         righe_html.append(f"<div style='padding: 1px 0;'>{riga_fmt}</div>")
