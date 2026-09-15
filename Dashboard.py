@@ -4163,12 +4163,46 @@ else:
             
                 try:
                     path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
+                    try:
+                        mtime_log = datetime.fromtimestamp(os.path.getmtime(path_log))
+                    except Exception:
+                        mtime_log = now_it()
                     with open(path_log, "r", encoding="utf-8") as f:
                         lines = [l.strip().replace("\r", " ").replace("\n", " ") for l in f.readlines() if l.strip()]
-                    # Mostra prima le righe più recenti in alto
-                    reversed_lines = list(reversed(lines))
+                    
+                    # Calcolo data per ciascuna riga andando a ritroso (gestione cambio mezzanotte)
+                    # La data [gg/mm] viene riservata esclusivamente alla sottotab Tentativi (5)
+                    tagged_reversed = []
+                    cur_d = mtime_log.date()
+                    last_h = None
+                    for riga in reversed(lines):
+                        m_dt = re.match(r"^\[(\d{1,2}/\d{1,2})\s+(\d{2}:\d{2}:\d{2})\]", riga)
+                        if m_dt:
+                            try:
+                                g, m = map(int, m_dt.group(1).split("/"))
+                                cur_d = cur_d.replace(month=m, day=g)
+                            except Exception:
+                                pass
+                            last_h = int(m_dt.group(2).split(":")[0])
+                            r_std = f"[{m_dt.group(2)}]" + riga[m_dt.end():]
+                            tagged_reversed.append((r_std, riga))
+                        else:
+                            m_t = re.match(r"^\[(\d{2}):(\d{2}):(\d{2})\]", riga)
+                            if m_t:
+                                h = int(m_t.group(1))
+                                if last_h is not None and h > last_h and (h - last_h) >= 12:
+                                    cur_d = cur_d - timedelta(days=1)
+                                last_h = h
+                                d_str = cur_d.strftime("%d/%m")
+                                r_con_data = f"[{d_str} {m_t.group(1)}:{m_t.group(2)}:{m_t.group(3)}]" + riga[m_t.end():]
+                                tagged_reversed.append((riga, r_con_data))
+                            else:
+                                tagged_reversed.append((riga, riga))
+
+                    reversed_lines = [item[0] for item in tagged_reversed]
                 except FileNotFoundError:
                     reversed_lines = [f"> In attesa di connessione col Motore per {conto_selezionato}..."]
+                    tagged_reversed = [(reversed_lines[0], reversed_lines[0])]
                 
                 def render_terminal_box(lista_righe, empty_msg="Nessun evento registrato in questa categoria."):
                     if not lista_righe:
@@ -4250,19 +4284,19 @@ else:
                 tentativi_lines = []
                 varie_lines = []
 
-                for riga in reversed_lines:
-                    r_up = riga.upper()
-                    # 1. Tentativi ripetuti e falliti (problematiche API IG)
+                for r_std, r_data in tagged_reversed:
+                    r_up = r_std.upper()
+                    # 1. Tentativi ripetuti e falliti (problematiche API IG) -> riceve r_data con [gg/mm]
                     is_tentativo = any(k in r_up for k in [
                         "TENTATIV", "RETRY", "CIRCUIT BREAKER", "FALLIT", "NON ANDAT", 
                         "RI-TENTATIV", "RATE LIMIT", "RIFIUTO API", "BACKOFF", "ATTESA 20S"
                     ]) or any(code in r_up for code in [" 403 ", "HTTP 403", "STATUS 403", "ERRORE 403", "[403]"])
                     if is_tentativo:
-                        tentativi_lines.append(riga)
+                        tentativi_lines.append(r_data)
 
-                    # 2. Candele chiuse
-                    if "CANDELA" in r_up or "🕯️" in riga:
-                        candele_lines.append(riga)
+                    # 2. Candele chiuse (standard senza data)
+                    if "CANDELA" in r_up or "🕯️" in r_std:
+                        candele_lines.append(r_std)
                     # 3. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.)
                     elif any(k in r_up for k in [
                         "CHIUSURA", "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
@@ -4271,7 +4305,7 @@ else:
                         "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI",
                         "PULIZIA [TICKET2]"
                     ]):
-                        chiusure_lines.append(riga)
+                        chiusure_lines.append(r_std)
                     # 4. Possibili entrate (segnali Radar e ordini di ingresso/restart/reverse)
                     elif any(k in r_up for k in [
                         "POSSIBILE ENTRATA", "RADAR", "OPEN CORE", "OPEN INCR", 
@@ -4280,10 +4314,10 @@ else:
                         "ORDINE OVERGAIN", "ORDINE OVERLOSS", "GRIGLIA ACCETTATA",
                         "REVERSE", "RESTART CORE", "RESTART LONG", "RESTART SHORT"
                     ]):
-                        entrate_lines.append(riga)
+                        entrate_lines.append(r_std)
                     # 5. Varie (sistema, connessioni, rollover, controlli tecnici)
                     else:
-                        varie_lines.append(riga)
+                        varie_lines.append(r_std)
 
                 sub_tabs = st.tabs([
                     "📋 Tutti", 

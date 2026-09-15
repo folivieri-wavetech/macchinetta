@@ -237,7 +237,15 @@ def verifica_notifiche_sistema_transizioni():
         )
 
 def print_log(strumento, messaggio):
-    ora = now_it().strftime("%H:%M:%S")
+    msg_up = messaggio.upper()
+    is_tent = any(k in msg_up for k in [
+        "TENTATIV", "RETRY", "CIRCUIT BREAKER", "FALLIT", "NON ANDAT", 
+        "RI-TENTATIV", "RATE LIMIT", "RIFIUTO API", "BACKOFF"
+    ]) or any(code in msg_up for code in [" 403 ", "HTTP 403", "STATUS 403", "ERRORE 403", "[403]"])
+    if is_tent:
+        ora = now_it().strftime("%d/%m %H:%M:%S")
+    else:
+        ora = now_it().strftime("%H:%M:%S")
     riga = f"[{ora}] [{strumento}] {messaggio}"
     print(f"[{NOME_CONTO}] {riga}")
     try:
