@@ -24,3 +24,15 @@
   - **NON tentare modifiche manuali o procedure alternative.**
   - **Chiedi direttamente all'utente di inviarti la nuova configurazione / nuovo token per `local.yaml`.**
   - Una volta fornito dall'utente, sovrascrivi `local.yaml` con il nuovo contenuto e ritesta subito con `.\kubectl.exe --kubeconfig=.\local.yaml get pods -n macchinetta`.
+
+---
+
+## ✍️ 3. Regola di Formattazione Testo: NESSUN Carattere Speciale LaTeX o Formule con Dollaro ($)
+- **DIVIETO ASSOLUTO DI SINTASSI LATEX**: Non usare MAI `$ ... $` o `$$ ... $$` per formule, espressioni matematiche, pip o frecce.
+  - **NO ASSOLUTO:** `$\text{TK} \pm 50\text{ pip}$`, `$\pm 5\text{ pip}$`, `$\ge$`, `$\le$`, `$\rightarrow$`
+  - **USA SOLO TESTO NORMALE O BACKTICK:**
+    - Scrivi: `TK +/- 50 pip` oppure **TK +/- 50 pip**
+    - Scrivi: `+/- 5 pip` oppure **+/- 5 pip**
+    - Scrivi: `>= 40 pip`, `<= 20 pip`
+    - Scrivi: `->` oppure `➡️`
+- L'utente vuole leggere testo pulito e naturale, senza artefatti di rendering o simboli del dollaro.
