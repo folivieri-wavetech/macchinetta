@@ -50,13 +50,13 @@ def test_scala_fifo():
     assert len(engine.pm.increments) == 3
     print("3° Incremento: size_max raggiunta a 10.")
     
-    # Ora con capienza piena (10), l'ingresso del 4° incremento a 158.55 deve chiudere in FIFO il 1° incremento
+    # Ora con capienza piena (10), l'ingresso del 4° incremento a 158.58 deve chiudere in FIFO il 1° incremento
     engine.seed_history([Candle(158.65, 158.75, 158.55, 158.65) for _ in range(55)])
-    c4 = Candle(158.55, 158.65, 158.55, 158.55)
-    evs4 = engine.on_candle_close(c4, 158.55)
-    assert any(e.get("type") in ("fifo_close", "tp_increment") for e in evs4)
+    c4 = Candle(158.55, 158.65, 158.55, 158.58)
+    evs4 = engine.on_candle_close(c4, 158.58)
+    assert any(e.get("type") == "fifo_close" for e in evs4)
     assert engine.pm.total_active_size() <= 10
-    print("4° Incremento: capienza gestita con successo (FIFO / TP)!")
+    print("4° Incremento: capienza gestita con successo tramite FIFO!")
 
 if __name__ == "__main__":
     test_scala_fifo()

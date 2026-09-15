@@ -97,14 +97,8 @@ class CoreEngine:
         return None
 
     def _get_increment_tp_pips(self):
-        """Restituisce il target Take Profit in pip per gli incrementi in base al Timeframe."""
-        tf_val = str(self.config.get("timeframe", "HOUR")).upper()
-        if "HOUR_4" in tf_val or "H4" in tf_val:
-            return 40
-        elif "DAY" in tf_val or "D1" in tf_val:
-            return 50
-        else:
-            return 30 # Default H1 (HOUR)
+        """Restituisce il target Take Profit in pip per gli incrementi rispetto a Tenkan (TK ± 50 pip su tutti i TF)."""
+        return self.config.get("increment_tp_tk_pips", 50)
 
     def _get_max_kj_tk_threshold_pips(self):
         """Restituisce la soglia di forbice Kijun-Tenkan in pip per Timeframe: H1=30, H4=40, D1=50."""
@@ -225,26 +219,29 @@ class CoreEngine:
 
             has_cleared_increments_long = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "LONG" and not has_cleared_increments_long:
-                # Take Profit Incrementi a fine candela: H1=+30 pip, H4=+40 pip, D1=+50 pip
+                # Take Profit Incrementi a fine candela: TK + 50 pip (chiusura in blocco di tutti gli incrementi con gain)
                 incr_tp_pips = self._get_increment_tp_pips()
-                if incr_tp_pips and len(self.pm.increments) > 0:
-                    tp_target_delta = incr_tp_pips * pip_val
-                    inc_to_close = [p for p in self.pm.increments if (c_close - p.entry_price) >= (tp_target_delta - 1e-7)]
-                    for inc in inc_to_close:
-                        inc.close(exec_price)
-                        self.pm.increments.remove(inc)
-                        self.pm.closed_positions.append(inc)
-                        events.append({
-                            "type": "tp_increment",
-                            "pnl": inc.pnl,
-                            "price": exec_price,
-                            "ticket": inc.ticket,
-                            "size": inc.size,
-                            "direction": "LONG",
-                            "tp_pips": incr_tp_pips
-                        })
-                    if inc_to_close:
-                        self.retracement_start_price = None
+                if incr_tp_pips and len(self.pm.increments) > 0 and tk is not None:
+                    tp_target_level = tk + (incr_tp_pips * pip_val)
+                    if c_close >= (tp_target_level - 1e-7):
+                        inc_to_close = [p for p in list(self.pm.increments) if (c_close - p.entry_price) > 1e-7]
+                        for inc in inc_to_close:
+                            inc.close(exec_price)
+                            self.pm.increments.remove(inc)
+                            self.pm.closed_positions.append(inc)
+                            diff_p = (c_close - inc.entry_price) / pip_val
+                            gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                            events.append({
+                                "type": "tp_increment",
+                                "pnl": inc.pnl,
+                                "price": exec_price,
+                                "ticket": inc.ticket,
+                                "size": inc.size,
+                                "direction": "LONG",
+                                "tp_pips": gained_pips
+                            })
+                        if inc_to_close:
+                            self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
                 # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sotto TK
@@ -358,26 +355,29 @@ class CoreEngine:
 
             has_cleared_increments_short = any(e.get("type") == "increments_cleared" for e in events)
             if self.current_direction == "SHORT" and not has_cleared_increments_short:
-                # Take Profit Incrementi a fine candela: H1=+30 pip, H4=+40 pip, D1=+50 pip
+                # Take Profit Incrementi a fine candela: TK - 50 pip (chiusura in blocco di tutti gli incrementi con gain)
                 incr_tp_pips = self._get_increment_tp_pips()
-                if incr_tp_pips and len(self.pm.increments) > 0:
-                    tp_target_delta = incr_tp_pips * pip_val
-                    inc_to_close = [p for p in self.pm.increments if (p.entry_price - c_close) >= (tp_target_delta - 1e-7)]
-                    for inc in inc_to_close:
-                        inc.close(exec_price)
-                        self.pm.increments.remove(inc)
-                        self.pm.closed_positions.append(inc)
-                        events.append({
-                            "type": "tp_increment",
-                            "pnl": inc.pnl,
-                            "price": exec_price,
-                            "ticket": inc.ticket,
-                            "size": inc.size,
-                            "direction": "SHORT",
-                            "tp_pips": incr_tp_pips
-                        })
-                    if inc_to_close:
-                        self.retracement_start_price = None
+                if incr_tp_pips and len(self.pm.increments) > 0 and tk is not None:
+                    tp_target_level = tk - (incr_tp_pips * pip_val)
+                    if c_close <= (tp_target_level + 1e-7):
+                        inc_to_close = [p for p in list(self.pm.increments) if (p.entry_price - c_close) > 1e-7]
+                        for inc in inc_to_close:
+                            inc.close(exec_price)
+                            self.pm.increments.remove(inc)
+                            self.pm.closed_positions.append(inc)
+                            diff_p = (inc.entry_price - c_close) / pip_val
+                            gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                            events.append({
+                                "type": "tp_increment",
+                                "pnl": inc.pnl,
+                                "price": exec_price,
+                                "ticket": inc.ticket,
+                                "size": inc.size,
+                                "direction": "SHORT",
+                                "tp_pips": gained_pips
+                            })
+                        if inc_to_close:
+                            self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sopra TK
@@ -463,10 +463,10 @@ class CoreEngine:
 
     def check_live_stops(self, current_price):
         """
-        Valuta Stop Loss e Take Profit in tempo reale (intracandela):
-        - Core: KJ +- 5 pip o Trailing SL Core
-        - Incrementi Stop: TK +- 10 pip o Trailing SL Incr
-        - Incrementi Take Profit: +30 pip (H1), +40 pip (H4), +50 pip (D1)
+        Valuta Stop Loss in tempo reale (intracandela):
+        - Core: KJ +- 15 pip o Trailing SL Core o Candela Segnale Min/Max +- 5 pip
+        - Incrementi Stop: Paracadute TK +- 15 pip o Candela Segnale TK Min/Max +- 5 pip
+        (Nota: il Take Profit Incrementi TK ± 50 pip viene valutato a fine candela)
         """
         events = []
         if not self.is_running or self.current_direction == "FLAT":
@@ -541,26 +541,7 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_min", "price": current_price})
                     self.retracement_start_price = None
 
-            # 5. Take Profit Incrementi (Live): H1=+30 pip, H4=+40 pip, D1=+50 pip dall'entry price
-            incr_tp_pips = self._get_increment_tp_pips()
-            if incr_tp_pips and len(self.pm.increments) > 0:
-                tp_target_delta = incr_tp_pips * pip_val
-                inc_to_close = [p for p in self.pm.increments if (current_price - p.entry_price) >= (tp_target_delta - 1e-7)]
-                for inc in inc_to_close:
-                    inc.close(current_price)
-                    self.pm.increments.remove(inc)
-                    self.pm.closed_positions.append(inc)
-                    events.append({
-                        "type": "tp_increment",
-                        "pnl": inc.pnl,
-                        "price": current_price,
-                        "ticket": inc.ticket,
-                        "size": inc.size,
-                        "direction": "LONG",
-                        "tp_pips": incr_tp_pips
-                    })
-                if inc_to_close:
-                    self.retracement_start_price = None
+            # Nota: Take Profit Incrementi (TK ± 50 pip) valutato esclusivamente a fine candela in on_candle_close
 
         elif self.current_direction == "SHORT":
             # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip o Trailing SL Core
@@ -622,26 +603,6 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_max", "price": current_price})
                     self.retracement_start_price = None
 
-            # 5. Take Profit Incrementi (Live): H1=+30 pip, H4=+40 pip, D1=+50 pip dall'entry price
-
-            incr_tp_pips = self._get_increment_tp_pips()
-            if incr_tp_pips and len(self.pm.increments) > 0:
-                tp_target_delta = incr_tp_pips * pip_val
-                inc_to_close = [p for p in self.pm.increments if (p.entry_price - current_price) >= (tp_target_delta - 1e-7)]
-                for inc in inc_to_close:
-                    inc.close(current_price)
-                    self.pm.increments.remove(inc)
-                    self.pm.closed_positions.append(inc)
-                    events.append({
-                        "type": "tp_increment",
-                        "pnl": inc.pnl,
-                        "price": current_price,
-                        "ticket": inc.ticket,
-                        "size": inc.size,
-                        "direction": "SHORT",
-                        "tp_pips": incr_tp_pips
-                    })
-                if inc_to_close:
-                    self.retracement_start_price = None
+            # Nota: Take Profit Incrementi (TK ± 50 pip) valutato esclusivamente a fine candela in on_candle_close
 
         return events
