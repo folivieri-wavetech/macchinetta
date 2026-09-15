@@ -4297,7 +4297,7 @@ else:
                     # 2. Candele chiuse (standard senza data)
                     if "CANDELA" in r_up or "🕯️" in r_std:
                         candele_lines.append(r_std)
-                    # 3. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.)
+                    # 3. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.) -> con data [gg/mm]
                     elif any(k in r_up for k in [
                         "CHIUSURA", "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
                         "FIFO INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE KJ",
@@ -4305,8 +4305,8 @@ else:
                         "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI",
                         "PULIZIA [TICKET2]"
                     ]):
-                        chiusure_lines.append(r_std)
-                    # 4. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi)
+                        chiusure_lines.append(r_data)
+                    # 4. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi) -> con data [gg/mm]
                     elif any(k in r_up for k in [
                         "INCREMENTO", "OPEN INCR", "INCR", "OPEN CORE", "CORE", 
                         "ENTRATA A MERCATO", "RESTART CORE", "RESTART LONG", "RESTART SHORT",
@@ -4315,11 +4315,11 @@ else:
                         "ORDINE OVERLOSS", "GRIGLIA ACCETTATA"
                     ]):
                         if "POSSIBILE ENTRATA" not in r_up and "RADAR" not in r_up:
-                            core_incrementi_lines.append(r_std)
-                    # 5. Varie (sistema, connessioni, rollover, controlli tecnici)
+                            core_incrementi_lines.append(r_data)
+                    # 5. Varie (sistema, connessioni, rollover, controlli tecnici) -> con data [gg/mm]
                     else:
                         if "POSSIBILE ENTRATA" not in r_up and "RADAR" not in r_up:
-                            varie_lines.append(r_std)
+                            varie_lines.append(r_data)
 
                 sub_tabs = st.tabs([
                     "📋 Tutti", 
