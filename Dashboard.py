@@ -168,7 +168,7 @@ def formatta_titolo_con_bandiere_orizzontale(nome, badge, extra_bandiere=""):
     }
     
     titolo = f"<span style='color: #FFD700;'>{nome}</span>"
-    extra_span = f"<span style='margin-left: 10px; font-size: 0.82rem; color: #FFD700; font-weight: bold;'>{extra_bandiere}</span>" if extra_bandiere else ""
+    extra_span = f"<span style='margin-left: 10px; font-size: 0.82rem; color: #FFA500; font-weight: bold;'>{extra_bandiere}</span>" if extra_bandiere else ""
     
     if len(nome) == 7 and nome[3] == '/':
         c1, c2 = nome[:3], nome[4:]
@@ -3197,9 +3197,9 @@ else:
                         atr_d1_val = calcola_atr_da_candele_dash(candele_d1, periods=21)
                         if atr_d1_val is not None:
                             mult_r = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
-                            atr_d1_pips = atr_d1_val / mult_r
+                            atr_d1_pips = int(round(atr_d1_val / mult_r))
                             unita_r = "pt" if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "pip"
-                            st.caption(f"📊 ATR(21) Live: **{atr_d1_pips:.1f} {unita_r}** ➡️ TP Live: **{tp_default}** (OPP: {opp_default} | DTS: {dts_default})")
+                            st.markdown(f"<div style='font-size: 0.82rem; color: #888; margin-top: 1px; margin-bottom: 3px;'>📊 <span style='color: #FFA500; font-weight: 600;'>ATR(21) Live: {atr_d1_pips} {unita_r}</span> ➡️ <span style='color: #FFA500; font-weight: 600;'>TP Live: {tp_default}</span> (OPP: {opp_default} | DTS: {dts_default})</div>", unsafe_allow_html=True)
 
                         margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
                         if margine_u != "N/D":
