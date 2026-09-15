@@ -4480,10 +4480,10 @@ else:
                                     try:
                                         dt = datetime.strptime(st_str, "%Y/%m/%d %H:%M:%S") + tf_delta
                                         ore_str = dt.strftime("%H:%M")
-                                        ts_str = dt.strftime("%H:%M:%S")
+                                        ts_str = dt.strftime("%H:%M")
                                     except Exception:
                                         ore_str = "--:--"
-                                        ts_str = "--:--:--"
+                                        ts_str = "--:--"
                                     
                                     o_v = last_c.get("openPrice", {}).get("bid")
                                     h_v = last_c.get("highPrice", {}).get("bid")
@@ -4504,7 +4504,7 @@ else:
                             
                             # 4. Fallback estremo solo se non vi è alcuna candela registrata
                             if not line_match:
-                                line_match = f"[--:--:--] [{s_nome}] 🕯️[{tf}]{atr_str_sub} | KJ: {kj_str} TK: {tk_str}"
+                                line_match = f"[--:--] [{s_nome}] 🕯️[{tf}]{atr_str_sub} | KJ: {kj_str} TK: {tk_str}"
                             
                             # Formattazione per terminal box: rimozione della parola Candela e di ore
                             line_match = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"[\1]  \2", line_match)
@@ -4512,9 +4512,13 @@ else:
                             line_match = re.sub(r"Candela\s*(\[[^\]]+\])\s*(?:ore\s*)?", r"\1  ", line_match)
                             line_match = re.sub(r"(🕯️\[[^\]]+\])\s*ore\s+", r"\1  ", line_match)
 
+                            # Sostituzione timestamp iniziale con solo [HH:MM] (senza secondi e senza data)
+                            line_match = re.sub(r"^\[(?:\d{1,2}/\d{1,2}\s+)?(\d{2}:\d{2})(?::\d{2})?\]", r"[\1]", line_match)
+                            line_match = re.sub(r"^\[--:--(?:--)?\]", r"[--:--]", line_match)
+
                             riga_esc = line_match.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                             riga_fmt = re.sub(
-                                r"^(\[(?:\d{1,2}/\d{1,2}\s+)?\d{2}:\d{2}:\d{2}|\[--:--:--\])",
+                                r"^(\[\d{2}:\d{2}\]|\[--:--\])",
                                 r"<span style='color: #64748b; font-weight: 500;'>\1</span>",
                                 riga_esc
                             )
