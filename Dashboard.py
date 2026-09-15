@@ -2201,6 +2201,11 @@ else:
             display: block !important;
             visibility: visible !important;
         }
+        /* Nasconde la linguetta della tab Radar dalla barra orizzontale in alto:
+           il Radar rimane accessibile unicamente tramite il pulsante dorato in Sidebar */
+        div[data-testid="stTabs"] div[role="tablist"] > button:nth-child(2) {
+            display: none !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -2213,35 +2218,47 @@ else:
         tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
-    if target_tab_to_open:
-        components.html(f"""
-            <script>
-            setTimeout(function() {{
-                try {{
-                    const tabs = window.parent.document.querySelectorAll('div[data-testid="stTabs"] button');
+    target_tab_js = target_tab_to_open if target_tab_to_open else ""
+    components.html(f"""
+        <script>
+        function gestisciTabs() {{
+            try {{
+                const tabs = window.parent.document.querySelectorAll('div[data-testid="stTabs"] button');
+                for (let t of tabs) {{
+                    const txt = (t.innerText || t.textContent || "").trim();
+                    if (txt.includes("Radar")) {{
+                        t.style.display = "none";
+                    }}
+                }}
+                const target = "{target_tab_js}";
+                if (target) {{
                     for (let t of tabs) {{
                         const txt = (t.innerText || t.textContent || "").trim();
-                        if ("{target_tab_to_open}" === "Trend") {{
+                        if (target === "Trend") {{
                             if (txt.includes("Trend") && !txt.includes("Sintesi") && !txt.includes("Radar")) {{
                                 t.click();
                                 break;
                             }}
-                        }} else if ("{target_tab_to_open}" === "Radar") {{
+                        }} else if (target === "Radar") {{
                             if (txt.includes("Radar")) {{
                                 t.click();
                                 break;
                             }}
-                        }} else if (txt.includes("{target_tab_to_open}")) {{
+                        }} else if (txt.includes(target)) {{
                             t.click();
                             break;
                         }}
                     }}
-                }} catch(e) {{
-                    console.error("Tab switch error:", e);
                 }}
-            }}, 120);
-            </script>
-        """, height=0, width=0)
+            }} catch(e) {{
+                console.error("Tab handling error:", e);
+            }}
+        }}
+        gestisciTabs();
+        setTimeout(gestisciTabs, 60);
+        setTimeout(gestisciTabs, 150);
+        </script>
+    """, height=0, width=0)
 
     with tab_portafoglio:
         @st.fragment(run_every=15)
