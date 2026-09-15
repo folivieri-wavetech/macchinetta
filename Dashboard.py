@@ -4366,8 +4366,10 @@ else:
                             tf_info = radar_cached_kj.get(s_nome, {}).get("timeframes", {}).get(tf, {})
                             kj_val = tf_info.get("kj")
                             tk_val = tf_info.get("tk")
+                            atr_val = tf_info.get("atr21")
                             kj_str = f"{kj_val:.{dec_s}f}" if isinstance(kj_val, (int, float)) else "-"
                             tk_str = f"{tk_val:.{dec_s}f}" if isinstance(tk_val, (int, float)) else "-"
+                            atr_str_sub = f" | ATR21: {int(round(atr_val))}" if isinstance(atr_val, (int, float)) else ""
                             
                             # 1. Cerca nella console live recente (ultime 500 righe)
                             line_match = None
@@ -4381,6 +4383,13 @@ else:
                             
                             # Se trovata nel log recente con dati completi (O: H: L: C:), aggiorna cache
                             if line_match and "O:" in line_match:
+                                if "ATR21:" in line_match:
+                                    line_match = re.sub(r"ATR21:\s*([0-9]+(?:\.[0-9]+)?)", lambda m: f"ATR21: {int(round(float(m.group(1))))}", line_match)
+                                elif atr_str_sub:
+                                    if " | KJ:" in line_match:
+                                        line_match = line_match.replace(" | KJ:", f"{atr_str_sub} | KJ:")
+                                    else:
+                                        line_match += atr_str_sub
                                 if "KJ:" not in line_match and kj_str != "-":
                                     line_match += f" | KJ: {kj_str}"
                                 if "TK:" not in line_match and tk_str != "-":
@@ -4396,6 +4405,13 @@ else:
                                 cached_line = cache_kj.get(s_nome, {}).get(tf)
                                 if cached_line and "O:" in cached_line:
                                     line_match = cached_line
+                                    if "ATR21:" in line_match:
+                                        line_match = re.sub(r"ATR21:\s*([0-9]+(?:\.[0-9]+)?)", lambda m: f"ATR21: {int(round(float(m.group(1))))}", line_match)
+                                    elif atr_str_sub:
+                                        if " | KJ:" in line_match:
+                                            line_match = line_match.replace(" | KJ:", f"{atr_str_sub} | KJ:")
+                                        else:
+                                            line_match += atr_str_sub
                                     # Sincronizza KJ e TK se mancanti
                                     if "KJ:" not in line_match and kj_str != "-":
                                         line_match += f" | KJ: {kj_str}"
@@ -4423,8 +4439,13 @@ else:
                                     l_v = last_c.get("lowPrice", {}).get("bid")
                                     c_v = last_c.get("closePrice", {}).get("bid")
                                     
+                                    if not atr_str_sub:
+                                        atr_c_loc = calcola_atr_da_candele_dash(candele_loc, 21)
+                                        if atr_c_loc is not None:
+                                            atr_str_sub = f" | ATR21: {int(round(atr_c_loc / cfg_s.get('moltiplicatore', 0.0001)))}"
+
                                     if o_v is not None and h_v is not None and l_v is not None and c_v is not None:
-                                        line_match = f"[{ts_str}] [{s_nome}] 🕯️[{tf}]  {ore_str} | O: {o_v:.{dec_s}f} H: {h_v:.{dec_s}f} L: {l_v:.{dec_s}f} C: {c_v:.{dec_s}f} | KJ: {kj_str} TK: {tk_str}"
+                                        line_match = f"[{ts_str}] [{s_nome}] 🕯️[{tf}]  {ore_str} | O: {o_v:.{dec_s}f} H: {h_v:.{dec_s}f} L: {l_v:.{dec_s}f} C: {c_v:.{dec_s}f}{atr_str_sub} | KJ: {kj_str} TK: {tk_str}"
                                         if s_nome not in cache_kj:
                                             cache_kj[s_nome] = {}
                                         cache_kj[s_nome][tf] = line_match
@@ -4432,7 +4453,7 @@ else:
                             
                             # 4. Fallback estremo solo se non vi è alcuna candela registrata
                             if not line_match:
-                                line_match = f"[--:--:--] [{s_nome}] 🕯️[{tf}] | KJ: {kj_str} TK: {tk_str}"
+                                line_match = f"[--:--:--] [{s_nome}] 🕯️[{tf}]{atr_str_sub} | KJ: {kj_str} TK: {tk_str}"
                             
                             # Formattazione per terminal box: rimozione della parola Candela e di ore
                             line_match = re.sub(r"Candela \((\w+)\) CHIUSA:[^()]*\(alle (\d{2}:\d{2}) ora italiana\)", r"[\1]  \2", line_match)
@@ -4454,6 +4475,12 @@ else:
                             riga_fmt = re.sub(
                                 r"(\[(?:M5|H1|H4|D|D1|MINUTE_5|HOUR|HOUR_4|DAY)\])",
                                 r"<span style='color: #fb923c; font-weight: 600;'>\1</span>",
+                                riga_fmt
+                            )
+                            # ATR21 in viola chiaro (#c084fc)
+                            riga_fmt = re.sub(
+                                r"(ATR(?:21)?:\s*[0-9]+)",
+                                r"<span style='color: #c084fc; font-weight: 600;'>\1</span>",
                                 riga_fmt
                             )
                             # KJ in giallo puro (#FFFF00, non oro)

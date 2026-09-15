@@ -1308,7 +1308,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 if atr_agg is not None:
                     mult_strum = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
                     atr_pips = atr_agg / mult_strum
-                    atr_str = f" | ATR21: {atr_pips:.1f}"
+                    atr_str = f" | ATR21: {int(round(atr_pips))}"
 
                 kj_tk_str = ""
                 if kj_agg is not None and tk_agg is not None:
