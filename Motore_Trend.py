@@ -1105,7 +1105,7 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                 diff_pts = px - kj
                 dist_pips = round(abs(diff_pts) / mult)
                 dir_pos = "Possibile Entrata"
-                is_vicino = (dist_pips <= 15)
+                is_vicino = (dist_pips < 20)
                 
                 atr_tf = calcola_atr_da_candele(candele, periods=21)
                 atr_pips_val = (atr_tf / mult) if atr_tf is not None else None
@@ -1120,15 +1120,6 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     "dir": dir_pos,
                     "vicino": is_vicino
                 }
-                
-                # Log radar senza invio notifica push (in Trend notifiche solo per trade ed incrementi)
-                if is_vicino and not is_in_trade and not is_rollover_active():
-                    k_alert = f"{nome}_{lbl}"
-                    last_alert_time = RADAR_LAST_ALERT.get(k_alert, 0)
-                    # Cooldown 1 ora (3600 secondi)
-                    if now_ts - last_alert_time >= 3600:
-                        RADAR_LAST_ALERT[k_alert] = now_ts
-                        print_log("RADAR", f"📡 [{nome} {lbl}] {dir_pos} (distanza: {int(dist_pips)} punti, KJ55: {kj:.{dec}f})")
             else:
                 atr_tf = calcola_atr_da_candele(candele, periods=21)
                 atr_pips_val = (atr_tf / mult) if atr_tf is not None else None

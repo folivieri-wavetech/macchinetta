@@ -1657,8 +1657,8 @@ def renderizza_schermata_radar(conto_selezionato=None):
             <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
             <div style='color: #aaa; font-size: 0.78rem; margin-top: -2px; margin-bottom: 8px;'>Scanner di prossimità a <b>0 chiamate API</b> su Kijun 55 periodi (H1, H4, D1). Ultimo aggiornamento: <b style='color: #FFD700; font-size: 0.90rem; margin-left: 3px;'>{ts_aggiornamento}</b></div>
             <div style='display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.76rem;'>
-                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (≤ 15 punti)</b>: Possibile ingresso imminente</div>
-                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (> 15 punti)</b>: Monitoraggio continuo</div>
+                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e;'></span> <b>Zona Calda (&lt; 20 punti)</b>: Possibile ingresso imminente</div>
+                <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #64748b;'></span> <b>Lontano (&ge; 20 punti)</b>: Monitoraggio continuo</div>
                 <div style='display: flex; align-items: center; gap: 5px;'><span style='display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;'></span> <b>In Trend</b>: Posizione già a mercato</div>
             </div>
             """)
@@ -1823,7 +1823,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                                 diff_pts = px - kj_v
                                 dist_p = round(abs(diff_pts) / mult)
                                 dir_p = "Possibile Entrata"
-                                vicino = (dist_p <= 15)
+                                vicino = (dist_p < 20)
 
                         is_current_tf_trade = (lbl_key in trades_tf)
                         
@@ -4279,7 +4279,7 @@ else:
 
                 # Suddivisione in categorie
                 candele_lines = []
-                entrate_lines = []
+                core_incrementi_lines = []
                 chiusure_lines = []
                 tentativi_lines = []
                 varie_lines = []
@@ -4306,30 +4306,32 @@ else:
                         "PULIZIA [TICKET2]"
                     ]):
                         chiusure_lines.append(r_std)
-                    # 4. Possibili entrate (segnali Radar e ordini di ingresso/restart/reverse)
+                    # 4. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi)
                     elif any(k in r_up for k in [
-                        "POSSIBILE ENTRATA", "RADAR", "OPEN CORE", "OPEN INCR", 
-                        "PRE-FLIGHT CHECK", "ENTRATA A MERCATO", "PIAZZAMENTO SAT1", 
-                        "INSERISCO [SAT2]", "INSERISCO ORDINE [TICKET", "FLIP DEL [TICKET",
-                        "ORDINE OVERGAIN", "ORDINE OVERLOSS", "GRIGLIA ACCETTATA",
-                        "REVERSE", "RESTART CORE", "RESTART LONG", "RESTART SHORT"
+                        "INCREMENTO", "OPEN INCR", "INCR", "OPEN CORE", "CORE", 
+                        "ENTRATA A MERCATO", "RESTART CORE", "RESTART LONG", "RESTART SHORT",
+                        "REVERSE", "PRE-FLIGHT CHECK", "PIAZZAMENTO SAT1", "INSERISCO [SAT2]",
+                        "INSERISCO ORDINE [TICKET", "FLIP DEL [TICKET", "ORDINE OVERGAIN",
+                        "ORDINE OVERLOSS", "GRIGLIA ACCETTATA"
                     ]):
-                        entrate_lines.append(r_std)
+                        if "POSSIBILE ENTRATA" not in r_up and "RADAR" not in r_up:
+                            core_incrementi_lines.append(r_std)
                     # 5. Varie (sistema, connessioni, rollover, controlli tecnici)
                     else:
-                        varie_lines.append(r_std)
+                        if "POSSIBILE ENTRATA" not in r_up and "RADAR" not in r_up:
+                            varie_lines.append(r_std)
 
                 sub_tabs = st.tabs([
                     "📋 Tutti", 
                     "🕯️ Candele chiuse", 
-                    "🎯 Possibili entrate", 
+                    "🎯 Core e Incrementi", 
                     "🛑 Chiusure", 
                     "📊 KJ55-TK21",
                     "🔁 Tentativi (5)",
                     "⚙️ Varie"
                 ])
 
-                tab_sub_tutti, tab_sub_candele, tab_sub_entrate, tab_sub_chiusure, tab_sub_kj, tab_sub_tentativi, tab_sub_varie = sub_tabs
+                tab_sub_tutti, tab_sub_candele, tab_sub_core_incr, tab_sub_chiusure, tab_sub_kj, tab_sub_tentativi, tab_sub_varie = sub_tabs
 
                 components.html("""
                     <script>
@@ -4380,9 +4382,9 @@ else:
 
                     render_terminal_box(candele_filtrate, empty_msg=f"Nessuna candela chiusa registrata per il Timeframe '{tf_sel}'.")
 
-                with tab_sub_entrate:
-                    st.caption(f"Eventi segnali / entrate a mercato: {len(entrate_lines)}")
-                    render_terminal_box(entrate_lines, empty_msg="Nessuna possibile entrata o ordine registrato di recente.")
+                with tab_sub_core_incr:
+                    st.caption(f"Eventi ordini ed eseguiti Core e Incrementi: {len(core_incrementi_lines)}")
+                    render_terminal_box(core_incrementi_lines, empty_msg="Nessun ingresso Core o Incremento registrato di recente.")
 
                 with tab_sub_chiusure:
                     st.caption(f"Eventi uscite / chiusure / stop: {len(chiusure_lines)}")
