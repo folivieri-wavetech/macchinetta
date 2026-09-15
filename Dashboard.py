@@ -155,7 +155,7 @@ def formatta_mercato_con_bandiere(nome, color="#FFD700"):
     
     return f"<div style='display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-left: 10px;'><u style='color: {color}; font-size: 1.15em; font-weight: bold;'>{nome}</u></div>"
 
-def formatta_titolo_con_bandiere_orizzontale(nome, badge):
+def formatta_titolo_con_bandiere_orizzontale(nome, badge, extra_bandiere=""):
     flags = {
         "AUD": "au",
         "CAD": "ca",
@@ -168,6 +168,7 @@ def formatta_titolo_con_bandiere_orizzontale(nome, badge):
     }
     
     titolo = f"<span style='color: #FFD700;'>{nome}</span>"
+    extra_span = f"<span style='margin-left: 10px; font-size: 0.82rem; color: #FFD700; font-weight: bold;'>{extra_bandiere}</span>" if extra_bandiere else ""
     
     if len(nome) == 7 and nome[3] == '/':
         c1, c2 = nome[:3], nome[4:]
@@ -175,10 +176,12 @@ def formatta_titolo_con_bandiere_orizzontale(nome, badge):
             nome_spaziato = nome.replace("/", " / ")
             img1 = f"<img src='https://flagcdn.com/w80/{flags[c1]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5); margin-right: 5px;'>"
             img2 = f"<img src='https://flagcdn.com/w80/{flags[c2]}.png' width='54' style='border-radius:3px; box-shadow: 0 0 4px rgba(0,0,0,0.5);'>"
-            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{img1}{img2}</div><span style='color: #FFD700;'>{nome_spaziato}</span>"
+            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{img1}{img2}{extra_span}</div><span style='color: #FFD700;'>{nome_spaziato}</span>"
         else:
             nome_spaziato = nome.replace("/", " / ")
-            titolo = f"<span style='color: #FFD700;'>{nome_spaziato}</span>"
+            titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{extra_span}</div><span style='color: #FFD700;'>{nome_spaziato}</span>" if extra_span else f"<span style='color: #FFD700;'>{nome_spaziato}</span>"
+    else:
+        titolo = f"<div style='margin-bottom: 5px; display: flex; align-items: center;'>{extra_span}</div><span style='color: #FFD700;'>{nome}</span>" if extra_span else f"<span style='color: #FFD700;'>{nome}</span>"
         
     return f"<div style='font-size: 1.4rem; font-weight: bold; white-space: nowrap; margin-bottom: -5px;'>{titolo} <span style='font-size: 0.85rem; padding-left: 4px; vertical-align: middle; color: #abb2bf;'>{badge}</span></div>"
 
@@ -3190,6 +3193,14 @@ else:
                         elif is_distanza_pericolosa: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 15px;'>⚠️ <b>ATTENZIONE:</b> Stop Minimo IG: <b>{min_richiesto_ig} pt</b>. Impostato: <b>{min_impostato} pt</b>.</div>", unsafe_allow_html=True)
                         else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
                     
+                        candele_d1 = carica_candele_locali_dash(conto_selezionato, nome, "DAY")
+                        atr_d1_val = calcola_atr_da_candele_dash(candele_d1, periods=21)
+                        if atr_d1_val is not None:
+                            mult_r = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                            atr_d1_pips = atr_d1_val / mult_r
+                            unita_r = "pt" if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "pip"
+                            st.caption(f"📊 ATR(21) Live: **{atr_d1_pips:.1f} {unita_r}** ➡️ TP Live: **{tp_default}** (OPP: {opp_default} | DTS: {dts_default})")
+
                         margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
                         if margine_u != "N/D":
                             st.caption(f"🛡️ Margine (Size=1): **{margine_u}€**")
@@ -3410,9 +3421,11 @@ else:
                         with col_titolo:
                             auto_restart = st.checkbox("Auto-Restart", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
                             
+                            locked_tp = dati_salvati.get("tp", tp_calc_trend) if stato_attivo else tp_calc_trend
                             badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
-                            tp_badge_str = f" <span style='color: #FFD700; font-size: 0.82rem; font-weight: bold; margin-left: 6px;'>(TP={tp_calc_trend})</span>"
-                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge + tp_badge_str)
+                            tp_badge_str = f" <span style='color: #FFD700; font-size: 0.82rem; font-weight: bold; margin-left: 6px;'>(TP={locked_tp})</span>"
+                            extra_bandiere_str = f"(TP Live: {tp_calc_trend})"
+                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge + tp_badge_str, extra_bandiere=extra_bandiere_str)
                             st.markdown(titolo_html, unsafe_allow_html=True)
                             
                             px_live = None
