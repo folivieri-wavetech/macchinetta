@@ -14,13 +14,23 @@ class Position:
         self.close_price = None
         self.ticket = None
         
+        # Campi per gestione dinamica Break-Even e Trailing Stop del singolo incremento
+        self.highest_price = entry_price
+        self.lowest_price = entry_price
+        self.be_active = False
+        self.sl_price = None
+        
     def to_dict(self):
         return {
             "entry": self.entry_price,
             "size": self.size,
             "type": self.position_type,
             "direction": self.direction,
-            "ticket": self.ticket
+            "ticket": self.ticket,
+            "highest_price": getattr(self, "highest_price", self.entry_price),
+            "lowest_price": getattr(self, "lowest_price", self.entry_price),
+            "be_active": getattr(self, "be_active", False),
+            "sl_price": getattr(self, "sl_price", None)
         }
 
     def close(self, current_price):
@@ -47,8 +57,13 @@ class PositionManager:
         self.core_position = Position(price, size, "core", direction)
         return self.core_position
 
-    def open_increment(self, price, size=1, direction="LONG"):
+    def open_increment(self, price, size=1, direction="LONG", ticket=None, highest_price=None, lowest_price=None, be_active=False, sl_price=None):
         pos = Position(price, size, "increment", direction)
+        pos.ticket = ticket
+        if highest_price is not None: pos.highest_price = highest_price
+        if lowest_price is not None: pos.lowest_price = lowest_price
+        pos.be_active = be_active
+        pos.sl_price = sl_price
         self.increments.append(pos)
         return pos
 

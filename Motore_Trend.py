@@ -1525,9 +1525,22 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     print_log(nome, msg)
                     invia_notifica(f"➖ FIFO INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
                 elif tipo == 'increment_closed':
-                    msg = f"➖ Close Incr ({sz}){px_str}{pnl_str}"
+                    r_inc = ev.get("reason", "")
+                    if r_inc == "be_increment":
+                        tag_inc = "BE Incr"
+                        tag_title = "BE INCR"
+                        ico = "shield"
+                    elif r_inc == "trailing_increment":
+                        tag_inc = "Trailing Incr"
+                        tag_title = "TRAILING INCR"
+                        ico = "chart_with_upwards_trend"
+                    else:
+                        tag_inc = "Close Incr"
+                        tag_title = "CLOSE INCR"
+                        ico = "heavy_minus_sign"
+                    msg = f"➖ {tag_inc} ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"➖ CLOSE INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    invia_notifica(f"➖ {tag_title} {tf_label}", f"[{nome}] {msg}", ico)
                 elif tipo == 'increments_cleared':
                     r_incr = ev.get("reason", "")
                     if not r_incr:
@@ -1574,6 +1587,17 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             msg_sig = f"⚠️ Candela chiusa oltre TK. Candela Segnale TK attiva: Stop incrementi a {stop_px:.{dec}f} ({ext_lbl} {c_ext:.{dec}f} {sign_str})"
             print_log(nome, msg_sig)
             storico.append(f"[{ora_str}] {msg_sig}")
+            ha_fatto_eventi = True
+
+        elif tipo == 'increment_be_activated':
+            sz = ev.get('size', size_i)
+            be_px = ev.get('sl_price')
+            be_p = ev.get('be_pips', 15)
+            px_str = f" a {be_px:.{dec}f}" if (be_px is not None and isinstance(be_px, (int, float))) else ""
+            msg = f"🛡️ BE Incr (+{be_p}p) ({sz}) protetto{px_str}"
+            print_log(nome, msg)
+            invia_notifica(f"🛡️ BE INCR {tf_label}", f"[{nome}] {msg}", "shield")
+            storico.append(f"[{ora_str}] {msg}")
             ha_fatto_eventi = True
 
         elif tipo == 'reversal':
@@ -1752,9 +1776,9 @@ def esegui_ciclo_trend():
         
         # Recupera parametri
         tf = dati.get("timeframe", "HOUR")
-        size_i = dati.get("size", 1)
-        size_max = dati.get("size_max", 3)
-        scala = int(dati.get("scala", 1) or 1)
+        size_i = dati.get("size", 4)
+        size_max = dati.get("size_max", 10)
+        scala = int(dati.get("scala", 2) or 2)
         min_body = dati.get("min_body", 10)
         auto_restart = dati.get("auto_restart", True)
         direzione = dati.get("direzione", "LONG")
@@ -1910,7 +1934,16 @@ def esegui_ciclo_trend():
                     pos.ticket = c_d.get("ticket")
                 for i_d in pos_incr:
                     dir_pos = i_d.get("direction", stato_corrente)
-                    pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), dir_pos)
+                    pos = engine.pm.open_increment(
+                        i_d.get("entry", 0),
+                        i_d.get("size", 1),
+                        dir_pos,
+                        ticket=i_d.get("ticket"),
+                        highest_price=i_d.get("highest_price"),
+                        lowest_price=i_d.get("lowest_price"),
+                        be_active=i_d.get("be_active", False),
+                        sl_price=i_d.get("sl_price")
+                    )
                     pos.ticket = i_d.get("ticket")
                 engine.trailing_sl_incr = dati.get("trailing_sl_incr")
                 engine.trailing_sl_core = dati.get("trailing_sl_core")
@@ -2237,7 +2270,16 @@ def esegui_ciclo_trend():
                 pos.ticket = c_d.get("ticket")
             for i_d in pos_incr:
                 dir_pos = i_d.get("direction", engine.current_direction)
-                pos = engine.pm.open_increment(i_d.get("entry", 0), i_d.get("size", 1), dir_pos)
+                pos = engine.pm.open_increment(
+                    i_d.get("entry", 0),
+                    i_d.get("size", 1),
+                    dir_pos,
+                    ticket=i_d.get("ticket"),
+                    highest_price=i_d.get("highest_price"),
+                    lowest_price=i_d.get("lowest_price"),
+                    be_active=i_d.get("be_active", False),
+                    sl_price=i_d.get("sl_price")
+                )
                 pos.ticket = i_d.get("ticket")
 
         valuta = CONFIG_STRUMENTI[nome]["valuta"]

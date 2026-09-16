@@ -876,9 +876,9 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
             st.rerun()
         return
     
-    sz_t = mem_t.get("size", 3)
-    szm_t = mem_t.get("size_max", 5)
-    sc_t = mem_t.get("scala", 1)
+    sz_t = mem_t.get("size", 4)
+    szm_t = mem_t.get("size_max", 10)
+    sc_t = mem_t.get("scala", 2)
     
     def_tp, def_opp, def_dts = calcola_default_range_da_atr_dash(conto_r, nome_strumento)
     tp_r = mem_r.get("tp")
@@ -3429,7 +3429,7 @@ else:
 
                 radar_data, _ = carica_radar_trend_dash(conto_selezionato)
 
-                def crea_riquadro_trend(nome, def_body=10, def_size=3, def_size_max=5, def_scala=1):
+                def crea_riquadro_trend(nome, def_body=10, def_size=4, def_size_max=10, def_scala=2):
                     with st.container(border=True):
                         dati_salvati = memoria_attuale.get(nome, {})
                         stato_corrente = dati_salvati.get("stato", "FLAT")

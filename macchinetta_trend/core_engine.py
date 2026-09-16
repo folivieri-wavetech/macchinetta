@@ -100,6 +100,29 @@ class CoreEngine:
         """Restituisce il target Take Profit in pip per gli incrementi rispetto a Tenkan (TK ± 50 pip su tutti i TF)."""
         return self.config.get("increment_tp_tk_pips", 50)
 
+    def _get_increment_rules(self):
+        """
+        Restituisce le soglie Break-Even, Trailing e Take Profit per singolo incremento:
+        - Commodities e Indici (Spot Gold, US 500 Cash, Oil - US Crude):
+            be_pips = 30, be_offset = 2, tp_pips = 50, trail_dist = 15
+        - Cross Forex:
+            be_pips = 15, be_offset = 1, tp_pips = 25, trail_dist = 12
+        """
+        nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip()
+        commodities = ["Spot Gold", "US 500 Cash", "Oil - US Crude", "GOLD", "US500", "OIL"]
+        is_comm = any(c.lower() in nome.lower() for c in commodities)
+        if is_comm:
+            be_pips = self.config.get("increment_be_pips", 30)
+            be_offset = self.config.get("increment_be_offset", 2)
+            tp_pips = self.config.get("increment_tp_pips", 50)
+            trail_dist = self.config.get("increment_trail_pips", 15)
+        else:
+            be_pips = self.config.get("increment_be_pips", 15)
+            be_offset = self.config.get("increment_be_offset", 1)
+            tp_pips = self.config.get("increment_tp_pips", 25)
+            trail_dist = self.config.get("increment_trail_pips", 12)
+        return be_pips, be_offset, tp_pips, trail_dist
+
     def _get_max_kj_tk_threshold_pips(self):
         """Restituisce la soglia di forbice Kijun-Tenkan in pip per Timeframe: H1=30, H4=40, D1=50."""
         tf_val = str(self.config.get("timeframe", "HOUR")).upper()
@@ -217,31 +240,30 @@ class CoreEngine:
                     self.signal_candle_tk_active = False
                     self.signal_stop_price_tk = None
 
-            has_cleared_increments_long = any(e.get("type") == "increments_cleared" for e in events)
+            has_cleared_increments_long = any(e.get("type") in ("increments_cleared", "reversal") for e in events)
             if self.current_direction == "LONG" and not has_cleared_increments_long:
-                # Take Profit Incrementi a fine candela: TK + 50 pip (chiusura in blocco di tutti gli incrementi con gain)
-                incr_tp_pips = self._get_increment_tp_pips()
-                if incr_tp_pips and len(self.pm.increments) > 0 and tk is not None:
-                    tp_target_level = tk + (incr_tp_pips * pip_val)
-                    if c_close >= (tp_target_level - 1e-7):
-                        inc_to_close = [p for p in list(self.pm.increments) if (c_close - p.entry_price) > 1e-7]
-                        for inc in inc_to_close:
-                            inc.close(exec_price)
-                            self.pm.increments.remove(inc)
-                            self.pm.closed_positions.append(inc)
-                            diff_p = (c_close - inc.entry_price) / pip_val
-                            gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
-                            events.append({
-                                "type": "tp_increment",
-                                "pnl": inc.pnl,
-                                "price": exec_price,
-                                "ticket": inc.ticket,
-                                "size": inc.size,
-                                "direction": "LONG",
-                                "tp_pips": gained_pips
-                            })
-                        if inc_to_close:
-                            self.retracement_start_price = None
+                # Take Profit Incrementi Bancomat (+25p Forex / +50p Comm) valutato a fine candela
+                be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
+                tp_threshold = tp_pips * pip_val
+                inc_to_close = [p for p in list(self.pm.increments) if (c_close - p.entry_price) >= (tp_threshold - 1e-7)]
+                for inc in inc_to_close:
+                    inc.close(exec_price)
+                    if inc in self.pm.increments:
+                        self.pm.increments.remove(inc)
+                    self.pm.closed_positions.append(inc)
+                    diff_p = (c_close - inc.entry_price) / pip_val
+                    gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                    events.append({
+                        "type": "tp_increment",
+                        "pnl": inc.pnl,
+                        "price": exec_price,
+                        "ticket": inc.ticket,
+                        "size": inc.size,
+                        "direction": "LONG",
+                        "tp_pips": gained_pips
+                    })
+                if inc_to_close:
+                    self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
                 # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sotto TK
@@ -353,31 +375,30 @@ class CoreEngine:
                     self.signal_candle_tk_active = False
                     self.signal_stop_price_tk = None
 
-            has_cleared_increments_short = any(e.get("type") == "increments_cleared" for e in events)
+            has_cleared_increments_short = any(e.get("type") in ("increments_cleared", "reversal") for e in events)
             if self.current_direction == "SHORT" and not has_cleared_increments_short:
-                # Take Profit Incrementi a fine candela: TK - 50 pip (chiusura in blocco di tutti gli incrementi con gain)
-                incr_tp_pips = self._get_increment_tp_pips()
-                if incr_tp_pips and len(self.pm.increments) > 0 and tk is not None:
-                    tp_target_level = tk - (incr_tp_pips * pip_val)
-                    if c_close <= (tp_target_level + 1e-7):
-                        inc_to_close = [p for p in list(self.pm.increments) if (p.entry_price - c_close) > 1e-7]
-                        for inc in inc_to_close:
-                            inc.close(exec_price)
-                            self.pm.increments.remove(inc)
-                            self.pm.closed_positions.append(inc)
-                            diff_p = (inc.entry_price - c_close) / pip_val
-                            gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
-                            events.append({
-                                "type": "tp_increment",
-                                "pnl": inc.pnl,
-                                "price": exec_price,
-                                "ticket": inc.ticket,
-                                "size": inc.size,
-                                "direction": "SHORT",
-                                "tp_pips": gained_pips
-                            })
-                        if inc_to_close:
-                            self.retracement_start_price = None
+                # Take Profit Incrementi Bancomat (+25p Forex / +50p Comm) valutato a fine candela
+                be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
+                tp_threshold = tp_pips * pip_val
+                inc_to_close = [p for p in list(self.pm.increments) if (p.entry_price - c_close) >= (tp_threshold - 1e-7)]
+                for inc in inc_to_close:
+                    inc.close(exec_price)
+                    if inc in self.pm.increments:
+                        self.pm.increments.remove(inc)
+                    self.pm.closed_positions.append(inc)
+                    diff_p = (inc.entry_price - c_close) / pip_val
+                    gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                    events.append({
+                        "type": "tp_increment",
+                        "pnl": inc.pnl,
+                        "price": exec_price,
+                        "ticket": inc.ticket,
+                        "size": inc.size,
+                        "direction": "SHORT",
+                        "tp_pips": gained_pips
+                    })
+                if inc_to_close:
+                    self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
                 # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sopra TK
@@ -481,6 +502,13 @@ class CoreEngine:
         dist_kj_tk_pips = abs(tk - kj) / pip_val
         proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
         
+        # Soglie per gestione a 3 stadi singolo incremento
+        be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
+        be_threshold = be_pips * pip_val
+        be_offset = be_offset_pips * pip_val
+        tp_threshold = tp_pips * pip_val
+        trail_dist = trail_dist_pips * pip_val
+
         if self.current_direction == "LONG":
             # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip o Trailing SL Core
             sl_core_base = kj - (15 * pip_val)
@@ -541,7 +569,74 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_min", "price": current_price})
                     self.retracement_start_price = None
 
-            # Nota: Take Profit Incrementi (TK ± 50 pip) valutato esclusivamente a fine candela in on_candle_close
+            # 5. Gestione a 3 Stadi Singolo Incremento (Break-Even, Trailing Stop e Take Profit Bancomat)
+            for inc in list(self.pm.increments):
+                gain = current_price - inc.entry_price
+                if not hasattr(inc, 'highest_price') or inc.highest_price is None:
+                    inc.highest_price = inc.entry_price
+                inc.highest_price = max(inc.highest_price, current_price)
+
+                # A. Take Profit Bancomat Immediato al Target (+25p Forex / +50p Comm)
+                if gain >= (tp_threshold - 1e-7):
+                    inc.close(current_price)
+                    if inc in self.pm.increments:
+                        self.pm.increments.remove(inc)
+                    self.pm.closed_positions.append(inc)
+                    diff_p = gain / pip_val
+                    gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                    events.append({
+                        "type": "tp_increment",
+                        "pnl": inc.pnl,
+                        "price": current_price,
+                        "ticket": inc.ticket,
+                        "size": inc.size,
+                        "direction": "LONG",
+                        "tp_pips": gained_pips
+                    })
+                    self.retracement_start_price = None
+                    continue
+
+                # B. Attivazione Break-Even (+15p Forex / +30p Comm)
+                if gain >= (be_threshold - 1e-7):
+                    be_level = inc.entry_price + be_offset
+                    if not getattr(inc, 'be_active', False):
+                        inc.be_active = True
+                        inc.sl_price = be_level
+                        events.append({
+                            "type": "increment_be_activated",
+                            "ticket": inc.ticket,
+                            "size": inc.size,
+                            "direction": "LONG",
+                            "price": current_price,
+                            "sl_price": be_level,
+                            "be_pips": be_pips
+                        })
+                    # Trailing Stop progressivo sopra Break-Even
+                    trail_level = inc.highest_price - trail_dist
+                    if getattr(inc, 'sl_price', None) is not None:
+                        inc.sl_price = max(inc.sl_price, trail_level)
+                    else:
+                        inc.sl_price = max(be_level, trail_level)
+
+                # C. Esecuzione Stop / Break-Even dell'incremento
+                if getattr(inc, 'sl_price', None) is not None and current_price <= (inc.sl_price + 1e-7):
+                    inc.close(current_price)
+                    if inc in self.pm.increments:
+                        self.pm.increments.remove(inc)
+                    self.pm.closed_positions.append(inc)
+                    is_pure_be = (inc.sl_price <= (inc.entry_price + be_offset + 1e-7))
+                    reason_close = "be_increment" if is_pure_be else "trailing_increment"
+                    events.append({
+                        "type": "increment_closed",
+                        "reason": reason_close,
+                        "pnl": inc.pnl,
+                        "price": current_price,
+                        "direction": "LONG",
+                        "ticket": inc.ticket,
+                        "size": inc.size,
+                        "sl_price": inc.sl_price
+                    })
+                    self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
             # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip o Trailing SL Core
@@ -603,6 +698,73 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_max", "price": current_price})
                     self.retracement_start_price = None
 
-            # Nota: Take Profit Incrementi (TK ± 50 pip) valutato esclusivamente a fine candela in on_candle_close
+            # 5. Gestione a 3 Stadi Singolo Incremento (Break-Even, Trailing Stop e Take Profit Bancomat)
+            for inc in list(self.pm.increments):
+                gain = inc.entry_price - current_price
+                if not hasattr(inc, 'lowest_price') or inc.lowest_price is None:
+                    inc.lowest_price = inc.entry_price
+                inc.lowest_price = min(inc.lowest_price, current_price)
+
+                # A. Take Profit Bancomat Immediato al Target (+25p Forex / +50p Comm)
+                if gain >= (tp_threshold - 1e-7):
+                    inc.close(current_price)
+                    if inc in self.pm.increments:
+                        self.pm.increments.remove(inc)
+                    self.pm.closed_positions.append(inc)
+                    diff_p = gain / pip_val
+                    gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                    events.append({
+                        "type": "tp_increment",
+                        "pnl": inc.pnl,
+                        "price": current_price,
+                        "ticket": inc.ticket,
+                        "size": inc.size,
+                        "direction": "SHORT",
+                        "tp_pips": gained_pips
+                    })
+                    self.retracement_start_price = None
+                    continue
+
+                # B. Attivazione Break-Even (+15p Forex / +30p Comm)
+                if gain >= (be_threshold - 1e-7):
+                    be_level = inc.entry_price - be_offset
+                    if not getattr(inc, 'be_active', False):
+                        inc.be_active = True
+                        inc.sl_price = be_level
+                        events.append({
+                            "type": "increment_be_activated",
+                            "ticket": inc.ticket,
+                            "size": inc.size,
+                            "direction": "SHORT",
+                            "price": current_price,
+                            "sl_price": be_level,
+                            "be_pips": be_pips
+                        })
+                    # Trailing Stop progressivo sopra Break-Even
+                    trail_level = inc.lowest_price + trail_dist
+                    if getattr(inc, 'sl_price', None) is not None:
+                        inc.sl_price = min(inc.sl_price, trail_level)
+                    else:
+                        inc.sl_price = min(be_level, trail_level)
+
+                # C. Esecuzione Stop / Break-Even dell'incremento
+                if getattr(inc, 'sl_price', None) is not None and current_price >= (inc.sl_price - 1e-7):
+                    inc.close(current_price)
+                    if inc in self.pm.increments:
+                        self.pm.increments.remove(inc)
+                    self.pm.closed_positions.append(inc)
+                    is_pure_be = (inc.sl_price >= (inc.entry_price - be_offset - 1e-7))
+                    reason_close = "be_increment" if is_pure_be else "trailing_increment"
+                    events.append({
+                        "type": "increment_closed",
+                        "reason": reason_close,
+                        "pnl": inc.pnl,
+                        "price": current_price,
+                        "direction": "SHORT",
+                        "ticket": inc.ticket,
+                        "size": inc.size,
+                        "sl_price": inc.sl_price
+                    })
+                    self.retracement_start_price = None
 
         return events
