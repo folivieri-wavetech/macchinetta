@@ -671,7 +671,10 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
         boundary_min = ((min_tot - offset) // m_dest) * m_dest + offset
         base_dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
         target_dt = base_dt + datetime.timedelta(minutes=boundary_min)
-        target_snap = target_dt.strftime("%Y/%m/%d %H:%M:00")
+        if m_dest >= 1440:
+            target_snap = f"{target_dt.strftime('%Y/%m/%d')} 00:00:00"
+        else:
+            target_snap = target_dt.strftime("%Y/%m/%d %H:%M:00")
         
         if target_snap not in groups:
             groups[target_snap] = []
