@@ -1671,7 +1671,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
         if not ts_aggiornamento:
             ts_aggiornamento = now_it().strftime("%d/%m/%Y %H:%M:%S")
 
-        col_radar_info, col_radar_btn = st.columns([5, 1.2])
+        col_radar_info, col_radar_btn = st.columns([5.2, 1.0])
         with col_radar_info:
             st.html(f"""
             <h2 style='color: #FFD700; margin-top: -15px; margin-bottom: 2px; font-size: 1.35rem; font-weight: bold;'>📡 Radar Trend Multi-Timeframe (KJ55)</h2>
@@ -1685,7 +1685,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
         with col_radar_btn:
             st.markdown("""
             <style>
-            div.st-key-btn_radar_nav_trend button, div.st-key-btn_radar_refresh button {
+            div.st-key-btn_radar_nav_trend button {
                 background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
                 color: #ffffff !important;
                 border: 1px solid #60a5fa !important;
@@ -1696,7 +1696,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35) !important;
                 transition: all 0.2s ease-in-out !important;
             }
-            div.st-key-btn_radar_nav_trend button:hover, div.st-key-btn_radar_refresh button:hover {
+            div.st-key-btn_radar_nav_trend button:hover {
                 background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
                 border-color: #93c5fd !important;
                 box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6) !important;
@@ -1704,8 +1704,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
             }
             </style>
             """, unsafe_allow_html=True)
-            if st.button("🔄 Aggiorna", key="btn_radar_refresh", use_container_width=True):
-                st.rerun()
             if st.button("📈 TREND", key="btn_radar_nav_trend", use_container_width=True):
                 st.session_state.vista_sidebar = "CONTO"
                 st.session_state.target_tab = "Trend"
