@@ -21,7 +21,7 @@ spec:
       initContainers:
         - name: init
           image: docker.wavetech.it/macchinetta:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
                 name: macchinetta-secrets
@@ -35,7 +35,7 @@ spec:
       containers:
         - name: dashboard
           image: docker.wavetech.it/macchinetta:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           command: ["streamlit", "run", "/data/Dashboard.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
           workingDir: /data
           envFrom:
