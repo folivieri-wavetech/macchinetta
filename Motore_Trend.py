@@ -752,8 +752,16 @@ def carica_candele_locali(nome, tf, px_live=None):
             pass
             
     # 2. Cerca across accounts (se ha almeno 55 barre ed è valido per il tf)
-    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "Logs_e_Cache"]:
-        alt_path = os.path.join("..", altro, f"candele_{clean}_{tf}.json")
+    candidati_dir = []
+    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "Logs_e_Cache", "."]:
+        candidati_dir.extend([
+            os.path.join("..", altro),
+            os.path.join("/data", altro),
+            altro,
+            "/data"
+        ])
+    for cdir in set(candidati_dir):
+        alt_path = os.path.join(cdir, f"candele_{clean}_{tf}.json")
         if os.path.exists(alt_path):
             try:
                 with open(alt_path, "r", encoding="utf-8") as f:
@@ -847,22 +855,41 @@ def salva_candele_locali(nome, tf, candele_list):
     if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude"):
         candele_list = [c for c in candele_list if " 23:00:00" not in c.get("snapshotTime", "")]
     buffer_60 = candele_list[-60:]
-    LOCAL_CANDELE_CACHE[(nome, tf)] = buffer_60
     
-    target_dirs = [".", "Logs_e_Cache", "../Logs_e_Cache", "/data/Logs_e_Cache"]
+    target_dirs = [".", "/data", "Logs_e_Cache", "../Logs_e_Cache", "/data/Logs_e_Cache"]
     for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
         target_dirs.extend([f"../{acc}", f"/data/{acc}", acc])
         
+    dati_da_salvare = buffer_60
     for d in set(target_dirs):
         if os.path.exists(d) and os.path.isdir(d):
             dest = os.path.join(d, fname)
+            # PROTEZIONE ANTI-TRONCAMENTO: se il file esistente ha più candele di buffer_60, fai il merge
+            salvataggio_locale = buffer_60
+            if len(buffer_60) < 55 and os.path.exists(dest):
+                try:
+                    with open(dest, "r", encoding="utf-8") as f_ex:
+                        ex_list = json.load(f_ex)
+                        if isinstance(ex_list, list) and len(ex_list) > len(buffer_60):
+                            snaps = {c.get("snapshotTime"): c for c in ex_list if c.get("snapshotTime")}
+                            for c in buffer_60:
+                                s = c.get("snapshotTime")
+                                if s:
+                                    snaps[s] = c
+                            merged = sorted(snaps.values(), key=lambda x: x.get("snapshotTime", ""))[-60:]
+                            if len(merged) > len(buffer_60):
+                                salvataggio_locale = merged
+                                dati_da_salvare = merged
+                except Exception:
+                    pass
             try:
                 tmp = f"{dest}.tmp.{os.getpid()}"
                 with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(buffer_60, f, indent=2)
+                    json.dump(salvataggio_locale, f, indent=2)
                 os.replace(tmp, dest)
             except Exception:
                 pass
+    LOCAL_CANDELE_CACHE[(nome, tf)] = dati_da_salvare[-60:]
 
 # --- FUNZIONI CORE ---
 def scarica_candele(epic, timeframe, limit=60, headers=None):
