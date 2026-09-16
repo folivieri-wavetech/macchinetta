@@ -169,20 +169,20 @@ def esegui_sync_candele(forza=False):
 
     totale_file_aggiornati = 0
     totale_candele = 0
+    totale_attesi = len(CONFIG_STRUMENTI) * len(TIMEFRAMES) # 11 * 3 = 33
+    file_falliti = []
+    idx_progresso = 0
 
-    for nome, info in CONFIG_STRUMENTI.items():
-        epic = info["epic"]
-        clean = get_clean_name(nome)
+    print(f"⏳ Inizio scarico rilassato: {totale_attesi} file totali con pausa di 5 secondi tra ciascuno...")
 
-        for tf in TIMEFRAMES:
+    def _scarica_e_salva_singolo(nome, epic, clean, tf, tentativi_max=3):
+        for attempt in range(1, tentativi_max + 1):
             url = f"https://demo-api.ig.com/gateway/deal/prices/{epic}?resolution={tf}&max=60&pageSize=0"
-            r = ig_api_request("GET", url, headers=req_headers, timeout=10, logger_func=lambda tag, msg: print(f"[{tag}] {msg}"))
+            r = ig_api_request("GET", url, headers=req_headers, timeout=12, logger_func=lambda tag, msg: print(f"[{tag}] {msg}"))
             if r and r.status_code == 200:
                 prices = r.json().get("prices", [])
-                if len(prices) > 0:
+                if len(prices) >= 20:
                     fname = f"candele_{clean}_{tf}.json"
-                    totale_file_aggiornati += 1
-                    totale_candele += len(prices)
                     for d in valid_target_dirs:
                         dest = os.path.join(d, fname)
                         try:
@@ -192,22 +192,75 @@ def esegui_sync_candele(forza=False):
                             os.replace(tmp, dest)
                         except Exception:
                             pass
-            # Pausa prudenziale di 2.5s per evitare qualsiasi congestione con Motore
-            time.sleep(2.5)
+                    return True, len(prices)
+            print(f"⚠️ Tentativo {attempt}/{tentativi_max} per {nome} [{tf}] non riuscito (status={r.status_code if r else 'Timeout'}). Pausa di recupero 10s...")
+            time.sleep(10.0)
+        return False, 0
 
-    # Registra successo
-    stato[chiave_settimana] = {
-        "stato": "SUCCESS",
-        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "file_aggiornati": totale_file_aggiornati,
-        "totale_candele": totale_candele
-    }
-    salva_stato_sync(stato)
+    # Primo passaggio: tutti i 33 file con cadenza calma di 5 secondi
+    for nome, info in CONFIG_STRUMENTI.items():
+        epic = info["epic"]
+        clean = get_clean_name(nome)
 
-    msg_ok = f"Sincronizzazione completata: {totale_file_aggiornati}/33 file aggiornati ({totale_candele} candele totali distribuite su tutti i conti)."
-    print(f"✅ {msg_ok}")
-    invia_ntfy("SYNC CANDLE SETTIMANALE OK", msg_ok, "white_check_mark")
-    return True, msg_ok
+        for tf in TIMEFRAMES:
+            idx_progresso += 1
+            print(f"[{idx_progresso}/{totale_attesi}] Richiesta {nome} [{tf}]...")
+            ok, n_c = _scarica_e_salva_singolo(nome, epic, clean, tf, tentativi_max=2)
+            if ok:
+                totale_file_aggiornati += 1
+                totale_candele += n_c
+                print(f"  ✅ {nome} [{tf}]: {n_c} candele salvate con successo.")
+            else:
+                print(f"  ❌ {nome} [{tf}]: Fallito primo passaggio.")
+                file_falliti.append((nome, epic, clean, tf))
+
+            # Pausa prudenziale di 5 secondi tra ogni richiesta per rispettare i server IG
+            time.sleep(5.0)
+
+    # Secondo passaggio di recupero: se qualche file è fallito, ritenta con calma aggiuntiva (8s)
+    if file_falliti:
+        print(f"🔄 Avvio secondo passaggio di recupero per {len(file_falliti)} file non completati...")
+        time.sleep(15.0)
+        ancora_falliti = []
+        for nome, epic, clean, tf in file_falliti:
+            print(f"[RECUPERO] Richiesta {nome} [{tf}]...")
+            ok, n_c = _scarica_e_salva_singolo(nome, epic, clean, tf, tentativi_max=3)
+            if ok:
+                totale_file_aggiornati += 1
+                totale_candele += n_c
+                print(f"  ✅ [RECUPERO OK] {nome} [{tf}]: {n_c} candele salvate.")
+            else:
+                print(f"  ❌ [RECUPERO FALLITO] {nome} [{tf}].")
+                ancora_falliti.append(f"{nome} {tf}")
+            time.sleep(8.0)
+        file_falliti = ancora_falliti
+
+    # Verifica rigorosa: SUCCESS solo ed esclusivamente se 33 su 33 sono stati aggiornati
+    if totale_file_aggiornati == totale_attesi:
+        stato[chiave_settimana] = {
+            "stato": "SUCCESS",
+            "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "file_aggiornati": totale_file_aggiornati,
+            "totale_candele": totale_candele
+        }
+        salva_stato_sync(stato)
+        msg_ok = f"Sincronizzazione completata al 100%: {totale_file_aggiornati}/{totale_attesi} file aggiornati ({totale_candele} candele totali distribuite su tutti i conti)."
+        print(f"✅ {msg_ok}")
+        invia_ntfy("SYNC CANDLE SETTIMANALE 100% OK", msg_ok, "white_check_mark")
+        return True, msg_ok
+    else:
+        stato[chiave_settimana] = {
+            "stato": "PARTIAL",
+            "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "file_aggiornati": totale_file_aggiornati,
+            "totale_candele": totale_candele,
+            "mancanti": file_falliti
+        }
+        salva_stato_sync(stato)
+        msg_warn = f"Attenzione: Sincronizzazione parziale ({totale_file_aggiornati}/{totale_attesi} file). Mancanti: {', '.join(file_falliti)}. Verrà ritentato al prossimo controllo."
+        print(f"⚠️ {msg_warn}")
+        invia_ntfy("SYNC CANDLE SETTIMANALE PARZIALE", msg_warn, "warning")
+        return False, msg_warn
 
 _LAST_CHECK_TS = 0
 
@@ -218,7 +271,7 @@ def controlla_schedulazione_settimanale(nome_conto):
     1. Il conto è FIORDOK_DEMO (gli altri conti leggono i file distribuiti su PVC).
     2. È Lunedì (weekday == 0).
     3. L'orario è >= 05:30 italiane (a metà barra per non interferire con il cambio candela H1 delle 06:00).
-    4. Non è ancora stato eseguito per la settimana corrente.
+    4. Non è ancora stato completato con SUCCESS per la settimana corrente (se PARTIAL, ritenta dopo 15 minuti).
     """
     global _LAST_CHECK_TS
     if nome_conto != "FIORDOK_DEMO":
@@ -234,8 +287,24 @@ def controlla_schedulazione_settimanale(nome_conto):
     if now.weekday() == 0 and (now.hour > 5 or (now.hour == 5 and now.minute >= 30)):
         chiave_settimana = f"{now.year}-W{now.isocalendar()[1]}"
         stato = leggi_stato_sync()
-        if stato.get(chiave_settimana, {}).get("stato") != "SUCCESS":
-            esegui_sync_candele(forza=False)
+        info_settimana = stato.get(chiave_settimana, {})
+        stato_corrente = info_settimana.get("stato")
+        
+        # Se già completato con successo al 100%, non fare nulla
+        if stato_corrente == "SUCCESS":
+            return
+            
+        # Se era PARTIAL o non eseguito, esegui (con debouncing di almeno 15 minuti dall'ultimo tentativo)
+        last_ts_str = info_settimana.get("timestamp")
+        if last_ts_str:
+            try:
+                last_dt = datetime.datetime.strptime(last_ts_str, "%Y-%m-%d %H:%M:%S")
+                if (now.replace(tzinfo=None) - last_dt).total_seconds() < 900:
+                    return # attende 15 minuti prima del retry
+            except Exception:
+                pass
+                
+        esegui_sync_candele(forza=False)
 
 if __name__ == "__main__":
     if "--force" in sys.argv:
