@@ -1276,6 +1276,14 @@ def aggiorna_candele_live_globale(prezzi_live):
             # devono chiudersi alle 23:00 come se fosse l'01:00 di sabato mattina.
             if is_venerdi_23 and tf in ("HOUR_4", "DAY"):
                 curr_snap = f"{base_dt.strftime('%Y/%m/%d')} 23:00:00"
+
+            # REGOLA APERTURA DOMENICA E CHIUSURA 01:00 LUNEDÌ (FOREX, GOLD, CRUDE):
+            # - Forex apre domenica alle 22:00: 3 candele H1 (22:00, 23:00, 00:00).
+            # - Gold e Crude aprono lunedì alle 00:00: 1 candela H1 (00:00).
+            # - All'01:00 di lunedì scatta la chiusura per TUTTI gli 11 strumenti:
+            #   * H4 chiude aggregando le prime ore (Forex 3h: 22:00-01:00, Gold/Crude 1h: 00:00-01:00).
+            #   * D1 chiude con data di DOMENICA (per Forex aggrega le 3h, per Gold/Crude aggrega l'ora 00:00-01:00).
+            # - Dalle 01:00 di lunedì parte la candela D1 del Lunedì per tutti.
             
             tracker = LIVE_OHLC_TRACKER.get((nome, tf))
             if not tracker:
