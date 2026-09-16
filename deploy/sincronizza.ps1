@@ -55,7 +55,10 @@ try {
         $fname = $_.Name
         & $KUBECTL --kubeconfig=$KUBECONFIG cp "macchinetta_trend/$fname" "macchinetta/${POD_DASH}:/data/macchinetta_trend/$fname"
     }
-    & $KUBECTL --kubeconfig=$KUBECONFIG cp Sistema/auth_manager.py "macchinetta/${POD_DASH}:/data/Sistema/auth_manager.py"
+    Get-ChildItem -Path "Sistema" -File | ForEach-Object {
+        $fname = $_.Name
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp "Sistema/$fname" "macchinetta/${POD_DASH}:/data/Sistema/$fname"
+    }
     Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
 } finally {
     Pop-Location
