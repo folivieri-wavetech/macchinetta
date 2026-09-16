@@ -263,6 +263,39 @@ def print_log(strumento, messaggio):
 
 CACHE_ULTIMI_KJ_FILE = "cache_ultimi_rilevamenti_kj.json"
 
+def estrai_valori_kj_tk_riga(riga):
+    """Estrae KJ, TK e ATR21 dall'evento registrato a candela chiusa."""
+    if not riga or not isinstance(riga, str):
+        return None, None, None
+    kj_val, tk_val, atr_val = None, None, None
+    m_kj = re.search(r"KJ(?:55)?:\s*([0-9]+(?:\.[0-9]+)?)", riga)
+    if m_kj:
+        try: kj_val = float(m_kj.group(1))
+        except Exception: pass
+    m_tk = re.search(r"TK(?:21)?:\s*([0-9]+(?:\.[0-9]+)?)", riga)
+    if m_tk:
+        try: tk_val = float(m_tk.group(1))
+        except Exception: pass
+    m_atr = re.search(r"ATR(?:21)?:\s*([0-9]+(?:\.[0-9]+)?)", riga)
+    if m_atr:
+        try: atr_val = float(m_atr.group(1))
+        except Exception: pass
+    return kj_val, tk_val, atr_val
+
+def leggi_cache_ultimi_kj_motore():
+    """Legge la cache certificata dei rilevamenti KJ55-TK21 a candela chiusa."""
+    for base in [".", "..", "FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "Logs_e_Cache"]:
+        p = os.path.join(base, CACHE_ULTIMI_KJ_FILE)
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if isinstance(d, dict) and d:
+                        return d
+            except Exception:
+                pass
+    return {}
+
 def aggiorna_cache_ultimo_kj_motore(nome, tf_lbl, riga):
     try:
         data = {}
@@ -778,24 +811,7 @@ def carica_candele_locali(nome, tf, px_live=None):
             return allinea_candele_live(local_data, nome, tf, px_live)
         return local_data
 
-    # 5. Ultima ratio: solo se non c'è assolutamente nessun dato
-    if px_live and isinstance(px_live, (int, float)):
-        res = []
-        now_dt = now_it()
-        min_tf = TF_MAP.get(tf, 5)
-        for i in range(60, 0, -1):
-            t = now_dt - datetime.timedelta(minutes=i * min_tf)
-            snap = t.strftime("%Y/%m/%d %H:%M:00")
-            res.append({
-                "snapshotTime": snap,
-                "openPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
-                "highPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
-                "lowPrice": {"bid": px_live, "ask": px_live, "lastTraded": None},
-                "closePrice": {"bid": px_live, "ask": px_live, "lastTraded": None}
-            })
-        salva_candele_locali(nome, tf, res)
-        return res
-        
+    # 5. Ultima ratio: se non c'è dato su disco, non salvare MAI candele piatte che corrompono lo storico
     return []
 
 FILE_QUOTA_IG = "ig_quota_status.json"
@@ -1079,6 +1095,9 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
     tfs_radar = ["HOUR", "HOUR_4", "DAY"]
     tf_labels = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
     
+    # Cache certificata dell'ultima candela chiusa (Unica Fonte di Verità condivisa con sottotab KJ55-TK21)
+    cache_kj = leggi_cache_ultimi_kj_motore()
+    
     for nome, cfg in CONFIG_STRUMENTI.items():
         px = prezzi_live.get(nome)
         if not px or not isinstance(px, (int, float)):
@@ -1098,17 +1117,27 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
         
         for tf in tfs_radar:
             lbl = tf_labels[tf]
-            candele = carica_candele_locali(nome, tf, px_live=px)
-            kj = calcola_kj55_da_candele(candele, periods=55)
-            tk = calcola_kj55_da_candele(candele, periods=21)
+            # 1. Fonte primaria: valore certificato dell'ultima candela chiusa da cache_ultimi_rilevamenti_kj.json
+            riga_cache = cache_kj.get(nome, {}).get(lbl)
+            kj_c, tk_c, atr_c = estrai_valori_kj_tk_riga(riga_cache)
+            
+            if kj_c is not None:
+                kj = kj_c
+                tk = tk_c
+                atr_pips_val = atr_c
+            else:
+                # 2. Fallback su candele chiuse da disco (RIGOROSAMENTE SENZA px_live)
+                candele = carica_candele_locali(nome, tf)
+                kj = calcola_kj55_da_candele(candele, periods=55)
+                tk = calcola_kj55_da_candele(candele, periods=21)
+                atr_tf = calcola_atr_da_candele(candele, periods=21)
+                atr_pips_val = (atr_tf / mult) if atr_tf is not None else None
+
             if kj is not None:
                 diff_pts = px - kj
                 dist_pips = round(abs(diff_pts) / mult)
                 dir_pos = "Possibile Entrata"
                 is_vicino = (dist_pips < 20)
-                
-                atr_tf = calcola_atr_da_candele(candele, periods=21)
-                atr_pips_val = (atr_tf / mult) if atr_tf is not None else None
                 tp_suggerito = max(40, int(round(atr_pips_val / 10.0) * 10)) if atr_pips_val is not None else 40
 
                 radar_data[nome]["timeframes"][lbl] = {
@@ -1121,8 +1150,6 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                     "vicino": is_vicino
                 }
             else:
-                atr_tf = calcola_atr_da_candele(candele, periods=21)
-                atr_pips_val = (atr_tf / mult) if atr_tf is not None else None
                 tp_suggerito = max(40, int(round(atr_pips_val / 10.0) * 10)) if atr_pips_val is not None else 40
                 radar_data[nome]["timeframes"][lbl] = {
                     "kj": None,
@@ -1138,9 +1165,8 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
         tf_conf = dati_mem.get("timeframe", "HOUR")
         lbl_conf = tf_labels.get(tf_conf, "H1")
         kj_conf = radar_data[nome]["timeframes"].get(lbl_conf, {}).get("kj")
-        if kj_conf is not None and (dati_mem.get("current_kj") != kj_conf):
-            candele_conf = carica_candele_locali(nome, tf_conf, px_live=px)
-            tk_conf = calcola_kj55_da_candele(candele_conf, periods=21)
+        tk_conf = radar_data[nome]["timeframes"].get(lbl_conf, {}).get("tk")
+        if kj_conf is not None and (dati_mem.get("current_kj") != kj_conf or dati_mem.get("current_tk") != tk_conf):
             aggiorna_memoria(nome, {"current_kj": kj_conf, "current_tk": tk_conf})
             dati_mem["current_kj"] = kj_conf
             dati_mem["current_tk"] = tk_conf

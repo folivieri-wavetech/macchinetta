@@ -692,6 +692,25 @@ def carica_cache_ultimi_kj(conto=None):
                 pass
     return {}
 
+def estrai_valori_kj_tk_riga(riga):
+    """Estrae KJ, TK e ATR21 dall'evento registrato a candela chiusa."""
+    if not riga or not isinstance(riga, str):
+        return None, None, None
+    kj_val, tk_val, atr_val = None, None, None
+    m_kj = re.search(r"KJ(?:55)?:\s*([0-9]+(?:\.[0-9]+)?)", riga)
+    if m_kj:
+        try: kj_val = float(m_kj.group(1))
+        except Exception: pass
+    m_tk = re.search(r"TK(?:21)?:\s*([0-9]+(?:\.[0-9]+)?)", riga)
+    if m_tk:
+        try: tk_val = float(m_tk.group(1))
+        except Exception: pass
+    m_atr = re.search(r"ATR(?:21)?:\s*([0-9]+(?:\.[0-9]+)?)", riga)
+    if m_atr:
+        try: atr_val = float(m_atr.group(1))
+        except Exception: pass
+    return kj_val, tk_val, atr_val
+
 def salva_cache_ultimi_kj(conto, cache):
     target = os.path.join(conto, CACHE_ULTIMI_KJ_FILE) if conto else CACHE_ULTIMI_KJ_FILE
     try:
@@ -1620,8 +1639,9 @@ def renderizza_schermata_radar(conto_selezionato=None):
         prezzi_live = {}
         
         accs = get_accounts()
-        if conto_selezionato and conto_selezionato not in accs:
-            accs = [conto_selezionato] + accs
+        if conto_selezionato:
+            accs = [c for c in accs if c != conto_selezionato] + [conto_selezionato]
+        cache_kj_master = carica_cache_ultimi_kj(conto_selezionato)
             
         for c_dir in accs:
             r_file = os.path.join(c_dir, "radar_trend.json")
@@ -1814,9 +1834,19 @@ def renderizza_schermata_radar(conto_selezionato=None):
                         dir_p = t_data.get("dir", "-")
                         vicino = t_data.get("vicino", False)
                         
-                        if kj_v is None and px and isinstance(px, (int, float)):
+                        # Fonte primaria certificata: candela chiusa da cache_ultimi_rilevamenti_kj (stessa di KJ55-TK21)
+                        riga_cache = cache_kj_master.get(s_nome, {}).get(lbl_key)
+                        kj_c, tk_c, atr_c = estrai_valori_kj_tk_riga(riga_cache)
+                        if kj_c is not None:
+                            kj_v = kj_c
+                            if px and isinstance(px, (int, float)):
+                                diff_pts = px - kj_v
+                                dist_p = round(abs(diff_pts) / mult)
+                                dir_p = "Possibile Entrata"
+                                vicino = (dist_p < 20)
+                        elif kj_v is None and px and isinstance(px, (int, float)):
                             tf_code = tf_map_code.get(lbl_key, "HOUR")
-                            candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code, px_live=px)
+                            candele_c = carica_candele_locali_dash(conto_selezionato or "FIORDOK_DEMO", s_nome, tf_code)
                             kj_c = calcola_kj55_da_candele_dash(candele_c, 55)
                             if kj_c is not None:
                                 kj_v = kj_c
