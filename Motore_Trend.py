@@ -591,13 +591,42 @@ def is_valid_candele(data, tf=None, check_freshness=True):
                         except Exception:
                             pass
             if len(times) >= 2:
-                delta_m = round((times[1] - times[0]).total_seconds() / 60.0)
-                if expected_min <= 15 and delta_m >= 30:
-                    return False
-                if expected_min == 60 and (delta_m < 30 or delta_m > 120):
-                    return False
-                if expected_min >= 1440 and delta_m < 720:
-                    return False
+                # Calcola delta tra candele consecutive dello stesso giorno lavorativo (evita weekend e gap session break)
+                intra_deltas = []
+                for i in range(1, len(times)):
+                    if times[i].weekday() == times[i-1].weekday():
+                        intra_deltas.append(round((times[i] - times[i-1]).total_seconds() / 60.0))
+                if not intra_deltas and len(data) > 10:
+                    for i in range(1, min(len(data), 30)):
+                        st_a = data[i-1].get('snapshotTime', '')
+                        st_b = data[i].get('snapshotTime', '')
+                        try:
+                            t_a = datetime.datetime.strptime(st_a[:19], "%Y/%m/%d %H:%M:%S")
+                            t_b = datetime.datetime.strptime(st_b[:19], "%Y/%m/%d %H:%M:%S")
+                            if t_a.weekday() == t_b.weekday():
+                                intra_deltas.append(round((t_b - t_a).total_seconds() / 60.0))
+                        except Exception:
+                            pass
+                if intra_deltas:
+                    import statistics
+                    med = statistics.median(intra_deltas)
+                    if expected_min <= 15 and med >= 30:
+                        return False
+                    if expected_min == 60 and not (50 <= med <= 70):
+                        return False
+                    if expected_min == 240 and not (200 <= med <= 260):
+                        return False
+                    if expected_min >= 1440 and med < 720:
+                        return False
+                else:
+                    # Fallback standard solo se non vi sono coppie dello stesso giorno
+                    delta_m = round((times[1] - times[0]).total_seconds() / 60.0)
+                    if expected_min <= 15 and delta_m >= 30:
+                        return False
+                    if expected_min == 60 and (delta_m < 30 or delta_m > 3600):
+                        return False
+                    if expected_min >= 1440 and delta_m < 720:
+                        return False
                     
             # Controllo freschezza ultima candela (solo se richiesto esplicitamente)
             if check_freshness and not is_weekend_active():
