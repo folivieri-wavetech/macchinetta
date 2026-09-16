@@ -85,6 +85,31 @@ def invia_ntfy(titolo, messaggio, tag="arrows_counterclockwise"):
     except Exception:
         pass
 
+def scrivi_log_console(tag, messaggio):
+    """Scrive direttamente in console_live.log di tutti i conti per renderlo visibile nella sottotab Varie."""
+    orario = now_it().strftime("%H:%M:%S")
+    riga = f"[{orario}] [{tag}] {messaggio}\n"
+    target_dirs = [".", "/data"]
+    for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
+        target_dirs.extend([acc, f"../{acc}", f"/data/{acc}"])
+    for d in set(target_dirs):
+        if os.path.exists(d) and os.path.isdir(d):
+            log_p = os.path.join(d, "console_live.log")
+            try:
+                righe = []
+                if os.path.exists(log_p):
+                    with open(log_p, "r", encoding="utf-8") as f:
+                        righe = f.readlines()
+                righe.append(riga)
+                if len(righe) > 1500:
+                    righe = righe[-1500:]
+                tmp = f"{log_p}.tmp.{os.getpid()}"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    f.writelines(righe)
+                os.replace(tmp, log_p)
+            except Exception:
+                pass
+
 def trova_env_fiordok():
     for p in ["FIORDOK_DEMO/.env", "/data/FIORDOK_DEMO/.env", "../FIORDOK_DEMO/.env", ".env"]:
         if os.path.exists(p):
@@ -117,7 +142,9 @@ def esegui_sync_candele(forza=False):
     if not api_key or not username or not password:
         return False, "Credenziali IG incomplete nel file .env"
 
-    print(f"🔄 Avvio sincronizzazione settimanale candele (Settimana {chiave_settimana})...")
+    msg_avvio = f"🔄 Avvio sincronizzazione settimanale candele in tranquillità (Settimana {chiave_settimana})..."
+    print(msg_avvio)
+    scrivi_log_console("SYNC", f"⏳ Avvio lettura settimanale candele (33 file storici, cadenza calma 5s)...")
     from ig_request_manager import ig_api_request
 
     auth_payload = {"identifier": username, "password": password}
@@ -246,6 +273,7 @@ def esegui_sync_candele(forza=False):
         salva_stato_sync(stato)
         msg_ok = f"Sincronizzazione completata al 100%: {totale_file_aggiornati}/{totale_attesi} file aggiornati ({totale_candele} candele totali distribuite su tutti i conti)."
         print(f"✅ {msg_ok}")
+        scrivi_log_console("SYNC", f"✅ Lettura settimanale completata con successo: {totale_file_aggiornati}/{totale_attesi} file aggiornati al 100% ({totale_candele} candele distribuite).")
         invia_ntfy("SYNC CANDLE SETTIMANALE 100% OK", msg_ok, "white_check_mark")
         return True, msg_ok
     else:
@@ -259,6 +287,7 @@ def esegui_sync_candele(forza=False):
         salva_stato_sync(stato)
         msg_warn = f"Attenzione: Sincronizzazione parziale ({totale_file_aggiornati}/{totale_attesi} file). Mancanti: {', '.join(file_falliti)}. Verrà ritentato al prossimo controllo."
         print(f"⚠️ {msg_warn}")
+        scrivi_log_console("SYNC", f"⚠️ Lettura settimanale parziale: {totale_file_aggiornati}/{totale_attesi} file. Mancanti: {', '.join(file_falliti)}. Verrà ritentato tra 15 min.")
         invia_ntfy("SYNC CANDLE SETTIMANALE PARZIALE", msg_warn, "warning")
         return False, msg_warn
 
