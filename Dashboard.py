@@ -1122,12 +1122,33 @@ st.markdown("""
             margin-left: auto !important;
             text-align: right !important;
             white-space: nowrap !important;
+            flex-shrink: 0 !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) > span:last-child {
+            margin-left: auto !important;
+            text-align: right !important;
+            white-space: nowrap !important;
+            font-weight: 700 !important;
+            font-size: 0.68rem !important;
+            flex-shrink: 0 !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(255, 43, 43)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="red"] {
+            color: #ef4444 !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(33, 195, 84)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(9, 171, 59)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="green"] {
+            color: #22c55e !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="gray"] {
+            color: #94a3b8 !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
             box-shadow: 0 2px 8px rgba(25, 135, 84, 0.4) !important;
         }
         @media (min-width: 769px) {
-            section[data-testid="stSidebar"] { min-width: 240px !important; max-width: 240px !important; }
+            section[data-testid="stSidebar"] { min-width: 250px !important; max-width: 250px !important; }
         }
         button[data-testid="stNumberInputStepUp"], button[data-testid="stNumberInputStepDown"] { display: flex !important; }
         div[data-testid="stNumberInputContainer"] { padding-left: 0.2rem !important; padding-right: 0.2rem !important; }
@@ -2062,6 +2083,19 @@ else:
                 except:
                     return "🟢"
 
+            def get_dd_tag_conto(st_acc):
+                try:
+                    dd_raw = st_acc.get('drawdown', 0.0)
+                    dd_num = float(dd_raw) if dd_raw not in (None, "") else 0.0
+                    if dd_num > 0:
+                        return f":green[+{formatta_eur(dd_num)} €]"
+                    elif dd_num < 0:
+                        return f":red[{formatta_eur(dd_num)} €]"
+                    else:
+                        return ":gray[0,00 €]"
+                except Exception:
+                    return ":gray[0,00 €]"
+
             vista_side = st.session_state.get("vista_sidebar", "CONTO")
             if conti_reali:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
@@ -2069,10 +2103,11 @@ else:
                     nome_cr_clean = cr.replace("_REALE", "")
                     st_cr = leggi_stato_sistema(cr)
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
+                    dd_cr = get_dd_tag_conto(st_cr)
                     is_sel = (cr == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cr, st_cr)
                     salute = get_stato_salute(cr)
-                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute}"
+                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cr
                         st.session_state.vista_sidebar = "CONTO"
@@ -2085,10 +2120,11 @@ else:
                     nome_cd_clean = cd.replace("_DEMO", "")
                     st_cd = leggi_stato_sistema(cd)
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
+                    dd_cd = get_dd_tag_conto(st_cd)
                     is_sel = (cd == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
-                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} {salute}"
+                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cd
                         st.session_state.vista_sidebar = "CONTO"
