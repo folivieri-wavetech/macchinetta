@@ -1774,11 +1774,16 @@ def esegui_ciclo_trend():
         epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
         if not epic: continue
         
-        # Recupera parametri
+        # Recupera parametri con default specifici (Oil: Core 1, Max 3, Scala 1; altri: Core 4, Max 10, Scala 2)
+        is_oil = ("oil" in nome.lower() or "crude" in nome.lower())
+        def_size = 1 if is_oil else 4
+        def_size_max = 3 if is_oil else 10
+        def_scala = 1 if is_oil else 2
+
         tf = dati.get("timeframe", "HOUR")
-        size_i = dati.get("size", 4)
-        size_max = dati.get("size_max", 10)
-        scala = int(dati.get("scala", 2) or 2)
+        size_i = dati.get("size", def_size)
+        size_max = dati.get("size_max", def_size_max)
+        scala = int(dati.get("scala", def_scala) or def_scala)
         min_body = dati.get("min_body", 10)
         auto_restart = dati.get("auto_restart", True)
         direzione = dati.get("direzione", "LONG")

@@ -194,10 +194,64 @@ def test_serialization_persistence():
     assert inc2.sl_price == 1.0851
     print("-> Test Serializzazione & Ripristino superato con successo!")
 
+def test_oil_90_100_logic():
+    print("=== TEST CRUDE OIL BE 90 PUNTI & TP 100 PUNTI ===")
+    config = {
+        "nome": "Oil - US Crude",
+        "size_i": 1,
+        "size_max": 3,
+        "scala": 1,
+        "pip_value": 1.0
+    }
+    engine = CoreEngine(config)
+    engine.start(10000.0, "LONG")
+    engine.current_tk = 10000.0
+    engine.current_kj = 9950.0
+    
+    # 1. Verifica paracadute Kijun per Oil: KJ - 40 punti = 9950 - 40 = 9910.0
+    # A 9920.0 la Core deve restare aperta
+    evs_sl = engine.check_live_stops(9920.0)
+    assert engine.pm.core_position is not None
+    assert len(evs_sl) == 0
+    # A 9905.0 (< 9910.0) scatta il paracadute
+    evs_sl2 = engine.check_live_stops(9905.0)
+    assert any(e.get("type") == "reversal" for e in evs_sl2)
+    assert engine.pm.core_position is None
+    
+    # Riavvio per test incremento
+    engine.start(10000.0, "LONG")
+    inc = engine.pm.open_increment(10050.0, 1, "LONG")
+    assert engine.pm.total_active_size() == 2
+    
+    # 2. Prezzo a +50 punti (10100.0): niente BE (soglia per Oil è 90)
+    evs = engine.check_live_stops(10100.0)
+    assert len(evs) == 0
+    assert inc.be_active == False
+    
+    # 3. Prezzo a +90 punti (10140.0): scatta BE (+5 punti = 10055.0)
+    evs = engine.check_live_stops(10140.0)
+    assert len(evs) == 1
+    assert evs[0]["type"] == "increment_be_activated"
+    assert evs[0]["sl_price"] == 10055.0
+    assert evs[0]["be_pips"] == 90
+    assert inc.be_active == True
+    # Trailing Stop = highest - 30p = 10140 - 30 = 10110.0
+    assert inc.sl_price == 10110.0
+    
+    # 4. Prezzo a +100 punti (10150.0): scatta Take Profit Bancomat (+100 punti = 1 dollaro)
+    evs = engine.check_live_stops(10150.0)
+    tp_ev = next(e for e in evs if e["type"] == "tp_increment")
+    assert tp_ev["size"] == 1
+    assert tp_ev["tp_pips"] == 100
+    assert len(engine.pm.increments) == 0
+    assert engine.pm.total_active_size() == 1
+    print("-> Test Crude Oil 90/100 superato con successo!")
+
 if __name__ == "__main__":
     test_forex_be_and_trailing()
     test_forex_tp_bancomat()
     test_gold_30_50_logic()
+    test_oil_90_100_logic()
     test_short_forex()
     test_serialization_persistence()
     print("\n>>> TUTTI I TEST SONO STATI SUPERATI CON SUCCESSO! <<<")

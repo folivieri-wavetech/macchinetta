@@ -876,9 +876,10 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
             st.rerun()
         return
     
-    sz_t = mem_t.get("size", 4)
-    szm_t = mem_t.get("size_max", 10)
-    sc_t = mem_t.get("scala", 2)
+    is_oil = ("oil" in nome_strumento.lower() or "crude" in nome_strumento.lower())
+    sz_t = mem_t.get("size", 1 if is_oil else 4)
+    szm_t = mem_t.get("size_max", 3 if is_oil else 10)
+    sc_t = mem_t.get("scala", 1 if is_oil else 2)
     
     def_tp, def_opp, def_dts = calcola_default_range_da_atr_dash(conto_r, nome_strumento)
     tp_r = mem_r.get("tp")
@@ -3429,8 +3430,13 @@ else:
 
                 radar_data, _ = carica_radar_trend_dash(conto_selezionato)
 
-                def crea_riquadro_trend(nome, def_body=10, def_size=4, def_size_max=10, def_scala=2):
+                def crea_riquadro_trend(nome, def_body=10, def_size=None, def_size_max=None, def_scala=None):
                     with st.container(border=True):
+                        is_oil = ("oil" in nome.lower() or "crude" in nome.lower())
+                        if def_size is None: def_size = 1 if is_oil else 4
+                        if def_size_max is None: def_size_max = 3 if is_oil else 10
+                        if def_scala is None: def_scala = 1 if is_oil else 2
+
                         dati_salvati = memoria_attuale.get(nome, {})
                         stato_corrente = dati_salvati.get("stato", "FLAT")
                         stato_attivo = dati_salvati.get("attivo", False)

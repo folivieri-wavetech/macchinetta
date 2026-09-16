@@ -103,15 +103,20 @@ class CoreEngine:
     def _get_increment_rules(self):
         """
         Restituisce le soglie Break-Even, Trailing e Take Profit per singolo incremento:
-        - Commodities e Indici (Spot Gold, US 500 Cash, Oil - US Crude):
+        - Crude Oil (Oil - US Crude):
+            be_pips = 90, be_offset = 5, tp_pips = 100, trail_dist = 30
+        - Commodities e Indici (Spot Gold, US 500 Cash):
             be_pips = 30, be_offset = 2, tp_pips = 50, trail_dist = 15
         - Cross Forex:
             be_pips = 15, be_offset = 1, tp_pips = 25, trail_dist = 12
         """
-        nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip()
-        commodities = ["Spot Gold", "US 500 Cash", "Oil - US Crude", "GOLD", "US500", "OIL"]
-        is_comm = any(c.lower() in nome.lower() for c in commodities)
-        if is_comm:
+        nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
+        if "oil" in nome or "crude" in nome:
+            be_pips = self.config.get("increment_be_pips", 90)
+            be_offset = self.config.get("increment_be_offset", 5)
+            tp_pips = self.config.get("increment_tp_pips", 100)
+            trail_dist = self.config.get("increment_trail_pips", 30)
+        elif any(c in nome for c in ["gold", "us 500", "us500", "sp500"]):
             be_pips = self.config.get("increment_be_pips", 30)
             be_offset = self.config.get("increment_be_offset", 2)
             tp_pips = self.config.get("increment_tp_pips", 50)
@@ -122,6 +127,13 @@ class CoreEngine:
             tp_pips = self.config.get("increment_tp_pips", 25)
             trail_dist = self.config.get("increment_trail_pips", 12)
         return be_pips, be_offset, tp_pips, trail_dist
+
+    def _get_tk_increment_filters(self):
+        """Restituisce (tolleranza_tk, max_dist_tk, min_dist_incr, min_candle_body) in pip/punti."""
+        nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
+        if "oil" in nome or "crude" in nome:
+            return 10, 40, 30, 5 # Per Oil: tolleranza 10p, zona TK 40p, dist tra incr 30p, body 5p
+        return 5, 20, 10, 1 # Per Forex e altri: 5p, 20p, 10p, 1p
 
     def _get_max_kj_tk_threshold_pips(self):
         """Restituisce la soglia di forbice Kijun-Tenkan in pip per Timeframe: H1=30, H4=40, D1=50."""
@@ -266,14 +278,16 @@ class CoreEngine:
                     self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
-                # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sotto TK
-                tolleranza_tk = 5 * pip_val
-                if closed_candle.open > (tk - tolleranza_tk) and c_close >= (tk - tolleranza_tk - 1e-7) and (c_close - tk) <= (20 * pip_val + 1e-7):
-                    # Candela rossa di almeno 1 pip su tutti i TF
-                    if (closed_candle.open - closed_candle.close) >= (1 * pip_val - 1e-7):
+                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
+                tolleranza_tk = tol_pips * pip_val
+                max_dist_tk = max_tk_dist_pips * pip_val
+                min_dist_incr = min_dist_pips * pip_val
+                min_body = min_body_pips * pip_val
+
+                if closed_candle.open > (tk - tolleranza_tk) and c_close >= (tk - tolleranza_tk - 1e-7) and (c_close - tk) <= (max_dist_tk + 1e-7):
+                    # Candela rossa di almeno min_body pip
+                    if (closed_candle.open - closed_candle.close) >= (min_body - 1e-7):
                         entry_price = exec_price
-                        # REGOLA OPZIONE B: Distanza minima di almeno 10 pip da qualsiasi incremento attivo a mercato
-                        min_dist_incr = 10 * pip_val
                         troppo_vicino = any(abs(entry_price - inc.entry_price) < (min_dist_incr - 1e-7) for inc in self.pm.increments)
                         if troppo_vicino:
                             self.retracement_start_price = None
@@ -401,14 +415,16 @@ class CoreEngine:
                     self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
-                # Tolleranza di 5 pip sul confronto con TK: close può arrivare fino a 5 pip sopra TK
-                tolleranza_tk = 5 * pip_val
-                if closed_candle.open < (tk + tolleranza_tk) and c_close <= (tk + tolleranza_tk + 1e-7) and (tk - c_close) <= (20 * pip_val + 1e-7):
-                    # Candela verde di almeno 1 pip su tutti i TF
-                    if (closed_candle.close - closed_candle.open) >= (1 * pip_val - 1e-7):
+                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
+                tolleranza_tk = tol_pips * pip_val
+                max_dist_tk = max_tk_dist_pips * pip_val
+                min_dist_incr = min_dist_pips * pip_val
+                min_body = min_body_pips * pip_val
+
+                if closed_candle.open < (tk + tolleranza_tk) and c_close <= (tk + tolleranza_tk + 1e-7) and (tk - c_close) <= (max_dist_tk + 1e-7):
+                    # Candela verde di almeno min_body pip
+                    if (closed_candle.close - closed_candle.open) >= (min_body - 1e-7):
                         entry_price = exec_price
-                        # REGOLA OPZIONE B: Distanza minima di almeno 10 pip da qualsiasi incremento attivo a mercato
-                        min_dist_incr = 10 * pip_val
                         troppo_vicino = any(abs(entry_price - inc.entry_price) < (min_dist_incr - 1e-7) for inc in self.pm.increments)
                         if troppo_vicino:
                             self.retracement_start_price = None
@@ -509,9 +525,12 @@ class CoreEngine:
         tp_threshold = tp_pips * pip_val
         trail_dist = trail_dist_pips * pip_val
 
+        nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
+        sl_core_pips = 40 if ("oil" in nome_str or "crude" in nome_str) else 15
+
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip o Trailing SL Core
-            sl_core_base = kj - (15 * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip (40p per Oil) o Trailing SL Core
+            sl_core_base = kj - (sl_core_pips * pip_val)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price <= (effective_sl_core + 1e-7):
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
@@ -639,8 +658,8 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip o Trailing SL Core
-            sl_core_base = kj + (15 * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip (40p per Oil) o Trailing SL Core
+            sl_core_base = kj + (sl_core_pips * pip_val)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
             if current_price >= (effective_sl_core - 1e-7):
                 reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
