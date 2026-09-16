@@ -1777,12 +1777,11 @@ def renderizza_schermata_radar(conto_selezionato=None):
             </div>
             <table style='width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.75rem; table-layout: fixed;'>
                 <colgroup>
+                    <col style='width: 25%;'>
+                    <col style='width: 15%;'>
                     <col style='width: 20%;'>
-                    <col style='width: 12%;'>
-                    <col style='width: 19%;'>
-                    <col style='width: 19%;'>
-                    <col style='width: 19%;'>
-                    <col style='width: 11%;'>
+                    <col style='width: 20%;'>
+                    <col style='width: 20%;'>
                 </colgroup>
                 <thead>
                     <tr style='background: #1e293b; color: #cbd5e1; text-align: center; border-bottom: 2px solid #334155;'>
@@ -1791,7 +1790,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
                         <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>H1</th>
                         <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>H4</th>
                         <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>D1</th>
-                        <th style='padding: 5px 8px; font-size: 0.73rem; text-transform: uppercase;'>Stato Trend</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1852,28 +1850,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
                                 }
                     except Exception:
                         pass
-                
-                if trades_tf:
-                    pills = []
-                    for tf_k in ["H1", "H4", "D1"]:
-                        if tf_k in trades_tf:
-                            t_info = trades_tf[tf_k]
-                            st_dir = t_info["stato"]
-                            ct_name = t_info["conto"]
-                            is_profit = t_info.get("is_profit", True)
-                            pnl_pts = t_info.get("pnl_pts", 0.0)
-                            pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
-                            
-                            col_bg = "rgba(34, 197, 94, 0.2)" if is_profit else "rgba(239, 68, 68, 0.2)"
-                            col_bdr = "#22c55e" if is_profit else "#ef4444"
-                            col_txt = "#4ade80" if is_profit else "#f87171"
-                            icon_d = "🟢" if is_profit else "🔴"
-                            tag_d = "L" if st_dir == "LONG" else "S"
-                            title_p = f"Conto: {ct_name} ({st_dir}) | PnL: {pnl_sign} pt".replace("'", "&#39;")
-                            pills.append(f"<span style='background: {col_bg}; color: {col_txt}; border: 1px solid {col_bdr}; border-radius: 3px; padding: 1px 4px; font-weight: bold; font-size: 0.68rem; white-space: nowrap;' title='{title_p}'>{icon_d} {tf_k} ({tag_d})</span>")
-                    badge_stato = f"<div style='display: flex; gap: 3px; justify-content: center; flex-wrap: nowrap;'>{''.join(pills)}</div>"
-                else:
-                    badge_stato = "<span style='background: rgba(148, 163, 184, 0.15); color: #94a3b8; border-radius: 3px; padding: 2px 5px; font-size: 0.70rem;'>⏳ FLAT</span>"
                 
                 px_str = f"<b>{px:.{dec}f}</b>" if (px and isinstance(px, (int, float))) else "<span style='color:#64748b;'>-</span>"
                 
@@ -1950,7 +1926,6 @@ def renderizza_schermata_radar(conto_selezionato=None):
                     <td style='padding: 2px 4px;'>{c_h1}</td>
                     <td style='padding: 2px 4px;'>{c_h4}</td>
                     <td style='padding: 2px 4px;'>{c_d1}</td>
-                    <td style='padding: 3px 6px; text-align: center;'>{badge_stato}</td>
                 </tr>
                 """
             
