@@ -1,11 +1,11 @@
+import os
 import streamlit as st
 import time
-import datetime
-from hyper_gold_m1_engine import HyperGoldM1Engine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CORE_TP_PIPS
+from hyper_gold_m1_engine import HyperGoldM1Engine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CORE_TS_TRIGGER_PIPS, is_gold_trading_suspended, is_gold_feed_suspended
 
 # Configurazione Pagina Streamlit
 st.set_page_config(
-    page_title="Hyper-Trading Spot Gold 1€ (M5)",
+    page_title="[M5] Hyper Spot Gold 1€",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -13,6 +13,8 @@ st.set_page_config(
 
 # Istanza Engine Singleton
 engine = HyperGoldM1Engine.get_instance()
+if engine.position is None and os.path.exists("hyper_gold_m1_state.json"):
+    engine.load_state()
 
 # Stile CSS Dark Moderno
 st.markdown("""
@@ -36,6 +38,44 @@ st.markdown("""
     }
     .table-dark th { background-color: #1e293b; color: #94a3b8; padding: 8px 10px; text-align: left; }
     .table-dark td { padding: 7px 10px; border-bottom: 1px solid #334155; }
+
+    /* Pulsante AVVIA TRADING: verde quando attivo, disabilitato quando trading attivo */
+    .btn-start div.stButton > button {
+        background-color: #16a34a !important;
+        border: 1px solid #22c55e !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    .btn-start div.stButton > button:hover:not(:disabled) {
+        background-color: #15803d !important;
+        border-color: #16a34a !important;
+    }
+    .btn-start div.stButton > button:disabled {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        color: #64748b !important;
+        opacity: 0.50 !important;
+        cursor: not-allowed !important;
+    }
+
+    /* Pulsante STOP TRADING: rosso quando attivo, disabilitato quando trading in pausa */
+    .btn-stop div.stButton > button {
+        background-color: #dc2626 !important;
+        border: 1px solid #ef4444 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    .btn-stop div.stButton > button:hover:not(:disabled) {
+        background-color: #b91c1c !important;
+        border-color: #dc2626 !important;
+    }
+    .btn-stop div.stButton > button:disabled {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        color: #64748b !important;
+        opacity: 0.50 !important;
+        cursor: not-allowed !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -67,25 +107,65 @@ def render_live_desk():
     realized_pnl = balance - init_bal
 
     # HEADER SUPERIORE
-    c_title, c_badges = st.columns([2.5, 1.5])
+    c_title, c_badges = st.columns([2.9, 1.1])
     with c_title:
-        st.markdown("## ⚡ Hyper-Trading Spot Gold 1€ (Barre 5m • TK144 / KJ55)")
-        st.caption("Filtro Macro TK 144 • Trigger KJ 55 • Core 5c + Max 5 Incr x 3c (TP +4 pip) • Totale max 20c • Porta 8505")
+        st.markdown("<h3 style='margin: 0; font-size: 1.18rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 6px; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>📊 TF 5 MIN</span> <span style='font-size: 0.88rem; color: #94a3b8; font-weight: 500;'>(TK144 / KJ55)</span></h3>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.74rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 • Core 5c (TS a +10 pip, Lock +6, Step 2) • Incr 3c (TP +5) • Stop Trading auto su TS Hit • Porta 8502</div>", unsafe_allow_html=True)
 
     with c_badges:
-        st.markdown("<div style='display: flex; justify-content: flex-end; gap: 10px; align-items: center; margin-top: 8px;'>", unsafe_allow_html=True)
+        st.markdown("<div style='display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 4px; white-space: nowrap;'>", unsafe_allow_html=True)
+        is_feed_closed = is_gold_feed_suspended()
+        is_trade_frozen = is_gold_trading_suspended()
+
         if is_conn:
             st.markdown(f"<span class='badge-live' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>🟢 Lightstreamer LIVE ({total_ticks} tick)</span>", unsafe_allow_html=True)
+        elif is_feed_closed:
+            st.markdown("<span class='badge-live' style='background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #64748b;'>💤 Feed Chiuso (22:45-00:00)</span>", unsafe_allow_html=True)
         else:
             st.markdown("<span class='badge-live' style='background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444;'>🔴 In Connessione...</span>", unsafe_allow_html=True)
 
-        if trading_on:
+        if is_trade_frozen:
+            st.markdown("<span class='badge-live' style='background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #facc15;'>🌙 ORDINI CONGELATI (fino 00:15)</span>", unsafe_allow_html=True)
+        elif trading_on:
             st.markdown("<span class='badge-live' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>⚡ TRADING ATTIVO</span>", unsafe_allow_html=True)
         else:
             st.markdown("<span class='badge-live' style='background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid #64748b;'>⏸️ IN PAUSA</span>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 10px 0 16px 0; border-color: #334155;' />", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 10px 0 14px 0; border-color: #334155;' />", unsafe_allow_html=True)
+
+    # Avviso Sospensione Notturna Gold
+    if is_trade_frozen:
+        st.markdown("""
+        <div style='background: rgba(234, 179, 8, 0.12); border: 1px solid #eab308; border-radius: 8px; padding: 10px 16px; margin-bottom: 14px;'>
+            <div style='display: flex; align-items: center; gap: 12px;'>
+                <span style='font-size: 1.3rem;'>🌙</span>
+                <div>
+                    <span style='font-size: 0.98rem; font-weight: 700; color: #fde047;'>OPERATIVITÀ ORDINI CONGELATA (22:45 - 00:15)</span>
+                    <div style='font-size: 0.83rem; color: #cbd5e1; margin-top: 2px;'>
+                        Dalle 00:00 il feed quotazioni e candele è attivo per aggiornare KJ55 e TK144 in tempo reale. <b>Apertura automatica nuovi ordini alle 00:15</b>.
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Banner Ciclo Trailing Stop Completato
+    last_c = engine.last_ts_cycle
+    if last_c and not trading_on:
+        st.markdown(f"""
+        <div style='background: rgba(34, 197, 94, 0.12); border: 1px solid #22c55e; border-radius: 8px; padding: 10px 16px; margin-bottom: 14px;'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <div>
+                    <span style='font-size: 1.02rem; font-weight: 700; color: #4ade80;'>🏆 CICLO TRAILING STOP COMPLETATO (M5)</span>
+                    <div style='font-size: 0.83rem; color: #cbd5e1; margin-top: 3px;'>
+                        Chiusura {last_c['direction']} @ {last_c['close_price']:.2f} (+{last_c['core_pips']:.1f} pip Core, Peak: {last_c['peak_price']:.2f}) • <b>P&L Ciclo: +{last_c['total_pnl']:,.2f} €</b> • Bot posto in <b>STOP TRADING</b> per proteggere il profitto.
+                    </div>
+                </div>
+                <div style='font-size: 0.78rem; color: #94a3b8;'>Orario: {last_c['time']}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
@@ -138,10 +218,12 @@ def render_live_desk():
             dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
             dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
             num_inc = len(increments)
-            tp_core_val = pos.get("tp_price")
-            if not tp_core_val:
-                tp_core_val = round(pos["open_price"] + (CORE_TP_PIPS if pos["direction"] == "LONG" else -CORE_TP_PIPS), 2)
-            sub_text = f"Core: {CORE_CONTRACTS}c @ {pos['open_price']:.2f} (TP: {tp_core_val:.2f}) | Incr: {num_inc}/{MAX_INCREMENTS}"
+            if pos.get("ts_active"):
+                ts_px = pos.get("ts_price", 0.0)
+                peak_px = pos.get("peak_price", pos["open_price"])
+                sub_text = f"🚀 TRAILING ATTIVO | Stop: {ts_px:.2f} (Peak: {peak_px:.2f}) | Incr: {num_inc}/{MAX_INCREMENTS}"
+            else:
+                sub_text = f"Core: {CORE_CONTRACTS}c @ {pos['open_price']:.2f} (TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f} pip) | Incr: {num_inc}/{MAX_INCREMENTS}"
             st.markdown(f"""
             <div class='kpi-card'>
                 <div class='kpi-title'>Esposizione a Mercato</div>
@@ -243,17 +325,21 @@ def render_live_desk():
     # 4. PANNELLO CONTROLLI (AVVIA / STOP / RESET)
     col_btn1, col_btn2, col_btn3 = st.columns([1.5, 1.5, 2])
     with col_btn1:
-        if st.button("🟢 AVVIA TRADING M5", use_container_width=True, type="primary" if not trading_on else "secondary"):
+        st.markdown("<div class='btn-start'>", unsafe_allow_html=True)
+        if st.button("🟢 AVVIA TRADING M5", key="btn_start_m5", disabled=trading_on, use_container_width=True):
             engine.set_trading(True)
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col_btn2:
-        if st.button("🛑 STOP TRADING M5", use_container_width=True, type="primary" if trading_on else "secondary"):
+        st.markdown("<div class='btn-stop'>", unsafe_allow_html=True)
+        if st.button("🛑 STOP TRADING M5", key="btn_stop_m5", disabled=not trading_on, use_container_width=True):
             engine.set_trading(False)
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col_btn3:
-        if st.button("🔄 RESET SALDO A 10.000 €", use_container_width=True):
+        if st.button("🔄 RESET SALDO A 10.000 €", key="btn_reset_m5", use_container_width=True):
             engine.reset_portfolio()
             st.rerun()
 
@@ -263,60 +349,115 @@ def render_live_desk():
     col_t1, col_t2 = st.columns([2, 1.2])
 
     with col_t1:
-        st.markdown("### 📋 Storico Operazioni Eseguite (M5)")
-        if trades:
+        st.markdown("### 📋 Storico Operazioni Chiuse (M5 • Trend TK144/KJ55)")
+        closed_trades = [
+            t for t in trades 
+            if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", ""))
+        ]
+        if closed_trades:
             rows_html = []
-            for t in trades[:30]:
+            for t in closed_trades[:30]:
                 col_pnl = "#22c55e" if t["pnl"] > 0 else ("#ef4444" if t["pnl"] < 0 else "#94a3b8")
                 sign_p = f"+{t['pnl']:.2f}" if t["pnl"] > 0 else f"{t['pnl']:.2f}"
-                if "🎯 TP" in t["action"]:
+                if "🏆 TS HIT" in t["action"]:
+                    action_badge = "<span style='color: #4ade80; font-weight: bold;'>🏆 " + t["action"] + "</span>"
+                elif "🎯 TP" in t["action"]:
                     action_badge = "<span style='color: #38bdf8; font-weight: bold;'>🎯 " + t["action"] + "</span>"
-                elif "➕ OPEN INC" in t["action"]:
-                    action_badge = "<span style='color: #f59e0b; font-weight: bold;'>➕ " + t["action"] + "</span>"
                 elif "CLOSE INC" in t["action"]:
                     action_badge = "<span style='color: #cbd5e1; font-weight: bold;'>⏹️ " + t["action"] + "</span>"
-                elif "LONG" in t["action"]:
-                    action_badge = "<span style='color: #22c55e; font-weight: bold;'>🟢 " + t["action"] + "</span>"
-                elif "SHORT" in t["action"]:
-                    action_badge = "<span style='color: #ef4444; font-weight: bold;'>🔴 " + t["action"] + "</span>"
+                elif "CLOSE CORE" in t["action"]:
+                    action_badge = "<span style='color: #f59e0b; font-weight: bold;'>⏹️ " + t["action"] + "</span>"
                 else:
                     action_badge = t["action"]
 
                 close_str = f"{t['close_price']:.2f}" if t.get("close_price") else "--"
                 rows_html.append(
-                    f"<tr><td>{t['time']}</td><td>{action_badge}</td><td>{t['open_price']:.2f}</td><td>{close_str}</td><td style='color: {col_pnl}; font-weight: bold;'>{sign_p} €</td><td style='font-weight: 600;'>{t['balance']:,.2f} €</td><td style='color: #94a3b8; font-size: 0.78rem;'>{t['reason']}</td></tr>"
+                    f"<tr><td>{t['time']}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{close_str}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-weight: 600; white-space: nowrap;'>{t['balance']:,.2f}&nbsp;€</td><td style='color: #94a3b8; font-size: 0.78rem;'>{t['reason']}</td></tr>"
                 )
             tbl_t = (
                 "<table class='table-dark'>"
-                "<thead><tr><th>Orario</th><th>Azione</th><th>Prezzo In</th><th>Prezzo Out</th><th>P&L</th><th>Saldo</th><th>Trigger</th></tr></thead>"
+                "<thead><tr><th>Orario</th><th>Azione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Saldo</th><th>Trigger</th></tr></thead>"
                 f"<tbody>{''.join(rows_html)}</tbody>"
                 "</table>"
             )
             st.markdown(tbl_t, unsafe_allow_html=True)
         else:
-            st.info("Nessuna operazione ancora eseguita. Al primo segnale conforme al filtro TK144 e trigger KJ55 verrà registrato l'ordine.")
+            st.info("Nessuna operazione ancora chiusa. Non appena una posizione Core o incremento verrà liquidato (Take Profit, Trailing Stop o Uscita KJ), comparirà qui con il relativo P&L.")
 
     with col_t2:
-        st.markdown("### ⏱️ Ultime Barre Concluse (M5)")
-        if candles_recent:
-            rows_c = []
-            for c in reversed(candles_recent):
-                is_green = c["close"] >= c["open"]
-                col_c = "#22c55e" if is_green else "#ef4444"
-                dir_txt = "🟢 Bull" if is_green else "🔴 Bear"
-                kj_v = f"{c['kj55']:.2f}" if c.get("kj55") else "--"
-                rows_c.append(
-                    f"<tr><td>{c['time']}</td><td style='color: {col_c}; font-weight: bold;'>{dir_txt}</td><td>{c['open']:.2f}</td><td>{c['close']:.2f}</td><td style='color: #38bdf8;'>{kj_v}</td></tr>"
+        st.markdown("### 💼 Posizioni in Portafoglio")
+        if pos:
+            dir_pos = pos["direction"]
+            dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
+            dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core {dir_pos}</span>"
+
+            # PnL Core
+            if live_mid is not None:
+                core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
+                core_pnl_val = round(core_diff * pos.get("contracts", CORE_CONTRACTS) * 1.0, 2)
+            else:
+                core_pnl_val = 0.0
+
+            col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
+            sign_core = "+" if core_pnl_val >= 0 else ""
+
+            p_rows = [
+                f"<tr>"
+                f"<td>{dir_badge}</td>"
+                f"<td style='text-align: center; font-weight: 700; white-space: nowrap;'>{pos.get('contracts', CORE_CONTRACTS)}c</td>"
+                f"<td style='text-align: right; font-weight: 600; white-space: nowrap;'>{pos['open_price']:.2f}</td>"
+                f"<td style='text-align: right; color: {col_core_pnl}; font-weight: 700; white-space: nowrap;'>{sign_core}{core_pnl_val:,.2f}&nbsp;€</td>"
+                f"</tr>"
+            ]
+
+            # Incrementi aperti
+            for idx, inc in enumerate(increments, 1):
+                if live_mid is not None:
+                    inc_diff = (live_mid - inc["open_price"]) if inc["direction"] == "LONG" else (inc["open_price"] - live_mid)
+                    inc_pnl_val = round(inc_diff * inc.get("contracts", INC_CONTRACTS) * 1.0, 2)
+                else:
+                    inc_pnl_val = 0.0
+
+                col_inc_pnl = "#22c55e" if inc_pnl_val >= 0 else "#ef4444"
+                sign_inc = "+" if inc_pnl_val >= 0 else ""
+
+                p_rows.append(
+                    f"<tr>"
+                    f"<td><span style='color: #f59e0b; font-weight: 600; white-space: nowrap;'>➕ Incr #{idx}</span></td>"
+                    f"<td style='text-align: center; font-weight: 700; white-space: nowrap;'>{inc.get('contracts', INC_CONTRACTS)}c</td>"
+                    f"<td style='text-align: right; font-weight: 600; white-space: nowrap;'>{inc['open_price']:.2f}</td>"
+                    f"<td style='text-align: right; color: {col_inc_pnl}; font-weight: 700; white-space: nowrap;'>{sign_inc}{inc_pnl_val:,.2f}&nbsp;€</td>"
+                    f"</tr>"
                 )
-            tbl_c = (
+
+            # Riga Totale
+            col_tot_pnl = "#22c55e" if float_pnl >= 0 else "#ef4444"
+            sign_tot = "+" if float_pnl >= 0 else ""
+            px_live_str = f"{live_mid:.2f}" if live_mid is not None else "--"
+            p_rows.append(
+                f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 2px solid #475569; font-weight: 800;'>"
+                f"<td style='color: #f8fafc;'>TOTALE</td>"
+                f"<td style='text-align: center; color: #38bdf8; white-space: nowrap;'>{total_contracts}c</td>"
+                f"<td style='text-align: right; color: #94a3b8; white-space: nowrap;'>Live: {px_live_str}</td>"
+                f"<td style='text-align: right; color: {col_tot_pnl}; white-space: nowrap;'>{sign_tot}{float_pnl:,.2f}&nbsp;€</td>"
+                f"</tr>"
+            )
+
+            tbl_port = (
                 "<table class='table-dark'>"
-                "<thead><tr><th>Ora</th><th>Tipo</th><th>Open</th><th>Close</th><th>KJ55</th></tr></thead>"
-                f"<tbody>{''.join(rows_c)}</tbody>"
+                "<thead><tr><th>Posizione</th><th style='text-align: center; white-space: nowrap;'>Size</th><th style='text-align: right; white-space: nowrap;'>Open</th><th style='text-align: right; white-space: nowrap;'>P&L (€)</th></tr></thead>"
+                f"<tbody>{''.join(p_rows)}</tbody>"
                 "</table>"
             )
-            st.markdown(tbl_c, unsafe_allow_html=True)
+            st.markdown(tbl_port, unsafe_allow_html=True)
         else:
-            st.info("In attesa di candele M5...")
+            st.markdown("""
+            <div style='background: rgba(30, 41, 59, 0.5); border: 1px dashed #334155; border-radius: 8px; padding: 22px 16px; text-align: center;'>
+                <div style='font-size: 1.4rem; margin-bottom: 6px;'>⚪</div>
+                <div style='font-weight: 700; color: #e2e8f0; font-size: 0.92rem;'>Nessuna posizione aperta (FLAT)</div>
+                <div style='font-size: 0.76rem; color: #94a3b8; margin-top: 4px;'>Size: 0c • In attesa automatica del prossimo segnale</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # Render del desk
 render_live_desk()

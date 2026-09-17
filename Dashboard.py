@@ -4357,6 +4357,7 @@ else:
                 candele_lines = []
                 core_incrementi_lines = []
                 chiusure_lines = []
+                conferme_lines = []
                 tentativi_lines = []
                 varie_lines = []
 
@@ -4373,16 +4374,22 @@ else:
                     # 2. Candele chiuse (standard senza data)
                     if "CANDELA" in r_up or "🕯️" in r_std:
                         candele_lines.append(r_std)
-                    # 3. Chiusure (uscite, TP, SL, bancomat, stop KJ/TK, ecc.) -> con data [gg/mm]
+                    # 3. Conferme tecniche API IG / Ricevute esecuzione (es. "✅ Chiusura [INCREMENT_CLOSED] eseguita con successo.")
                     elif any(k in r_up for k in [
-                        "CHIUSURA", "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
-                        "FIFO INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE KJ",
+                        "ESEGUITA CON SUCCESSO", "ESEGUITO CON SUCCESSO", "INVIATA.", 
+                        "GIÀ CHIUSA", "GIÀ LIQUIDATA", "GIA CHIUSA", "GIA LIQUIDATA", 
+                        "PULIZIA [TICKET", "CONFERMA DEAL"
+                    ]) or ("CHIUSURA" in r_up and any(k in r_up for k in ["[INCREMENT_CLOSED]", "[CORE_CLOSED]", "[ORFANA]", "ESEGUIT"])):
+                        conferme_lines.append(r_data)
+                    # 4. Chiusure con P&L reale (uscite economiche, TP, Bancomat, FIFO, Stop TK/KJ, Trailing, ecc.)
+                    elif any(k in r_up for k in [
+                        "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
+                        "FIFO INCR", "BE INCR", "TRAILING INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE",
                         "CHIUSO IN PROFITTO", "CHIUSO IN STOP LOSS", "CHIUSO IN LOSS", 
-                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI",
-                        "PULIZIA [TICKET2]"
+                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI"
                     ]):
                         chiusure_lines.append(r_data)
-                    # 4. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi) -> con data [gg/mm]
+                    # 5. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi) -> con data [gg/mm]
                     elif any(k in r_up for k in [
                         "INCREMENTO", "OPEN INCR", "INCR", "OPEN CORE", "CORE", 
                         "ENTRATA A MERCATO", "RESTART CORE", "RESTART LONG", "RESTART SHORT",
@@ -4392,7 +4399,7 @@ else:
                     ]):
                         if "POSSIBILE ENTRATA" not in r_up and "RADAR" not in r_up:
                             core_incrementi_lines.append(r_data)
-                    # 5. Varie (sistema, connessioni, rollover, controlli tecnici) -> con data [gg/mm]
+                    # 6. Varie (sistema, connessioni, rollover, controlli tecnici) -> con data [gg/mm]
                     else:
                         if "POSSIBILE ENTRATA" not in r_up and "RADAR" not in r_up:
                             varie_lines.append(r_data)
@@ -4401,13 +4408,14 @@ else:
                     "📋 Tutti", 
                     "🕯️ Candele chiuse", 
                     "🎯 Core e Incrementi", 
-                    "🛑 Chiusure", 
+                    "🛑 Chiusure (P&L)", 
+                    "✅ Conferme API",
                     "📊 KJ55-TK21",
                     "🔁 Tentativi (5)",
                     "⚙️ Varie"
                 ])
 
-                tab_sub_tutti, tab_sub_candele, tab_sub_core_incr, tab_sub_chiusure, tab_sub_kj, tab_sub_tentativi, tab_sub_varie = sub_tabs
+                tab_sub_tutti, tab_sub_candele, tab_sub_core_incr, tab_sub_chiusure, tab_sub_conferme, tab_sub_kj, tab_sub_tentativi, tab_sub_varie = sub_tabs
 
                 components.html("""
                     <script>
@@ -4463,8 +4471,12 @@ else:
                     render_terminal_box(core_incrementi_lines, empty_msg="Nessun ingresso Core o Incremento registrato di recente.")
 
                 with tab_sub_chiusure:
-                    st.caption(f"Eventi uscite / chiusure / stop: {len(chiusure_lines)}")
-                    render_terminal_box(chiusure_lines, empty_msg="Nessuna chiusura o stop registrato di recente.")
+                    st.caption(f"Eventi uscite / chiusure con P&L: {len(chiusure_lines)}")
+                    render_terminal_box(chiusure_lines, empty_msg="Nessuna chiusura con P&L registrata di recente.")
+
+                with tab_sub_conferme:
+                    st.caption(f"Ricevute tecniche e conferme esecuzione API IG: {len(conferme_lines)}")
+                    render_terminal_box(conferme_lines, empty_msg="Nessuna conferma API registrata di recente.")
 
                 with tab_sub_kj:
                     st.caption("Ultimo rilevamento Kijun (KJ55) e Tenkan (TK21) su tutti gli strumenti (3 Timeframe ciascuno - 33 righe)")

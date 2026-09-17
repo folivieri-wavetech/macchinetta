@@ -1,10 +1,17 @@
 import os
 import sys
+import ssl
 import time
 import json
 import threading
 import datetime
 import requests
+
+# Disabilita controllo revoca Windows su Lightstreamer Demo (evita timeout WinError 10060)
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except Exception:
+    pass
 
 EPIC_GOLD = "CS.D.CFEGOLD.CBE.IP"
 CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
@@ -13,13 +20,49 @@ WARMUP_BARS_TK = 144    # Tenkan/Macro 144 periodi
 STATE_FILE = "hyper_gold_m1_state.json"
 ENV_PATH = os.path.join("FIORDOK_DEMO", ".env")
 
-# Parametri Strategia: Core + Incrementi (Size 20 totale)
-CORE_CONTRACTS = 5      # Size iniziale Core: 5 contratti
-CORE_TP_PIPS = 10.0     # Take Profit Core: 10 pip (chiude tutto a FLAT e resta pronto ad autorestart)
-INC_CONTRACTS = 3       # Incrementi: 3 contratti ciascuno
-MAX_INCREMENTS = 5      # Max 5 incrementi x 3c = 15 contratti (Totale max 20 con core)
-INC_TP_PIPS = 4.0       # TP incrementi su M5: 4 pip
-KJ_TOLERANCE_PIPS = 3.0 # Tolleranza di 3 pip prima di chiudere la posizione su uscita KJ55
+# Parametri Strategia: Core + Incrementi + Trailing Stop (M5)
+CORE_CONTRACTS = 5          # Size iniziale Core: 5 contratti
+CORE_TS_TRIGGER_PIPS = 10.0 # Attivazione Trailing Stop: a +10 pip di guadagno
+CORE_TS_LOCK_PIPS = 6.0     # Lock profit iniziale: +6 pip garantiti (+30.00 €)
+CORE_TS_STEP_PIPS = 2.0     # Avanzamento a scatti: di 2 in 2 pip
+INC_CONTRACTS = 3           # Incrementi: 3 contratti ciascuno
+MAX_INCREMENTS = 5          # Max 5 incrementi x 3c = 15 contratti (Totale max 20 con core)
+INC_TP_PIPS = 5.0           # TP incrementi su M5: 5 pip (+15.00 € a incremento)
+KJ_TOLERANCE_PIPS = 5.0     # Tolleranza di 5 pip su Kijun 55
+
+# Orari Sospensione Gold:
+# 1. Chiusura Feed IG Spot Gold (Nessun tick disponibile dalle 22:45 alle 00:00)
+GOLD_FEED_SUSPEND_START_HOUR = 22
+GOLD_FEED_SUSPEND_START_MIN = 45
+
+# 2. Congelamento Operatività / Ordini (Dalle 22:45 alle 00:15 per spread/stabilizzazione)
+GOLD_TRADE_SUSPEND_START_HOUR = 22
+GOLD_TRADE_SUSPEND_START_MIN = 45
+GOLD_TRADE_SUSPEND_END_HOUR = 0
+GOLD_TRADE_SUSPEND_END_MIN = 15
+
+def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
+    """Restituisce True SOLO durante la chiusura reale del feed dati Gold (22:45 - 00:00).
+    Dalle 00:00 il feed riapre: Lightstreamer si connette per aggiornare le candele e ricalcolare KJ55 e TK144."""
+    if dt is None:
+        dt = datetime.datetime.now()
+    t = dt.time()
+    t_start = datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0)
+    return t >= t_start
+
+def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
+    """Restituisce True se l'operatività/apertura ordini è congelata (dalle 22:45 alle 00:15).
+    Dalle 00:00 alle 00:15 le candele si aggiornano e KJ55/TK144 vengono calcolate, ma non si aprono ordini."""
+    if dt is None:
+        dt = datetime.datetime.now()
+    t = dt.time()
+    t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0)
+    t_end = datetime.time(GOLD_TRADE_SUSPEND_END_HOUR, GOLD_TRADE_SUSPEND_END_MIN, 0)
+    return t >= t_start or t < t_end
+
+def is_gold_market_suspended(dt: datetime.datetime = None) -> bool:
+    """Alias retrocompatibile per lo stato operatività congelata"""
+    return is_gold_trading_suspended(dt)
 
 class HyperGoldM1Engine:
     _instance = None
@@ -72,8 +115,9 @@ class HyperGoldM1Engine:
         self.increments = []
         self.inc_tp_pips = INC_TP_PIPS
 
-        # Storico eseguiti
+        # Storico eseguiti e stato ultimo ciclo TS
         self.trades = []
+        self.last_ts_cycle = None
 
         # 1. Carica eventuale stato persistito
         self.load_state()
@@ -184,23 +228,41 @@ class HyperGoldM1Engine:
             self.tk144 = None
 
     def load_state(self):
-        if os.path.exists(STATE_FILE):
+        if not os.path.exists(STATE_FILE):
+            return
+        d = None
+        for _ in range(5):
             try:
-                with open(STATE_FILE, "r", encoding="utf-8") as f:
-                    d = json.load(f)
-                    self.balance = float(d.get("balance", 10000.0))
-                    self.trading_enabled = bool(d.get("trading_enabled", False))
-                    self.position = d.get("position")
-                    self.increments = d.get("increments", [])
-                    self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
-                    self.trades = d.get("trades", [])
-                    self.candles = d.get("candles", [])
-                    self._recalculate_indicators()
+                with open(STATE_FILE, "r", encoding="utf-8", errors="ignore") as f:
+                    text = f.read()
+                if not text.strip():
+                    return
+                try:
+                    d = json.loads(text)
+                except Exception:
+                    # Decodifica il primo blocco JSON valido se ci sono dati residui
+                    d, _ = json.JSONDecoder().raw_decode(text)
+                if d and isinstance(d, dict):
+                    break
             except Exception:
-                pass
+                time.sleep(0.05)
+
+        if not d or not isinstance(d, dict):
+            return
+
+        with self.lock:
+            self.balance = float(d.get("balance", 10000.0))
+            self.trading_enabled = bool(d.get("trading_enabled", False))
+            self.position = d.get("position")
+            self.increments = d.get("increments", [])
+            self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
+            self.trades = d.get("trades", [])
+            self.last_ts_cycle = d.get("last_ts_cycle")
+            self.candles = d.get("candles", [])
+            self._recalculate_indicators()
 
     def save_state(self):
-        try:
+        with self.lock:
             d = {
                 "balance": self.balance,
                 "trading_enabled": self.trading_enabled,
@@ -208,14 +270,18 @@ class HyperGoldM1Engine:
                 "increments": self.increments,
                 "inc_tp_pips": self.inc_tp_pips,
                 "trades": self.trades[-100:],
+                "last_ts_cycle": self.last_ts_cycle,
                 "candles": self.candles[-500:]
             }
-            tmp = f"{STATE_FILE}.tmp.{os.getpid()}"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(d, f, indent=2)
-            os.replace(tmp, STATE_FILE)
-        except Exception:
-            pass
+            # Scrittura diretta con truncate e retry per compatibilità Windows
+            for _ in range(5):
+                try:
+                    with open(STATE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(d, f, indent=2, ensure_ascii=False)
+                        f.flush()
+                    break
+                except Exception:
+                    time.sleep(0.05)
 
     def reset_portfolio(self):
         with self.lock:
@@ -228,11 +294,25 @@ class HyperGoldM1Engine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
+            if not enabled:
+                # Quando l'utente preme STOP TRADING, chiude immediatamente tutte le posizioni aperte a FLAT
+                if self.position or self.increments:
+                    exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                    t_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura immediata di tutte le posizioni a FLAT")
             self.save_state()
 
     def _run_streaming_loop(self):
         while self.running:
             try:
+                # Durante la chiusura effettiva del feed Gold (22:45 - 00:00) NON effettuiamo chiamate API né login.
+                # Dalle 00:00 in poi lo streaming è attivo per aggiornare le candele e ricalcolare KJ55 e TK144!
+                if is_gold_feed_suspended():
+                    with self.lock:
+                        self.ls_connected = False
+                    time.sleep(20)
+                    continue
+
                 user, pwd, api_key = self._get_ig_credentials()
                 if not user or not pwd or not api_key:
                     time.sleep(5)
@@ -297,67 +377,173 @@ class HyperGoldM1Engine:
                     self.ls_connected = False
                 time.sleep(5)
 
-    def _check_core_tp(self, current_price: float, time_str: str):
-        """Controlla se la posizione Core ha raggiunto il Take Profit di 10 pip.
-        In caso positivo: chiude TUTTE le posizioni (Core + incrementi), va a FLAT e resta in attesa automatica del prossimo segnale."""
+    def _check_core_trailing_stop(self, current_price: float, time_str: str):
+        """Gestisce il Trailing Stop sulla posizione Core M5:
+        1. A +10 pip attiva il TS e piazza il lock a +6 pip garantiti (+30.00 €).
+        2. Segue il prezzo a scatti di 2 in 2 pip:
+           - A +12 pip: TS scatta a +8 pip garantiti (+40.00 €)
+           - A +14 pip: TS scatta a +10 pip garantiti (+50.00 €)
+           - A +16 pip: TS scatta a +12 pip garantiti (+60.00 €)
+        3. Quando il prezzo tocca il TS: chiude Core + tutti gli incrementi a FLAT,
+           imposta automaticamente trading_enabled = False (STOP TRADING) e salva il ciclo."""
         if not self.position:
             return
 
         pos = self.position
-        hit_tp = False
-        core_tp_price = pos.get("tp_price")
-        if core_tp_price is None:
-            if pos["direction"] == "LONG":
-                core_tp_price = round(pos["open_price"] + CORE_TP_PIPS, 2)
-            else:
-                core_tp_price = round(pos["open_price"] - CORE_TP_PIPS, 2)
-            pos["tp_price"] = core_tp_price
+        direction = pos["direction"]
+        open_px = pos["open_price"]
 
-        if pos["direction"] == "LONG" and current_price >= core_tp_price:
-            hit_tp = True
-        elif pos["direction"] == "SHORT" and current_price <= core_tp_price:
-            hit_tp = True
+        # Calcolo pips attuali
+        if direction == "LONG":
+            profit_pips = round(current_price - open_px, 2)
+        else:
+            profit_pips = round(open_px - current_price, 2)
 
-        if hit_tp:
-            # 1. Chiudi Core con Take Profit (+10 pip * 5 contratti * 1 = +50 €)
-            core_pnl = round(CORE_TP_PIPS * pos["contracts"] * self.point_value, 2)
-            self.balance += core_pnl
-            self.trades.insert(0, {
-                "time": time_str,
-                "action": f"🎯 TP CORE {pos['direction']} (+{CORE_TP_PIPS:.1f} pip)",
-                "open_price": pos["open_price"],
-                "close_price": core_tp_price,
-                "contracts": pos["contracts"],
-                "pnl": core_pnl,
-                "balance": round(self.balance, 2),
-                "reason": f"Raggiunto TP Core {CORE_TP_PIPS:.0f} pip @ {core_tp_price:.2f} ➔ FLAT E ATTESA AUTO SEGNALE"
-            })
-            self.position = None
-
-            # 2. Chiudi tutti gli incrementi residui
-            for inc in self.increments:
-                if inc["direction"] == "LONG":
-                    inc_pnl = round((current_price - inc["open_price"]) * inc["contracts"] * self.point_value, 2)
+        # 1. Attivazione Trailing Stop al raggiungimento di +10 pip
+        if not pos.get("ts_active", False):
+            if profit_pips >= CORE_TS_TRIGGER_PIPS:
+                pos["ts_active"] = True
+                pos["peak_price"] = current_price
+                steps = int((profit_pips - CORE_TS_TRIGGER_PIPS) // CORE_TS_STEP_PIPS)
+                locked_pips = CORE_TS_LOCK_PIPS + (steps * CORE_TS_STEP_PIPS)
+                if direction == "LONG":
+                    pos["ts_price"] = round(open_px + locked_pips, 2)
                 else:
-                    inc_pnl = round((inc["open_price"] - current_price) * inc["contracts"] * self.point_value, 2)
-                self.balance += inc_pnl
+                    pos["ts_price"] = round(open_px - locked_pips, 2)
+
                 self.trades.insert(0, {
                     "time": time_str,
-                    "action": f"CLOSE INC {inc['direction']} (TP CORE TRIGGER)",
-                    "open_price": inc["open_price"],
+                    "action": f"🚀 TRAILING ATTIVATO {direction}",
+                    "open_price": open_px,
                     "close_price": current_price,
-                    "contracts": inc["contracts"],
-                    "pnl": inc_pnl,
+                    "contracts": pos["contracts"],
+                    "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
                     "balance": round(self.balance, 2),
-                    "reason": f"Chiusura a FLAT per TP Core raggiunto @ {core_tp_price:.2f}"
+                    "reason": f"Raggiunti +{profit_pips:.1f} pip @ {current_price:.2f} ➔ Lock +{locked_pips:.1f} pip @ {pos['ts_price']:.2f} (Step 2 pip)"
                 })
-            self.increments = []
+                self.save_state()
 
-            # Salvataggio: il trading_enabled RESTA TRUE, pronto al prossimo segnale in modo automatico!
-            self.save_state()
+        # 2. Aggiornamento dinamico del Trailing (scatti di 2 in 2) e verifica tocco
+        if pos.get("ts_active", False):
+            peak_px = pos.get("peak_price", current_price)
+
+            if direction == "LONG":
+                # Nuovo picco massimo
+                if current_price > peak_px:
+                    pos["peak_price"] = current_price
+                    steps = int((profit_pips - CORE_TS_TRIGGER_PIPS) // CORE_TS_STEP_PIPS)
+                    locked_pips = CORE_TS_LOCK_PIPS + (steps * CORE_TS_STEP_PIPS)
+                    new_ts = round(open_px + locked_pips, 2)
+                    if new_ts > pos["ts_price"]:
+                        pos["ts_price"] = new_ts
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"📈 TS STEP UP (+{locked_pips:.1f} pip)",
+                            "open_price": open_px,
+                            "close_price": current_price,
+                            "contracts": pos["contracts"],
+                            "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
+                            "balance": round(self.balance, 2),
+                            "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS sale a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
+                        })
+                        self.save_state()
+
+                # Verifica tocco Trailing Stop
+                if current_price <= pos["ts_price"]:
+                    self._close_cycle_trailing_hit(current_price, time_str)
+
+            else: # SHORT
+                # Nuovo picco minimo
+                if current_price < peak_px:
+                    pos["peak_price"] = current_price
+                    steps = int((profit_pips - CORE_TS_TRIGGER_PIPS) // CORE_TS_STEP_PIPS)
+                    locked_pips = CORE_TS_LOCK_PIPS + (steps * CORE_TS_STEP_PIPS)
+                    new_ts = round(open_px - locked_pips, 2)
+                    if new_ts < pos["ts_price"]:
+                        pos["ts_price"] = new_ts
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"📉 TS STEP DOWN (+{locked_pips:.1f} pip)",
+                            "open_price": open_px,
+                            "close_price": current_price,
+                            "contracts": pos["contracts"],
+                            "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
+                            "balance": round(self.balance, 2),
+                            "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS scende a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
+                        })
+                        self.save_state()
+
+                # Verifica tocco Trailing Stop
+                if current_price >= pos["ts_price"]:
+                    self._close_cycle_trailing_hit(current_price, time_str)
+
+    def _close_cycle_trailing_hit(self, current_price: float, time_str: str):
+        """Chiusura completa a FLAT all'entrata del Trailing Stop su M5:
+        - Chiude Core e tutti gli incrementi
+        - Disattiva il trading (STOP TRADING) lasciando all'utente la ripartenza"""
+        pos = self.position
+        if not pos:
+            return
+
+        direction = pos["direction"]
+        open_px = pos["open_price"]
+        if direction == "LONG":
+            core_pips = round(current_price - open_px, 2)
+        else:
+            core_pips = round(open_px - current_price, 2)
+
+        core_pnl = round(core_pips * pos["contracts"] * self.point_value, 2)
+        self.balance += core_pnl
+
+        # Chiudi tutti gli incrementi residui
+        inc_pnl_tot = 0.0
+        for inc in self.increments:
+            if inc["direction"] == "LONG":
+                pnl_i = round((current_price - inc["open_price"]) * inc["contracts"] * self.point_value, 2)
+            else:
+                pnl_i = round((inc["open_price"] - current_price) * inc["contracts"] * self.point_value, 2)
+            self.balance += pnl_i
+            inc_pnl_tot += pnl_i
+            self.trades.insert(0, {
+                "time": time_str,
+                "action": f"CLOSE INC {inc['direction']} (TS CICLO)",
+                "open_price": inc["open_price"],
+                "close_price": current_price,
+                "contracts": inc["contracts"],
+                "pnl": pnl_i,
+                "balance": round(self.balance, 2),
+                "reason": f"Chiusura incremento per Trailing Stop Core scattato @ {current_price:.2f}"
+            })
+        self.increments = []
+
+        tot_cycle_pnl = round(core_pnl + inc_pnl_tot, 2)
+        self.trades.insert(0, {
+            "time": time_str,
+            "action": f"🏆 TS HIT CORE {direction} (+{core_pips:.1f} pip)",
+            "open_price": open_px,
+            "close_price": current_price,
+            "contracts": pos["contracts"],
+            "pnl": core_pnl,
+            "balance": round(self.balance, 2),
+            "reason": f"Trailing Stop toccato @ {current_price:.2f} (Peak: {pos.get('peak_price', current_price):.2f}) ➔ CICLO M5 COMPLETATO: +{core_pips:.1f} pip (+{tot_cycle_pnl:,.2f} €) | BOT IN PAUSA"
+        })
+
+        self.last_ts_cycle = {
+            "time": time_str,
+            "direction": direction,
+            "core_pips": core_pips,
+            "total_pnl": tot_cycle_pnl,
+            "peak_price": pos.get("peak_price", current_price),
+            "close_price": current_price
+        }
+
+        self.position = None
+        # Disattivazione automatica trading: attende avvio manuale utente!
+        self.trading_enabled = False
+        self.save_state()
 
     def _check_increments_tp(self, current_price: float, time_str: str):
-        """Controlla Take Profit (+4 pip = +12.00 €) per gli incrementi aperti su M5"""
+        """Controlla Take Profit (+5 pip = +15.00 €) per gli incrementi aperti su M5"""
         remaining = []
         closed_any = False
         for inc in self.increments:
@@ -402,13 +588,21 @@ class HyperGoldM1Engine:
             self.live_mid = mid
             self.live_time_str = time_str
 
-            # 1. Verifica Take Profit (10 pip) per la Core
-            if self.trading_enabled and self.position:
-                self._check_core_tp(mid, time_str)
+            # Verifica sospensione notturna Gold (22:45 - 00:15)
+            market_suspended = is_gold_market_suspended()
 
-            # 2. Verifica Take Profit (4 pip) per gli incrementi aperti
-            if self.trading_enabled and self.increments:
-                self._check_increments_tp(mid, time_str)
+            if market_suspended:
+                # Se è scattata l'ora di sospensione con posizioni ancora aperte, le chiudiamo a FLAT di sicurezza
+                if self.position or self.increments:
+                    self._close_all_to_flat(mid, time_str, reason="Sospensione Notturna Gold (22:45 - 00:15) ➔ Chiusura automatica di sicurezza a FLAT")
+            else:
+                # 1. Verifica Trailing Stop per la Core (Trigger a +10 pip, Lock +6 pip, Step 2 pip)
+                if self.trading_enabled and self.position:
+                    self._check_core_trailing_stop(mid, time_str)
+
+                # 2. Verifica Take Profit (5 pip) per gli incrementi aperti
+                if self.trading_enabled and self.increments:
+                    self._check_increments_tp(mid, time_str)
 
             # Inizializzazione prima barra M5
             if self.curr_boundary is None:
@@ -453,8 +647,8 @@ class HyperGoldM1Engine:
 
                 self.save_state()
 
-                # Strategia Unidirezionale TK144 + Trigger KJ55
-                if self.trading_enabled and self.kj55 is not None and self.tk144 is not None:
+                # Strategia Unidirezionale TK144 + Trigger KJ55: solo se il mercato NON è sospeso
+                if self.trading_enabled and not market_suspended and self.kj55 is not None and self.tk144 is not None:
                     self._evaluate_unidirectional_strategy(closed_candle, self.kj55, self.tk144, new_open, time_str)
 
     def _evaluate_unidirectional_strategy(self, closed_candle: dict, kj: float, tk: float, exec_price: float, time_str: str):
@@ -474,9 +668,11 @@ class HyperGoldM1Engine:
                     self.position = {
                         "direction": "LONG",
                         "open_price": exec_price,
-                        "tp_price": round(exec_price + CORE_TP_PIPS, 2),
                         "contracts": CORE_CONTRACTS,
-                        "open_time": time_str
+                        "open_time": time_str,
+                        "ts_active": False,
+                        "ts_price": None,
+                        "peak_price": exec_price
                     }
                     self.trades.insert(0, {
                         "time": time_str,
@@ -486,11 +682,11 @@ class HyperGoldM1Engine:
                         "contracts": CORE_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Prezzo > TK144 ({tk:.2f}) e Close > KJ ({kj:.2f}) | TP Core: {exec_price + CORE_TP_PIPS:.2f} (+10 pip)"
+                        "reason": f"Prezzo > TK144 ({tk:.2f}) e Close > KJ ({kj:.2f}) | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p, Lock: +{CORE_TS_LOCK_PIPS:.0f}p, Step: {CORE_TS_STEP_PIPS:.0f}p"
                     })
                     self.save_state()
                 elif self.position["direction"] == "LONG":
-                    # Core già LONG: incremento su barra contraria (rossa) da 3c con TP 4 pip
+                    # Core già LONG: incremento su barra contraria (rossa) da 3c con TP 5 pip
                     if prev_close < prev_open:
                         if len(self.increments) < MAX_INCREMENTS:
                             tp_p = round(exec_price + self.inc_tp_pips, 2)
@@ -512,7 +708,7 @@ class HyperGoldM1Engine:
                                 "contracts": INC_CONTRACTS,
                                 "pnl": 0.0,
                                 "balance": round(self.balance, 2),
-                                "reason": f"Barra M5 rossa (C:{prev_close:.2f} < O:{prev_open:.2f}) | TP: {tp_p:.2f} (+4 pip)"
+                                "reason": f"Barra M5 rossa (C:{prev_close:.2f} < O:{prev_open:.2f}) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f} pip)"
                             })
                             self.save_state()
 
@@ -534,9 +730,11 @@ class HyperGoldM1Engine:
                     self.position = {
                         "direction": "SHORT",
                         "open_price": exec_price,
-                        "tp_price": round(exec_price - CORE_TP_PIPS, 2),
                         "contracts": CORE_CONTRACTS,
-                        "open_time": time_str
+                        "open_time": time_str,
+                        "ts_active": False,
+                        "ts_price": None,
+                        "peak_price": exec_price
                     }
                     self.trades.insert(0, {
                         "time": time_str,
@@ -546,11 +744,11 @@ class HyperGoldM1Engine:
                         "contracts": CORE_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Prezzo < TK144 ({tk:.2f}) e Close < KJ ({kj:.2f}) | TP Core: {exec_price - CORE_TP_PIPS:.2f} (+10 pip)"
+                        "reason": f"Prezzo < TK144 ({tk:.2f}) e Close < KJ ({kj:.2f}) | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p, Lock: +{CORE_TS_LOCK_PIPS:.0f}p, Step: {CORE_TS_STEP_PIPS:.0f}p"
                     })
                     self.save_state()
                 elif self.position["direction"] == "SHORT":
-                    # Core già SHORT: incremento su barra contraria (verde) da 3c con TP 4 pip
+                    # Core già SHORT: incremento su barra contraria (verde) da 3c con TP 5 pip
                     if prev_close > prev_open:
                         if len(self.increments) < MAX_INCREMENTS:
                             tp_p = round(exec_price - self.inc_tp_pips, 2)
@@ -572,7 +770,7 @@ class HyperGoldM1Engine:
                                 "contracts": INC_CONTRACTS,
                                 "pnl": 0.0,
                                 "balance": round(self.balance, 2),
-                                "reason": f"Barra M5 verde (C:{prev_close:.2f} > O:{prev_open:.2f}) | TP: {tp_p:.2f} (+4 pip)"
+                                "reason": f"Barra M5 verde (C:{prev_close:.2f} > O:{prev_open:.2f}) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f} pip)"
                             })
                             self.save_state()
 
