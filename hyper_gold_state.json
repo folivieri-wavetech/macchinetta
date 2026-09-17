@@ -1,6 +1,6 @@
 {
   "balance": 10081.059999999996,
-  "trading_enabled": true,
+  "trading_enabled": false,
   "use_core_trailing": true,
   "core_size": 2,
   "scalini_plan": [
@@ -15,15 +15,7 @@
       "tp_pips": 3.0
     }
   ],
-  "position": {
-    "direction": "SHORT",
-    "open_price": 4360.5,
-    "contracts": 2,
-    "open_time": "18:40:55",
-    "ts_active": false,
-    "ts_price": null,
-    "peak_price": 4360.5
-  },
+  "position": null,
   "increments": [],
   "inc_tp_pips": 2.0,
   "signal_candle_active": true,

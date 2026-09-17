@@ -105,6 +105,13 @@ def inject_hyper_css():
             border-color: #94a3b8 !important;
             color: #ffffff !important;
         }
+        /* Forza la visibilità di tutte le sottotab di Hyper (30s e 5m) */
+        div[data-testid="stTabsContent"] div[data-testid="stTabs"] div[role="tablist"] > button,
+        div[data-testid="stTabsContent"] div[role="tablist"] > button {
+            display: inline-flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 

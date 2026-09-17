@@ -2321,9 +2321,10 @@ else:
             display: block !important;
             visibility: visible !important;
         }
-        /* Nasconde la linguetta della tab Radar dalla barra orizzontale in alto:
+        /* Nasconde la linguetta della tab Radar solo dalla barra orizzontale principale:
            il Radar rimane accessibile unicamente tramite il pulsante dorato in Sidebar */
-        div[data-testid="stTabs"] div[role="tablist"] > button:nth-child(2) {
+        .block-container > div[data-testid="stTabs"] > div[role="tablist"] > button:nth-child(2),
+        div[data-testid="stMainBlockContainer"] > div[data-testid="stTabs"] > div[role="tablist"] > button:nth-child(2) {
             display: none !important;
         }
         </style>
