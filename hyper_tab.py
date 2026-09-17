@@ -150,7 +150,8 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
     engine = HyperGoldEngine.get_instance(account_dir=conto_attivo)
-    if engine.position is None and os.path.exists("hyper_gold_state.json"):
+    st_file = engine._get_state_file()
+    if engine.position is None and os.path.exists(st_file):
         engine.load_state()
 
     with engine.lock:
@@ -181,8 +182,11 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     val_margine = acc_data["marg_str"]
     val_equity = f"{equity_fl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    session_realized_pnl = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades if t.get("close_price") is not None)
-    num_closed = len([t for t in trades if t.get("close_price") is not None])
+    # P&L e Storico Eseguiti Reali IG per 30S (Fonte di verità assoluta)
+    order_mgr = HyperOrderManager.get_instance(conto_attivo)
+    history_30s = order_mgr.get_trades_history(tf="30S")
+    session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_30s)
+    num_closed = len(history_30s)
 
     # Intestazione e Badge di Stato
     c_title, c_badges = st.columns([2.3, 1.7])
@@ -412,12 +416,10 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (30s)</h4>", unsafe_allow_html=True)
         with c_th2:
             if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_30s_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                order_mgr.clear_trades_history(tf="30S")
                 engine.clear_session_trades()
                 st.rerun()
-        closed_trades = [
-            t for t in trades 
-            if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", "") or "PARACADUTE" in t.get("action", ""))
-        ]
+        closed_trades = history_30s
         if closed_trades:
             num_core_closed = 0
             pnl_core_closed = 0.0
@@ -425,12 +427,12 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             pnl_inc_closed = 0.0
 
             for t in closed_trades:
-                act = t.get("action", "").upper()
-                p = float(t.get("pnl", 0.0) or 0.0)
-                if "CORE" in act:
+                lbl = t.get("label", "").upper()
+                p = float(t.get("pnl_eur", 0.0) or 0.0)
+                if "CORE" in lbl:
                     num_core_closed += 1
                     pnl_core_closed += p
-                elif "INC" in act or "TP" in act or "SCALINO" in act:
+                else:
                     num_inc_closed += 1
                     pnl_inc_closed += p
 
@@ -443,33 +445,33 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             sign_tot = "+" if tot_pnl_closed >= 0 else ""
 
             rows_html = []
-            for t in closed_trades[:8]:
-                col_pnl = "#22c55e" if t["pnl"] > 0 else ("#ef4444" if t["pnl"] < 0 else "#94a3b8")
-                sign_p = f"+{t['pnl']:.2f}" if t["pnl"] > 0 else f"{t['pnl']:.2f}"
-                if "PARACADUTE" in t["action"]:
-                    action_badge = "<span style='color: #f87171; font-weight: bold;'>" + t["action"] + "</span>"
-                elif "🏆 TS HIT" in t["action"]:
-                    action_badge = "<span style='color: #4ade80; font-weight: bold;'>" + t["action"] + "</span>"
-                elif "🎯 TP" in t["action"]:
-                    action_badge = "<span style='color: #38bdf8; font-weight: bold;'>🎯 " + t["action"] + "</span>"
-                elif "SCALINO" in t["action"] or "CLOSE INC" in t["action"]:
-                    action_badge = "<span style='color: #cbd5e1; font-weight: bold;'>⏹️ " + t["action"] + "</span>"
-                elif "CLOSE CORE" in t["action"]:
-                    action_badge = "<span style='color: #f59e0b; font-weight: bold;'>⏹️ " + t["action"] + "</span>"
-                else:
-                    action_badge = t["action"]
+            for t in closed_trades[:12]:
+                pnl_val = float(t.get("pnl_eur", 0.0) or 0.0)
+                col_pnl = "#22c55e" if pnl_val > 0 else ("#ef4444" if pnl_val < 0 else "#94a3b8")
+                sign_p = f"+{pnl_val:.2f}" if pnl_val > 0 else f"{pnl_val:.2f}"
+                lbl = t.get("label", "Trade")
+                rsn = t.get("reason", "")
 
-                close_str = f"{t['close_price']:.2f}" if t.get("close_price") else "--"
+                if "PARACADUTE" in rsn.upper():
+                    action_badge = f"<span style='color: #f87171; font-weight: bold;'>🪂 {lbl}</span>"
+                elif "TP" in rsn.upper() or "TP" in lbl.upper():
+                    action_badge = f"<span style='color: #38bdf8; font-weight: bold;'>🎯 {lbl}</span>"
+                elif "TRAILING" in rsn.upper() or "TS" in rsn.upper():
+                    action_badge = f"<span style='color: #4ade80; font-weight: bold;'>🏆 TS {lbl}</span>"
+                else:
+                    action_badge = f"<span style='color: #cbd5e1; font-weight: bold;'>⏹️ {lbl}</span>"
+
+                t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
                 rows_html.append(
-                    f"<tr><td>{t['time']}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{close_str}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-weight: 600; white-space: nowrap;'>{t['balance']:,.2f}&nbsp;€</td><td style='color: #94a3b8; font-size: 0.78rem;'>{t['reason']}</td></tr>"
+                    f"<tr><td>{t_str}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
                 )
 
             summary_html = (
                 f"<tr style='background-color: #1e293b; border-top: 2px solid #475569; font-weight: 700; font-size: 0.75rem;'>"
-                f"<td colspan='2' style='color: #f8fafc; text-transform: uppercase;'>📊 TOTALI CHIUSI</td>"
-                f"<td colspan='2' style='color: #cbd5e1;'>Core: <span style='color: #38bdf8;'>{num_core_closed}</span> (<span style='color: {col_core_pnl};'>{sign_core}{pnl_core_closed:,.2f} €</span>) | Incr: <span style='color: #38bdf8;'>{num_inc_closed}</span> (<span style='color: {col_inc_pnl};'>{sign_inc}{pnl_inc_closed:,.2f} €</span>)</td>"
+                f"<td colspan='2' style='color: #f8fafc; text-transform: uppercase;'>📊 TOTALI CHIUSI (30S)</td>"
+                f"<td colspan='2' style='color: #cbd5e1;'>Core: <span style='color: #38bdf8;'>{num_core_closed}</span> (<span style='color: {col_core_pnl};'>{sign_core}{pnl_core_closed:,.2f} €</span>) | Scalini: <span style='color: #38bdf8;'>{num_inc_closed}</span> (<span style='color: {col_inc_pnl};'>{sign_inc}{pnl_inc_closed:,.2f} €</span>)</td>"
                 f"<td style='color: {col_tot_pnl}; font-size: 0.84rem; white-space: nowrap;'>{sign_tot}{tot_pnl_closed:,.2f}&nbsp;€</td>"
-                f"<td colspan='2' style='color: #94a3b8; font-size: 0.70rem;'>P&L complessivo operazioni sessione</td>"
+                f"<td colspan='2' style='color: #94a3b8; font-size: 0.70rem;'>P&L complessivo eseguiti reali IG</td>"
                 f"</tr>"
             )
             rows_html.append(summary_html)
@@ -477,7 +479,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             st.markdown(f"""
             <table class='table-dark-hyper'>
                 <thead>
-                    <tr><th>Orario</th><th>Azione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Saldo</th><th>Trigger</th></tr>
+                    <tr><th>Orario</th><th>Posizione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Deal ID</th><th>Trigger Chiusura</th></tr>
                 </thead>
                 <tbody>{''.join(rows_html)}</tbody>
             </table>
@@ -599,7 +601,8 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
     engine = HyperGoldM1Engine.get_instance(account_dir=conto_attivo)
-    if engine.position is None and os.path.exists("hyper_gold_m1_state.json"):
+    st_file_m1 = engine._get_state_file()
+    if engine.position is None and os.path.exists(st_file_m1):
         engine.load_state()
 
     with engine.lock:
@@ -630,8 +633,11 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     val_margine = acc_data["marg_str"]
     val_equity = f"{equity_fl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    session_realized_pnl = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades if t.get("close_price") is not None)
-    num_closed = len([t for t in trades if t.get("close_price") is not None])
+    # P&L e Storico Eseguiti Reali IG per 5M (Fonte di verità assoluta)
+    order_mgr = HyperOrderManager.get_instance(conto_attivo)
+    history_5m = order_mgr.get_trades_history(tf="5M")
+    session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_5m)
+    num_closed = len(history_5m)
 
     # Intestazione e Badge di Stato
     c_title, c_badges = st.columns([2.3, 1.7])
@@ -848,12 +854,10 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (M5)</h4>", unsafe_allow_html=True)
         with c_th2:
             if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                order_mgr.clear_trades_history(tf="5M")
                 engine.clear_session_trades()
                 st.rerun()
-        closed_trades = [
-            t for t in trades 
-            if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", "") or "PARACADUTE" in t.get("action", ""))
-        ]
+        closed_trades = history_5m
         if closed_trades:
             num_core_closed = 0
             pnl_core_closed = 0.0
@@ -861,12 +865,12 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             pnl_inc_closed = 0.0
 
             for t in closed_trades:
-                act = t.get("action", "").upper()
-                p = float(t.get("pnl", 0.0) or 0.0)
-                if "CORE" in act:
+                lbl = t.get("label", "").upper()
+                p = float(t.get("pnl_eur", 0.0) or 0.0)
+                if "CORE" in lbl:
                     num_core_closed += 1
                     pnl_core_closed += p
-                elif "INC" in act or "TP" in act:
+                else:
                     num_inc_closed += 1
                     pnl_inc_closed += p
 
@@ -879,33 +883,33 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             sign_tot = "+" if tot_pnl_closed >= 0 else ""
 
             rows_html = []
-            for t in closed_trades[:8]:
-                col_pnl = "#22c55e" if t["pnl"] > 0 else ("#ef4444" if t["pnl"] < 0 else "#94a3b8")
-                sign_p = f"+{t['pnl']:.2f}" if t["pnl"] > 0 else f"{t['pnl']:.2f}"
-                if "PARACADUTE" in t["action"]:
-                    action_badge = "<span style='color: #f87171; font-weight: bold;'>" + t["action"] + "</span>"
-                elif "🏆 TS HIT" in t["action"]:
-                    action_badge = "<span style='color: #4ade80; font-weight: bold;'>" + t["action"] + "</span>"
-                elif "🎯 TP" in t["action"]:
-                    action_badge = "<span style='color: #38bdf8; font-weight: bold;'>🎯 " + t["action"] + "</span>"
-                elif "CLOSE INC" in t["action"]:
-                    action_badge = "<span style='color: #cbd5e1; font-weight: bold;'>⏹️ " + t["action"] + "</span>"
-                elif "CLOSE CORE" in t["action"]:
-                    action_badge = "<span style='color: #f59e0b; font-weight: bold;'>⏹️ " + t["action"] + "</span>"
-                else:
-                    action_badge = t["action"]
+            for t in closed_trades[:12]:
+                pnl_val = float(t.get("pnl_eur", 0.0) or 0.0)
+                col_pnl = "#22c55e" if pnl_val > 0 else ("#ef4444" if pnl_val < 0 else "#94a3b8")
+                sign_p = f"+{pnl_val:.2f}" if pnl_val > 0 else f"{pnl_val:.2f}"
+                lbl = t.get("label", "Trade")
+                rsn = t.get("reason", "")
 
-                close_str = f"{t['close_price']:.2f}" if t.get("close_price") else "--"
+                if "PARACADUTE" in rsn.upper():
+                    action_badge = f"<span style='color: #f87171; font-weight: bold;'>🪂 {lbl}</span>"
+                elif "TP" in rsn.upper() or "TP" in lbl.upper():
+                    action_badge = f"<span style='color: #38bdf8; font-weight: bold;'>🎯 {lbl}</span>"
+                elif "TRAILING" in rsn.upper() or "TS" in rsn.upper():
+                    action_badge = f"<span style='color: #4ade80; font-weight: bold;'>🏆 TS {lbl}</span>"
+                else:
+                    action_badge = f"<span style='color: #cbd5e1; font-weight: bold;'>⏹️ {lbl}</span>"
+
+                t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
                 rows_html.append(
-                    f"<tr><td>{t['time']}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{close_str}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-weight: 600; white-space: nowrap;'>{t['balance']:,.2f}&nbsp;€</td><td style='color: #94a3b8; font-size: 0.78rem;'>{t['reason']}</td></tr>"
+                    f"<tr><td>{t_str}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
                 )
 
             summary_html = (
                 f"<tr style='background-color: #1e293b; border-top: 2px solid #475569; font-weight: 700; font-size: 0.75rem;'>"
-                f"<td colspan='2' style='color: #f8fafc; text-transform: uppercase;'>📊 TOTALI CHIUSI</td>"
+                f"<td colspan='2' style='color: #f8fafc; text-transform: uppercase;'>📊 TOTALI CHIUSI (5M)</td>"
                 f"<td colspan='2' style='color: #cbd5e1;'>Core: <span style='color: #38bdf8;'>{num_core_closed}</span> (<span style='color: {col_core_pnl};'>{sign_core}{pnl_core_closed:,.2f} €</span>) | Incr: <span style='color: #38bdf8;'>{num_inc_closed}</span> (<span style='color: {col_inc_pnl};'>{sign_inc}{pnl_inc_closed:,.2f} €</span>)</td>"
                 f"<td style='color: {col_tot_pnl}; font-size: 0.84rem; white-space: nowrap;'>{sign_tot}{tot_pnl_closed:,.2f}&nbsp;€</td>"
-                f"<td colspan='2' style='color: #94a3b8; font-size: 0.70rem;'>P&L complessivo operazioni sessione</td>"
+                f"<td colspan='2' style='color: #94a3b8; font-size: 0.70rem;'>P&L complessivo eseguiti reali IG</td>"
                 f"</tr>"
             )
             rows_html.append(summary_html)
@@ -913,7 +917,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             st.markdown(f"""
             <table class='table-dark-hyper'>
                 <thead>
-                    <tr><th>Orario</th><th>Azione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Saldo</th><th>Trigger</th></tr>
+                    <tr><th>Orario</th><th>Posizione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Deal ID</th><th>Trigger Chiusura</th></tr>
                 </thead>
                 <tbody>{''.join(rows_html)}</tbody>
             </table>
