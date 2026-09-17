@@ -6,6 +6,16 @@ import threading
 import datetime
 import requests
 
+try:
+    from zoneinfo import ZoneInfo
+    TZ_ITALIA = ZoneInfo("Europe/Rome")
+except Exception:
+    from datetime import timezone, timedelta
+    TZ_ITALIA = timezone(timedelta(hours=2))
+
+def now_it():
+    return datetime.datetime.now(TZ_ITALIA)
+
 logger = logging.getLogger("HyperOrderManager")
 if not logger.handlers:
     handler = logging.StreamHandler()
@@ -246,7 +256,7 @@ class HyperOrderManager:
                                 "direction": dir_str,
                                 "size": size_val,
                                 "label": label,
-                                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "time": now_it().strftime("%Y-%m-%d %H:%M:%S")
                             }
                         else:
                             reason = conf_data.get("reason", "UNKNOWN_REJECT")
@@ -271,7 +281,7 @@ class HyperOrderManager:
                                             "direction": dir_str,
                                             "size": size_val,
                                             "label": label,
-                                            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                            "time": now_it().strftime("%Y-%m-%d %H:%M:%S")
                                         }
                             return {"success": False, "reason": reason}
                     else:
@@ -334,7 +344,7 @@ class HyperOrderManager:
                                 "profit": profit,
                                 "label": label,
                                 "reason": reason_note,
-                                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "time": now_it().strftime("%Y-%m-%d %H:%M:%S")
                             }
                         else:
                             rej_reason = conf_data.get("reason", "UNKNOWN_REJECT")
@@ -359,7 +369,7 @@ class HyperOrderManager:
     def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = ""):
         """Salva in modo persistente l'operazione conclusa in hyper_trades_history.json."""
         with self.lock:
-            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now_str = now_it().strftime("%Y-%m-%d %H:%M:%S")
             trade_item = {
                 "id": str(int(time.time() * 1000)),
                 "time_open": time_open or now_str,

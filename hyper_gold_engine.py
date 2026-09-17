@@ -7,7 +7,7 @@ import threading
 import datetime
 import requests
 import logging
-from hyper_order_manager import HyperOrderManager
+from hyper_order_manager import HyperOrderManager, TZ_ITALIA, now_it
 
 logger = logging.getLogger("HyperGoldEngine")
 
@@ -61,7 +61,7 @@ def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
     """Restituisce True SOLO durante la chiusura reale del feed dati Gold (22:45 - 00:00).
     Dalle 00:00 il feed riapre: Lightstreamer si connette per aggiornare le candele e ricalcolare la KJ55."""
     if dt is None:
-        dt = datetime.datetime.now()
+        dt = now_it()
     t = dt.time()
     t_start = datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0)
     return t >= t_start
@@ -70,7 +70,7 @@ def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
     """Restituisce True se l'operatività/apertura ordini è congelata (dalle 22:45 alle 00:15).
     Dalle 00:00 alle 00:15 le candele si aggiornano e KJ55 viene calcolata, ma non si aprono ordini."""
     if dt is None:
-        dt = datetime.datetime.now()
+        dt = now_it()
     t = dt.time()
     t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0)
     t_end = datetime.time(GOLD_TRADE_SUSPEND_END_HOUR, GOLD_TRADE_SUSPEND_END_MIN, 0)
@@ -199,7 +199,11 @@ class HyperGoldEngine:
                     for p in prices:
                         try:
                             st_time = p.get("snapshotTime", "")
-                            t_str = st_time.split(" ")[1] if " " in st_time else st_time
+                            try:
+                                dt_u = datetime.datetime.strptime(st_time, "%Y/%m/%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+                                t_str = dt_u.astimezone(TZ_ITALIA).strftime("%H:%M:%S")
+                            except Exception:
+                                t_str = st_time.split(" ")[1] if " " in st_time else st_time
                             op = round((p["openPrice"]["bid"] + p["openPrice"]["ask"]) / 2.0, 2)
                             hi = round((p["highPrice"]["bid"] + p["highPrice"]["ask"]) / 2.0, 2)
                             lo = round((p["lowPrice"]["bid"] + p["lowPrice"]["ask"]) / 2.0, 2)
@@ -365,7 +369,7 @@ class HyperGoldEngine:
                 # Quando l'utente preme STOP TRADING, chiude immediatamente tutte le posizioni aperte a FLAT
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                    t_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    t_str = now_it().strftime("%H:%M:%S")
                     self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura immediata di tutte le posizioni a FLAT")
             self.save_state()
 
@@ -439,7 +443,7 @@ class HyperGoldEngine:
                     bid_s = vals.get("BID")
                     ask_s = vals.get("OFFER")
                     # Orario locale italiano (Roma UTC+2/UTC+1) per storico ed eseguiti
-                    t_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    t_str = now_it().strftime("%H:%M:%S")
                     if bid_s and ask_s:
                         try:
                             b = float(bid_s)
@@ -929,7 +933,7 @@ class HyperGoldEngine:
                 # Chiusura barra 30s
                 closed_candle = {
                     "boundary": self.curr_boundary,
-                    "time": datetime.datetime.fromtimestamp(self.curr_boundary).strftime("%H:%M:%S"),
+                    "time": datetime.datetime.fromtimestamp(self.curr_boundary, TZ_ITALIA).strftime("%H:%M:%S"),
                     "open": self.curr_open,
                     "high": self.curr_high,
                     "low": self.curr_low,
