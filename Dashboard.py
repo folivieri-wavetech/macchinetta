@@ -434,8 +434,10 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     else:
         pnl_c = 0.0
         for r in (storico or []):
-            if any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core", "Reverse")):
-                m_sz = re.search(r"Core\s*\(([^)]+)\)", r)
+            if any(k.upper() in r.upper() for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core", "Reverse", "STOP MANUALE Core", "STOP Core", "STOP")):
+                m_sz = re.search(r"Core\s*(?:\([^)]+\)\s*)?\((\d+(?:\.\d+)?)\)", r, re.IGNORECASE)
+                if not m_sz:
+                    m_sz = re.search(r"Core\s*\[?\(?(\d+(?:\.\d+)?)\)?\]?", r, re.IGNORECASE)
                 if m_sz:
                     try:
                         v_sz = float(m_sz.group(1))
@@ -447,7 +449,7 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
                     pnl_c = float(m_c.group(1).replace(",", "."))
                     break
         if sz_core is None:
-            sz_def = float(dati_inst.get("size_i", 1))
+            sz_def = float(dati_inst.get("size", dati_inst.get("size_i", 1)))
             sz_core = int(sz_def) if sz_def == int(sz_def) else sz_def
         stato_c_lbl = "Chiusa"
 
@@ -461,16 +463,16 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     n_inc_c = 0
     sz_inc_c = 0.0
     for r in (storico or []):
-        if not any(k in r for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core")):
+        if not any(k.upper() in r.upper() for k in ("Close Core", "Stop Core", "Trailing Core", "Paracadute Core", "STOP MANUALE Core", "Stop Core")):
             m_inc = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", r)
             if m_inc:
                 tot_inc_c += float(m_inc.group(1).replace(",", "."))
                 n_inc_c += 1
-                m_sz_i = re.search(r"(?:Incr|Bancomat|FIFO)\s*(?:\([^)]+\)\s*)?\((\d+(?:\.\d+)?)\)", r)
+                m_sz_i = re.search(r"(?:Incr|Bancomat|FIFO|Scalino)\s*(?:\([^)]+\)\s*)?\((\d+(?:\.\d+)?)\)", r)
                 if m_sz_i:
                     sz_inc_c += float(m_sz_i.group(1))
                 else:
-                    sz_inc_c += float(dati_inst.get("size_i", 1))
+                    sz_inc_c += float(dati_inst.get("scala", dati_inst.get("size_i", 1)))
     segno_ic = "+" if tot_inc_c >= 0.5 else ""
     col_ic = "#00E676" if tot_inc_c >= 0.5 else ("#FA8072" if tot_inc_c <= -0.5 else "#cccccc")
     line2_html = f"<div><span style='color: {col_oro}; font-weight: normal;'>Incr. Chiusi [{n_inc_c}]:</span> <span style='color: {col_ic}; font-weight: normal;'>{segno_ic}{tot_inc_c:.0f} €</span></div>"
@@ -495,7 +497,7 @@ def mostra_diario_wip_trend(nome_strumento, storico, conto=None):
     try:
         sz_c_val = float(sz_core)
     except Exception:
-        sz_c_val = float(dati_inst.get("size_i", 1))
+        sz_c_val = float(dati_inst.get("size", dati_inst.get("size_i", 1)))
     margine_u = float(c_cfg.get("margine_unitario", 300))
     tot_contratti = sz_c_val + sz_inc_c + sz_inc_a
     margine_totale = tot_contratti * margine_u
@@ -578,6 +580,7 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
         
         pos_list = r.json().get("positions", [])
         chiusi = 0
+        chiusi_dettagli = []
         errori = []
         rimaste = []
         
@@ -634,6 +637,31 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
                                     pass
                         if accettato:
                             chiusi += 1
+                            c_lvl = c_data.get("level")
+                            c_prof = c_data.get("profit")
+                            op_lvl = pos.get("level") or pos.get("openLevel")
+                            pnl_calc = 0.0
+                            if c_prof is not None:
+                                pnl_calc = float(c_prof)
+                            elif c_lvl and op_lvl:
+                                try:
+                                    c_cfg = CONFIG_STRUMENTI.get(nome_strumento, {})
+                                    c_mult = float(c_cfg.get("moltiplicatore", 1))
+                                    c_vp = float(c_cfg.get("valore_punto", 1))
+                                    c_val = c_cfg.get("valuta", "USD")
+                                    c_r = get_eur_rate(c_val) if "get_eur_rate" in globals() else 1.0
+                                    pts = (float(c_lvl) - float(op_lvl))/c_mult if direction in ("BUY", "LONG") else (float(op_lvl) - float(c_lvl))/c_mult
+                                    pnl_calc = pts * float(size) * c_vp * c_r
+                                except Exception:
+                                    pass
+                            chiusi_dettagli.append({
+                                "deal_id": deal_id,
+                                "direction": direction,
+                                "size": float(size),
+                                "open_level": float(op_lvl or 0.0),
+                                "close_level": float(c_lvl or 0.0),
+                                "pnl_eur": round(pnl_calc, 2)
+                            })
                         else:
                             rimaste.append(pos)
                     else:
@@ -644,7 +672,7 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
         if rimaste or errori:
             err_str = ", ".join(set(errori)) if errori else "Posizioni non chiuse"
             return False, err_str, rimaste
-        return True, f"{chiusi} posizioni chiuse", []
+        return True, f"{chiusi} posizioni chiuse", chiusi_dettagli
     except Exception as e:
         return False, str(e), []
 
@@ -3744,10 +3772,42 @@ else:
                                         st.rerun()
                                     st.session_state[err_key] = ""
                                     ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                                    ok_ig, msg_ig, rimaste = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
+                                    ok_ig, msg_ig, closed_items = chiudi_posizioni_trend_su_ig(conto_selezionato, nome)
                                     storico = dati_salvati.get("storico_wip_trend", [])
                                     if ok_ig:
-                                        storico.append(f"[{ora_str}] 🛑 STOP: Spento e chiuso su IG ({msg_ig})")
+                                        pos_c_mem = dati_salvati.get("posizioni_core", [])
+                                        pos_i_mem = dati_salvati.get("posizioni_incr", [])
+                                        dec_it = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
+                                        
+                                        if isinstance(closed_items, list) and closed_items:
+                                            for it in closed_items:
+                                                sz_it = it.get("size", 1)
+                                                sz_int = int(sz_it) if sz_it == int(sz_it) else sz_it
+                                                px_c = it.get("close_level", 0.0)
+                                                pnl_it = it.get("pnl_eur", 0.0)
+                                                sign_p = "+" if pnl_it >= 0 else ""
+                                                
+                                                is_core = True
+                                                if pos_c_mem and pos_i_mem:
+                                                    core_sz = float(pos_c_mem[0].get("size", 1))
+                                                    if abs(float(sz_it) - core_sz) > 1e-4:
+                                                        is_core = False
+                                                elif not pos_c_mem and pos_i_mem:
+                                                    is_core = False
+                                                
+                                                msg_stop = f"[{ora_str}] 🛑 STOP MANUALE {label_tipo}{px_str} [PnL: {sign_p}{pnl_it:.0f} €]"
+                                                storico.append(msg_stop)
+                                                try:
+                                                    scrivi_log(f"[{nome}] 🛑 STOP MANUALE: Chiusa posizione {label_tipo}{px_str} [PnL: {sign_p}{pnl_it:.0f} €]", conto=conto_selezionato)
+                                                except Exception:
+                                                    pass
+                                        else:
+                                            msg_stop = f"[{ora_str}] 🛑 STOP: Spento e chiuso su IG ({msg_ig})"
+                                            storico.append(msg_stop)
+                                            try:
+                                                scrivi_log(f"[{nome}] 🛑 STOP MANUALE: Spento e chiuso su IG ({msg_ig})", conto=conto_selezionato)
+                                            except Exception:
+                                                pass
                                         memoria_attuale[nome] = {
                                             **dati_salvati, 
                                             "attivo": False,
@@ -4404,7 +4464,7 @@ else:
                         "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
                         "FIFO INCR", "BE INCR", "TRAILING INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE",
                         "CHIUSO IN PROFITTO", "CHIUSO IN STOP LOSS", "CHIUSO IN LOSS", 
-                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI", "[PNL:", "PNL:"
+                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI", "[PNL:", "PNL:", "STOP MANUALE"
                     ]):
                         chiusure_lines.append(r_data)
                     # 5. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi) -> con data [gg/mm]

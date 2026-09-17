@@ -30,7 +30,11 @@ MAX_INCREMENTS = 5          # Max 5 incrementi x 3c = 15 contratti (Totale max 2
 INC_TP_PIPS = 5.0           # TP incrementi su M5: 5 pip (+15.00 € a incremento)
 KJ_TOLERANCE_PIPS = 5.0     # Tolleranza di 5 pip su Kijun 55
 MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <= 5 pip
+MIN_DIST_INCR_PIPS = 5.0       # Distanza minima tra incrementi consecutivi su M5: >= 5 pip
 PARACADUTE_KJ_PIPS = 6.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 6 pip
+CANDELA_SEGNALE_OFFSET_PIPS = 3.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 3 pip
+TK_FILTER_PIPS = 3.0              # Filtro Macro TK 144: Conferma cambio direzione a TK +- 3 pip
+CORE_REENTRY_KJ_DIST_PIPS = 5.0   # Max distanza da KJ per ingresso/rientro Core M5: <= 5 pip
 
 # Orari Sospensione Gold:
 # 1. Chiusura Feed IG Spot Gold (Nessun tick disponibile dalle 22:45 alle 00:00)
@@ -109,7 +113,7 @@ class HyperGoldM1Engine:
         self.point_value = 1.0   # 1 EUR per punto/pip per contratto
         self.num_contracts = CORE_CONTRACTS
         self.trading_enabled = False
-        self.use_core_trailing = False  # Soluzione 3: Core trend-follower puro su KJ55, incrementi continui a TP
+        self.use_core_trailing = True   # Trailing Stop Core attivo di default (+10 pip trigger, +6 pip lock, step 2p)
 
         # Posizione Core: None (FLAT) o {"direction": "LONG"/"SHORT", "open_price": float, "contracts": 5, "tp_price": float, "open_time": str}
         self.position = None
@@ -117,6 +121,11 @@ class HyperGoldM1Engine:
         # Incrementi aperti: lista di {"id": int, "direction": str, "open_price": float, "contracts": 3, "tp_price": float, "open_time": str}
         self.increments = []
         self.inc_tp_pips = INC_TP_PIPS
+
+        # Candela Segnale KJ: Stop confermato su rottura Massimo/Minimo
+        self.signal_candle_active = False
+        self.signal_stop_price = None
+        self.signal_ref_price = None
 
         # Storico eseguiti e stato ultimo ciclo TS
         self.trades = []
@@ -256,13 +265,16 @@ class HyperGoldM1Engine:
         with self.lock:
             self.balance = float(d.get("balance", 10000.0))
             self.trading_enabled = bool(d.get("trading_enabled", False))
-            self.use_core_trailing = bool(d.get("use_core_trailing", False))
+            self.use_core_trailing = True
             self.position = d.get("position")
             self.increments = d.get("increments", [])
             self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
             self.trades = d.get("trades", [])
             self.last_ts_cycle = d.get("last_ts_cycle")
             self.candles = d.get("candles", [])
+            self.signal_candle_active = bool(d.get("signal_candle_active", False))
+            self.signal_stop_price = d.get("signal_stop_price")
+            self.signal_ref_price = d.get("signal_ref_price")
             self._recalculate_indicators()
 
     def save_state(self):
@@ -270,10 +282,13 @@ class HyperGoldM1Engine:
             d = {
                 "balance": self.balance,
                 "trading_enabled": self.trading_enabled,
-                "use_core_trailing": getattr(self, "use_core_trailing", False),
+                "use_core_trailing": True,
                 "position": self.position,
                 "increments": self.increments,
                 "inc_tp_pips": self.inc_tp_pips,
+                "signal_candle_active": getattr(self, "signal_candle_active", False),
+                "signal_stop_price": getattr(self, "signal_stop_price", None),
+                "signal_ref_price": getattr(self, "signal_ref_price", None),
                 "trades": self.trades[-100:],
                 "last_ts_cycle": self.last_ts_cycle,
                 "candles": self.candles[-500:]
@@ -535,7 +550,7 @@ class HyperGoldM1Engine:
             "contracts": pos["contracts"],
             "pnl": core_pnl,
             "balance": round(self.balance, 2),
-            "reason": f"Trailing Stop toccato @ {current_price:.2f} (Peak: {pos.get('peak_price', current_price):.2f}) ➔ CICLO M5 COMPLETATO: +{core_pips:.1f} pip (+{tot_cycle_pnl:,.2f} €) | BOT IN PAUSA"
+            "reason": f"Trailing Stop toccato @ {current_price:.2f} (Peak: {pos.get('peak_price', current_price):.2f}) ➔ CICLO M5 COMPLETATO: +{core_pips:.1f} pip (+{tot_cycle_pnl:,.2f} €) | IN ATTESA RIENTRO KJ/TK"
         })
 
         self.last_ts_cycle = {
@@ -548,8 +563,7 @@ class HyperGoldM1Engine:
         }
 
         self.position = None
-        # Disattivazione automatica trading: attende avvio manuale utente!
-        self.trading_enabled = False
+        # Il trading rimane ATTIVO: attende il riavvicinamento a KJ (<= 5 pip) o inversione TK
         self.save_state()
 
     def _check_increments_tp(self, current_price: float, time_str: str):
@@ -610,6 +624,38 @@ class HyperGoldM1Engine:
                     reason=f"Paracadute KJ Intracandela: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
                 )
 
+    def _check_candela_segnale_stop(self, mid: float, time_str: str):
+        """Verifica Stop Conferma Candela Segnale KJ (Tick-by-Tick):
+        Se una candela M5 precedente ha chiuso oltre KJ attivando la Candela Segnale,
+        ed il prezzo live rompe il livello confermato (Minimo - 5p per LONG, Massimo + 5p per SHORT),
+        chiude immediatamente all'istante la Core e tutti gli incrementi a FLAT."""
+        if not self.position or not self.signal_candle_active or self.signal_stop_price is None:
+            return
+
+        pos_dir = self.position["direction"]
+        if pos_dir == "LONG":
+            if mid <= self.signal_stop_price:
+                stop_val = self.signal_stop_price
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+                self.signal_ref_price = None
+                self._close_all_to_flat(
+                    mid,
+                    time_str,
+                    reason=f"Candela Segnale KJ Confermata: Mid live {mid:.2f} <= Stop {stop_val:.2f} (Minimo - {CANDELA_SEGNALE_OFFSET_PIPS:.0f}p) ➔ FLAT"
+                )
+        elif pos_dir == "SHORT":
+            if mid >= self.signal_stop_price:
+                stop_val = self.signal_stop_price
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+                self.signal_ref_price = None
+                self._close_all_to_flat(
+                    mid,
+                    time_str,
+                    reason=f"Candela Segnale KJ Confermata: Mid live {mid:.2f} >= Stop {stop_val:.2f} (Massimo + {CANDELA_SEGNALE_OFFSET_PIPS:.0f}p) ➔ FLAT"
+                )
+
     def _process_tick(self, bid: float, ask: float, time_str: str):
         now_t = time.time()
         mid = round((bid + ask) / 2.0, 2)
@@ -631,8 +677,8 @@ class HyperGoldM1Engine:
                 if self.position or self.increments:
                     self._close_all_to_flat(mid, time_str, reason="Sospensione Notturna Gold (22:45 - 00:15) ➔ Chiusura automatica di sicurezza a FLAT")
             else:
-                # 1. Verifica Trailing Stop per la Core (SOLO se abilitato; di default False - Soluzione 3: Core sempre in trend)
-                if self.trading_enabled and self.position and getattr(self, "use_core_trailing", False):
+                # 1. Verifica Trailing Stop per la Core (Attivo di default: Trigger +10p, Lock +6p, Step 2p)
+                if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
                     self._check_core_trailing_stop(mid, time_str)
 
                 # 2. Verifica Take Profit (5 pip) per gli incrementi aperti (Bancomat continuo)
@@ -642,6 +688,10 @@ class HyperGoldM1Engine:
                 # 3. Paracadute KJ Intracandela (6 pip): Chiusura istantanea di sicurezza a FLAT
                 if self.trading_enabled and self.position and self.kj55 is not None:
                     self._check_paracadute_kj(mid, time_str)
+
+                # 4. Stop Conferma Candela Segnale KJ (5 pip): Chiusura a rottura confermata
+                if self.trading_enabled and self.position and self.signal_candle_active:
+                    self._check_candela_segnale_stop(mid, time_str)
 
             # Inizializzazione prima barra M5
             if self.curr_boundary is None:
@@ -694,40 +744,60 @@ class HyperGoldM1Engine:
         prev_close = closed_candle["close"]
         prev_open = closed_candle["open"]
 
-        # =============================================================
-        # 1. REGIME BULLISH: PREZZO > TK144 (SOLO TRADE LONG)
-        # =============================================================
-        if prev_close > tk:
-            if self.position and self.position["direction"] == "SHORT":
-                self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > TK144 {tk:.2f}")
+        tk_bullish_threshold = round(tk + TK_FILTER_PIPS, 2)
+        tk_bearish_threshold = round(tk - TK_FILTER_PIPS, 2)
 
+        # =============================================================
+        # 1. CONTROLLO INVERSIONE MACRO SU POSIZIONI ESISTENTI (FILTRO 3 PIP)
+        # =============================================================
+        if self.position and self.position["direction"] == "SHORT" and prev_close > tk_bullish_threshold:
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > (TK144 {tk:.2f} + {TK_FILTER_PIPS:.0f}p = {tk_bullish_threshold:.2f})")
+
+        elif self.position and self.position["direction"] == "LONG" and prev_close < tk_bearish_threshold:
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < (TK144 {tk:.2f} - {TK_FILTER_PIPS:.0f}p = {tk_bearish_threshold:.2f})")
+
+        # =============================================================
+        # 2. GESTIONE OPERATIVA SECONDO IL REGIME
+        # =============================================================
+        # A) REGIME BULLISH (Close > TK144 + 3 pip) o POSIZIONE LONG RESIDUA (non ancora invertita)
+        if prev_close > tk_bullish_threshold or (self.position and self.position["direction"] == "LONG"):
             if prev_close > kj:
-                if self.position is None:
-                    # Apri Core LONG (5 contratti)
-                    self.position = {
-                        "direction": "LONG",
-                        "open_price": exec_price,
-                        "contracts": CORE_CONTRACTS,
-                        "open_time": time_str,
-                        "ts_active": False,
-                        "ts_price": None,
-                        "peak_price": exec_price
-                    }
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": "OPEN CORE LONG",
-                        "open_price": exec_price,
-                        "close_price": None,
-                        "contracts": CORE_CONTRACTS,
-                        "pnl": 0.0,
-                        "balance": round(self.balance, 2),
-                        "reason": f"Prezzo > TK144 ({tk:.2f}) e Close > KJ ({kj:.2f}) | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p, Lock: +{CORE_TS_LOCK_PIPS:.0f}p, Step: {CORE_TS_STEP_PIPS:.0f}p"
-                    })
-                    self.save_state()
-                elif self.position["direction"] == "LONG":
-                    # Core già LONG: incremento su barra contraria (rossa) solo se distanza da KJ <= 5 pip
+                if self.position is None and prev_close > tk_bullish_threshold:
+                    # Verifica condizione rientro Core LONG:
+                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 5 pip su M5)
                     dist_kj = abs(exec_price - kj)
-                    if prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS:
+                    if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
+                        self.signal_candle_active = False
+                        self.signal_stop_price = None
+                        self.signal_ref_price = None
+                        self.position = {
+                            "direction": "LONG",
+                            "open_price": exec_price,
+                            "contracts": CORE_CONTRACTS,
+                            "open_time": time_str,
+                            "ts_active": False,
+                            "ts_price": None,
+                            "peak_price": exec_price
+                        }
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": "OPEN CORE LONG",
+                            "open_price": exec_price,
+                            "close_price": None,
+                            "contracts": CORE_CONTRACTS,
+                            "pnl": 0.0,
+                            "balance": round(self.balance, 2),
+                            "reason": f"Ingresso/Rientro Core LONG: Prezzo > TK144+{TK_FILTER_PIPS:.0f}p ({tk_bullish_threshold:.2f}), Close > KJ ({kj:.2f}) e dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p, Lock: +{CORE_TS_LOCK_PIPS:.0f}p, Step: {CORE_TS_STEP_PIPS:.0f}p"
+                        })
+                        self.save_state()
+                elif self.position and self.position["direction"] == "LONG":
+                    # Core già LONG: azzera eventuale Candela Segnale e valuta incremento
+                    self.signal_candle_active = False
+                    self.signal_stop_price = None
+                    self.signal_ref_price = None
+                    dist_kj = abs(exec_price - kj)
+                    troppo_vicino = any(abs(exec_price - inc["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for inc in self.increments)
+                    if prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
                         if len(self.increments) < MAX_INCREMENTS:
                             tp_p = round(exec_price + self.inc_tp_pips, 2)
                             new_inc = {
@@ -748,49 +818,64 @@ class HyperGoldM1Engine:
                                 "contracts": INC_CONTRACTS,
                                 "pnl": 0.0,
                                 "balance": round(self.balance, 2),
-                                "reason": f"Barra M5 rossa (C:{prev_close:.2f} < O:{prev_open:.2f}, dist KJ {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f} pip)"
+                                "reason": f"Barra M5 rossa (C:{prev_close:.2f} < O:{prev_open:.2f}, dist KJ {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p, dist incr >= {MIN_DIST_INCR_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f} pip)"
                             })
                             self.save_state()
 
-            elif prev_close < (kj - KJ_TOLERANCE_PIPS):
-                # Uscita KJ55 in regime Bullish con tolleranza 3 pip: chiudi tutto a FLAT
+            else:
+                # prev_close <= kj in Regime Bullish: Candela Segnale se siamo LONG!
+                # Non chiude subito all'Open: imposta stop confermato su Minimo - 3 pip
                 if self.position and self.position["direction"] == "LONG":
-                    self._close_all_to_flat(exec_price, time_str, reason=f"Uscita KJ: Close {prev_close:.2f} < (KJ {kj:.2f} - {KJ_TOLERANCE_PIPS:.0f} pip = {kj - KJ_TOLERANCE_PIPS:.2f}) ➔ FLAT")
-
-        # =============================================================
-        # 2. REGIME BEARISH: PREZZO < TK144 (SOLO TRADE SHORT)
-        # =============================================================
-        elif prev_close < tk:
-            if self.position and self.position["direction"] == "LONG":
-                self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < TK144 {tk:.2f}")
-
-            if prev_close < kj:
-                if self.position is None:
-                    # Apri Core SHORT (5 contratti)
-                    self.position = {
-                        "direction": "SHORT",
-                        "open_price": exec_price,
-                        "contracts": CORE_CONTRACTS,
-                        "open_time": time_str,
-                        "ts_active": False,
-                        "ts_price": None,
-                        "peak_price": exec_price
-                    }
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": "OPEN CORE SHORT",
-                        "open_price": exec_price,
-                        "close_price": None,
-                        "contracts": CORE_CONTRACTS,
-                        "pnl": 0.0,
-                        "balance": round(self.balance, 2),
-                        "reason": f"Prezzo < TK144 ({tk:.2f}) e Close < KJ ({kj:.2f}) | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p, Lock: +{CORE_TS_LOCK_PIPS:.0f}p, Step: {CORE_TS_STEP_PIPS:.0f}p"
-                    })
+                    stop_livello = round(closed_candle["low"] - CANDELA_SEGNALE_OFFSET_PIPS, 2)
+                    if self.signal_candle_active and self.signal_stop_price is not None:
+                        if stop_livello < self.signal_stop_price:
+                            self.signal_stop_price = stop_livello
+                            self.signal_ref_price = closed_candle["low"]
+                    else:
+                        self.signal_candle_active = True
+                        self.signal_stop_price = stop_livello
+                        self.signal_ref_price = closed_candle["low"]
                     self.save_state()
-                elif self.position["direction"] == "SHORT":
-                    # Core già SHORT: incremento su barra contraria (verde) solo se distanza da KJ <= 5 pip
+
+        # B) REGIME BEARISH (Close < TK144 - 3 pip) o POSIZIONE SHORT RESIDUA (non ancora invertita)
+        elif prev_close < tk_bearish_threshold or (self.position and self.position["direction"] == "SHORT"):
+            if prev_close < kj:
+                if self.position is None and prev_close < tk_bearish_threshold:
+                    # Verifica condizione rientro Core SHORT:
+                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 5 pip su M5)
                     dist_kj = abs(exec_price - kj)
-                    if prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS:
+                    if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
+                        self.signal_candle_active = False
+                        self.signal_stop_price = None
+                        self.signal_ref_price = None
+                        self.position = {
+                            "direction": "SHORT",
+                            "open_price": exec_price,
+                            "contracts": CORE_CONTRACTS,
+                            "open_time": time_str,
+                            "ts_active": False,
+                            "ts_price": None,
+                            "peak_price": exec_price
+                        }
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": "OPEN CORE SHORT",
+                            "open_price": exec_price,
+                            "close_price": None,
+                            "contracts": CORE_CONTRACTS,
+                            "pnl": 0.0,
+                            "balance": round(self.balance, 2),
+                            "reason": f"Ingresso/Rientro Core SHORT: Prezzo < TK144-{TK_FILTER_PIPS:.0f}p ({tk_bearish_threshold:.2f}), Close < KJ ({kj:.2f}) e dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | Paracadute: +{PARACADUTE_KJ_PIPS:.0f}p, Candela Segnale: +{CANDELA_SEGNALE_OFFSET_PIPS:.0f}p"
+                        })
+                        self.save_state()
+                elif self.position and self.position["direction"] == "SHORT":
+                    # Core già SHORT: azzera eventuale Candela Segnale e valuta incremento
+                    self.signal_candle_active = False
+                    self.signal_stop_price = None
+                    self.signal_ref_price = None
+                    dist_kj = abs(exec_price - kj)
+                    troppo_vicino = any(abs(exec_price - inc["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for inc in self.increments)
+                    if prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
                         if len(self.increments) < MAX_INCREMENTS:
                             tp_p = round(exec_price - self.inc_tp_pips, 2)
                             new_inc = {
@@ -811,17 +896,30 @@ class HyperGoldM1Engine:
                                 "contracts": INC_CONTRACTS,
                                 "pnl": 0.0,
                                 "balance": round(self.balance, 2),
-                                "reason": f"Barra M5 verde (C:{prev_close:.2f} > O:{prev_open:.2f}, dist KJ {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f} pip)"
+                                "reason": f"Barra M5 verde (C:{prev_close:.2f} > O:{prev_open:.2f}, dist KJ {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p, dist incr >= {MIN_DIST_INCR_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f} pip)"
                             })
                             self.save_state()
 
-            elif prev_close > (kj + KJ_TOLERANCE_PIPS):
-                # Uscita KJ55 in regime Bearish con tolleranza 3 pip: chiudi tutto a FLAT
+            else:
+                # prev_close >= kj in Regime Bearish: Candela Segnale se siamo SHORT!
+                # Non chiude subito all'Open: imposta stop confermato su Massimo + 3 pip
                 if self.position and self.position["direction"] == "SHORT":
-                    self._close_all_to_flat(exec_price, time_str, reason=f"Uscita KJ: Close {prev_close:.2f} > (KJ {kj:.2f} + {KJ_TOLERANCE_PIPS:.0f} pip = {kj + KJ_TOLERANCE_PIPS:.2f}) ➔ FLAT")
+                    stop_livello = round(closed_candle["high"] + CANDELA_SEGNALE_OFFSET_PIPS, 2)
+                    if self.signal_candle_active and self.signal_stop_price is not None:
+                        if stop_livello > self.signal_stop_price:
+                            self.signal_stop_price = stop_livello
+                            self.signal_ref_price = closed_candle["high"]
+                    else:
+                        self.signal_candle_active = True
+                        self.signal_stop_price = stop_livello
+                        self.signal_ref_price = closed_candle["high"]
+                    self.save_state()
 
     def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
         """Chiude la Core e tutti gli incrementi tornando a FLAT"""
+        self.signal_candle_active = False
+        self.signal_stop_price = None
+        self.signal_ref_price = None
         is_paracadute = "Paracadute" in reason
 
         if self.position:

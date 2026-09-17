@@ -2316,7 +2316,21 @@ def esegui_ciclo_trend():
             # CASO B: Nessuna posizione aperta su IG per questo strumento ma il motore pensa di essere in trade
             elif not pos_ig_strum and engine.is_running:
                 if engine.pm.core_position or engine.pm.increments:
-                    msg = f"ℹ️ Riconciliazione IG: Nessuna posizione aperta su IG per {nome}. Resetto motore a FLAT."
+                    has_recent_stop = any("STOP" in r.upper() or "[PNL:" in r.upper() for r in storico[-5:])
+                    if not has_recent_stop:
+                        core_p = engine.pm.core_position
+                        pnl_str = ""
+                        if core_p and px_cur:
+                            dir_c = core_p.direction
+                            raw_pts = (px_cur - core_p.entry)/mult if dir_c == "LONG" else (core_p.entry - px_cur)/mult
+                            rate_c = get_eur_rate(valuta_c, prezzi_live)
+                            pnl_eur = raw_pts * core_p.size * valore_punto * rate_c
+                            sign_p = "+" if pnl_eur >= 0 else ""
+                            sz_c = int(core_p.size) if core_p.size == int(core_p.size) else core_p.size
+                            pnl_str = f" Core ({sz_c}) [PnL: {sign_p}{pnl_eur:.0f} €]"
+                        msg = f"ℹ️ Riconciliazione IG: Nessuna posizione su IG per {nome}. Resetto motore a FLAT.{pnl_str}"
+                    else:
+                        msg = f"ℹ️ Riconciliazione IG: Chiusura {nome} confermata a FLAT."
                     print_log(nome, msg)
                     storico.append(f"[{ora_str}] {msg}")
                     engine.pm.core_position = None

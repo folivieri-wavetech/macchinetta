@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import time
-from hyper_gold_m1_engine import HyperGoldM1Engine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CORE_TS_TRIGGER_PIPS, is_gold_trading_suspended, is_gold_feed_suspended
+from hyper_gold_m1_engine import HyperGoldM1Engine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CORE_TS_TRIGGER_PIPS, CANDELA_SEGNALE_OFFSET_PIPS, TK_FILTER_PIPS, is_gold_trading_suspended, is_gold_feed_suspended
 
 # Configurazione Pagina Streamlit
 st.set_page_config(
@@ -132,7 +132,7 @@ def render_live_desk():
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
         st.markdown("<h3 style='margin: 0; font-size: 1.08rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>📊 TF 5 MIN</span> <span style='font-size: 0.80rem; color: #94a3b8; font-weight: 500;'>(TK144 / KJ55)</span></h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 • Core 5c (TS a +10 pip, Lock +6, Step 2) • Incr 3c (TP +5) • Stop Trading auto su TS Hit • Porta 8502</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (Paracadute 6p, Candela Segnale 3p) • Core 5c • Incr 3c (TP +5p) • Porta 8502</div>", unsafe_allow_html=True)
 
     with c_badges:
         is_feed_closed = is_gold_feed_suspended()
@@ -281,8 +281,15 @@ def render_live_desk():
         tk_str = f"{tk:.2f}" if tk else "--"
         kj_str = f"{kj:.2f}" if kj else "--"
         if live_mid and tk:
-            regime = "🟢 BULLISH (SOLO LONG)" if live_mid > tk else "🔴 BEARISH (SOLO SHORT)"
-            col_reg = "#22c55e" if live_mid > tk else "#ef4444"
+            if live_mid > (tk + TK_FILTER_PIPS):
+                regime = "🟢 BULLISH (SOLO LONG)"
+                col_reg = "#22c55e"
+            elif live_mid < (tk - TK_FILTER_PIPS):
+                regime = "🔴 BEARISH (SOLO SHORT)"
+                col_reg = "#ef4444"
+            else:
+                regime = "⚪ ZONA NEUTRA TK (±3p)"
+                col_reg = "#f59e0b"
         else:
             regime = "Inizializzazione..."
             col_reg = "#94a3b8"
@@ -309,7 +316,7 @@ def render_live_desk():
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 • Trigger KJ55 • 🪂 Paracadute KJ: ±6p (Live)</div>
+            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±6p (Live)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -348,21 +355,11 @@ def render_live_desk():
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-    use_core_ts = getattr(engine, "use_core_trailing", False)
-
     # 4 & 5. SEZIONE CONTROLLI, STORICO E POSIZIONI IN PORTAFOGLIO AFFIANCATE
-    col_left, col_right = st.columns([1.85, 1.35])
+    col_left, col_right = st.columns([1.60, 1.60])
 
     with col_left:
-        # Riga 1: Toggle Trailing Stop Core posizionato sopra la colonna Reset
-        r_top1, r_top2, r_top3 = st.columns([1, 1, 1.25])
-        with r_top3:
-            core_ts_active = st.toggle("🎯 Trailing Stop Core", value=use_core_ts, key="toggle_core_ts_m5", help="OFF (Soluzione 3): Core sempre aperta a cavalcare il trend (chiude/rigira solo su rottura KJ55) e incrementi a rotazione continua a TP (+5 pip). ON: Chiude Core + incrementi a FLAT sul Trailing Stop.")
-            if core_ts_active != use_core_ts:
-                engine.set_use_core_trailing(core_ts_active)
-                st.rerun()
-
-        # Riga 2: Pulsanti AVVIA, STOP e RESET (10k) perfettamente allineati in orizzontale
+        # Pulsanti AVVIA, STOP e RESET (10k) perfettamente allineati in orizzontale
         c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1.25])
         with c_btn1:
             st.markdown("<div class='btn-start'>", unsafe_allow_html=True)
@@ -392,8 +389,32 @@ def render_live_desk():
             if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", "") or "PARACADUTE" in t.get("action", ""))
         ]
         if closed_trades:
+            # Calcolo totali cumulativi sessione per Core e Incrementi
+            num_core_closed = 0
+            pnl_core_closed = 0.0
+            num_inc_closed = 0
+            pnl_inc_closed = 0.0
+
+            for t in closed_trades:
+                act = t.get("action", "").upper()
+                p = float(t.get("pnl", 0.0) or 0.0)
+                if "CORE" in act:
+                    num_core_closed += 1
+                    pnl_core_closed += p
+                elif "INC" in act or "TP" in act:
+                    num_inc_closed += 1
+                    pnl_inc_closed += p
+
+            tot_pnl_closed = round(pnl_core_closed + pnl_inc_closed, 2)
+            col_core_pnl = "#22c55e" if pnl_core_closed >= 0 else "#ef4444"
+            sign_core = "+" if pnl_core_closed >= 0 else ""
+            col_inc_pnl = "#22c55e" if pnl_inc_closed >= 0 else "#ef4444"
+            sign_inc = "+" if pnl_inc_closed >= 0 else ""
+            col_tot_pnl = "#22c55e" if tot_pnl_closed >= 0 else "#ef4444"
+            sign_tot = "+" if tot_pnl_closed >= 0 else ""
+
             rows_html = []
-            for t in closed_trades[:30]:
+            for t in closed_trades[:10]:
                 col_pnl = "#22c55e" if t["pnl"] > 0 else ("#ef4444" if t["pnl"] < 0 else "#94a3b8")
                 sign_p = f"+{t['pnl']:.2f}" if t["pnl"] > 0 else f"{t['pnl']:.2f}"
                 if "PARACADUTE" in t["action"]:
@@ -413,6 +434,21 @@ def render_live_desk():
                 rows_html.append(
                     f"<tr><td>{t['time']}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{close_str}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-weight: 600; white-space: nowrap;'>{t['balance']:,.2f}&nbsp;€</td><td style='color: #94a3b8; font-size: 0.78rem;'>{t['reason']}</td></tr>"
                 )
+
+            # Riga aggiuntiva di totale dopo le 10 operazioni
+            summary_row = (
+                f"<tr style='background: rgba(30, 41, 59, 0.95); border-top: 2px solid #38bdf8; font-size: 0.78rem;'>"
+                f"<td style='font-weight: 800; color: #38bdf8; white-space: nowrap;'>📊 TOTALI</td>"
+                f"<td colspan='3' style='color: #f1f5f9; font-weight: 600;'>"
+                f"Core: <span style='font-weight: 800;'>{num_core_closed}</span> (<span style='color: {col_core_pnl}; font-weight: 700;'>{sign_core}{pnl_core_closed:,.2f} €</span>) &nbsp;•&nbsp; "
+                f"Incr: <span style='font-weight: 800;'>{num_inc_closed}</span> (<span style='color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{pnl_inc_closed:,.2f} €</span>)"
+                f"</td>"
+                f"<td style='color: {col_tot_pnl}; font-weight: 800; white-space: nowrap;'>{sign_tot}{tot_pnl_closed:,.2f}&nbsp;€</td>"
+                f"<td colspan='2' style='color: #94a3b8; font-size: 0.72rem;'>{len(closed_trades)} op. totali</td>"
+                f"</tr>"
+            )
+            rows_html.append(summary_row)
+
             tbl_t = (
                 "<table class='table-dark'>"
                 "<thead><tr><th>Orario</th><th>Azione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Saldo</th><th>Trigger</th></tr></thead>"
@@ -424,11 +460,41 @@ def render_live_desk():
             st.info("Nessuna operazione ancora chiusa. Non appena una posizione Core o incremento verrà liquidato (Take Profit, Trailing Stop o Uscita KJ), comparirà qui con il relativo P&L.")
 
     with col_right:
-        st.markdown("<h3 style='margin: 0 0 8px 0; font-size: 1.02rem; font-weight: 700;'>💼 Posizioni in Portafoglio</h3>", unsafe_allow_html=True)
+        sig_act = getattr(engine, "signal_candle_active", False)
+        sig_px = getattr(engine, "signal_stop_price", None)
+        sig_ref = getattr(engine, "signal_ref_price", None)
+
+        if sig_act and sig_px is not None:
+            if sig_ref is None:
+                if pos and pos.get("direction") == "LONG":
+                    sig_ref = round(sig_px + CANDELA_SEGNALE_OFFSET_PIPS, 2)
+                elif pos and pos.get("direction") == "SHORT":
+                    sig_ref = round(sig_px - CANDELA_SEGNALE_OFFSET_PIPS, 2)
+                else:
+                    sig_ref = sig_px
+            sign_op = "-" if (pos and pos.get("direction") == "LONG") else "+"
+            sig_badge = f"<span style='font-size: 0.94rem; font-weight: 700; color: #f97316; white-space: nowrap;'>Candela Segnale: <span style='font-weight: 800; color: #fb923c;'>{sig_px:.2f}</span> <span style='font-size: 0.88rem; color: #fed7aa; font-weight: 600;'>({sig_ref:.2f} {sign_op} 3 pip)</span></span>"
+        else:
+            sig_badge = "<span style='font-size: 0.94rem; font-weight: 700; color: #64748b; white-space: nowrap;'>---</span>"
+
+        st.markdown(f"""
+        <div style='display: flex; justify-content: flex-start; align-items: baseline; gap: 14px; margin: 0 0 8px 0;'>
+            <h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>💼 Posizioni in Portafoglio</h3>
+            {sig_badge}
+        </div>
+        """, unsafe_allow_html=True)
         if pos:
             dir_pos = pos["direction"]
             dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
-            dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core {dir_pos}</span>"
+            dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core {dir_pos}</span> <span style='font-size: 0.82rem; color: #cbd5e1; font-weight: 600;'>({pos['open_price']:.2f})</span>"
+
+            # TS Info Core: punto di attivazione (TS In) o livello di stop una volta entrato (TS Stop)
+            if pos.get("ts_active"):
+                ts_stop_px = pos.get("ts_price", 0.0)
+                ts_badge = f"<div style='font-size: 0.70rem; color: #4ade80; font-weight: 700; margin-top: 2px;'>🚀 TS Stop: {ts_stop_px:.2f}</div>"
+            else:
+                ts_target = round((pos["open_price"] + CORE_TS_TRIGGER_PIPS) if dir_pos == "LONG" else (pos["open_price"] - CORE_TS_TRIGGER_PIPS), 2)
+                ts_badge = f"<div style='font-size: 0.70rem; color: #94a3b8; margin-top: 2px;'>TS In: <span style='color: #38bdf8; font-weight: 600;'>{ts_target:.2f}</span> (+{CORE_TS_TRIGGER_PIPS:.0f}p)</div>"
 
             # PnL Core
             if live_mid is not None:
@@ -442,7 +508,7 @@ def render_live_desk():
 
             p_rows = [
                 f"<tr>"
-                f"<td>{dir_badge}</td>"
+                f"<td>{dir_badge}{ts_badge}</td>"
                 f"<td style='text-align: center; font-weight: 700; white-space: nowrap;'>{pos.get('contracts', CORE_CONTRACTS)}c</td>"
                 f"<td style='text-align: right; font-weight: 600; white-space: nowrap;'>{pos['open_price']:.2f}</td>"
                 f"<td style='text-align: right; color: {col_core_pnl}; font-weight: 700; white-space: nowrap;'>{sign_core}{core_pnl_val:,.2f}&nbsp;€</td>"
