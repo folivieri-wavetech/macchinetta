@@ -1,6 +1,6 @@
 {
   "balance": 10047.87,
-  "trading_enabled": true,
+  "trading_enabled": false,
   "use_core_trailing": true,
   "position": null,
   "increments": [],
@@ -11,53 +11,53 @@
   "trades": [
     {
       "time": "13:11:27",
-      "action": "🏆 TS HIT CORE LONG (+12.0 pip)",
+      "action": "\ud83c\udfc6 TS HIT CORE LONG (+12.0 pip)",
       "open_price": 4322.49,
       "close_price": 4334.48,
       "contracts": 5,
       "pnl": 59.95,
       "balance": 10047.87,
-      "reason": "Trailing Stop toccato @ 4334.48 (Peak: 4340.25) ➔ CICLO M5 COMPLETATO: +12.0 pip (+59.95 €) | BOT IN PAUSA"
+      "reason": "Trailing Stop toccato @ 4334.48 (Peak: 4340.25) \u2794 CICLO M5 COMPLETATO: +12.0 pip (+59.95 \u20ac) | BOT IN PAUSA"
     },
     {
       "time": "13:10:31",
-      "action": "📈 TS STEP UP (+12.0 pip)",
+      "action": "\ud83d\udcc8 TS STEP UP (+12.0 pip)",
       "open_price": 4322.49,
       "close_price": 4338.54,
       "contracts": 5,
       "pnl": 80.25,
       "balance": 9987.92,
-      "reason": "Nuovo picco 4338.54 (+16.1 pip) ➔ TS sale a 4334.49 (+12.0 pip garantiti)"
+      "reason": "Nuovo picco 4338.54 (+16.1 pip) \u2794 TS sale a 4334.49 (+12.0 pip garantiti)"
     },
     {
       "time": "13:09:56",
-      "action": "📈 TS STEP UP (+10.0 pip)",
+      "action": "\ud83d\udcc8 TS STEP UP (+10.0 pip)",
       "open_price": 4322.49,
       "close_price": 4336.53,
       "contracts": 5,
       "pnl": 70.2,
       "balance": 9987.92,
-      "reason": "Nuovo picco 4336.53 (+14.0 pip) ➔ TS sale a 4332.49 (+10.0 pip garantiti)"
+      "reason": "Nuovo picco 4336.53 (+14.0 pip) \u2794 TS sale a 4332.49 (+10.0 pip garantiti)"
     },
     {
       "time": "13:09:41",
-      "action": "📈 TS STEP UP (+8.0 pip)",
+      "action": "\ud83d\udcc8 TS STEP UP (+8.0 pip)",
       "open_price": 4322.49,
       "close_price": 4335.0,
       "contracts": 5,
       "pnl": 62.55,
       "balance": 9987.92,
-      "reason": "Nuovo picco 4335.00 (+12.5 pip) ➔ TS sale a 4330.49 (+8.0 pip garantiti)"
+      "reason": "Nuovo picco 4335.00 (+12.5 pip) \u2794 TS sale a 4330.49 (+8.0 pip garantiti)"
     },
     {
       "time": "13:07:26",
-      "action": "🚀 TRAILING ATTIVATO LONG",
+      "action": "\ud83d\ude80 TRAILING ATTIVATO LONG",
       "open_price": 4322.49,
       "close_price": 4332.57,
       "contracts": 5,
       "pnl": 50.4,
       "balance": 9987.92,
-      "reason": "Raggiunti +10.1 pip @ 4332.57 ➔ Lock +6.0 pip @ 4328.49 (Step 2 pip)"
+      "reason": "Raggiunti +10.1 pip @ 4332.57 \u2794 Lock +6.0 pip @ 4328.49 (Step 2 pip)"
     },
     {
       "time": "12:55:00",
@@ -71,7 +71,7 @@
     },
     {
       "time": "12:16:58",
-      "action": "🪂 PARACADUTE INC LONG (FLAT)",
+      "action": "\ud83e\ude82 PARACADUTE INC LONG (FLAT)",
       "open_price": 4311.89,
       "close_price": 4308.73,
       "contracts": 3,
@@ -81,17 +81,17 @@
     },
     {
       "time": "12:16:58",
-      "action": "🪂 PARACADUTE CORE LONG (FLAT)",
+      "action": "\ud83e\ude82 PARACADUTE CORE LONG (FLAT)",
       "open_price": 4312.25,
       "close_price": 4308.73,
       "contracts": 5,
       "pnl": -17.6,
       "balance": 9997.4,
-      "reason": "Paracadute KJ Intracandela: Mid live 4308.73 <= (KJ 4314.85 - 6p = 4308.85) ➔ FLAT"
+      "reason": "Paracadute KJ Intracandela: Mid live 4308.73 <= (KJ 4314.85 - 6p = 4308.85) \u2794 FLAT"
     },
     {
       "time": "11:20:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
+      "action": "\u2795 OPEN INC LONG (+3 Contr., Tot: 8)",
       "open_price": 4311.89,
       "close_price": null,
       "contracts": 3,
@@ -101,7 +101,7 @@
     },
     {
       "time": "11:09:37",
-      "action": "🎯 TP INC LONG (+5.0 pip)",
+      "action": "\ud83c\udfaf TP INC LONG (+5.0 pip)",
       "open_price": 4311.43,
       "close_price": 4316.43,
       "contracts": 3,
@@ -111,7 +111,7 @@
     },
     {
       "time": "11:00:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
+      "action": "\u2795 OPEN INC LONG (+3 Contr., Tot: 8)",
       "open_price": 4311.43,
       "close_price": null,
       "contracts": 3,
@@ -3849,6 +3849,76 @@
       "low": 4365.64,
       "close": 4366.93,
       "kj55": 4352.99,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789662000,
+      "time": "18:20:00",
+      "open": 4366.98,
+      "high": 4368.79,
+      "low": 4365.65,
+      "close": 4367.87,
+      "kj55": 4357.43,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789662300,
+      "time": "18:25:00",
+      "open": 4367.89,
+      "high": 4368.39,
+      "low": 4363.4,
+      "close": 4367.46,
+      "kj55": 4360.7,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789662600,
+      "time": "18:30:00",
+      "open": 4367.56,
+      "high": 4367.59,
+      "low": 4357.77,
+      "close": 4358.48,
+      "kj55": 4362.44,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789662900,
+      "time": "18:35:00",
+      "open": 4358.57,
+      "high": 4361.25,
+      "low": 4357.6,
+      "close": 4360.35,
+      "kj55": 4363.37,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789663200,
+      "time": "18:40:00",
+      "open": 4360.48,
+      "high": 4360.77,
+      "low": 4357.2,
+      "close": 4359.81,
+      "kj55": 4366.36,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789663500,
+      "time": "18:45:00",
+      "open": 4359.84,
+      "high": 4361.88,
+      "low": 4358.23,
+      "close": 4358.23,
+      "kj55": 4366.36,
+      "tk144": 4333.42
+    },
+    {
+      "boundary": 1789663800,
+      "time": "18:50:00",
+      "open": 4358.22,
+      "high": 4361.37,
+      "low": 4355.85,
+      "close": 4360.73,
+      "kj55": 4366.36,
       "tk144": 4333.42
     }
   ]

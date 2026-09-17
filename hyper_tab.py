@@ -22,6 +22,26 @@ from hyper_gold_m1_engine import (
     CANDELA_SEGNALE_OFFSET_PIPS as CANDELA_SEGNALE_OFFSET_PIPS_5M,
     TK_FILTER_PIPS as TK_FILTER_PIPS_5M
 )
+import json
+
+def get_account_saldo_info(conto_selezionato):
+    """Recupera saldo, disponibile e margine reale dal file stato_sistema.json del conto IG selezionato."""
+    candidates = []
+    if conto_selezionato:
+        candidates.append(os.path.join(conto_selezionato, "stato_sistema.json"))
+    candidates.append("stato_sistema.json")
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    saldo = float(d.get("saldo", 0.0) or 0.0)
+                    disp = float(d.get("disponibile", 0.0) or 0.0)
+                    marg = float(d.get("margine", 0.0) or 0.0)
+                    return saldo, disp, marg
+            except Exception:
+                pass
+    return 0.0, 0.0, 0.0
 
 def inject_hyper_css():
     st.markdown("""
@@ -113,9 +133,18 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         trades = list(engine.trades)
         curr_bar_t = engine.curr_bar_start_t
 
+    real_saldo, real_disp, real_marg = get_account_saldo_info(conto_selezionato)
     float_pnl = engine.get_floating_pnl()
-    equity = balance + float_pnl
-    realized_pnl = balance - init_bal
+
+    # Saldo ed Equity collegati all'account IG reale
+    if real_saldo > 0:
+        balance = real_saldo
+        equity = real_saldo + float_pnl
+    else:
+        equity = balance + float_pnl
+
+    session_realized_pnl = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades if t.get("close_price") is not None)
+    num_closed = len([t for t in trades if t.get("close_price") is not None])
 
     # Intestazione e Badge di Stato
     c_title, c_badges = st.columns([2.3, 1.7])
@@ -151,26 +180,24 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        col_eq = "#22c55e" if equity >= init_bal else "#ef4444"
-        delta_eq = equity - init_bal
-        sign_eq = "+" if delta_eq >= 0 else ""
+        col_eq = "#38bdf8"
+        disp_txt = f"{real_disp:,.2f} €" if real_disp > 0 else "--"
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Portafoglio Totale (Equity)</div>
+            <div class='kpi-title-hyper'>Equity Conto ({conto_selezionato})</div>
             <div class='kpi-val-hyper' style='color: {col_eq};'>{equity:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: {col_eq};'>{sign_eq}{delta_eq:,.2f} € ({sign_eq}{(delta_eq/init_bal)*100:.2f}%)</div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Saldo: <b style='color: #f8fafc;'>{balance:,.2f} €</b> • Disp: <b style='color: #cbd5e1;'>{disp_txt}</b></div>
         </div>
         """, unsafe_allow_html=True)
 
     with k2:
-        col_bal = "#38bdf8"
-        col_real = "#22c55e" if realized_pnl >= 0 else "#ef4444"
-        sign_real = "+" if realized_pnl >= 0 else ""
+        col_real = "#22c55e" if session_realized_pnl >= 0 else ("#ef4444" if session_realized_pnl < 0 else "#94a3b8")
+        sign_real = "+" if session_realized_pnl > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Saldo Realizzato</div>
-            <div class='kpi-val-hyper' style='color: {col_bal};'>{balance:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: {col_real};'>P&L Chiuso: {sign_real}{realized_pnl:,.2f} €</div>
+            <div class='kpi-title-hyper'>P&L Sessione Hyper (30s)</div>
+            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{session_realized_pnl:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{num_closed} operazioni concluse</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -281,12 +308,13 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         """, unsafe_allow_html=True)
 
     with m3:
-        margine_usato = total_contracts * 220.0
+        hyper_margine = total_contracts * 220.0
+        tot_marg = real_marg if real_marg > 0 else hyper_margine
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
-            <div class='kpi-title-hyper'>Margine Utilizzato</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{margine_usato:,.2f} €</div>
-            <div style='font-size: 0.70rem; color: #cbd5e1;'>220 € / c • {total_contracts} contratti a mercato</div>
+            <div class='kpi-title-hyper'>Margine ({conto_selezionato})</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{tot_marg:,.2f} €</div>
+            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} € ({total_contracts}c) • Marg. Conto</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -331,7 +359,7 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             st.warning("⚠️ **Hyper 5M è attualmente ATTIVO su questo conto.** Per proteggere il margine, ferma il 5M prima di avviare il 30S.")
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
-        c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1.25])
+        c_btn1, c_btn2 = st.columns([1, 1])
         dis_start = trading_on or is_other_active
         with c_btn1:
             st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
@@ -344,13 +372,6 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
             if st.button("🔴 STOP 30S", key=f"btn_stop_30s_{conto_selezionato}", disabled=(not trading_on), use_container_width=True):
                 engine.set_trading(False)
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with c_btn3:
-            st.markdown("<div class='btn-reset-hyper'>", unsafe_allow_html=True)
-            if st.button("🔄 RESET (10k)", key=f"btn_reset_30s_{conto_selezionato}", use_container_width=True):
-                engine.reset_portfolio()
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -559,9 +580,18 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         trades = list(engine.trades)
         curr_bar_t = engine.curr_bar_start_t
 
+    real_saldo, real_disp, real_marg = get_account_saldo_info(conto_selezionato)
     float_pnl = engine.get_floating_pnl()
-    equity = balance + float_pnl
-    realized_pnl = balance - init_bal
+
+    # Saldo ed Equity collegati all'account IG reale
+    if real_saldo > 0:
+        balance = real_saldo
+        equity = real_saldo + float_pnl
+    else:
+        equity = balance + float_pnl
+
+    session_realized_pnl = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades if t.get("close_price") is not None)
+    num_closed = len([t for t in trades if t.get("close_price") is not None])
 
     # Intestazione e Badge di Stato
     c_title, c_badges = st.columns([2.3, 1.7])
@@ -597,26 +627,24 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        col_eq = "#22c55e" if equity >= init_bal else "#ef4444"
-        delta_eq = equity - init_bal
-        sign_eq = "+" if delta_eq >= 0 else ""
+        col_eq = "#38bdf8"
+        disp_txt = f"{real_disp:,.2f} €" if real_disp > 0 else "--"
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Portafoglio Totale (Equity)</div>
+            <div class='kpi-title-hyper'>Equity Conto ({conto_selezionato})</div>
             <div class='kpi-val-hyper' style='color: {col_eq};'>{equity:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: {col_eq};'>{sign_eq}{delta_eq:,.2f} € ({sign_eq}{(delta_eq/init_bal)*100:.2f}%)</div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Saldo: <b style='color: #f8fafc;'>{balance:,.2f} €</b> • Disp: <b style='color: #cbd5e1;'>{disp_txt}</b></div>
         </div>
         """, unsafe_allow_html=True)
 
     with k2:
-        col_bal = "#38bdf8"
-        col_real = "#22c55e" if realized_pnl >= 0 else "#ef4444"
-        sign_real = "+" if realized_pnl >= 0 else ""
+        col_real = "#22c55e" if session_realized_pnl >= 0 else ("#ef4444" if session_realized_pnl < 0 else "#94a3b8")
+        sign_real = "+" if session_realized_pnl > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Saldo Realizzato</div>
-            <div class='kpi-val-hyper' style='color: {col_bal};'>{balance:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: {col_real};'>P&L Chiuso: {sign_real}{realized_pnl:,.2f} €</div>
+            <div class='kpi-title-hyper'>P&L Sessione Hyper (5m)</div>
+            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{session_realized_pnl:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{num_closed} operazioni concluse</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -721,12 +749,13 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         """, unsafe_allow_html=True)
 
     with m3:
-        margine_usato = total_contracts * 220.0
+        hyper_margine = total_contracts * 220.0
+        tot_marg = real_marg if real_marg > 0 else hyper_margine
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
-            <div class='kpi-title-hyper'>Margine Utilizzato</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{margine_usato:,.2f} €</div>
-            <div style='font-size: 0.70rem; color: #cbd5e1;'>220 € / c • {total_contracts} contratti a mercato</div>
+            <div class='kpi-title-hyper'>Margine ({conto_selezionato})</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{tot_marg:,.2f} €</div>
+            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} € ({total_contracts}c) • Marg. Conto</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -764,7 +793,7 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             st.warning("⚠️ **Hyper 30S è attualmente ATTIVO su questo conto.** Per proteggere il margine, ferma il 30S prima di avviare il 5M.")
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
-        c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1.25])
+        c_btn1, c_btn2 = st.columns([1, 1])
         dis_start = trading_on or is_other_active
         with c_btn1:
             st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
@@ -777,13 +806,6 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
             if st.button("🔴 STOP 5M", key=f"btn_stop_m5_{conto_selezionato}", disabled=(not trading_on), use_container_width=True):
                 engine.set_trading(False)
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with c_btn3:
-            st.markdown("<div class='btn-reset-hyper'>", unsafe_allow_html=True)
-            if st.button("🔄 RESET (10k)", key=f"btn_reset_m5_{conto_selezionato}", use_container_width=True):
-                engine.reset_portfolio()
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
