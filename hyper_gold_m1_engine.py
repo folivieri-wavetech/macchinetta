@@ -44,9 +44,9 @@ CORE_REENTRY_KJ_DIST_PIPS = 5.0   # Max distanza da KJ per ingresso/rientro Core
 GOLD_FEED_SUSPEND_START_HOUR = 22
 GOLD_FEED_SUSPEND_START_MIN = 45
 
-# 2. Congelamento Operatività / Ordini (Dalle 22:45 alle 00:15 per spread/stabilizzazione)
+# 2. Congelamento Operatività / Ordini (Dalle 22:44 alle 00:15 per rollover e spread)
 GOLD_TRADE_SUSPEND_START_HOUR = 22
-GOLD_TRADE_SUSPEND_START_MIN = 45
+GOLD_TRADE_SUSPEND_START_MIN = 44
 GOLD_TRADE_SUSPEND_END_HOUR = 0
 GOLD_TRADE_SUSPEND_END_MIN = 15
 
@@ -60,7 +60,8 @@ def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
     return t >= t_start
 
 def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True se l'operatività/apertura ordini è congelata (dalle 22:45 alle 00:15).
+    """Restituisce True se l'operatività/apertura ordini è congelata (dalle 22:44 alle 00:15).
+    Alle 22:44 le posizioni vengono chiuse a FLAT automaticamente prima della chiusura del feed delle 22:45.
     Dalle 00:00 alle 00:15 le candele si aggiornano e KJ55/TK144 vengono calcolate, ma non si aprono ordini."""
     if dt is None:
         dt = now_it()
@@ -428,6 +429,14 @@ class HyperGoldM1Engine:
 
                 while self.running and self.ls_connected:
                     time.sleep(2)
+                    # Controllo proattivo chiusura Rollover alle 22:44 (1 min prima del freeze del feed)
+                    if is_gold_market_suspended():
+                        with self.lock:
+                            has_pos = (self.position is not None or len(self.increments) > 0)
+                            mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                        if has_pos:
+                            t_str = now_it().strftime("%H:%M:%S")
+                            self._close_all_to_flat(mid_px, t_str, reason="Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT")
                     if self.last_tick_time and (time.time() - self.last_tick_time) > 40:
                         break
 
@@ -868,13 +877,13 @@ class HyperGoldM1Engine:
             self.live_mid = mid
             self.live_time_str = time_str
 
-            # Verifica sospensione notturna Gold (22:45 - 00:15)
+            # Verifica sospensione notturna / rollover Gold (22:44 - 00:15)
             market_suspended = is_gold_market_suspended()
 
             if market_suspended:
-                # Se è scattata l'ora di sospensione con posizioni ancora aperte, le chiudiamo a FLAT di sicurezza
+                # Se è scattata l'ora di sospensione (22:44) con posizioni ancora aperte, le chiudiamo a FLAT di sicurezza
                 if self.position or self.increments:
-                    self._close_all_to_flat(mid, time_str, reason="Sospensione Notturna Gold (22:45 - 00:15) ➔ Chiusura automatica di sicurezza a FLAT")
+                    self._close_all_to_flat(mid, time_str, reason="Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT")
             else:
                 # 1. Verifica Trailing Stop per la Core (Attivo di default: Trigger +10p, Lock +6p, Step 2p)
                 if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
