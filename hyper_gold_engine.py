@@ -81,17 +81,16 @@ def is_gold_market_suspended(dt: datetime.datetime = None) -> bool:
     return is_gold_trading_suspended(dt)
 
 class HyperGoldEngine:
-    _instance = None
+    _instances = {}
     _lock = threading.RLock()
 
     @classmethod
     def get_instance(cls, account_dir: str = None):
+        key = account_dir or "DEFAULT"
         with cls._lock:
-            if cls._instance is None:
-                cls._instance = cls(account_dir=account_dir)
-            elif account_dir:
-                cls._instance.account_dir = account_dir
-            return cls._instance
+            if key not in cls._instances:
+                cls._instances[key] = cls(account_dir=account_dir)
+            return cls._instances[key]
 
     def __init__(self, account_dir: str = None):
         self.account_dir = account_dir

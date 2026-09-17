@@ -166,9 +166,6 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
     engine = HyperGoldEngine.get_instance(account_dir=conto_attivo)
-    st_file = engine._get_state_file()
-    if engine.position is None and os.path.exists(st_file):
-        engine.load_state()
 
     with engine.lock:
         is_conn = engine.ls_connected
@@ -617,9 +614,6 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
     engine = HyperGoldM1Engine.get_instance(account_dir=conto_attivo)
-    st_file_m1 = engine._get_state_file()
-    if engine.position is None and os.path.exists(st_file_m1):
-        engine.load_state()
 
     with engine.lock:
         is_conn = engine.ls_connected
