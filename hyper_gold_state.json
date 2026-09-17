@@ -1,1363 +1,11 @@
 {
-  "balance": 9822.190000000002,
+  "balance": 10000.0,
   "trading_enabled": false,
   "position": null,
   "increments": [],
   "inc_tp_pips": 2.0,
-  "trades": [
-    {
-      "time": "02:13:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
-      "open_price": 4285.51,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9743.17,
-      "reason": "Barra 30s rossa (C:4285.34 < O:4286.39) su Supporto KJ | TP: 4287.51 (+2p)"
-    },
-    {
-      "time": "02:10:00",
-      "action": "OPEN CORE LONG",
-      "open_price": 4279.21,
-      "close_price": null,
-      "contracts": 5,
-      "pnl": 0.0,
-      "balance": 9743.17,
-      "reason": "S&R Supporto: Prezzo > KJ+tolleranza (4276.80) | TS Trigger: +10p, Trail 4p"
-    },
-    {
-      "time": "02:10:00",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4270.67,
-      "close_price": 4279.21,
-      "contracts": 3,
-      "pnl": -25.62,
-      "balance": 9743.17,
-      "reason": "Uscita FLAT @ 4279.21"
-    },
-    {
-      "time": "02:10:00",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4268.97,
-      "close_price": 4279.21,
-      "contracts": 3,
-      "pnl": -30.72,
-      "balance": 9768.79,
-      "reason": "Uscita FLAT @ 4279.21"
-    },
-    {
-      "time": "02:10:00",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4270.03,
-      "close_price": 4279.21,
-      "contracts": 3,
-      "pnl": -27.54,
-      "balance": 9799.51,
-      "reason": "Uscita FLAT @ 4279.21"
-    },
-    {
-      "time": "02:10:00",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4269.91,
-      "close_price": 4279.21,
-      "contracts": 3,
-      "pnl": -27.9,
-      "balance": 9827.05,
-      "reason": "Uscita FLAT @ 4279.21"
-    },
-    {
-      "time": "02:10:00",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4267.3,
-      "close_price": 4279.21,
-      "contracts": 3,
-      "pnl": -35.73,
-      "balance": 9854.95,
-      "reason": "Uscita FLAT @ 4279.21"
-    },
-    {
-      "time": "02:10:00",
-      "action": "CLOSE CORE SHORT (FLAT)",
-      "open_price": 4266.69,
-      "close_price": 4279.21,
-      "contracts": 5,
-      "pnl": -62.6,
-      "balance": 9890.68,
-      "reason": "Inversione S&R: Rottura KJ al rialzo oltre tolleranza (C:4279.18 > KJ:4272.80 + 4p = 4276.80)"
-    },
-    {
-      "time": "02:05:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 20)",
-      "open_price": 4270.67,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9953.28,
-      "reason": "Barra 30s verde in test KJ (C:4270.49 > O:4268.97) | TP: 4268.67 (+2p)"
-    },
-    {
-      "time": "02:05:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 17)",
-      "open_price": 4268.97,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9953.28,
-      "reason": "Barra 30s verde in test KJ (C:4268.98 > O:4268.94) | TP: 4266.97 (+2p)"
-    },
-    {
-      "time": "02:04:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 14)",
-      "open_price": 4270.03,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9953.28,
-      "reason": "Barra 30s verde in test KJ (C:4270.04 > O:4269.24) | TP: 4268.03 (+2p)"
-    },
-    {
-      "time": "02:03:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 11)",
-      "open_price": 4269.91,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9953.28,
-      "reason": "Barra 30s verde in test KJ (C:4269.92 > O:4267.30) | TP: 4267.91 (+2p)"
-    },
-    {
-      "time": "02:02:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 8)",
-      "open_price": 4267.3,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9953.28,
-      "reason": "Barra 30s verde in test KJ (C:4267.29 > O:4266.69) | TP: 4265.30 (+2p)"
-    },
-    {
-      "time": "02:02:00",
-      "action": "OPEN CORE SHORT",
-      "open_price": 4266.69,
-      "close_price": null,
-      "contracts": 5,
-      "pnl": 0.0,
-      "balance": 9953.28,
-      "reason": "S&R Resistenza: Prezzo < KJ-tolleranza (4267.03) | TS Trigger: +10p, Trail 4p"
-    },
-    {
-      "time": "02:02:00",
-      "action": "CLOSE INC LONG (FLAT)",
-      "open_price": 4272.82,
-      "close_price": 4266.69,
-      "contracts": 3,
-      "pnl": -18.39,
-      "balance": 9953.28,
-      "reason": "Uscita FLAT @ 4266.69"
-    },
-    {
-      "time": "02:02:00",
-      "action": "CLOSE INC LONG (FLAT)",
-      "open_price": 4273.11,
-      "close_price": 4266.69,
-      "contracts": 3,
-      "pnl": -19.26,
-      "balance": 9971.67,
-      "reason": "Uscita FLAT @ 4266.69"
-    },
-    {
-      "time": "02:02:00",
-      "action": "CLOSE INC LONG (FLAT)",
-      "open_price": 4274.04,
-      "close_price": 4266.69,
-      "contracts": 3,
-      "pnl": -22.05,
-      "balance": 9990.93,
-      "reason": "Uscita FLAT @ 4266.69"
-    },
-    {
-      "time": "02:02:00",
-      "action": "CLOSE INC LONG (FLAT)",
-      "open_price": 4274.13,
-      "close_price": 4266.69,
-      "contracts": 3,
-      "pnl": -22.32,
-      "balance": 10012.98,
-      "reason": "Uscita FLAT @ 4266.69"
-    },
-    {
-      "time": "02:02:00",
-      "action": "CLOSE INC LONG (FLAT)",
-      "open_price": 4274.44,
-      "close_price": 4266.69,
-      "contracts": 3,
-      "pnl": -23.25,
-      "balance": 10035.3,
-      "reason": "Uscita FLAT @ 4266.69"
-    },
-    {
-      "time": "02:02:00",
-      "action": "CLOSE CORE LONG (FLAT)",
-      "open_price": 4269.55,
-      "close_price": 4266.69,
-      "contracts": 5,
-      "pnl": -14.3,
-      "balance": 10058.55,
-      "reason": "Inversione S&R: Rottura KJ al ribasso oltre tolleranza (C:4266.99 < KJ:4271.03 - 4p = 4267.03)"
-    },
-    {
-      "time": "01:53:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 20)",
-      "open_price": 4272.82,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10072.85,
-      "reason": "Barra 30s rossa in test KJ (C:4272.86 < O:4273.11) | TP: 4274.82 (+2p)"
-    },
-    {
-      "time": "01:53:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 17)",
-      "open_price": 4273.11,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10072.85,
-      "reason": "Barra 30s rossa in test KJ (C:4273.16 < O:4273.76) | TP: 4275.11 (+2p)"
-    },
-    {
-      "time": "01:52:46",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4272.78,
-      "close_price": 4274.78,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10072.85,
-      "reason": "Raggiunto TP 2 pip @ 4274.78"
-    },
-    {
-      "time": "01:52:43",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4272.2,
-      "close_price": 4274.2,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10066.85,
-      "reason": "Raggiunto TP 2 pip @ 4274.20"
-    },
-    {
-      "time": "01:51:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 20)",
-      "open_price": 4272.2,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10060.85,
-      "reason": "Barra 30s rossa in test KJ (C:4272.22 < O:4272.78) | TP: 4274.20 (+2p)"
-    },
-    {
-      "time": "01:51:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 17)",
-      "open_price": 4272.78,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10060.85,
-      "reason": "Barra 30s rossa in test KJ (C:4272.74 < O:4274.95) | TP: 4274.78 (+2p)"
-    },
-    {
-      "time": "01:50:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 14)",
-      "open_price": 4274.04,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10060.85,
-      "reason": "Barra 30s rossa in test KJ (C:4274.06 < O:4274.13) | TP: 4276.04 (+2p)"
-    },
-    {
-      "time": "01:49:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 11)",
-      "open_price": 4274.13,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10060.85,
-      "reason": "Barra 30s rossa in test KJ (C:4274.22 < O:4275.11) | TP: 4276.13 (+2p)"
-    },
-    {
-      "time": "01:48:59",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4273.21,
-      "close_price": 4275.21,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10060.85,
-      "reason": "Raggiunto TP 2 pip @ 4275.21"
-    },
-    {
-      "time": "01:48:59",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4273.33,
-      "close_price": 4275.33,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10054.85,
-      "reason": "Raggiunto TP 2 pip @ 4275.33"
-    },
-    {
-      "time": "01:48:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 14)",
-      "open_price": 4273.21,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10048.85,
-      "reason": "Barra 30s rossa in test KJ (C:4273.12 < O:4274.44) | TP: 4275.21 (+2p)"
-    },
-    {
-      "time": "01:48:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 11)",
-      "open_price": 4274.44,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10048.85,
-      "reason": "Barra 30s rossa in test KJ (C:4274.46 < O:4274.87) | TP: 4276.44 (+2p)"
-    },
-    {
-      "time": "01:47:36",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4273.09,
-      "close_price": 4275.09,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10048.85,
-      "reason": "Raggiunto TP 2 pip @ 4275.09"
-    },
-    {
-      "time": "01:46:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 11)",
-      "open_price": 4273.09,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10042.85,
-      "reason": "Barra 30s rossa in test KJ (C:4273.25 < O:4273.33) | TP: 4275.09 (+2p)"
-    },
-    {
-      "time": "01:45:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
-      "open_price": 4273.33,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10042.85,
-      "reason": "Barra 30s rossa in test KJ (C:4273.31 < O:4274.29) | TP: 4275.33 (+2p)"
-    },
-    {
-      "time": "01:42:50",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4270.09,
-      "close_price": 4272.09,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10042.85,
-      "reason": "Raggiunto TP 2 pip @ 4272.09"
-    },
-    {
-      "time": "01:41:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
-      "open_price": 4270.09,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10036.85,
-      "reason": "Barra 30s rossa in test KJ (C:4269.89 < O:4271.40) | TP: 4272.09 (+2p)"
-    },
-    {
-      "time": "01:40:35",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4271.88,
-      "close_price": 4273.88,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10036.85,
-      "reason": "Raggiunto TP 2 pip @ 4273.88"
-    },
-    {
-      "time": "01:40:35",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4271.75,
-      "close_price": 4273.75,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10030.85,
-      "reason": "Raggiunto TP 2 pip @ 4273.75"
-    },
-    {
-      "time": "01:40:35",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4271.79,
-      "close_price": 4273.79,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10024.85,
-      "reason": "Raggiunto TP 2 pip @ 4273.79"
-    },
-    {
-      "time": "01:40:35",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4272.15,
-      "close_price": 4274.15,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10018.85,
-      "reason": "Raggiunto TP 2 pip @ 4274.15"
-    },
-    {
-      "time": "01:40:35",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4272.37,
-      "close_price": 4274.37,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10012.85,
-      "reason": "Raggiunto TP 2 pip @ 4274.37"
-    },
-    {
-      "time": "01:31:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 20)",
-      "open_price": 4271.88,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10006.85,
-      "reason": "Barra 30s rossa (C:4271.90 < O:4272.43) su Supporto KJ | TP: 4273.88 (+2p)"
-    },
-    {
-      "time": "01:30:10",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4271.65,
-      "close_price": 4273.65,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10006.85,
-      "reason": "Raggiunto TP 2 pip @ 4273.65"
-    },
-    {
-      "time": "01:29:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 20)",
-      "open_price": 4271.65,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10000.85,
-      "reason": "Barra 30s rossa (C:4271.72 < O:4272.51) su Supporto KJ | TP: 4273.65 (+2p)"
-    },
-    {
-      "time": "01:28:57",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4270.41,
-      "close_price": 4272.41,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10000.85,
-      "reason": "Raggiunto TP 2 pip @ 4272.41"
-    },
-    {
-      "time": "01:26:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 20)",
-      "open_price": 4270.41,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9994.85,
-      "reason": "Barra 30s rossa (C:4270.42 < O:4271.75) su Supporto KJ | TP: 4272.41 (+2p)"
-    },
-    {
-      "time": "01:25:30",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 17)",
-      "open_price": 4271.75,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9994.85,
-      "reason": "Barra 30s rossa (C:4271.72 < O:4271.79) su Supporto KJ | TP: 4273.75 (+2p)"
-    },
-    {
-      "time": "01:25:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 14)",
-      "open_price": 4271.79,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9994.85,
-      "reason": "Barra 30s rossa (C:4271.68 < O:4272.15) su Supporto KJ | TP: 4273.79 (+2p)"
-    },
-    {
-      "time": "01:24:32",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 11)",
-      "open_price": 4272.15,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9994.85,
-      "reason": "Barra 30s rossa (C:4272.13 < O:4272.69) su Supporto KJ | TP: 4274.15 (+2p)"
-    },
-    {
-      "time": "01:23:31",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
-      "open_price": 4272.37,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9994.85,
-      "reason": "Barra 30s rossa (C:4272.38 < O:4273.12) su Supporto KJ | TP: 4274.37 (+2p)"
-    },
-    {
-      "time": "01:21:51",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4270.11,
-      "close_price": 4272.11,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 9994.85,
-      "reason": "Raggiunto TP 2 pip @ 4272.11"
-    },
-    {
-      "time": "01:21:26",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4269.13,
-      "close_price": 4271.13,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 9988.85,
-      "reason": "Raggiunto TP 2 pip @ 4271.13"
-    },
-    {
-      "time": "01:21:26",
-      "action": "🎯 TP INC LONG (+2.0 pip)",
-      "open_price": 4268.7,
-      "close_price": 4270.7,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 9982.85,
-      "reason": "Raggiunto TP 2 pip @ 4270.70"
-    },
-    {
-      "time": "01:21:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 14)",
-      "open_price": 4270.11,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9976.85,
-      "reason": "Barra 30s rossa (C:4269.76 < O:4270.17) su Supporto KJ | TP: 4272.11 (+2p)"
-    },
-    {
-      "time": "01:20:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 11)",
-      "open_price": 4269.13,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9976.85,
-      "reason": "Barra 30s rossa in test KJ (C:4269.06 < O:4269.21) | TP: 4271.13 (+2p)"
-    },
-    {
-      "time": "01:19:00",
-      "action": "➕ OPEN INC LONG (+3 Contr., Tot: 8)",
-      "open_price": 4268.7,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 9976.85,
-      "reason": "Barra 30s rossa in test KJ (C:4268.74 < O:4269.55) | TP: 4270.70 (+2p)"
-    },
-    {
-      "time": "01:18:30",
-      "action": "OPEN CORE LONG",
-      "open_price": 4269.55,
-      "close_price": null,
-      "contracts": 5,
-      "pnl": 0.0,
-      "balance": 9976.85,
-      "reason": "S&R Supporto: Prezzo > KJ+tolleranza (4269.26) | TS Trigger: +10p, Trail 4p"
-    },
-    {
-      "time": "01:18:30",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4263.04,
-      "close_price": 4269.55,
-      "contracts": 3,
-      "pnl": -19.53,
-      "balance": 9976.85,
-      "reason": "Uscita FLAT @ 4269.55"
-    },
-    {
-      "time": "01:18:30",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4263.18,
-      "close_price": 4269.55,
-      "contracts": 3,
-      "pnl": -19.11,
-      "balance": 9996.38,
-      "reason": "Uscita FLAT @ 4269.55"
-    },
-    {
-      "time": "01:18:30",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4263.11,
-      "close_price": 4269.55,
-      "contracts": 3,
-      "pnl": -19.32,
-      "balance": 10015.49,
-      "reason": "Uscita FLAT @ 4269.55"
-    },
-    {
-      "time": "01:18:30",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4262.89,
-      "close_price": 4269.55,
-      "contracts": 3,
-      "pnl": -19.98,
-      "balance": 10034.81,
-      "reason": "Uscita FLAT @ 4269.55"
-    },
-    {
-      "time": "01:18:30",
-      "action": "CLOSE INC SHORT (FLAT)",
-      "open_price": 4261.28,
-      "close_price": 4269.55,
-      "contracts": 3,
-      "pnl": -24.81,
-      "balance": 10054.79,
-      "reason": "Uscita FLAT @ 4269.55"
-    },
-    {
-      "time": "01:18:30",
-      "action": "CLOSE CORE SHORT (FLAT)",
-      "open_price": 4267.47,
-      "close_price": 4269.55,
-      "contracts": 5,
-      "pnl": -10.4,
-      "balance": 10079.6,
-      "reason": "Inversione S&R: Rottura KJ al rialzo oltre tolleranza (C:4269.53 > KJ:4265.26 + 4p = 4269.26)"
-    },
-    {
-      "time": "01:16:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 20)",
-      "open_price": 4263.04,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10090.0,
-      "reason": "Barra 30s verde in test KJ (C:4262.92 > O:4262.36) | TP: 4261.04 (+2p)"
-    },
-    {
-      "time": "01:15:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 17)",
-      "open_price": 4263.18,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10090.0,
-      "reason": "Barra 30s verde in test KJ (C:4263.20 > O:4263.11) | TP: 4261.18 (+2p)"
-    },
-    {
-      "time": "01:14:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 14)",
-      "open_price": 4263.11,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10090.0,
-      "reason": "Barra 30s verde in test KJ (C:4263.12 > O:4262.81) | TP: 4261.11 (+2p)"
-    },
-    {
-      "time": "01:13:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 11)",
-      "open_price": 4262.89,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10090.0,
-      "reason": "Barra 30s verde in test KJ (C:4262.88 > O:4262.05) | TP: 4260.89 (+2p)"
-    },
-    {
-      "time": "01:12:28",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4264.35,
-      "close_price": 4262.35,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10090.0,
-      "reason": "Raggiunto TP 2 pip @ 4262.35"
-    },
-    {
-      "time": "01:12:28",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4264.8,
-      "close_price": 4262.8,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10084.0,
-      "reason": "Raggiunto TP 2 pip @ 4262.80"
-    },
-    {
-      "time": "01:12:27",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4265.06,
-      "close_price": 4263.06,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10078.0,
-      "reason": "Raggiunto TP 2 pip @ 4263.06"
-    },
-    {
-      "time": "01:12:25",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4265.59,
-      "close_price": 4263.59,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10072.0,
-      "reason": "Raggiunto TP 2 pip @ 4263.59"
-    },
-    {
-      "time": "01:11:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 20)",
-      "open_price": 4265.59,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10066.0,
-      "reason": "Barra 30s verde in test KJ (C:4265.61 > O:4265.06) | TP: 4263.59 (+2p)"
-    },
-    {
-      "time": "01:11:03",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 17)",
-      "open_price": 4265.06,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10066.0,
-      "reason": "Barra 30s verde in test KJ (C:4265.01 > O:4264.51) | TP: 4263.06 (+2p)"
-    },
-    {
-      "time": "01:10:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 14)",
-      "open_price": 4264.8,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10066.0,
-      "reason": "Barra 30s verde in test KJ (C:4264.81 > O:4263.97) | TP: 4262.80 (+2p)"
-    },
-    {
-      "time": "01:09:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 11)",
-      "open_price": 4264.35,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10066.0,
-      "reason": "Barra 30s verde in test KJ (C:4264.61 > O:4261.28) | TP: 4262.35 (+2p)"
-    },
-    {
-      "time": "01:08:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 8)",
-      "open_price": 4261.28,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10066.0,
-      "reason": "Barra 30s verde (C:4261.44 > O:4260.35) su Resistenza KJ | TP: 4259.28 (+2p)"
-    },
-    {
-      "time": "01:07:15",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4263.66,
-      "close_price": 4261.66,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10066.0,
-      "reason": "Raggiunto TP 2 pip @ 4261.66"
-    },
-    {
-      "time": "01:07:13",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4263.97,
-      "close_price": 4261.97,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10060.0,
-      "reason": "Raggiunto TP 2 pip @ 4261.97"
-    },
-    {
-      "time": "01:07:13",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4264.24,
-      "close_price": 4262.24,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10054.0,
-      "reason": "Raggiunto TP 2 pip @ 4262.24"
-    },
-    {
-      "time": "01:07:01",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 14)",
-      "open_price": 4263.66,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10048.0,
-      "reason": "Barra 30s verde (C:4264.05 > O:4263.97) su Resistenza KJ | TP: 4261.66 (+2p)"
-    },
-    {
-      "time": "01:06:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 11)",
-      "open_price": 4263.97,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10048.0,
-      "reason": "Barra 30s verde (C:4263.93 > O:4263.85) su Resistenza KJ | TP: 4261.97 (+2p)"
-    },
-    {
-      "time": "01:06:08",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4265.45,
-      "close_price": 4263.45,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10048.0,
-      "reason": "Raggiunto TP 2 pip @ 4263.45"
-    },
-    {
-      "time": "01:05:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 11)",
-      "open_price": 4265.45,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10042.0,
-      "reason": "Barra 30s verde in test KJ (C:4265.53 > O:4264.24) | TP: 4263.45 (+2p)"
-    },
-    {
-      "time": "01:04:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 8)",
-      "open_price": 4264.24,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10042.0,
-      "reason": "Barra 30s verde (C:4264.05 > O:4263.23) su Resistenza KJ | TP: 4262.24 (+2p)"
-    },
-    {
-      "time": "01:02:56",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4266.11,
-      "close_price": 4264.11,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10042.0,
-      "reason": "Raggiunto TP 2 pip @ 4264.11"
-    },
-    {
-      "time": "01:02:56",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4266.2,
-      "close_price": 4264.2,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10036.0,
-      "reason": "Raggiunto TP 2 pip @ 4264.20"
-    },
-    {
-      "time": "01:02:50",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4267.2,
-      "close_price": 4265.2,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10030.0,
-      "reason": "Raggiunto TP 2 pip @ 4265.20"
-    },
-    {
-      "time": "01:02:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 14)",
-      "open_price": 4267.2,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10024.0,
-      "reason": "Barra 30s verde in test KJ (C:4267.21 > O:4264.95) | TP: 4265.20 (+2p)"
-    },
-    {
-      "time": "01:01:16",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4266.92,
-      "close_price": 4264.92,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10024.0,
-      "reason": "Raggiunto TP 2 pip @ 4264.92"
-    },
-    {
-      "time": "01:01:13",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4267.17,
-      "close_price": 4265.17,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10018.0,
-      "reason": "Raggiunto TP 2 pip @ 4265.17"
-    },
-    {
-      "time": "01:01:13",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4267.14,
-      "close_price": 4265.14,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10012.0,
-      "reason": "Raggiunto TP 2 pip @ 4265.14"
-    },
-    {
-      "time": "00:57:31",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 20)",
-      "open_price": 4267.17,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10006.0,
-      "reason": "Barra 30s verde in test KJ (C:4267.16 > O:4266.92) | TP: 4265.17 (+2p)"
-    },
-    {
-      "time": "00:57:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 17)",
-      "open_price": 4266.92,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10006.0,
-      "reason": "Barra 30s verde in test KJ (C:4266.93 > O:4266.47) | TP: 4264.92 (+2p)"
-    },
-    {
-      "time": "00:56:12",
-      "action": "🎯 TP INC SHORT (+2.0 pip)",
-      "open_price": 4268.77,
-      "close_price": 4266.77,
-      "contracts": 3,
-      "pnl": 6.0,
-      "balance": 10006.0,
-      "reason": "Raggiunto TP 2 pip @ 4266.77"
-    },
-    {
-      "time": "00:56:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 17)",
-      "open_price": 4267.14,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10000.0,
-      "reason": "Barra 30s verde in test KJ (C:4267.17 > O:4267.15) | TP: 4265.14 (+2p)"
-    },
-    {
-      "time": "00:54:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 14)",
-      "open_price": 4268.77,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10000.0,
-      "reason": "Barra 30s verde in test KJ (C:4268.92 > O:4266.11) | TP: 4266.77 (+2p)"
-    },
-    {
-      "time": "00:54:00",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 11)",
-      "open_price": 4266.11,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10000.0,
-      "reason": "Barra 30s verde in test KJ (C:4266.78 > O:4266.20) | TP: 4264.11 (+2p)"
-    },
-    {
-      "time": "00:53:30",
-      "action": "➕ OPEN INC SHORT (+3 Contr., Tot: 8)",
-      "open_price": 4266.2,
-      "close_price": null,
-      "contracts": 3,
-      "pnl": 0.0,
-      "balance": 10000.0,
-      "reason": "Barra 30s verde in test KJ (C:4266.21 > O:4265.99) | TP: 4264.20 (+2p)"
-    },
-    {
-      "time": "00:52:30",
-      "action": "OPEN CORE SHORT",
-      "open_price": 4267.47,
-      "close_price": null,
-      "contracts": 5,
-      "pnl": 0.0,
-      "balance": 10000.0,
-      "reason": "S&R Resistenza: Prezzo < KJ (4268.91) | TS Trigger: +10p, Trail 4p"
-    }
-  ],
+  "trades": [],
   "candles": [
-    {
-      "boundary": 1789614480,
-      "time": "05:08:00",
-      "open": 4285.68,
-      "high": 4286.64,
-      "low": 4285.5,
-      "close": 4285.59,
-      "kj55": 4282.61
-    },
-    {
-      "boundary": 1789614510,
-      "time": "05:08:30",
-      "open": 4285.55,
-      "high": 4286.12,
-      "low": 4284.72,
-      "close": 4284.87,
-      "kj55": 4282.61
-    },
-    {
-      "boundary": 1789614540,
-      "time": "05:09:00",
-      "open": 4285.2,
-      "high": 4286.25,
-      "low": 4284.88,
-      "close": 4286.25,
-      "kj55": 4282.61
-    },
-    {
-      "boundary": 1789614570,
-      "time": "05:09:30",
-      "open": 4286.31,
-      "high": 4286.32,
-      "low": 4284.51,
-      "close": 4284.67,
-      "kj55": 4282.61
-    },
-    {
-      "boundary": 1789614600,
-      "time": "05:10:00",
-      "open": 4284.72,
-      "high": 4286.27,
-      "low": 4284.41,
-      "close": 4286.27,
-      "kj55": 4282.61
-    },
-    {
-      "boundary": 1789614630,
-      "time": "05:10:30",
-      "open": 4285.87,
-      "high": 4285.97,
-      "low": 4284.75,
-      "close": 4284.86,
-      "kj55": 4282.61
-    },
-    {
-      "boundary": 1789614660,
-      "time": "05:11:00",
-      "open": 4284.82,
-      "high": 4284.93,
-      "low": 4283.37,
-      "close": 4284.24,
-      "kj55": 4282.25
-    },
-    {
-      "boundary": 1789614690,
-      "time": "05:11:30",
-      "open": 4284.15,
-      "high": 4284.36,
-      "low": 4282.51,
-      "close": 4282.79,
-      "kj55": 4282.09
-    },
-    {
-      "boundary": 1789614720,
-      "time": "05:12:00",
-      "open": 4282.81,
-      "high": 4284.4,
-      "low": 4282.75,
-      "close": 4284.02,
-      "kj55": 4282.09
-    },
-    {
-      "boundary": 1789614750,
-      "time": "05:12:30",
-      "open": 4284.05,
-      "high": 4284.17,
-      "low": 4283.14,
-      "close": 4283.14,
-      "kj55": 4280.4
-    },
-    {
-      "boundary": 1789614780,
-      "time": "05:13:00",
-      "open": 4283.1,
-      "high": 4283.32,
-      "low": 4282.48,
-      "close": 4282.78,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614810,
-      "time": "05:13:30",
-      "open": 4282.79,
-      "high": 4283.56,
-      "low": 4282.68,
-      "close": 4283.3,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614840,
-      "time": "05:14:00",
-      "open": 4283.32,
-      "high": 4283.62,
-      "low": 4282.54,
-      "close": 4283.5,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614870,
-      "time": "05:14:30",
-      "open": 4283.53,
-      "high": 4285.04,
-      "low": 4283.38,
-      "close": 4284.91,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614900,
-      "time": "05:15:00",
-      "open": 4285.17,
-      "high": 4286.33,
-      "low": 4284.59,
-      "close": 4285.52,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614930,
-      "time": "05:15:30",
-      "open": 4285.51,
-      "high": 4285.97,
-      "low": 4284.35,
-      "close": 4284.35,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614960,
-      "time": "05:16:00",
-      "open": 4284.55,
-      "high": 4285.71,
-      "low": 4284.34,
-      "close": 4284.72,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789614990,
-      "time": "05:16:30",
-      "open": 4284.71,
-      "high": 4284.82,
-      "low": 4283.1,
-      "close": 4284.05,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789615020,
-      "time": "05:17:00",
-      "open": 4284.16,
-      "high": 4285.41,
-      "low": 4284.07,
-      "close": 4284.51,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789615050,
-      "time": "05:17:30",
-      "open": 4284.5,
-      "high": 4285.65,
-      "low": 4284.38,
-      "close": 4285.5,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789615080,
-      "time": "05:18:00",
-      "open": 4285.62,
-      "high": 4285.84,
-      "low": 4285.19,
-      "close": 4285.41,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789615110,
-      "time": "05:18:30",
-      "open": 4285.35,
-      "high": 4285.36,
-      "low": 4284.8,
-      "close": 4284.99,
-      "kj55": 4280.34
-    },
-    {
-      "boundary": 1789615140,
-      "time": "05:19:00",
-      "open": 4285.0,
-      "high": 4286.93,
-      "low": 4284.88,
-      "close": 4286.89,
-      "kj55": 4280.48
-    },
-    {
-      "boundary": 1789615170,
-      "time": "05:19:30",
-      "open": 4286.88,
-      "high": 4287.28,
-      "low": 4286.12,
-      "close": 4286.36,
-      "kj55": 4280.65
-    },
-    {
-      "boundary": 1789615200,
-      "time": "05:20:00",
-      "open": 4286.26,
-      "high": 4286.56,
-      "low": 4284.34,
-      "close": 4284.95,
-      "kj55": 4280.65
-    },
-    {
-      "boundary": 1789615230,
-      "time": "05:20:30",
-      "open": 4284.94,
-      "high": 4285.13,
-      "low": 4284.19,
-      "close": 4284.95,
-      "kj55": 4280.65
-    },
-    {
-      "boundary": 1789615260,
-      "time": "05:21:00",
-      "open": 4284.93,
-      "high": 4285.56,
-      "low": 4283.99,
-      "close": 4285.51,
-      "kj55": 4280.65
-    },
-    {
-      "boundary": 1789615290,
-      "time": "05:21:30",
-      "open": 4285.53,
-      "high": 4285.61,
-      "low": 4284.27,
-      "close": 4284.65,
-      "kj55": 4280.65
-    },
-    {
-      "boundary": 1789615320,
-      "time": "05:22:00",
-      "open": 4284.64,
-      "high": 4284.65,
-      "low": 4283.26,
-      "close": 4283.26,
-      "kj55": 4280.65
-    },
-    {
-      "boundary": 1789615380,
-      "time": "05:23:00",
-      "open": 4283.67,
-      "high": 4283.7,
-      "low": 4283.39,
-      "close": 4283.4,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615410,
-      "time": "05:23:30",
-      "open": 4283.41,
-      "high": 4283.6,
-      "low": 4283.21,
-      "close": 4283.48,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615440,
-      "time": "05:24:00",
-      "open": 4283.58,
-      "high": 4285.41,
-      "low": 4283.54,
-      "close": 4285.41,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615470,
-      "time": "05:24:30",
-      "open": 4285.37,
-      "high": 4286.3,
-      "low": 4285.23,
-      "close": 4286.26,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615500,
-      "time": "05:25:00",
-      "open": 4286.24,
-      "high": 4286.39,
-      "low": 4285.55,
-      "close": 4285.55,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615530,
-      "time": "05:25:30",
-      "open": 4285.54,
-      "high": 4286.15,
-      "low": 4285.37,
-      "close": 4285.88,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615560,
-      "time": "05:26:00",
-      "open": 4285.84,
-      "high": 4286.87,
-      "low": 4285.84,
-      "close": 4286.03,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615590,
-      "time": "05:26:30",
-      "open": 4286.01,
-      "high": 4286.34,
-      "low": 4285.71,
-      "close": 4286.28,
-      "kj55": 4281.36
-    },
-    {
-      "boundary": 1789615620,
-      "time": "05:27:00",
-      "open": 4286.27,
-      "high": 4286.53,
-      "low": 4285.12,
-      "close": 4285.85,
-      "kj55": 4281.45
-    },
-    {
-      "boundary": 1789615650,
-      "time": "05:27:30",
-      "open": 4285.76,
-      "high": 4286.35,
-      "low": 4285.43,
-      "close": 4286.14,
-      "kj55": 4281.98
-    },
     {
       "boundary": 1789615680,
       "time": "05:28:00",
@@ -1383,7 +31,7 @@
       "high": 4285.73,
       "low": 4285.1,
       "close": 4285.53,
-      "kj55": 4282.17
+      "kj55": 4282.43
     },
     {
       "boundary": 1789615770,
@@ -1392,7 +40,7 @@
       "high": 4286.04,
       "low": 4285.31,
       "close": 4285.96,
-      "kj55": 4282.43
+      "kj55": 4282.67
     },
     {
       "boundary": 1789615800,
@@ -1401,7 +49,7 @@
       "high": 4288.95,
       "low": 4285.83,
       "close": 4288.25,
-      "kj55": 4283.51
+      "kj55": 4284.05
     },
     {
       "boundary": 1789615830,
@@ -1410,7 +58,7 @@
       "high": 4290.96,
       "low": 4288.25,
       "close": 4290.62,
-      "kj55": 4285.05
+      "kj55": 4285.16
     },
     {
       "boundary": 1789615860,
@@ -1419,7 +67,7 @@
       "high": 4291.32,
       "low": 4290.24,
       "close": 4290.91,
-      "kj55": 4285.34
+      "kj55": 4285.78
     },
     {
       "boundary": 1789615890,
@@ -1428,7 +76,7 @@
       "high": 4292.06,
       "low": 4290.75,
       "close": 4291.26,
-      "kj55": 4286.15
+      "kj55": 4286.66
     },
     {
       "boundary": 1789615920,
@@ -1446,7 +94,7 @@
       "high": 4291.74,
       "low": 4290.13,
       "close": 4291.07,
-      "kj55": 4286.66
+      "kj55": 4286.88
     },
     {
       "boundary": 1789615980,
@@ -1455,7 +103,7 @@
       "high": 4291.92,
       "low": 4291.06,
       "close": 4291.9,
-      "kj55": 4286.88
+      "kj55": 4287.27
     },
     {
       "boundary": 1789616010,
@@ -1590,7 +238,7 @@
       "high": 4292.52,
       "low": 4291.84,
       "close": 4292.29,
-      "kj55": 4288.2
+      "kj55": 4288.23
     },
     {
       "boundary": 1789616460,
@@ -1608,7 +256,7 @@
       "high": 4293.39,
       "low": 4292.52,
       "close": 4293.39,
-      "kj55": 4288.23
+      "kj55": 4288.51
     },
     {
       "boundary": 1789616520,
@@ -1653,7 +301,7 @@
       "high": 4296.63,
       "low": 4295.2,
       "close": 4295.8,
-      "kj55": 4289.86
+      "kj55": 4289.91
     },
     {
       "boundary": 1789616670,
@@ -1662,7 +310,7 @@
       "high": 4296.04,
       "low": 4295.18,
       "close": 4296.04,
-      "kj55": 4289.92
+      "kj55": 4289.91
     },
     {
       "boundary": 1789616700,
@@ -1671,7 +319,7 @@
       "high": 4296.74,
       "low": 4296.08,
       "close": 4296.41,
-      "kj55": 4289.98
+      "kj55": 4289.97
     },
     {
       "boundary": 1789616730,
@@ -1680,7 +328,7 @@
       "high": 4296.79,
       "low": 4296.14,
       "close": 4296.58,
-      "kj55": 4290.0
+      "kj55": 4289.99
     },
     {
       "boundary": 1789616760,
@@ -1689,7 +337,7 @@
       "high": 4297.13,
       "low": 4295.95,
       "close": 4296.2,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616790,
@@ -1698,7 +346,7 @@
       "high": 4296.76,
       "low": 4295.86,
       "close": 4296.55,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616820,
@@ -1707,7 +355,7 @@
       "high": 4297.08,
       "low": 4294.93,
       "close": 4294.94,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616850,
@@ -1716,7 +364,7 @@
       "high": 4295.0,
       "low": 4293.93,
       "close": 4294.27,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616880,
@@ -1725,7 +373,7 @@
       "high": 4294.96,
       "low": 4293.75,
       "close": 4294.96,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616910,
@@ -1734,7 +382,7 @@
       "high": 4296.78,
       "low": 4294.74,
       "close": 4296.47,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616940,
@@ -1743,7 +391,7 @@
       "high": 4296.91,
       "low": 4295.1,
       "close": 4296.07,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789616970,
@@ -1752,30 +400,30 @@
       "high": 4296.18,
       "low": 4295.55,
       "close": 4296.11,
-      "kj55": 4290.17
+      "kj55": 4290.16
     },
     {
       "boundary": 1789617000,
       "time": "05:50:00",
       "open": 4296.19,
       "high": 4296.23,
-      "low": 4295.2,
-      "close": 4295.72,
-      "kj55": 4290.17
+      "low": 4295.68,
+      "close": 4295.82,
+      "kj55": 4290.16
     },
     {
       "boundary": 1789617030,
       "time": "05:50:30",
-      "open": 4295.73,
+      "open": 4295.89,
       "high": 4296.13,
-      "low": 4295.52,
-      "close": 4295.65,
+      "low": 4295.58,
+      "close": 4295.64,
       "kj55": 4290.17
     },
     {
       "boundary": 1789617060,
       "time": "05:51:00",
-      "open": 4295.64,
+      "open": 4295.63,
       "high": 4295.87,
       "low": 4295.07,
       "close": 4295.23,
@@ -2802,17 +1450,26 @@
       "boundary": 1789620480,
       "time": "06:48:00",
       "open": 4297.54,
-      "high": 4298.45,
+      "high": 4298.62,
       "low": 4297.54,
-      "close": 4298.29,
+      "close": 4298.62,
+      "kj55": 4294.85
+    },
+    {
+      "boundary": 1789620510,
+      "time": "06:48:30",
+      "open": 4298.65,
+      "high": 4298.73,
+      "low": 4298.16,
+      "close": 4298.59,
       "kj55": 4294.85
     },
     {
       "boundary": 1789620540,
       "time": "06:49:00",
-      "open": 4298.07,
-      "high": 4298.24,
-      "low": 4297.83,
+      "open": 4298.49,
+      "high": 4298.49,
+      "low": 4297.81,
       "close": 4298.04,
       "kj55": 4294.85
     },
@@ -2976,7 +1633,7 @@
       "high": 4298.48,
       "low": 4297.73,
       "close": 4298.05,
-      "kj55": 4294.85
+      "kj55": 4295.02
     },
     {
       "boundary": 1789621110,
@@ -2985,7 +1642,7 @@
       "high": 4298.12,
       "low": 4297.23,
       "close": 4297.37,
-      "kj55": 4295.02
+      "kj55": 4295.2
     },
     {
       "boundary": 1789621140,
@@ -3048,7 +1705,7 @@
       "high": 4298.74,
       "low": 4297.86,
       "close": 4298.43,
-      "kj55": 4295.2
+      "kj55": 4295.25
     },
     {
       "boundary": 1789621350,
@@ -3057,7 +1714,7 @@
       "high": 4299.13,
       "low": 4298.27,
       "close": 4298.82,
-      "kj55": 4295.25
+      "kj55": 4295.63
     },
     {
       "boundary": 1789621380,
@@ -3066,7 +1723,7 @@
       "high": 4298.83,
       "low": 4297.44,
       "close": 4297.53,
-      "kj55": 4295.63
+      "kj55": 4295.77
     },
     {
       "boundary": 1789621410,
@@ -3075,7 +1732,7 @@
       "high": 4298.03,
       "low": 4297.04,
       "close": 4297.35,
-      "kj55": 4295.77
+      "kj55": 4295.81
     },
     {
       "boundary": 1789621440,
@@ -3084,7 +1741,7 @@
       "high": 4297.47,
       "low": 4296.92,
       "close": 4297.47,
-      "kj55": 4295.81
+      "kj55": 4296.44
     },
     {
       "boundary": 1789621470,
@@ -3192,7 +1849,7 @@
       "high": 4298.02,
       "low": 4295.83,
       "close": 4296.13,
-      "kj55": 4296.44
+      "kj55": 4296.59
     },
     {
       "boundary": 1789621830,
@@ -3201,7 +1858,7 @@
       "high": 4296.66,
       "low": 4295.82,
       "close": 4295.86,
-      "kj55": 4296.59
+      "kj55": 4297.26
     },
     {
       "boundary": 1789621860,
@@ -3264,7 +1921,7 @@
       "high": 4295.35,
       "low": 4293.84,
       "close": 4293.99,
-      "kj55": 4296.56
+      "kj55": 4296.49
     },
     {
       "boundary": 1789622070,
@@ -3477,25 +2134,16 @@
       "boundary": 1789622760,
       "time": "07:26:00",
       "open": 4287.64,
-      "high": 4288.15,
+      "high": 4287.77,
       "low": 4286.63,
-      "close": 4288.11,
-      "kj55": 4292.3
-    },
-    {
-      "boundary": 1789622790,
-      "time": "07:26:30",
-      "open": 4288.08,
-      "high": 4288.08,
-      "low": 4286.78,
-      "close": 4286.95,
+      "close": 4287.17,
       "kj55": 4292.3
     },
     {
       "boundary": 1789622820,
       "time": "07:27:00",
-      "open": 4286.96,
-      "high": 4287.35,
+      "open": 4287.06,
+      "high": 4287.27,
       "low": 4286.72,
       "close": 4286.95,
       "kj55": 4292.3
@@ -3552,7 +2200,7 @@
       "high": 4288.51,
       "low": 4286.23,
       "close": 4288.51,
-      "kj55": 4292.15
+      "kj55": 4292.3
     },
     {
       "boundary": 1789623030,
@@ -3561,7 +2209,7 @@
       "high": 4291.96,
       "low": 4288.63,
       "close": 4291.24,
-      "kj55": 4292.01
+      "kj55": 4292.15
     },
     {
       "boundary": 1789623060,
@@ -3633,7 +2281,7 @@
       "high": 4296.54,
       "low": 4293.65,
       "close": 4294.64,
-      "kj55": 4291.9
+      "kj55": 4292.01
     },
     {
       "boundary": 1789623300,
@@ -3669,7 +2317,7 @@
       "high": 4294.3,
       "low": 4292.22,
       "close": 4292.58,
-      "kj55": 4291.79
+      "kj55": 4291.9
     },
     {
       "boundary": 1789623420,
@@ -3678,7 +2326,7 @@
       "high": 4294.8,
       "low": 4292.26,
       "close": 4293.87,
-      "kj55": 4291.74
+      "kj55": 4291.79
     },
     {
       "boundary": 1789623450,
@@ -3687,7 +2335,7 @@
       "high": 4294.44,
       "low": 4293.09,
       "close": 4293.1,
-      "kj55": 4291.31
+      "kj55": 4291.74
     },
     {
       "boundary": 1789623480,
@@ -3939,7 +2587,7 @@
       "high": 4301.66,
       "low": 4300.2,
       "close": 4301.66,
-      "kj55": 4293.94
+      "kj55": 4293.56
     },
     {
       "boundary": 1789624320,
@@ -4260,15 +2908,15 @@
       "boundary": 1789625370,
       "time": "08:09:30",
       "open": 4308.91,
-      "high": 4309.07,
+      "high": 4310.87,
       "low": 4308.91,
-      "close": 4309.07,
+      "close": 4310.72,
       "kj55": 4303.3
     },
     {
       "boundary": 1789625400,
       "time": "08:10:00",
-      "open": 4310.75,
+      "open": 4310.61,
       "high": 4311.02,
       "low": 4309.94,
       "close": 4309.94,
@@ -4478,6 +3126,1391 @@
       "open": 4306.72,
       "high": 4306.97,
       "low": 4305.88,
+      "close": 4306.47,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626120,
+      "time": "08:22:00",
+      "open": 4306.37,
+      "high": 4309.07,
+      "low": 4306.3,
+      "close": 4309.07,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626150,
+      "time": "08:22:30",
+      "open": 4309.15,
+      "high": 4309.18,
+      "low": 4307.92,
+      "close": 4308.12,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626180,
+      "time": "08:23:00",
+      "open": 4308.05,
+      "high": 4308.09,
+      "low": 4306.16,
+      "close": 4306.58,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626210,
+      "time": "08:23:30",
+      "open": 4306.59,
+      "high": 4306.93,
+      "low": 4306.22,
+      "close": 4306.75,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626240,
+      "time": "08:24:00",
+      "open": 4306.79,
+      "high": 4308.29,
+      "low": 4306.74,
+      "close": 4308.26,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626270,
+      "time": "08:24:30",
+      "open": 4308.25,
+      "high": 4308.67,
+      "low": 4307.31,
+      "close": 4307.89,
+      "kj55": 4307.38
+    },
+    {
+      "boundary": 1789626300,
+      "time": "08:25:00",
+      "open": 4307.87,
+      "high": 4308.94,
+      "low": 4307.75,
+      "close": 4308.18,
+      "kj55": 4307.74
+    },
+    {
+      "boundary": 1789626330,
+      "time": "08:25:30",
+      "open": 4308.16,
+      "high": 4308.95,
+      "low": 4307.59,
+      "close": 4308.04,
+      "kj55": 4308.1
+    },
+    {
+      "boundary": 1789626360,
+      "time": "08:26:00",
+      "open": 4307.99,
+      "high": 4308.52,
+      "low": 4307.53,
+      "close": 4308.52,
+      "kj55": 4308.51
+    },
+    {
+      "boundary": 1789626390,
+      "time": "08:26:30",
+      "open": 4308.53,
+      "high": 4310.74,
+      "low": 4308.53,
+      "close": 4309.73,
+      "kj55": 4308.58
+    },
+    {
+      "boundary": 1789626420,
+      "time": "08:27:00",
+      "open": 4309.76,
+      "high": 4310.38,
+      "low": 4308.97,
+      "close": 4310.17,
+      "kj55": 4308.58
+    },
+    {
+      "boundary": 1789626450,
+      "time": "08:27:30",
+      "open": 4310.27,
+      "high": 4310.57,
+      "low": 4309.25,
+      "close": 4310.06,
+      "kj55": 4308.58
+    },
+    {
+      "boundary": 1789626480,
+      "time": "08:28:00",
+      "open": 4310.1,
+      "high": 4310.29,
+      "low": 4309.61,
+      "close": 4310.22,
+      "kj55": 4308.58
+    },
+    {
+      "boundary": 1789626510,
+      "time": "08:28:30",
+      "open": 4310.18,
+      "high": 4310.42,
+      "low": 4309.74,
+      "close": 4309.78,
+      "kj55": 4308.58
+    },
+    {
+      "boundary": 1789626540,
+      "time": "08:29:00",
+      "open": 4309.78,
+      "high": 4310.69,
+      "low": 4309.61,
+      "close": 4310.61,
+      "kj55": 4308.58
+    },
+    {
+      "boundary": 1789626570,
+      "time": "08:29:30",
+      "open": 4310.82,
+      "high": 4313.01,
+      "low": 4310.57,
+      "close": 4311.81,
+      "kj55": 4308.76
+    },
+    {
+      "boundary": 1789626600,
+      "time": "08:30:00",
+      "open": 4311.83,
+      "high": 4313.51,
+      "low": 4311.3,
+      "close": 4312.92,
+      "kj55": 4309.01
+    },
+    {
+      "boundary": 1789626630,
+      "time": "08:30:30",
+      "open": 4312.91,
+      "high": 4313.35,
+      "low": 4312.15,
+      "close": 4312.2,
+      "kj55": 4309.01
+    },
+    {
+      "boundary": 1789626660,
+      "time": "08:31:00",
+      "open": 4312.04,
+      "high": 4314.54,
+      "low": 4312.04,
+      "close": 4314.32,
+      "kj55": 4309.52
+    },
+    {
+      "boundary": 1789626690,
+      "time": "08:31:30",
+      "open": 4314.24,
+      "high": 4315.2,
+      "low": 4313.81,
+      "close": 4315.15,
+      "kj55": 4309.85
+    },
+    {
+      "boundary": 1789626720,
+      "time": "08:32:00",
+      "open": 4315.07,
+      "high": 4315.74,
+      "low": 4314.31,
+      "close": 4314.51,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626750,
+      "time": "08:32:30",
+      "open": 4314.36,
+      "high": 4314.47,
+      "low": 4312.67,
+      "close": 4313.14,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626780,
+      "time": "08:33:00",
+      "open": 4313.2,
+      "high": 4314.3,
+      "low": 4312.54,
+      "close": 4312.73,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626810,
+      "time": "08:33:30",
+      "open": 4312.74,
+      "high": 4314.5,
+      "low": 4312.7,
+      "close": 4313.83,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626840,
+      "time": "08:34:00",
+      "open": 4313.87,
+      "high": 4314.06,
+      "low": 4313.1,
+      "close": 4313.39,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626870,
+      "time": "08:34:30",
+      "open": 4313.63,
+      "high": 4313.71,
+      "low": 4313.07,
+      "close": 4313.37,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626900,
+      "time": "08:35:00",
+      "open": 4313.32,
+      "high": 4313.32,
+      "low": 4311.2,
+      "close": 4311.79,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626930,
+      "time": "08:35:30",
+      "open": 4311.8,
+      "high": 4311.8,
+      "low": 4311.24,
+      "close": 4311.39,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626960,
+      "time": "08:36:00",
+      "open": 4311.47,
+      "high": 4311.58,
+      "low": 4311.33,
+      "close": 4311.48,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789626990,
+      "time": "08:36:30",
+      "open": 4311.3,
+      "high": 4311.3,
+      "low": 4309.72,
+      "close": 4309.72,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627020,
+      "time": "08:37:00",
+      "open": 4309.58,
+      "high": 4310.4,
+      "low": 4309.03,
+      "close": 4310.39,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627050,
+      "time": "08:37:30",
+      "open": 4310.24,
+      "high": 4310.49,
+      "low": 4307.74,
+      "close": 4308.45,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627080,
+      "time": "08:38:00",
+      "open": 4308.41,
+      "high": 4308.46,
+      "low": 4307.81,
+      "close": 4307.87,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627110,
+      "time": "08:38:30",
+      "open": 4307.97,
+      "high": 4308.49,
+      "low": 4307.16,
+      "close": 4308.44,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627140,
+      "time": "08:39:00",
+      "open": 4308.47,
+      "high": 4308.48,
+      "low": 4306.64,
+      "close": 4306.64,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627170,
+      "time": "08:39:30",
+      "open": 4306.67,
+      "high": 4307.04,
+      "low": 4305.61,
+      "close": 4306.33,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627200,
+      "time": "08:40:00",
+      "open": 4306.42,
+      "high": 4306.71,
+      "low": 4306.07,
+      "close": 4306.17,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627230,
+      "time": "08:40:30",
+      "open": 4306.27,
+      "high": 4307.61,
+      "low": 4306.0,
+      "close": 4306.89,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627260,
+      "time": "08:41:00",
+      "open": 4306.87,
+      "high": 4307.44,
+      "low": 4306.57,
+      "close": 4306.96,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627290,
+      "time": "08:41:30",
+      "open": 4306.94,
+      "high": 4308.34,
+      "low": 4306.34,
+      "close": 4308.14,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627320,
+      "time": "08:42:00",
+      "open": 4308.23,
+      "high": 4308.58,
+      "low": 4307.81,
+      "close": 4308.32,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627350,
+      "time": "08:42:30",
+      "open": 4308.52,
+      "high": 4309.1,
+      "low": 4307.93,
+      "close": 4308.81,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627380,
+      "time": "08:43:00",
+      "open": 4308.64,
+      "high": 4309.53,
+      "low": 4308.64,
+      "close": 4308.94,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627410,
+      "time": "08:43:30",
+      "open": 4308.9,
+      "high": 4309.44,
+      "low": 4308.61,
+      "close": 4309.14,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627440,
+      "time": "08:44:00",
+      "open": 4309.2,
+      "high": 4309.2,
+      "low": 4307.42,
+      "close": 4307.47,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627470,
+      "time": "08:44:30",
+      "open": 4307.43,
+      "high": 4310.36,
+      "low": 4307.18,
+      "close": 4309.79,
+      "kj55": 4310.12
+    },
+    {
+      "boundary": 1789627500,
+      "time": "08:45:00",
+      "open": 4309.99,
+      "high": 4310.41,
+      "low": 4307.86,
+      "close": 4308.42,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627530,
+      "time": "08:45:30",
+      "open": 4308.39,
+      "high": 4310.34,
+      "low": 4308.18,
+      "close": 4308.96,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627560,
+      "time": "08:46:00",
+      "open": 4308.78,
+      "high": 4310.03,
+      "low": 4308.16,
+      "close": 4308.36,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627590,
+      "time": "08:46:30",
+      "open": 4308.37,
+      "high": 4309.31,
+      "low": 4308.12,
+      "close": 4308.35,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627620,
+      "time": "08:47:00",
+      "open": 4308.29,
+      "high": 4308.47,
+      "low": 4306.92,
+      "close": 4307.47,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627650,
+      "time": "08:47:30",
+      "open": 4307.36,
+      "high": 4308.21,
+      "low": 4307.3,
+      "close": 4307.83,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627680,
+      "time": "08:48:00",
+      "open": 4307.76,
+      "high": 4309.1,
+      "low": 4307.59,
+      "close": 4308.98,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627710,
+      "time": "08:48:30",
+      "open": 4308.97,
+      "high": 4309.7,
+      "low": 4308.69,
+      "close": 4309.31,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627740,
+      "time": "08:49:00",
+      "open": 4309.5,
+      "high": 4312.08,
+      "low": 4309.36,
+      "close": 4311.74,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627770,
+      "time": "08:49:30",
+      "open": 4311.75,
+      "high": 4311.75,
+      "low": 4310.31,
+      "close": 4310.4,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627800,
+      "time": "08:50:00",
+      "open": 4310.39,
+      "high": 4310.39,
+      "low": 4308.95,
+      "close": 4309.04,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627830,
+      "time": "08:50:30",
+      "open": 4309.17,
+      "high": 4309.2,
+      "low": 4308.58,
+      "close": 4308.75,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627860,
+      "time": "08:51:00",
+      "open": 4308.74,
+      "high": 4308.77,
+      "low": 4307.09,
+      "close": 4307.09,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627890,
+      "time": "08:51:30",
+      "open": 4307.13,
+      "high": 4307.39,
+      "low": 4306.44,
+      "close": 4307.33,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627920,
+      "time": "08:52:00",
+      "open": 4307.31,
+      "high": 4308.24,
+      "low": 4307.04,
+      "close": 4308.13,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627950,
+      "time": "08:52:30",
+      "open": 4308.14,
+      "high": 4308.29,
+      "low": 4307.49,
+      "close": 4307.54,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789627980,
+      "time": "08:53:00",
+      "open": 4307.66,
+      "high": 4309.77,
+      "low": 4306.73,
+      "close": 4309.77,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628010,
+      "time": "08:53:30",
+      "open": 4309.84,
+      "high": 4311.02,
+      "low": 4309.84,
+      "close": 4310.74,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628040,
+      "time": "08:54:00",
+      "open": 4310.78,
+      "high": 4311.11,
+      "low": 4310.05,
+      "close": 4310.42,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628070,
+      "time": "08:54:30",
+      "open": 4310.4,
+      "high": 4311.39,
+      "low": 4309.86,
+      "close": 4310.19,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628100,
+      "time": "08:55:00",
+      "open": 4310.36,
+      "high": 4310.93,
+      "low": 4309.98,
+      "close": 4309.98,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628130,
+      "time": "08:55:30",
+      "open": 4309.94,
+      "high": 4309.94,
+      "low": 4309.21,
+      "close": 4309.21,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628160,
+      "time": "08:56:00",
+      "open": 4309.2,
+      "high": 4311.0,
+      "low": 4309.06,
+      "close": 4310.92,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628190,
+      "time": "08:56:30",
+      "open": 4310.94,
+      "high": 4311.74,
+      "low": 4310.74,
+      "close": 4311.27,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628220,
+      "time": "08:57:00",
+      "open": 4311.17,
+      "high": 4311.28,
+      "low": 4309.89,
+      "close": 4310.63,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628250,
+      "time": "08:57:30",
+      "open": 4310.6,
+      "high": 4311.07,
+      "low": 4310.32,
+      "close": 4310.91,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628280,
+      "time": "08:58:00",
+      "open": 4310.92,
+      "high": 4311.08,
+      "low": 4309.93,
+      "close": 4310.03,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628310,
+      "time": "08:58:30",
+      "open": 4310.08,
+      "high": 4311.12,
+      "low": 4309.84,
+      "close": 4311.1,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628340,
+      "time": "08:59:00",
+      "open": 4311.11,
+      "high": 4311.11,
+      "low": 4309.79,
+      "close": 4310.65,
+      "kj55": 4310.67
+    },
+    {
+      "boundary": 1789628370,
+      "time": "08:59:30",
+      "open": 4310.52,
+      "high": 4311.31,
+      "low": 4310.4,
+      "close": 4311.29,
+      "kj55": 4310.06
+    },
+    {
+      "boundary": 1789628400,
+      "time": "09:00:00",
+      "open": 4311.3,
+      "high": 4311.61,
+      "low": 4309.76,
+      "close": 4310.42,
+      "kj55": 4310.06
+    },
+    {
+      "boundary": 1789628430,
+      "time": "09:00:30",
+      "open": 4310.33,
+      "high": 4311.55,
+      "low": 4309.96,
+      "close": 4311.36,
+      "kj55": 4310.06
+    },
+    {
+      "boundary": 1789628460,
+      "time": "09:01:00",
+      "open": 4311.37,
+      "high": 4312.34,
+      "low": 4311.14,
+      "close": 4311.32,
+      "kj55": 4309.84
+    },
+    {
+      "boundary": 1789628490,
+      "time": "09:01:30",
+      "open": 4311.24,
+      "high": 4314.03,
+      "low": 4311.23,
+      "close": 4313.88,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628520,
+      "time": "09:02:00",
+      "open": 4313.89,
+      "high": 4313.89,
+      "low": 4311.83,
+      "close": 4312.29,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628550,
+      "time": "09:02:30",
+      "open": 4312.01,
+      "high": 4312.91,
+      "low": 4311.97,
+      "close": 4312.64,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628580,
+      "time": "09:03:00",
+      "open": 4312.65,
+      "high": 4312.95,
+      "low": 4311.71,
+      "close": 4312.87,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628610,
+      "time": "09:03:30",
+      "open": 4312.89,
+      "high": 4313.61,
+      "low": 4312.27,
+      "close": 4312.58,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628640,
+      "time": "09:04:00",
+      "open": 4312.57,
+      "high": 4312.78,
+      "low": 4312.04,
+      "close": 4312.73,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628670,
+      "time": "09:04:30",
+      "open": 4312.72,
+      "high": 4313.3,
+      "low": 4311.94,
+      "close": 4312.1,
+      "kj55": 4309.82
+    },
+    {
+      "boundary": 1789628700,
+      "time": "09:05:00",
+      "open": 4312.13,
+      "high": 4314.15,
+      "low": 4312.13,
+      "close": 4314.15,
+      "kj55": 4309.88
+    },
+    {
+      "boundary": 1789628730,
+      "time": "09:05:30",
+      "open": 4314.16,
+      "high": 4314.51,
+      "low": 4312.98,
+      "close": 4314.36,
+      "kj55": 4310.06
+    },
+    {
+      "boundary": 1789628760,
+      "time": "09:06:00",
+      "open": 4314.38,
+      "high": 4314.79,
+      "low": 4314.02,
+      "close": 4314.03,
+      "kj55": 4310.2
+    },
+    {
+      "boundary": 1789628790,
+      "time": "09:06:30",
+      "open": 4314.4,
+      "high": 4314.86,
+      "low": 4313.66,
+      "close": 4314.86,
+      "kj55": 4310.23
+    },
+    {
+      "boundary": 1789628820,
+      "time": "09:07:00",
+      "open": 4315.04,
+      "high": 4315.17,
+      "low": 4314.3,
+      "close": 4314.64,
+      "kj55": 4310.59
+    },
+    {
+      "boundary": 1789628850,
+      "time": "09:07:30",
+      "open": 4314.62,
+      "high": 4315.44,
+      "low": 4314.07,
+      "close": 4314.17,
+      "kj55": 4310.72
+    },
+    {
+      "boundary": 1789628880,
+      "time": "09:08:00",
+      "open": 4314.16,
+      "high": 4314.89,
+      "low": 4314.03,
+      "close": 4314.73,
+      "kj55": 4310.89
+    },
+    {
+      "boundary": 1789628910,
+      "time": "09:08:30",
+      "open": 4314.72,
+      "high": 4315.47,
+      "low": 4314.46,
+      "close": 4314.86,
+      "kj55": 4310.91
+    },
+    {
+      "boundary": 1789628940,
+      "time": "09:09:00",
+      "open": 4314.83,
+      "high": 4316.09,
+      "low": 4314.29,
+      "close": 4315.86,
+      "kj55": 4311.26
+    },
+    {
+      "boundary": 1789628970,
+      "time": "09:09:30",
+      "open": 4316.0,
+      "high": 4316.23,
+      "low": 4315.03,
+      "close": 4315.32,
+      "kj55": 4311.33
+    },
+    {
+      "boundary": 1789629000,
+      "time": "09:10:00",
+      "open": 4315.44,
+      "high": 4318.61,
+      "low": 4315.44,
+      "close": 4318.41,
+      "kj55": 4312.52
+    },
+    {
+      "boundary": 1789629030,
+      "time": "09:10:30",
+      "open": 4318.58,
+      "high": 4320.29,
+      "low": 4318.58,
+      "close": 4319.52,
+      "kj55": 4313.36
+    },
+    {
+      "boundary": 1789629060,
+      "time": "09:11:00",
+      "open": 4319.54,
+      "high": 4322.09,
+      "low": 4318.42,
+      "close": 4321.84,
+      "kj55": 4314.26
+    },
+    {
+      "boundary": 1789629090,
+      "time": "09:11:30",
+      "open": 4321.83,
+      "high": 4322.21,
+      "low": 4320.59,
+      "close": 4320.89,
+      "kj55": 4314.32
+    },
+    {
+      "boundary": 1789629120,
+      "time": "09:12:00",
+      "open": 4320.88,
+      "high": 4321.38,
+      "low": 4319.25,
+      "close": 4320.15,
+      "kj55": 4314.32
+    },
+    {
+      "boundary": 1789629150,
+      "time": "09:12:30",
+      "open": 4320.13,
+      "high": 4320.33,
+      "low": 4318.61,
+      "close": 4319.17,
+      "kj55": 4314.32
+    },
+    {
+      "boundary": 1789629180,
+      "time": "09:13:00",
+      "open": 4320.31,
+      "high": 4320.36,
+      "low": 4319.4,
+      "close": 4320.17,
+      "kj55": 4314.32
+    },
+    {
+      "boundary": 1789629210,
+      "time": "09:13:30",
+      "open": 4320.11,
+      "high": 4320.52,
+      "low": 4319.48,
+      "close": 4320.52,
+      "kj55": 4314.32
+    },
+    {
+      "boundary": 1789629240,
+      "time": "09:14:00",
+      "open": 4320.59,
+      "high": 4322.95,
+      "low": 4320.07,
+      "close": 4322.95,
+      "kj55": 4314.69
+    },
+    {
+      "boundary": 1789629270,
+      "time": "09:14:30",
+      "open": 4323.15,
+      "high": 4323.89,
+      "low": 4322.37,
+      "close": 4323.62,
+      "kj55": 4315.16
+    },
+    {
+      "boundary": 1789629300,
+      "time": "09:15:00",
+      "open": 4323.67,
+      "high": 4326.91,
+      "low": 4323.33,
+      "close": 4326.91,
+      "kj55": 4316.67
+    },
+    {
+      "boundary": 1789629330,
+      "time": "09:15:30",
+      "open": 4326.83,
+      "high": 4327.87,
+      "low": 4326.36,
+      "close": 4326.69,
+      "kj55": 4317.15
+    },
+    {
+      "boundary": 1789629360,
+      "time": "09:16:00",
+      "open": 4326.89,
+      "high": 4327.85,
+      "low": 4326.27,
+      "close": 4327.12,
+      "kj55": 4317.15
+    },
+    {
+      "boundary": 1789629390,
+      "time": "09:16:30",
+      "open": 4327.13,
+      "high": 4327.73,
+      "low": 4326.72,
+      "close": 4327.43,
+      "kj55": 4317.15
+    },
+    {
+      "boundary": 1789629420,
+      "time": "09:17:00",
+      "open": 4327.49,
+      "high": 4329.1,
+      "low": 4326.93,
+      "close": 4327.81,
+      "kj55": 4317.77
+    },
+    {
+      "boundary": 1789629450,
+      "time": "09:17:30",
+      "open": 4327.83,
+      "high": 4329.24,
+      "low": 4327.62,
+      "close": 4327.82,
+      "kj55": 4317.84
+    },
+    {
+      "boundary": 1789629480,
+      "time": "09:18:00",
+      "open": 4327.89,
+      "high": 4327.96,
+      "low": 4326.21,
+      "close": 4327.69,
+      "kj55": 4317.84
+    },
+    {
+      "boundary": 1789629510,
+      "time": "09:18:30",
+      "open": 4327.15,
+      "high": 4327.36,
+      "low": 4325.22,
+      "close": 4326.11,
+      "kj55": 4317.84
+    },
+    {
+      "boundary": 1789629540,
+      "time": "09:19:00",
+      "open": 4326.56,
+      "high": 4326.7,
+      "low": 4325.44,
+      "close": 4326.47,
+      "kj55": 4317.98
+    },
+    {
+      "boundary": 1789629570,
+      "time": "09:19:30",
+      "open": 4326.49,
+      "high": 4326.51,
+      "low": 4323.41,
+      "close": 4323.95,
+      "kj55": 4317.98
+    },
+    {
+      "boundary": 1789629600,
+      "time": "09:20:00",
+      "open": 4323.9,
+      "high": 4323.97,
+      "low": 4322.62,
+      "close": 4322.63,
+      "kj55": 4317.98
+    },
+    {
+      "boundary": 1789629630,
+      "time": "09:20:30",
+      "open": 4322.3,
+      "high": 4323.09,
+      "low": 4321.68,
+      "close": 4321.93,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629660,
+      "time": "09:21:00",
+      "open": 4321.96,
+      "high": 4322.17,
+      "low": 4320.47,
+      "close": 4320.63,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629690,
+      "time": "09:21:30",
+      "open": 4320.65,
+      "high": 4320.8,
+      "low": 4319.31,
+      "close": 4319.62,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629720,
+      "time": "09:22:00",
+      "open": 4319.51,
+      "high": 4322.07,
+      "low": 4319.01,
+      "close": 4321.89,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629750,
+      "time": "09:22:30",
+      "open": 4321.88,
+      "high": 4322.08,
+      "low": 4320.55,
+      "close": 4320.55,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629780,
+      "time": "09:23:00",
+      "open": 4320.57,
+      "high": 4322.08,
+      "low": 4320.18,
+      "close": 4321.97,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629810,
+      "time": "09:23:30",
+      "open": 4321.94,
+      "high": 4322.97,
+      "low": 4321.11,
+      "close": 4322.88,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629840,
+      "time": "09:24:00",
+      "open": 4322.41,
+      "high": 4325.25,
+      "low": 4322.25,
+      "close": 4324.65,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629870,
+      "time": "09:24:30",
+      "open": 4324.5,
+      "high": 4325.17,
+      "low": 4324.02,
+      "close": 4325.08,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629900,
+      "time": "09:25:00",
+      "open": 4324.94,
+      "high": 4325.2,
+      "low": 4324.45,
+      "close": 4324.86,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629930,
+      "time": "09:25:30",
+      "open": 4324.72,
+      "high": 4326.11,
+      "low": 4324.72,
+      "close": 4325.22,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629960,
+      "time": "09:26:00",
+      "open": 4325.3,
+      "high": 4325.95,
+      "low": 4323.99,
+      "close": 4324.56,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629990,
+      "time": "09:26:30",
+      "open": 4324.55,
+      "high": 4326.11,
+      "low": 4324.52,
+      "close": 4325.9,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789630020,
+      "time": "09:27:00",
+      "open": 4325.88,
+      "high": 4328.79,
+      "low": 4325.81,
+      "close": 4327.59,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789630050,
+      "time": "09:27:30",
+      "open": 4327.65,
+      "high": 4329.17,
+      "low": 4326.93,
+      "close": 4328.19,
+      "kj55": 4319.6
+    },
+    {
+      "boundary": 1789630080,
+      "time": "09:28:00",
+      "open": 4328.22,
+      "high": 4329.88,
+      "low": 4328.18,
+      "close": 4328.84,
+      "kj55": 4320.51
+    },
+    {
+      "boundary": 1789630110,
+      "time": "09:28:30",
+      "open": 4328.82,
+      "high": 4328.97,
+      "low": 4327.97,
+      "close": 4328.62,
+      "kj55": 4320.56
+    },
+    {
+      "boundary": 1789630140,
+      "time": "09:29:00",
+      "open": 4328.61,
+      "high": 4330.18,
+      "low": 4328.61,
+      "close": 4329.55,
+      "kj55": 4320.94
+    },
+    {
+      "boundary": 1789630170,
+      "time": "09:29:30",
+      "open": 4329.74,
+      "high": 4330.04,
+      "low": 4329.03,
+      "close": 4329.76,
+      "kj55": 4320.94
+    },
+    {
+      "boundary": 1789630200,
+      "time": "09:30:00",
+      "open": 4329.71,
+      "high": 4332.1,
+      "low": 4329.71,
+      "close": 4330.58,
+      "kj55": 4321.91
+    },
+    {
+      "boundary": 1789630230,
+      "time": "09:30:30",
+      "open": 4330.57,
+      "high": 4332.7,
+      "low": 4330.57,
+      "close": 4332.6,
+      "kj55": 4322.32
+    },
+    {
+      "boundary": 1789630260,
+      "time": "09:31:00",
+      "open": 4332.58,
+      "high": 4333.04,
+      "low": 4331.23,
+      "close": 4332.53,
+      "kj55": 4322.49
+    },
+    {
+      "boundary": 1789630290,
+      "time": "09:31:30",
+      "open": 4332.35,
+      "high": 4332.89,
+      "low": 4331.53,
+      "close": 4332.0,
+      "kj55": 4322.49
+    },
+    {
+      "boundary": 1789630320,
+      "time": "09:32:00",
+      "open": 4331.96,
+      "high": 4332.41,
+      "low": 4331.41,
+      "close": 4332.12,
+      "kj55": 4322.59
+    },
+    {
+      "boundary": 1789630350,
+      "time": "09:32:30",
+      "open": 4332.2,
+      "high": 4334.32,
+      "low": 4331.86,
+      "close": 4334.32,
+      "kj55": 4323.65
+    },
+    {
+      "boundary": 1789630380,
+      "time": "09:33:00",
+      "open": 4334.17,
+      "high": 4335.22,
+      "low": 4333.72,
+      "close": 4334.41,
+      "kj55": 4324.44
+    },
+    {
+      "boundary": 1789630410,
+      "time": "09:33:30",
+      "open": 4334.5,
+      "high": 4334.71,
+      "low": 4333.78,
+      "close": 4334.13,
+      "kj55": 4324.44
+    },
+    {
+      "boundary": 1789630440,
+      "time": "09:34:00",
+      "open": 4334.14,
+      "high": 4334.95,
+      "low": 4334.09,
+      "close": 4334.64,
+      "kj55": 4324.62
+    },
+    {
+      "boundary": 1789630470,
+      "time": "09:34:30",
+      "open": 4334.65,
+      "high": 4334.87,
+      "low": 4332.85,
+      "close": 4332.86,
+      "kj55": 4324.62
+    },
+    {
+      "boundary": 1789630500,
+      "time": "09:35:00",
+      "open": 4332.27,
+      "high": 4332.31,
+      "low": 4330.55,
+      "close": 4330.82,
+      "kj55": 4324.62
+    },
+    {
+      "boundary": 1789630530,
+      "time": "09:35:30",
+      "open": 4330.78,
+      "high": 4330.78,
+      "low": 4329.67,
+      "close": 4330.66,
+      "kj55": 4324.76
+    },
+    {
+      "boundary": 1789630560,
+      "time": "09:36:00",
+      "open": 4330.69,
+      "high": 4331.43,
+      "low": 4329.83,
+      "close": 4330.39,
+      "kj55": 4324.76
+    },
+    {
+      "boundary": 1789630590,
+      "time": "09:36:30",
+      "open": 4330.49,
+      "high": 4333.05,
+      "low": 4330.39,
+      "close": 4331.88,
+      "kj55": 4325.12
+    },
+    {
+      "boundary": 1789630620,
+      "time": "09:37:00",
+      "open": 4331.89,
+      "high": 4332.68,
+      "low": 4331.64,
+      "close": 4332.33,
+      "kj55": 4325.33
+    },
+    {
+      "boundary": 1789630650,
+      "time": "09:37:30",
+      "open": 4332.2,
+      "high": 4332.49,
+      "low": 4330.77,
+      "close": 4331.82,
+      "kj55": 4326.82
+    },
+    {
+      "boundary": 1789630680,
+      "time": "09:38:00",
+      "open": 4331.77,
+      "high": 4332.48,
+      "low": 4331.06,
+      "close": 4331.62,
+      "kj55": 4326.82
+    }
+  ],
+  "last_ts_cycle": null
+} ],
+  "last_ts_cycle": null
+}88,
       "close": 4306.47,
       "kj55": 4307.38
     },
@@ -5506,6 +5539,357 @@
       "low": 4325.22,
       "close": 4326.11,
       "kj55": 4317.84
+    },
+    {
+      "boundary": 1789629540,
+      "time": "09:19:00",
+      "open": 4326.56,
+      "high": 4326.7,
+      "low": 4325.44,
+      "close": 4326.47,
+      "kj55": 4317.98
+    },
+    {
+      "boundary": 1789629570,
+      "time": "09:19:30",
+      "open": 4326.49,
+      "high": 4326.51,
+      "low": 4323.41,
+      "close": 4323.95,
+      "kj55": 4317.98
+    },
+    {
+      "boundary": 1789629600,
+      "time": "09:20:00",
+      "open": 4323.9,
+      "high": 4323.97,
+      "low": 4323.19,
+      "close": 4323.48,
+      "kj55": 4317.98
+    },
+    {
+      "boundary": 1789629630,
+      "time": "09:20:30",
+      "open": 4322.22,
+      "high": 4322.26,
+      "low": 4321.68,
+      "close": 4321.93,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629660,
+      "time": "09:21:00",
+      "open": 4321.96,
+      "high": 4322.17,
+      "low": 4320.47,
+      "close": 4320.63,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629690,
+      "time": "09:21:30",
+      "open": 4320.65,
+      "high": 4320.8,
+      "low": 4319.31,
+      "close": 4319.62,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629720,
+      "time": "09:22:00",
+      "open": 4319.51,
+      "high": 4322.07,
+      "low": 4319.01,
+      "close": 4321.89,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629750,
+      "time": "09:22:30",
+      "open": 4321.88,
+      "high": 4322.08,
+      "low": 4320.55,
+      "close": 4320.55,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629780,
+      "time": "09:23:00",
+      "open": 4320.57,
+      "high": 4322.08,
+      "low": 4320.18,
+      "close": 4321.97,
+      "kj55": 4319.15
+    },
+    {
+      "boundary": 1789629810,
+      "time": "09:23:30",
+      "open": 4321.94,
+      "high": 4322.97,
+      "low": 4321.11,
+      "close": 4322.88,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629840,
+      "time": "09:24:00",
+      "open": 4322.41,
+      "high": 4325.25,
+      "low": 4322.25,
+      "close": 4324.65,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629870,
+      "time": "09:24:30",
+      "open": 4324.5,
+      "high": 4325.17,
+      "low": 4324.02,
+      "close": 4325.08,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629900,
+      "time": "09:25:00",
+      "open": 4324.94,
+      "high": 4325.2,
+      "low": 4324.45,
+      "close": 4324.86,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629930,
+      "time": "09:25:30",
+      "open": 4324.72,
+      "high": 4326.11,
+      "low": 4324.72,
+      "close": 4325.22,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629960,
+      "time": "09:26:00",
+      "open": 4325.3,
+      "high": 4325.95,
+      "low": 4323.99,
+      "close": 4324.56,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789629990,
+      "time": "09:26:30",
+      "open": 4324.55,
+      "high": 4326.11,
+      "low": 4324.52,
+      "close": 4325.9,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789630020,
+      "time": "09:27:00",
+      "open": 4325.88,
+      "high": 4328.79,
+      "low": 4325.81,
+      "close": 4327.59,
+      "kj55": 4319.5
+    },
+    {
+      "boundary": 1789630050,
+      "time": "09:27:30",
+      "open": 4327.65,
+      "high": 4329.17,
+      "low": 4326.93,
+      "close": 4328.19,
+      "kj55": 4319.6
+    },
+    {
+      "boundary": 1789630080,
+      "time": "09:28:00",
+      "open": 4328.22,
+      "high": 4329.88,
+      "low": 4328.18,
+      "close": 4328.84,
+      "kj55": 4320.51
+    },
+    {
+      "boundary": 1789630110,
+      "time": "09:28:30",
+      "open": 4328.82,
+      "high": 4328.97,
+      "low": 4327.97,
+      "close": 4328.62,
+      "kj55": 4320.56
+    },
+    {
+      "boundary": 1789630140,
+      "time": "09:29:00",
+      "open": 4328.61,
+      "high": 4330.18,
+      "low": 4328.61,
+      "close": 4329.55,
+      "kj55": 4320.94
+    },
+    {
+      "boundary": 1789630170,
+      "time": "09:29:30",
+      "open": 4329.74,
+      "high": 4330.04,
+      "low": 4329.03,
+      "close": 4329.76,
+      "kj55": 4320.94
+    },
+    {
+      "boundary": 1789630200,
+      "time": "09:30:00",
+      "open": 4329.71,
+      "high": 4332.1,
+      "low": 4329.71,
+      "close": 4330.58,
+      "kj55": 4321.91
+    },
+    {
+      "boundary": 1789630230,
+      "time": "09:30:30",
+      "open": 4330.57,
+      "high": 4332.7,
+      "low": 4330.57,
+      "close": 4332.6,
+      "kj55": 4322.32
+    },
+    {
+      "boundary": 1789630260,
+      "time": "09:31:00",
+      "open": 4332.58,
+      "high": 4333.04,
+      "low": 4331.23,
+      "close": 4332.53,
+      "kj55": 4322.49
+    },
+    {
+      "boundary": 1789630290,
+      "time": "09:31:30",
+      "open": 4332.35,
+      "high": 4332.89,
+      "low": 4331.53,
+      "close": 4332.0,
+      "kj55": 4322.49
+    },
+    {
+      "boundary": 1789630320,
+      "time": "09:32:00",
+      "open": 4331.96,
+      "high": 4332.41,
+      "low": 4331.41,
+      "close": 4332.12,
+      "kj55": 4322.59
+    },
+    {
+      "boundary": 1789630350,
+      "time": "09:32:30",
+      "open": 4332.2,
+      "high": 4334.32,
+      "low": 4331.86,
+      "close": 4334.32,
+      "kj55": 4323.65
+    },
+    {
+      "boundary": 1789630380,
+      "time": "09:33:00",
+      "open": 4334.17,
+      "high": 4335.22,
+      "low": 4333.72,
+      "close": 4334.41,
+      "kj55": 4324.44
+    },
+    {
+      "boundary": 1789630410,
+      "time": "09:33:30",
+      "open": 4334.5,
+      "high": 4334.71,
+      "low": 4333.78,
+      "close": 4334.13,
+      "kj55": 4324.44
+    },
+    {
+      "boundary": 1789630440,
+      "time": "09:34:00",
+      "open": 4334.14,
+      "high": 4334.95,
+      "low": 4334.09,
+      "close": 4334.64,
+      "kj55": 4324.62
+    },
+    {
+      "boundary": 1789630470,
+      "time": "09:34:30",
+      "open": 4334.65,
+      "high": 4334.87,
+      "low": 4332.85,
+      "close": 4332.86,
+      "kj55": 4324.62
+    },
+    {
+      "boundary": 1789630500,
+      "time": "09:35:00",
+      "open": 4332.27,
+      "high": 4332.31,
+      "low": 4330.55,
+      "close": 4330.82,
+      "kj55": 4324.62
+    },
+    {
+      "boundary": 1789630530,
+      "time": "09:35:30",
+      "open": 4330.78,
+      "high": 4330.78,
+      "low": 4329.67,
+      "close": 4330.66,
+      "kj55": 4324.76
+    },
+    {
+      "boundary": 1789630560,
+      "time": "09:36:00",
+      "open": 4330.69,
+      "high": 4331.43,
+      "low": 4329.83,
+      "close": 4330.39,
+      "kj55": 4324.76
+    },
+    {
+      "boundary": 1789630590,
+      "time": "09:36:30",
+      "open": 4330.49,
+      "high": 4333.05,
+      "low": 4330.39,
+      "close": 4331.88,
+      "kj55": 4325.12
+    },
+    {
+      "boundary": 1789630620,
+      "time": "09:37:00",
+      "open": 4331.89,
+      "high": 4332.68,
+      "low": 4331.64,
+      "close": 4332.33,
+      "kj55": 4325.33
+    },
+    {
+      "boundary": 1789630650,
+      "time": "09:37:30",
+      "open": 4332.2,
+      "high": 4332.49,
+      "low": 4330.77,
+      "close": 4331.82,
+      "kj55": 4326.82
+    },
+    {
+      "boundary": 1789630680,
+      "time": "09:38:00",
+      "open": 4331.77,
+      "high": 4332.48,
+      "low": 4331.06,
+      "close": 4331.62,
+      "kj55": 4326.82
     }
   ],
   "last_ts_cycle": {
@@ -5516,4 +5900,7 @@
     "peak_price": 4289.23,
     "close_price": 4285.18
   }
-}}}
+}
+}"close_price": 4285.18
+  }
+}

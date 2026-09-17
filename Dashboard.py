@@ -1820,8 +1820,13 @@ def renderizza_schermata_radar(conto_selezionato=None):
                                 pos_c = mem_s.get("posizioni_core", [])
                                 pos_i = mem_s.get("posizioni_incr", [])
                                 tot_pnl_pts = 0.0
+                                tot_pnl_eur = 0.0
                                 has_pos = False
                                 
+                                valore_punto = cfg_s.get("valore_punto", 1)
+                                valuta = cfg_s.get("valuta", "USD")
+                                c_rate = get_eur_rate(valuta, prezzi_live)
+
                                 if px and isinstance(px, (int, float)):
                                     for pc in pos_c:
                                         e_px = pc.get("entry")
@@ -1830,7 +1835,9 @@ def renderizza_schermata_radar(conto_selezionato=None):
                                         if e_px and isinstance(e_px, (int, float)) and e_px > 0:
                                             has_pos = True
                                             diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
-                                            tot_pnl_pts += (diff / mult) * sz
+                                            pts = diff / mult
+                                            tot_pnl_pts += pts * sz
+                                            tot_pnl_eur += pts * sz * valore_punto * c_rate
                                     for pi in pos_i:
                                         e_px = pi.get("entry")
                                         sz = pi.get("size", 1)
@@ -1838,15 +1845,18 @@ def renderizza_schermata_radar(conto_selezionato=None):
                                         if e_px and isinstance(e_px, (int, float)) and e_px > 0:
                                             has_pos = True
                                             diff = (px - e_px) if d_pos == "LONG" else (e_px - px)
-                                            tot_pnl_pts += (diff / mult) * sz
+                                            pts = diff / mult
+                                            tot_pnl_pts += pts * sz
+                                            tot_pnl_eur += pts * sz * valore_punto * c_rate
                                 
-                                is_profit = (tot_pnl_pts >= 0) if has_pos else True
+                                is_profit = (tot_pnl_eur >= 0) if has_pos else True
                                 
                                 trades_tf[tf_lbl] = {
                                     "stato": mem_s.get("stato"),
                                     "conto": c_dir.replace("_DEMO", "").replace("_REALE", ""),
                                     "is_profit": is_profit,
-                                    "pnl_pts": tot_pnl_pts
+                                    "pnl_pts": tot_pnl_pts,
+                                    "pnl_eur": tot_pnl_eur
                                 }
                     except Exception:
                         pass
@@ -1890,12 +1900,20 @@ def renderizza_schermata_radar(conto_selezionato=None):
                             ct_val = t_info["conto"]
                             is_profit = t_info.get("is_profit", True)
                             pnl_pts = t_info.get("pnl_pts", 0.0)
+                            pnl_eur = t_info.get("pnl_eur", 0.0)
                             col_dir_tr = "#4ade80" if is_profit else "#f87171"
                             icon_dir = "🟢" if is_profit else "🔴"
-                            pnl_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
-                            title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_sign} pt".replace("'", "&#39;")
+                            
+                            if abs(pnl_eur) < 10 and abs(pnl_eur) >= 0.05:
+                                pnl_fmt = f"+{pnl_eur:.1f}" if pnl_eur > 0 else f"{pnl_eur:.1f}"
+                            else:
+                                pnl_fmt = f"+{pnl_eur:.0f}" if pnl_eur > 0 else (f"{pnl_eur:.0f}" if pnl_eur < 0 else "0")
+                            pnl_str = f"{pnl_fmt} €"
+                            
+                            pnl_pts_sign = f"+{pnl_pts:.0f}" if pnl_pts > 0 else f"{pnl_pts:.0f}"
+                            title_tip = f"Conto: {ct_val} ({st_val}) | PnL: {pnl_str} ({pnl_pts_sign} pt)".replace("'", "&#39;")
                             kj_line = f"<span style='font-size:0.60rem; color:#FFFF00; font-weight:500;'>KJ: {kj_v:.{dec}f}</span>" if (kj_v is not None) else "<span style='font-size:0.60rem; color:#64748b;'>-</span>"
-                            return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span><br>{kj_line}</div>"
+                            return f"<div style='background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 4px; padding: 2px 4px; text-align: center; line-height: 1.15;' title='{title_tip}'><b style='color: #60a5fa; font-size: 0.70rem;'>IN TREND</b><br><span style='white-space: nowrap;'><span style='font-size:0.66rem; color:{col_dir_tr}; font-weight:bold;'>{icon_dir} {st_val}</span> <span style='font-size:0.60rem; color:{col_dir_tr}; font-weight:600;'>({pnl_str})</span></span><br>{kj_line}</div>"
 
                         if kj_v is None or dist_p is None:
                             return "<div style='color: #64748b; text-align: center; font-size: 0.75rem;'>-</div>"

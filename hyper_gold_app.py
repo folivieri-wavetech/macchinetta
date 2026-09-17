@@ -20,31 +20,41 @@ if engine.position is None and os.path.exists("hyper_gold_state.json"):
 st.markdown("""
 <style>
     .reportview-container, .main { background-color: #0f172a; color: #f8fafc; }
+    h3 { font-size: 1.02rem !important; margin-bottom: 8px !important; }
     .kpi-card {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 14px 18px;
+        border-radius: 9px;
+        padding: 12px 16px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     }
-    .kpi-title { font-size: 0.82rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .kpi-val { font-size: 1.65rem; font-weight: 700; }
-    .kpi-sub { font-size: 0.78rem; margin-top: 3px; }
+    .kpi-title { font-size: 0.74rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+    .kpi-val { font-size: 1.45rem; font-weight: 700; }
+    .kpi-sub { font-size: 0.70rem; margin-top: 3px; }
     .badge-live {
-        display: inline-block; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 0.75rem;
+        display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 5px; font-weight: 600; font-size: 0.70rem; white-space: nowrap;
     }
     .table-dark {
-        width: 100%; border-collapse: collapse; font-size: 0.85rem;
+        width: 100%; border-collapse: collapse; font-size: 0.78rem;
     }
-    .table-dark th { background-color: #1e293b; color: #94a3b8; padding: 8px 10px; text-align: left; }
-    .table-dark td { padding: 7px 10px; border-bottom: 1px solid #334155; }
+    .table-dark th { background-color: #1e293b; color: #94a3b8; padding: 6px 8px; text-align: left; font-size: 0.72rem; }
+    .table-dark td { padding: 6px 8px; border-bottom: 1px solid #334155; }
 
-    /* Pulsante AVVIA TRADING: verde quando attivo, disabilitato quando trading attivo */
+    /* Allineamento e stile proporzionato bottoni di controllo */
+    div.stButton > button {
+        height: 38px !important;
+        min-height: 38px !important;
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        padding: 0 10px !important;
+        white-space: nowrap !important;
+        border-radius: 6px !important;
+        margin: 0 !important;
+    }
     .btn-start div.stButton > button {
         background-color: #16a34a !important;
         border: 1px solid #22c55e !important;
         color: #ffffff !important;
-        font-weight: 700 !important;
     }
     .btn-start div.stButton > button:hover:not(:disabled) {
         background-color: #15803d !important;
@@ -58,12 +68,10 @@ st.markdown("""
         cursor: not-allowed !important;
     }
 
-    /* Pulsante STOP TRADING: rosso quando attivo, disabilitato quando trading in pausa */
     .btn-stop div.stButton > button {
         background-color: #dc2626 !important;
         border: 1px solid #ef4444 !important;
         color: #ffffff !important;
-        font-weight: 700 !important;
     }
     .btn-stop div.stButton > button:hover:not(:disabled) {
         background-color: #b91c1c !important;
@@ -75,6 +83,20 @@ st.markdown("""
         color: #64748b !important;
         opacity: 0.50 !important;
         cursor: not-allowed !important;
+    }
+
+    .btn-reset div.stButton > button {
+        background-color: #334155 !important;
+        border: 1px solid #475569 !important;
+        color: #e2e8f0 !important;
+    }
+    .btn-reset div.stButton > button:hover {
+        background-color: #475569 !important;
+        border-color: #64748b !important;
+    }
+
+    div[data-testid="stCheckbox"] label {
+        font-size: 0.78rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -121,30 +143,30 @@ def render_live_desk():
         regime_col = "#cbd5e1"
 
     # HEADER SUPERIORE
-    c_title, c_badges = st.columns([2.9, 1.1])
+    c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
-        st.markdown("<h3 style='margin: 0; font-size: 1.18rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 8px; border-radius: 6px; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.88rem; color: #94a3b8; font-weight: 500;'>(S&R Puro KJ55)</span></h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 0.74rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>S&R Puro KJ 55 (Toll. 3p) • Core 4c (TS a +10p, Lock +6p, Trail 4p) • Incr 2c (TP +2p, Max 4) • Max 12c • Stop Trading auto su TS Hit • Porta 8501</div>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin: 0; font-size: 1.08rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8; font-weight: 500;'>(S&R Puro KJ55)</span></h3>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>S&R Puro KJ 55 (Toll. 3p) • Core 4c (TS a +10p, Lock +6p, Trail 4p) • Incr 2c (TP +2p, Max 4) • Max 12c • Stop Trading auto su TS Hit • Porta 8501</div>", unsafe_allow_html=True)
 
     with c_badges:
-        st.markdown("<div style='display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 4px; white-space: nowrap;'>", unsafe_allow_html=True)
         is_feed_closed = is_gold_feed_suspended()
         is_trade_frozen = is_gold_trading_suspended()
 
         if is_conn:
-            st.markdown(f"<span class='badge-live' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>🟢 Lightstreamer LIVE ({total_ticks} tick)</span>", unsafe_allow_html=True)
+            badge_ls = f"<span class='badge-live' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>🟢 Lightstreamer LIVE ({total_ticks} tick)</span>"
         elif is_feed_closed:
-            st.markdown("<span class='badge-live' style='background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #64748b;'>💤 Feed Chiuso (22:45-00:00)</span>", unsafe_allow_html=True)
+            badge_ls = "<span class='badge-live' style='background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #64748b;'>💤 Feed Chiuso (22:45-00:00)</span>"
         else:
-            st.markdown("<span class='badge-live' style='background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444;'>🔴 In Connessione...</span>", unsafe_allow_html=True)
+            badge_ls = "<span class='badge-live' style='background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444;'>🔴 In Connessione...</span>"
 
         if is_trade_frozen:
-            st.markdown("<span class='badge-live' style='background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #facc15;'>🌙 ORDINI CONGELATI (fino 00:15)</span>", unsafe_allow_html=True)
+            badge_st = "<span class='badge-live' style='background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #facc15;'>🌙 ORDINI CONGELATI</span>"
         elif trading_on:
-            st.markdown("<span class='badge-live' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>⚡ TRADING ATTIVO</span>", unsafe_allow_html=True)
+            badge_st = "<span class='badge-live' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>⚡ TRADING ATTIVO</span>"
         else:
-            st.markdown("<span class='badge-live' style='background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid #64748b;'>⏸️ IN PAUSA</span>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+            badge_st = "<span class='badge-live' style='background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid #64748b;'>⏸️ IN PAUSA</span>"
+
+        st.markdown(f"<div style='display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 4px; white-space: nowrap;'>{badge_ls}{badge_st}</div>", unsafe_allow_html=True)
 
     st.markdown("<hr style='margin: 10px 0 14px 0; border-color: #334155;' />", unsafe_allow_html=True)
 
@@ -265,8 +287,8 @@ def render_live_desk():
         st.markdown(f"""
         <div class='kpi-card' style='padding: 10px 14px;'>
             <div class='kpi-title'>Spot Gold 1€ (Mid Live)</div>
-            <div style='font-size: 1.30rem; font-weight: 700; color: #22c55e;'>{px_str} €</div>
-            <div style='font-size: 0.75rem; color: #94a3b8;'>{bid_ask_str}</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #22c55e;'>{px_str} €</div>
+            <div style='font-size: 0.70rem; color: #94a3b8;'>{bid_ask_str}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -277,15 +299,15 @@ def render_live_desk():
             <div class='kpi-title'>Livello S&R (30s) • <span style='color: {regime_col}; font-weight: bold;'>{regime_label}</span></div>
             <div style='display: flex; gap: 18px; align-items: baseline; margin-top: 4px;'>
                 <div>
-                    <span style='font-size: 0.75rem; color: #94a3b8;'>MID LIVE: </span>
-                    <span style='font-size: 1.15rem; font-weight: 700; color: #22c55e;'>{px_str} €</span>
+                    <span style='font-size: 0.70rem; color: #94a3b8;'>MID LIVE: </span>
+                    <span style='font-size: 1.05rem; font-weight: 700; color: #22c55e;'>{px_str} €</span>
                 </div>
                 <div>
-                    <span style='font-size: 0.75rem; color: #94a3b8;'>KJ 55 (S&R): </span>
-                    <span style='font-size: 1.15rem; font-weight: 700; color: #FFD700;'>{kj_str}</span>
+                    <span style='font-size: 0.70rem; color: #94a3b8;'>KJ 55 (S&R): </span>
+                    <span style='font-size: 1.05rem; font-weight: 700; color: #FFD700;'>{kj_str}</span>
                 </div>
             </div>
-            <div style='font-size: 0.73rem; color: #94a3b8; margin-top: 3px;'>S&R Puro: Prezzo > KJ Supporto (Long) • Prezzo < KJ Resistenza (Short)</div>
+            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 3px;'>S&R Puro: Prezzo > KJ Supporto (Long) • Prezzo < KJ Resistenza (Short)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -294,8 +316,8 @@ def render_live_desk():
         st.markdown(f"""
         <div class='kpi-card' style='padding: 10px 14px;'>
             <div class='kpi-title'>Margine Utilizzato</div>
-            <div style='font-size: 1.30rem; font-weight: 700; color: #f59e0b;'>{margine_usato:,.2f} €</div>
-            <div style='font-size: 0.75rem; color: #cbd5e1;'>220 € / c • {total_contracts} contratti a mercato</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{margine_usato:,.2f} €</div>
+            <div style='font-size: 0.70rem; color: #cbd5e1;'>220 € / c • {total_contracts} contratti a mercato</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -306,8 +328,8 @@ def render_live_desk():
         st.markdown(f"""
         <div class='kpi-card' style='padding: 10px 14px;'>
             <div class='kpi-title'>Tempo Barra Attuale (30s)</div>
-            <div style='font-size: 1.30rem; font-weight: 700; color: #cbd5e1;'>{sec_elapsed}s / 30s</div>
-            <div style='font-size: 0.75rem; color: #94a3b8;'>Prossima chiusura: {30 - sec_elapsed}s</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #cbd5e1;'>{sec_elapsed}s / 30s</div>
+            <div style='font-size: 0.70rem; color: #94a3b8;'>Prossima chiusura: {30 - sec_elapsed}s</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -325,40 +347,39 @@ def render_live_desk():
 
     use_core_ts = getattr(engine, "use_core_trailing", False)
 
-    # 4. PANNELLO CONTROLLI (AVVIA / STOP / RESET / TOGGLE TS)
-    col_btn1, col_btn2, col_btn3, col_toggle = st.columns([1.3, 1.3, 1.4, 1.8])
-    with col_btn1:
-        st.markdown("<div class='btn-start'>", unsafe_allow_html=True)
-        if st.button("🟢 AVVIA TRADING 30S", key="btn_start_30s", disabled=trading_on, use_container_width=True):
-            engine.set_trading(True)
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    # 4 & 5. SEZIONE CONTROLLI, STORICO E POSIZIONI IN PORTAFOGLIO AFFIANCATE
+    col_left, col_right = st.columns([1.85, 1.35])
 
-    with col_btn2:
-        st.markdown("<div class='btn-stop'>", unsafe_allow_html=True)
-        if st.button("🛑 STOP TRADING 30S", key="btn_stop_30s", disabled=not trading_on, use_container_width=True):
-            engine.set_trading(False)
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    with col_left:
+        # Controlli: Avvia, Stop e (Trailing Stop Core sopra Reset)
+        c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1.25])
+        with c_btn1:
+            st.markdown("<div style='height: 28px;'></div><div class='btn-start'>", unsafe_allow_html=True)
+            if st.button("🟢 AVVIA", key="btn_start_30s", disabled=trading_on, use_container_width=True):
+                engine.set_trading(True)
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    with col_btn3:
-        if st.button("🔄 RESET SALDO (10k)", key="btn_reset_30s", use_container_width=True):
-            engine.reset_portfolio()
-            st.rerun()
+        with c_btn2:
+            st.markdown("<div style='height: 28px;'></div><div class='btn-stop'>", unsafe_allow_html=True)
+            if st.button("🛑 STOP", key="btn_stop_30s", disabled=not trading_on, use_container_width=True):
+                engine.set_trading(False)
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    with col_toggle:
-        core_ts_active = st.toggle("🎯 Trailing Stop Core", value=use_core_ts, key="toggle_core_ts_30s", help="OFF (Soluzione 3): Core sempre aperta a cavalcare il trend (chiude/rigira solo su rottura KJ55) e incrementi a rotazione continua a TP (+2 pip). ON: Chiude Core + incrementi a FLAT sul Trailing Stop.")
-        if core_ts_active != use_core_ts:
-            engine.set_use_core_trailing(core_ts_active)
-            st.rerun()
+        with c_btn3:
+            core_ts_active = st.toggle("🎯 Trailing Stop Core", value=use_core_ts, key="toggle_core_ts_30s", help="OFF (Soluzione 3): Core cavalca il trend e rigira solo su rottura KJ55. ON: Chiude Core + incrementi su Trailing Stop.")
+            if core_ts_active != use_core_ts:
+                engine.set_use_core_trailing(core_ts_active)
+                st.rerun()
+            st.markdown("<div class='btn-reset'>", unsafe_allow_html=True)
+            if st.button("🔄 RESET (10k)", key="btn_reset_30s", use_container_width=True):
+                engine.reset_portfolio()
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
-
-    # 5. TABELLA STORICO ESEGUITI E LOG OPERAZIONI
-    col_t1, col_t2 = st.columns([2, 1.2])
-
-    with col_t1:
-        st.markdown("### 📋 Storico Operazioni Chiuse (30s • S&R KJ55)")
+        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin: 0 0 8px 0; font-size: 1.02rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (30s • S&R KJ55)</h3>", unsafe_allow_html=True)
         closed_trades = [
             t for t in trades 
             if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", ""))
@@ -393,8 +414,8 @@ def render_live_desk():
         else:
             st.info("Nessuna operazione ancora chiusa. Non appena una posizione Core o incremento verrà liquidato (Take Profit, Trailing Stop o Uscita KJ), comparirà qui con il relativo P&L.")
 
-    with col_t2:
-        st.markdown("### 💼 Posizioni in Portafoglio")
+    with col_right:
+        st.markdown("<h3 style='margin: 0 0 8px 0; font-size: 1.02rem; font-weight: 700;'>💼 Posizioni in Portafoglio</h3>", unsafe_allow_html=True)
         if pos:
             dir_pos = pos["direction"]
             dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
