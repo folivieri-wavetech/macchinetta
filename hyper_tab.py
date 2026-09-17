@@ -181,9 +181,6 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
 
     st.markdown("<hr style='margin: 8px 0 12px 0; border-color: #334155;' />", unsafe_allow_html=True)
 
-    if is_other_active:
-        st.warning("⚠️ **Attenzione:** La modalità Hyper 5M è attualmente in esecuzione su questo conto. Ferma prima 5M se desideri operare a 30 Secondi.")
-
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
     with k1:
@@ -362,12 +359,10 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             </div>
             """, unsafe_allow_html=True)
 
-        if is_other_active:
-            st.warning("⚠️ **Hyper 5M è attualmente ATTIVO su questo conto.** Per proteggere il margine, ferma il 5M prima di avviare il 30S.")
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
         c_btn1, c_btn2 = st.columns([1, 1])
-        dis_start = trading_on or is_other_active
+        dis_start = trading_on
         with c_btn1:
             st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
             if st.button("🟢 AVVIA 30S", key=f"btn_start_30s_{conto_selezionato}", disabled=dis_start, use_container_width=True):
@@ -634,9 +629,6 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
 
     st.markdown("<hr style='margin: 8px 0 12px 0; border-color: #334155;' />", unsafe_allow_html=True)
 
-    if is_other_active:
-        st.warning("⚠️ **Attenzione:** La modalità Hyper 30S è attualmente in esecuzione su questo conto. Ferma prima 30S se desideri operare a 5 Minuti.")
-
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
     with k1:
@@ -802,12 +794,10 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             </div>
             """, unsafe_allow_html=True)
 
-        if is_other_active:
-            st.warning("⚠️ **Hyper 30S è attualmente ATTIVO su questo conto.** Per proteggere il margine, ferma il 30S prima di avviare il 5M.")
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
         c_btn1, c_btn2 = st.columns([1, 1])
-        dis_start = trading_on or is_other_active
+        dis_start = trading_on
         with c_btn1:
             st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
             if st.button("🟢 AVVIA 5M", key=f"btn_start_m5_{conto_selezionato}", disabled=dis_start, use_container_width=True):
