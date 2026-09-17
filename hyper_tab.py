@@ -376,7 +376,13 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-        st.markdown("<h4 style='margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (30s)</h4>", unsafe_allow_html=True)
+        c_th1, c_th2 = st.columns([2.2, 1.2])
+        with c_th1:
+            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (30s)</h4>", unsafe_allow_html=True)
+        with c_th2:
+            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_30s_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                engine.clear_session_trades()
+                st.rerun()
         closed_trades = [
             t for t in trades 
             if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", "") or "PARACADUTE" in t.get("action", ""))
@@ -810,7 +816,13 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-        st.markdown("<h4 style='margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (M5)</h4>", unsafe_allow_html=True)
+        c_th1, c_th2 = st.columns([2.2, 1.2])
+        with c_th1:
+            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (M5)</h4>", unsafe_allow_html=True)
+        with c_th2:
+            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                engine.clear_session_trades()
+                st.rerun()
         closed_trades = [
             t for t in trades 
             if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", "") or "PARACADUTE" in t.get("action", ""))

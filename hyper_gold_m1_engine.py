@@ -325,6 +325,12 @@ class HyperGoldM1Engine:
             self.trades = []
             self.save_state()
 
+    def clear_session_trades(self):
+        with self.lock:
+            self.trades = []
+            self.last_ts_cycle = None
+            self.save_state()
+
     def set_use_core_trailing(self, enabled: bool):
         with self.lock:
             self.use_core_trailing = enabled
