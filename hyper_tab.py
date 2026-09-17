@@ -156,6 +156,22 @@ def inject_hyper_css():
             visibility: visible !important;
             opacity: 1 !important;
         }
+
+        /* ANTI-FLICKER: Elimina il lampeggio/dissolvenza di Streamlit durante i refresh dei frammenti */
+        div[data-testid="stFragment"],
+        div[data-testid="stFragment"] > div,
+        div[data-stale="true"],
+        div[data-stale="true"] * {
+            opacity: 1 !important;
+            filter: none !important;
+            transition: none !important;
+            animation: none !important;
+        }
+        /* Nasconde il widget rotante di caricamento in alto a destra */
+        div[data-testid="stStatusWidget"] {
+            display: none !important;
+            visibility: hidden !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
