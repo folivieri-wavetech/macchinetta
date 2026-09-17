@@ -38,7 +38,7 @@ MIN_DIST_INCR_PIPS = 1.0       # Distanza minima tra incrementi: 1 pip
 PARACADUTE_KJ_PIPS = 2.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 2 pip
 CANDELA_SEGNALE_OFFSET_PIPS = 2.0 # Candela Segnale: Stop confermato su rottura Massimo/Minimo +- 2 pip
 TK_FILTER_PIPS = 3.0              # Filtro Macro TK 144: Conferma cambio direzione a TK +- 3 pip
-CORE_REENTRY_KJ_DIST_PIPS = 3.0   # Max distanza da KJ per ingresso/rientro Core 30S: <= 3 pip
+CORE_REENTRY_KJ_DIST_PIPS = 4.0   # Max distanza da KJ per ingresso/rientro Core 30S: <= 4 pip
 
 # Modello Fast Scalping 30S (Totale 10 Contratti: 4c @ 2p + 4c @ 3p + Core Runner 2c [TS a +10p])
 DEFAULT_SCALINI_PLAN_30S = [
@@ -981,7 +981,7 @@ class HyperGoldEngine:
             if prev_close > kj:
                 if self.position is None and prev_close > tk_bullish_threshold:
                     # Verifica condizione rientro Core LONG:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
+                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 4 pip su 30S)
                     dist_kj = abs(exec_price - kj)
                     if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
@@ -1020,7 +1020,7 @@ class HyperGoldEngine:
             if prev_close < kj:
                 if self.position is None and prev_close < tk_bearish_threshold:
                     # Verifica condizione rientro Core SHORT:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
+                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 4 pip su 30S)
                     dist_kj = abs(exec_price - kj)
                     if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
