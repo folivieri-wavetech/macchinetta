@@ -28,6 +28,8 @@ INC_CONTRACTS = 2           # Incrementi: 2 contratti ciascuno
 MAX_INCREMENTS = 4          # Max 4 incrementi x 2c = 8 contratti (Totale max 12 con core)
 INC_TP_PIPS = 2.0           # TP incrementi su 30S: 2 pip
 KJ_TOLERANCE_PIPS = 3.0     # Tolleranza di 3 pip su rottura Kijun 55
+MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <= 5 pip
+PARACADUTE_KJ_PIPS = 3.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 3 pip
 
 # Orari Sospensione Gold:
 # 1. Chiusura Feed IG Spot Gold (Nessun tick disponibile dalle 22:45 alle 00:00)
@@ -536,6 +538,31 @@ class HyperGoldEngine:
             self.increments = remaining
             self.save_state()
 
+    def _check_paracadute_kj(self, mid: float, time_str: str):
+        """Paracadute KJ Intracandela (Tick-by-Tick):
+        Se durante la candela 30s il prezzo sfonda la Kijun 55 oltre il paracadute (3 pip),
+        chiude immediatamente all'istante la Core e tutti gli incrementi a FLAT."""
+        if not self.position or self.kj55 is None:
+            return
+
+        pos_dir = self.position["direction"]
+        if pos_dir == "LONG":
+            threshold = round(self.kj55 - PARACADUTE_KJ_PIPS, 2)
+            if mid <= threshold:
+                self._close_all_to_flat(
+                    mid,
+                    time_str,
+                    reason=f"Paracadute KJ Intracandela: Mid live {mid:.2f} <= (KJ {self.kj55:.2f} - {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
+                )
+        elif pos_dir == "SHORT":
+            threshold = round(self.kj55 + PARACADUTE_KJ_PIPS, 2)
+            if mid >= threshold:
+                self._close_all_to_flat(
+                    mid,
+                    time_str,
+                    reason=f"Paracadute KJ Intracandela: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
+                )
+
     def _process_tick(self, bid: float, ask: float, time_str: str):
         now_t = time.time()
         mid = round((bid + ask) / 2.0, 2)
@@ -564,6 +591,10 @@ class HyperGoldEngine:
                 # 2. Verifica Take Profit (2 pip) per gli incrementi aperti (Bancomat continuo)
                 if self.trading_enabled and self.increments:
                     self._check_increments_tp(mid, time_str)
+
+                # 3. Paracadute KJ Intracandela (3 pip): Chiusura istantanea di sicurezza a FLAT
+                if self.trading_enabled and self.position and self.kj55 is not None:
+                    self._check_paracadute_kj(mid, time_str)
 
             # Inizializzazione prima barra 30s
             if self.curr_boundary is None:
@@ -648,8 +679,9 @@ class HyperGoldEngine:
                 self.save_state()
 
             elif self.position["direction"] == "LONG":
-                # Incremento su barra contraria (rossa)
-                if prev_close < prev_open and len(self.increments) < MAX_INCREMENTS:
+                # Incremento su barra contraria (rossa) se distanza da KJ <= 5 pip
+                dist_kj = abs(exec_price - kj)
+                if prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and len(self.increments) < MAX_INCREMENTS:
                     tp_p = round(exec_price + self.inc_tp_pips, 2)
                     new_inc = {
                         "id": int(time.time() * 1000),
@@ -669,7 +701,7 @@ class HyperGoldEngine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Barra 30s rossa (C:{prev_close:.2f} < O:{prev_open:.2f}) su Supporto KJ | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
+                        "reason": f"Barra 30s rossa (C:{prev_close:.2f} < O:{prev_open:.2f}) su Supporto KJ (dist {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
                     })
                     self.save_state()
 
@@ -705,8 +737,9 @@ class HyperGoldEngine:
                 self.save_state()
 
             elif self.position["direction"] == "SHORT":
-                # Incremento su barra contraria (verde)
-                if prev_close > prev_open and len(self.increments) < MAX_INCREMENTS:
+                # Incremento su barra contraria (verde) se distanza da KJ <= 5 pip
+                dist_kj = abs(exec_price - kj)
+                if prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and len(self.increments) < MAX_INCREMENTS:
                     tp_p = round(exec_price - self.inc_tp_pips, 2)
                     new_inc = {
                         "id": int(time.time() * 1000),
@@ -726,7 +759,7 @@ class HyperGoldEngine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Barra 30s verde (C:{prev_close:.2f} > O:{prev_open:.2f}) su Resistenza KJ | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
+                        "reason": f"Barra 30s verde (C:{prev_close:.2f} > O:{prev_open:.2f}) su Resistenza KJ (dist {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
                     })
                     self.save_state()
 
@@ -781,8 +814,9 @@ class HyperGoldEngine:
                     })
                     self.save_state()
             elif self.position["direction"] == "LONG":
-                # In zona cuscinetto, se barra rossa, puoi catturare incremento
-                if prev_close < prev_open and len(self.increments) < MAX_INCREMENTS:
+                # In zona cuscinetto, se barra rossa, puoi catturare incremento se distanza da KJ <= 5 pip
+                dist_kj = abs(exec_price - kj)
+                if prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and len(self.increments) < MAX_INCREMENTS:
                     tp_p = round(exec_price + self.inc_tp_pips, 2)
                     new_inc = {
                         "id": int(time.time() * 1000),
@@ -802,12 +836,13 @@ class HyperGoldEngine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Barra 30s rossa in test KJ (C:{prev_close:.2f} < O:{prev_open:.2f}) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
+                        "reason": f"Barra 30s rossa in test KJ (C:{prev_close:.2f} < O:{prev_open:.2f}, dist {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
                     })
                     self.save_state()
             elif self.position["direction"] == "SHORT":
-                # In zona cuscinetto, se barra verde, puoi catturare incremento
-                if prev_close > prev_open and len(self.increments) < MAX_INCREMENTS:
+                # In zona cuscinetto, se barra verde, puoi catturare incremento se distanza da KJ <= 5 pip
+                dist_kj = abs(exec_price - kj)
+                if prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and len(self.increments) < MAX_INCREMENTS:
                     tp_p = round(exec_price - self.inc_tp_pips, 2)
                     new_inc = {
                         "id": int(time.time() * 1000),
@@ -827,12 +862,14 @@ class HyperGoldEngine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Barra 30s verde in test KJ (C:{prev_close:.2f} > O:{prev_open:.2f}) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
+                        "reason": f"Barra 30s verde in test KJ (C:{prev_close:.2f} > O:{prev_open:.2f}, dist {dist_kj:.1f}p <= {MAX_INC_KJ_DISTANCE_PIPS:.0f}p) | TP: {tp_p:.2f} (+{self.inc_tp_pips:.0f}p)"
                     })
                     self.save_state()
 
     def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
         """Chiude la Core e tutti gli incrementi tornando a FLAT"""
+        is_paracadute = "Paracadute" in reason
+
         if self.position:
             p = self.position
             if p["direction"] == "LONG":
@@ -841,9 +878,10 @@ class HyperGoldEngine:
                 pnl = round((p["open_price"] - exec_price) * p["contracts"] * self.point_value, 2)
 
             self.balance += pnl
+            act_core = f"🪂 PARACADUTE CORE {p['direction']} (FLAT)" if is_paracadute else f"CLOSE CORE {p['direction']} (FLAT)"
             self.trades.insert(0, {
                 "time": time_str,
-                "action": f"CLOSE CORE {p['direction']} (FLAT)",
+                "action": act_core,
                 "open_price": p["open_price"],
                 "close_price": exec_price,
                 "contracts": p["contracts"],
@@ -860,15 +898,16 @@ class HyperGoldEngine:
                 inc_pnl = round((inc["open_price"] - exec_price) * inc["contracts"] * self.point_value, 2)
 
             self.balance += inc_pnl
+            act_inc = f"🪂 PARACADUTE INC {inc['direction']} (FLAT)" if is_paracadute else f"CLOSE INC {inc['direction']} (FLAT)"
             self.trades.insert(0, {
                 "time": time_str,
-                "action": f"CLOSE INC {inc['direction']} (FLAT)",
+                "action": act_inc,
                 "open_price": inc["open_price"],
                 "close_price": exec_price,
                 "contracts": inc["contracts"],
                 "pnl": inc_pnl,
                 "balance": round(self.balance, 2),
-                "reason": f"Uscita FLAT @ {exec_price:.2f}"
+                "reason": f"Uscita FLAT @ {exec_price:.2f}" + (" (Paracadute KJ)" if is_paracadute else "")
             })
         self.increments = []
         self.save_state()

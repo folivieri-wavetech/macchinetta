@@ -2102,6 +2102,7 @@ def esegui_ciclo_trend():
         # Inizializza/Recupera Engine
         if nome not in stato_motore.motori:
             cfg = {
+                "nome": nome,
                 "size_i": size_i,
                 "size_max": size_max,
                 "scala": scala,
@@ -2116,6 +2117,7 @@ def esegui_ciclo_trend():
             }
             stato_motore.motori[nome] = CoreEngine(cfg)
         else:
+            stato_motore.motori[nome].config["nome"] = nome
             stato_motore.motori[nome].config["size_i"] = size_i
             stato_motore.motori[nome].config["size_max"] = size_max
             stato_motore.motori[nome].config["scala"] = scala

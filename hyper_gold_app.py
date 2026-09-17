@@ -307,7 +307,7 @@ def render_live_desk():
                     <span style='font-size: 1.05rem; font-weight: 700; color: #FFD700;'>{kj_str}</span>
                 </div>
             </div>
-            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 3px;'>S&R Puro: Prezzo > KJ Supporto (Long) • Prezzo < KJ Resistenza (Short)</div>
+            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 3px;'>S&R Puro: Prezzo > KJ Supporto (Long) • Prezzo < KJ Resistenza (Short) • 🪂 Paracadute KJ: ±3p (Live)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -351,27 +351,31 @@ def render_live_desk():
     col_left, col_right = st.columns([1.85, 1.35])
 
     with col_left:
-        # Controlli: Avvia, Stop e (Trailing Stop Core sopra Reset)
+        # Riga 1: Toggle Trailing Stop Core posizionato sopra la colonna Reset
+        r_top1, r_top2, r_top3 = st.columns([1, 1, 1.25])
+        with r_top3:
+            core_ts_active = st.toggle("🎯 Trailing Stop Core", value=use_core_ts, key="toggle_core_ts_30s", help="OFF (Soluzione 3): Core cavalca il trend e rigira solo su rottura KJ55. ON: Chiude Core + incrementi su Trailing Stop.")
+            if core_ts_active != use_core_ts:
+                engine.set_use_core_trailing(core_ts_active)
+                st.rerun()
+
+        # Riga 2: Pulsanti AVVIA, STOP e RESET (10k) perfettamente allineati in orizzontale
         c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1.25])
         with c_btn1:
-            st.markdown("<div style='height: 28px;'></div><div class='btn-start'>", unsafe_allow_html=True)
+            st.markdown("<div class='btn-start'>", unsafe_allow_html=True)
             if st.button("🟢 AVVIA", key="btn_start_30s", disabled=trading_on, use_container_width=True):
                 engine.set_trading(True)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
         with c_btn2:
-            st.markdown("<div style='height: 28px;'></div><div class='btn-stop'>", unsafe_allow_html=True)
+            st.markdown("<div class='btn-stop'>", unsafe_allow_html=True)
             if st.button("🛑 STOP", key="btn_stop_30s", disabled=not trading_on, use_container_width=True):
                 engine.set_trading(False)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
         with c_btn3:
-            core_ts_active = st.toggle("🎯 Trailing Stop Core", value=use_core_ts, key="toggle_core_ts_30s", help="OFF (Soluzione 3): Core cavalca il trend e rigira solo su rottura KJ55. ON: Chiude Core + incrementi su Trailing Stop.")
-            if core_ts_active != use_core_ts:
-                engine.set_use_core_trailing(core_ts_active)
-                st.rerun()
             st.markdown("<div class='btn-reset'>", unsafe_allow_html=True)
             if st.button("🔄 RESET (10k)", key="btn_reset_30s", use_container_width=True):
                 engine.reset_portfolio()
@@ -382,14 +386,16 @@ def render_live_desk():
         st.markdown("<h3 style='margin: 0 0 8px 0; font-size: 1.02rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (30s • S&R KJ55)</h3>", unsafe_allow_html=True)
         closed_trades = [
             t for t in trades 
-            if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", ""))
+            if t.get("close_price") is not None and ("CLOSE" in t.get("action", "") or "TP" in t.get("action", "") or "TS HIT" in t.get("action", "") or "PARACADUTE" in t.get("action", ""))
         ]
         if closed_trades:
             rows_html = []
             for t in closed_trades[:30]:
                 col_pnl = "#22c55e" if t["pnl"] > 0 else ("#ef4444" if t["pnl"] < 0 else "#94a3b8")
                 sign_p = f"+{t['pnl']:.2f}" if t["pnl"] > 0 else f"{t['pnl']:.2f}"
-                if "🏆 TS HIT" in t["action"]:
+                if "PARACADUTE" in t["action"]:
+                    action_badge = "<span style='color: #f87171; font-weight: bold;'>" + t["action"] + "</span>"
+                elif "🏆 TS HIT" in t["action"]:
                     action_badge = "<span style='color: #4ade80; font-weight: bold;'>" + t["action"] + "</span>"
                 elif "🎯 TP" in t["action"]:
                     action_badge = "<span style='color: #38bdf8; font-weight: bold;'>🎯 " + t["action"] + "</span>"
