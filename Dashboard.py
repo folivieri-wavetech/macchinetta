@@ -2414,9 +2414,81 @@ else:
             stato = leggi_stato_sistema(conto_selezionato)
             prezzi_live = stato.get("prezzi_live", {})
             memoria_attuale = carica_memoria(conto_selezionato)
+
+            # --- Caricamento Stati Hyper Gold (30S e 5M) per riconoscimento ruoli ---
+            hyper_30s_state = {}
+            hyper_5m_state = {}
+            for p_30s in [os.path.join(conto_selezionato, "hyper_gold_state.json"), "hyper_gold_state.json"]:
+                if os.path.exists(p_30s):
+                    try:
+                        with open(p_30s, "r", encoding="utf-8") as f:
+                            hyper_30s_state = json.load(f)
+                            if hyper_30s_state:
+                                break
+                    except Exception:
+                        pass
+
+            for p_5m in [os.path.join(conto_selezionato, "hyper_gold_m1_state.json"), "hyper_gold_m1_state.json"]:
+                if os.path.exists(p_5m):
+                    try:
+                        with open(p_5m, "r", encoding="utf-8") as f:
+                            hyper_5m_state = json.load(f)
+                            if hyper_5m_state:
+                                break
+                    except Exception:
+                        pass
             
             # --- HELPER: Riconoscimento Ruolo Chirurgico ---
             def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
+                deal_id = pos_dict.get("dealId") or pos_dict.get("deal_id")
+                is_gold = (
+                    nome_strum in ("Spot Gold", "ORO")
+                    or "GOLD" in str(nome_strum).upper()
+                    or "CFEGOLD" in str(pos_dict.get("epic", ""))
+                )
+
+                # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold 1€) ---
+                pos_30s = hyper_30s_state.get("position") or {}
+                incs_30s = hyper_30s_state.get("increments") or []
+                pos_5m = hyper_5m_state.get("position") or {}
+                incs_5m = hyper_5m_state.get("increments") or []
+
+                # Verifica tramite dealId esatto registrato da Hyper
+                if deal_id:
+                    if deal_id == pos_30s.get("deal_id"):
+                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
+                    for idx_30, inc in enumerate(incs_30s):
+                        if inc.get("deal_id") == deal_id:
+                            st_num = inc.get("step_idx", idx_30 + 1)
+                            return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {st_num}</span>"
+
+                    if deal_id == pos_5m.get("deal_id"):
+                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
+                    for idx_5, inc in enumerate(incs_5m):
+                        if inc.get("deal_id") == deal_id:
+                            return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {idx_5 + 1}</span>"
+
+                # Fallback per size su Spot Gold
+                if is_gold:
+                    if abs(sz_pos - 2.0) < 0.001:
+                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
+                    elif abs(sz_pos - 5.0) < 0.001:
+                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
+                    elif abs(sz_pos - 4.0) < 0.001:
+                        matching_4c = [p for p in pos_data if abs(float(p['position']['size']) - 4.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
+                        try:
+                            sc_idx = matching_4c.index(next(p for p in matching_4c if p['position'].get('dealId') == deal_id)) + 1
+                        except Exception:
+                            sc_idx = 1
+                        return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {sc_idx}</span>"
+                    elif abs(sz_pos - 3.0) < 0.001:
+                        matching_3c = [p for p in pos_data if abs(float(p['position']['size']) - 3.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
+                        try:
+                            inc_idx = matching_3c.index(next(p for p in matching_3c if p['position'].get('dealId') == deal_id)) + 1
+                        except Exception:
+                            inc_idx = 1
+                        return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {inc_idx}</span>"
+
                 tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
                 
                 if tipo_strategia == "TREND":
@@ -2426,7 +2498,6 @@ else:
                     
                     pos_core = param_memoria.get("posizioni_core", [])
                     pos_incr = param_memoria.get("posizioni_incr", [])
-                    deal_id = pos_dict.get("dealId")
                     dir_str = 'LONG' if dir_pos=='BUY' else 'SHORT'
                     
                     if deal_id and any(c.get("ticket") == deal_id for c in pos_core):
@@ -2476,14 +2547,29 @@ else:
                                 distance_pts = abs(pos_level - sat_price) / mult
                                 if distance_pts > (tp / 8):
                                     return "OverLoss"
-                        return "SAT2"
-                    return "Posizione (1/4)"
+                            return "SAT2"
+                        return "Posizione (1/4)"
                 elif abs(sz_pos - s_c * 0.15) < 0.001: return "Ultima"
                 elif abs(sz_pos - s_c * 0.35) < 0.001: return f"Core ({dir_label}) (Taglio 1)"
                 elif abs(sz_pos - s_c * 0.50) < 0.001: return f"Core ({dir_label}) (Taglio 2)"
                 return "Posizione Orfana"
 
             def get_role_ord(nome_strum, dir_pos, sz_pos, param_memoria, ord_dict):
+                is_gold = (
+                    nome_strum in ("Spot Gold", "ORO")
+                    or "GOLD" in str(nome_strum).upper()
+                    or "CFEGOLD" in str(ord_dict.get("epic", ""))
+                )
+                if is_gold:
+                    if abs(sz_pos - 4.0) < 0.001:
+                        return "<span style='color: #38bdf8;'>TP scalino</span>"
+                    elif abs(sz_pos - 3.0) < 0.001:
+                        return "<span style='color: #38bdf8;'>TP incremento</span>"
+                    elif abs(sz_pos - 2.0) < 0.001:
+                        return "<span style='color: #FFD700;'>Ordine hyper 30S</span>"
+                    elif abs(sz_pos - 5.0) < 0.001:
+                        return "<span style='color: #FFD700;'>Ordine hyper 5m</span>"
+
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
                 stato_sys = param_memoria.get("stato", "")
@@ -2626,7 +2712,8 @@ else:
                 pnl_str = f"{tot_pnl_eur:.0f} €"
                 
                 if len(posizioni) > 1:
-                    ruolo_master_str = ""
+                    is_gold = (nome in ("Spot Gold", "ORO") or "GOLD" in str(nome).upper())
+                    ruolo_master_str = "<span style='color: #FFD700; font-weight: bold;'>Hyper Gold</span>" if is_gold else ""
                 else:
                     ruolo_master_str = list(ruoli_master)[0] if ruoli_master else "-"
                 

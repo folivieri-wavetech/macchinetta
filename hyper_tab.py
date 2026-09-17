@@ -286,7 +286,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 2. INDICATORI DI MERCATO (30S)
-    m1, m2, m3, m4 = st.columns([1, 1.8, 1.1, 1.1])
+    m1, m2, m3, m4 = st.columns([0.85, 2.15, 1.0, 1.0])
     with m1:
         px_str = f"{live_mid:.2f}" if live_mid else "--"
         bid_ask_str = f"Bid: {live_bid:.2f} | Ask: {live_ask:.2f}" if (live_bid and live_ask) else ""
@@ -337,7 +337,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±2p</div>
+            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±2p</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -729,7 +729,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 2. INDICATORI DI MERCATO (5M)
-    m1, m2, m3, m4 = st.columns([1, 1.8, 1.1, 1.1])
+    m1, m2, m3, m4 = st.columns([0.85, 2.15, 1.0, 1.0])
     with m1:
         px_str = f"{live_mid:.2f}" if live_mid else "--"
         bid_ask_str = f"Bid: {live_bid:.2f} | Ask: {live_ask:.2f}" if (live_bid and live_ask) else ""
@@ -780,7 +780,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±6p</div>
+            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±6p</div>
         </div>
         """, unsafe_allow_html=True)
 
