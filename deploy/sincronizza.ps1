@@ -56,12 +56,6 @@ try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_engine.py "macchinetta/${POD_DASH}:/data/hyper_gold_engine.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_m1_engine.py "macchinetta/${POD_DASH}:/data/hyper_gold_m1_engine.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp lightstreamer_client.py "macchinetta/${POD_DASH}:/data/lightstreamer_client.py"
-    if (Test-Path "hyper_gold_state.json") {
-        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_state.json "macchinetta/${POD_DASH}:/data/hyper_gold_state.json"
-    }
-    if (Test-Path "hyper_gold_m1_state.json") {
-        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_m1_state.json "macchinetta/${POD_DASH}:/data/hyper_gold_m1_state.json"
-    }
     Get-ChildItem -Path "macchinetta_trend" -File | ForEach-Object {
         $fname = $_.Name
         & $KUBECTL --kubeconfig=$KUBECONFIG cp "macchinetta_trend/$fname" "macchinetta/${POD_DASH}:/data/macchinetta_trend/$fname"
