@@ -47,10 +47,67 @@ CONSOLE_LOG_FILE = "console_live.log"
 STATO_TREND = "stato_trend.json"
 ULTIMO_LOG_ATTESA = {}
 LIVE_OHLC_TRACKER = {}
+FILE_LIVE_TRACKER = "live_ohlc_tracker.json"
+LAST_TRACKER_SAVE = 0
 LOCAL_CANDELE_CACHE = {}
 LAST_RADAR_SCAN = 0
 FRIDAY_23_CLOSED_DONE = set()
 LAST_SAFEGUARD_FRIDAY = 0
+
+def carica_live_tracker():
+    """Carica lo stato persistito del LIVE_OHLC_TRACKER da disco (resilienza assoluta a riavvii/deploy)."""
+    global LIVE_OHLC_TRACKER
+    candidati = [FILE_LIVE_TRACKER]
+    for altro in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO", "Logs_e_Cache", "."]:
+        candidati.extend([
+            os.path.join("..", altro, FILE_LIVE_TRACKER),
+            os.path.join("/data", altro, FILE_LIVE_TRACKER),
+            os.path.join(altro, FILE_LIVE_TRACKER),
+            os.path.join("/data", FILE_LIVE_TRACKER)
+        ])
+    for fpath in candidati:
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and data:
+                    count = 0
+                    for k_str, val in data.items():
+                        parts = k_str.split("__")
+                        if len(parts) == 2 and isinstance(val, dict):
+                            k = (parts[0], parts[1])
+                            if k not in LIVE_OHLC_TRACKER:
+                                LIVE_OHLC_TRACKER[k] = val
+                                count += 1
+                    if count > 0:
+                        print_log("SISTEMA", f"💾 [TRACKER LIVE] Ricaricati da {fpath} i dati in corso per {count} candele.")
+                        break
+            except Exception as e:
+                pass
+
+def salva_live_tracker():
+    """Salva atomicamente LIVE_OHLC_TRACKER su disco per non perdere Open, High, Low reali."""
+    try:
+        data = {}
+        for (nome, tf), val in LIVE_OHLC_TRACKER.items():
+            k_str = f"{nome}__{tf}"
+            data[k_str] = val
+        tmp = f"{FILE_LIVE_TRACKER}.tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, FILE_LIVE_TRACKER)
+        
+        # Backup anche su Logs_e_Cache per renderlo accessibile tra pod / conti
+        for cache_dir in ["../Logs_e_Cache", "/data/Logs_e_Cache"]:
+            if os.path.isdir(cache_dir):
+                dst = os.path.join(cache_dir, FILE_LIVE_TRACKER)
+                tmp_c = f"{dst}.tmp.{os.getpid()}"
+                with open(tmp_c, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                os.replace(tmp_c, dst)
+                break
+    except Exception:
+        pass
 
 # --- TRACKER E COOLDOWN DEI TENTATIVI (REGOLA FERREA MAX 5 TENTATIVI) ---
 COOLDOWN_OPERAZIONI = {}
@@ -1296,13 +1353,62 @@ def aggiorna_candele_live_globale(prezzi_live):
                 # Durante la pausa tecnica (23:00-00:00) per Spot Gold e Oil non aprire tracker H1
                 if tf == "HOUR" and is_session_break_active(nome, now_t):
                     continue
+
+                init_open = live_px
+                init_high = live_px
+                init_low = live_px
+                
+                c_loc = carica_candele_locali(nome, tf)
+                if c_loc:
+                    last_c = c_loc[-1]
+                    if tf == "HOUR":
+                        is_after_break = (nome in ("Spot Gold", "Oil - US Crude") and " 00:00:00" in curr_snap)
+                        is_after_weekend = (now_t.weekday() == 6 and now_t.hour == 22) or (now_t.weekday() == 0 and now_t.hour == 0)
+                        if not is_after_break and not is_after_weekend and last_c.get("closePrice"):
+                            try:
+                                prev_close = float(last_c["closePrice"]["bid"])
+                                init_open = prev_close
+                                init_high = max(prev_close, live_px)
+                                init_low = min(prev_close, live_px)
+                            except Exception:
+                                pass
+                    elif tf == "HOUR_4":
+                        try:
+                            c_h1 = carica_candele_locali(nome, "HOUR")
+                            h1_in_h4 = [c for c in c_h1 if c.get("snapshotTime") and curr_snap <= c["snapshotTime"]]
+                            if h1_in_h4:
+                                init_open = float(h1_in_h4[0]["openPrice"]["bid"])
+                                init_high = max(max(float(c["highPrice"]["bid"]) for c in h1_in_h4), live_px)
+                                init_low = min(min(float(c["lowPrice"]["bid"]) for c in h1_in_h4), live_px)
+                            elif last_c.get("closePrice"):
+                                init_open = float(last_c["closePrice"]["bid"])
+                                init_high = max(init_open, live_px)
+                                init_low = min(init_open, live_px)
+                        except Exception:
+                            pass
+                    elif tf == "DAY":
+                        try:
+                            c_h1 = carica_candele_locali(nome, "HOUR")
+                            h1_today = [c for c in c_h1 if c.get("snapshotTime") and curr_snap[:10] in c["snapshotTime"]]
+                            if h1_today:
+                                init_open = float(h1_today[0]["openPrice"]["bid"])
+                                init_high = max(max(float(c["highPrice"]["bid"]) for c in h1_today), live_px)
+                                init_low = min(min(float(c["lowPrice"]["bid"]) for c in h1_today), live_px)
+                            elif last_c.get("closePrice"):
+                                init_open = float(last_c["closePrice"]["bid"])
+                                init_high = max(init_open, live_px)
+                                init_low = min(init_open, live_px)
+                        except Exception:
+                            pass
+
                 LIVE_OHLC_TRACKER[(nome, tf)] = {
                     "snap": curr_snap,
-                    "open": live_px,
-                    "high": live_px,
-                    "low": live_px,
+                    "open": init_open,
+                    "high": init_high,
+                    "low": init_low,
                     "close": live_px
                 }
+                salva_live_tracker()
             elif tracker["snap"] != curr_snap:
                 # Candela conclusa al passaggio del boundary!
                 closed_snap = tracker["snap"]
@@ -1317,6 +1423,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                         "low": live_px,
                         "close": live_px
                     }
+                    salva_live_tracker()
                     continue
 
                 closed_candle_dict = {
@@ -1327,6 +1434,23 @@ def aggiorna_candele_live_globale(prezzi_live):
                     "closePrice": {"bid": tracker["close"], "ask": tracker["close"], "lastTraded": None}
                 }
                 
+                # Certificazione dell'Open per H1: verifica continuità assoluta rispetto alla chiusura precedente
+                if tf == "HOUR":
+                    is_after_break = (nome in ("Spot Gold", "Oil - US Crude") and " 00:00:00" in closed_snap)
+                    is_after_weekend = (now_t.weekday() == 6 and now_t.hour == 22) or (now_t.weekday() == 0 and now_t.hour == 0)
+                    try:
+                        c_prev_all = carica_candele_locali(nome, "HOUR")
+                        prior_c = [c for c in c_prev_all if c.get("snapshotTime") and c["snapshotTime"] < closed_snap]
+                        if prior_c and not is_after_break and not is_after_weekend:
+                            certified_open = float(prior_c[-1]["closePrice"]["bid"])
+                            closed_candle_dict["openPrice"] = {"bid": certified_open, "ask": certified_open, "lastTraded": None}
+                            closed_candle_dict["highPrice"]["bid"] = max(closed_candle_dict["highPrice"]["bid"], certified_open)
+                            closed_candle_dict["highPrice"]["ask"] = closed_candle_dict["highPrice"]["bid"]
+                            closed_candle_dict["lowPrice"]["bid"] = min(closed_candle_dict["lowPrice"]["bid"], certified_open)
+                            closed_candle_dict["lowPrice"]["ask"] = closed_candle_dict["lowPrice"]["bid"]
+                    except Exception:
+                        pass
+
                 # Arricchimento per HOUR_4: unisci e consolida con le candele H1 orarie già chiuse
                 if tf == "HOUR_4":
                     try:
@@ -1367,13 +1491,15 @@ def aggiorna_candele_live_globale(prezzi_live):
                     FRIDAY_23_CLOSED_DONE.add((nome, tf, now_t.date()))
                     LIVE_OHLC_TRACKER.pop((nome, tf), None)
                 else:
+                    new_open = float(closed_candle_dict["closePrice"]["bid"])
                     LIVE_OHLC_TRACKER[(nome, tf)] = {
                         "snap": curr_snap,
-                        "open": live_px,
-                        "high": live_px,
-                        "low": live_px,
+                        "open": new_open,
+                        "high": max(new_open, live_px),
+                        "low": min(new_open, live_px),
                         "close": live_px
                     }
+                salva_live_tracker()
                 
                 # Aggiornamento storico locale (FIFO: mantieni sempre ultime 60 candele, aggiornando se già presente)
                 c_loc = carica_candele_locali(nome, tf)
@@ -1433,6 +1559,12 @@ def aggiorna_candele_live_globale(prezzi_live):
                 tracker["low"] = min(tracker["low"], live_px)
                 tracker["close"] = live_px
                 
+    global LAST_TRACKER_SAVE
+    t_now = time.time()
+    if t_now - LAST_TRACKER_SAVE > 15:
+        salva_live_tracker()
+        LAST_TRACKER_SAVE = t_now
+
     return candele_chiuse
 
 def format_tf_label(tf_val):
@@ -2456,6 +2588,7 @@ if __name__ == "__main__":
         sys.exit()
 
     print(f"🚀 Avvio Motore Trend Multi-Timeframe per il conto {NOME_CONTO}...")
+    carica_live_tracker()
     
     # Eseguiamo un ciclo immediato all'avvio per forzare le inizializzazioni
     try:
