@@ -1508,6 +1508,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 engine.reset()
                 print_log(nome, "⚠️ Fallito Restart Core.")
                 if core_close_summary:
+                    print_log(nome, f"{core_close_summary} ➡️ FLAT")
                     invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {core_close_summary} ➡️ FLAT", "warning")
         
         elif tipo == 'increment_opened':
@@ -1550,7 +1551,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 
                 rate = get_eur_rate(valuta_c, prezzi_live)
                 pnl_eur = (raw_diff / mult) * valore_punto * rate
-                pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
+                pnl_str = f" [PnL: {pnl_eur:+.0f} €]"
                 
                 close_px = ev.get('price') or ev.get('exit_price') or prezzi_live.get(nome)
                 px_str = f" a {close_px:.{dec}f}" if (close_px is not None and isinstance(close_px, (int, float))) else ""
@@ -1577,6 +1578,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     core_close_summary = f"🛑 {tag_motivo} ({sz}){pnl_str}"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     if not has_auto_start:
+                        print_log(nome, msg)
                         invia_notifica(f"🛑 {tag_title} {tf_label}", f"[{nome}] {msg}", "warning")
                 elif tipo == 'tp_increment':
                     tp_p = ev.get('tp_pips', 20)

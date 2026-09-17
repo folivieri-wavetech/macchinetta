@@ -4386,7 +4386,7 @@ else:
                         "CLOSE CORE", "CLOSE INCR", "TP INCR", "BANCOMAT", 
                         "FIFO INCR", "BE INCR", "TRAILING INCR", "STOP TK", "STOP KJ", "TRAILING CORE", "PARACADUTE",
                         "CHIUSO IN PROFITTO", "CHIUSO IN STOP LOSS", "CHIUSO IN LOSS", 
-                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI"
+                        "TARGET FASE 1 RAGGIUNTO", "LIQUIDAT", "➡️ FLAT", "CHIUSURA POSIZIONI", "[PNL:", "PNL:"
                     ]):
                         chiusure_lines.append(r_data)
                     # 5. Core e Incrementi (ordini ed eseguiti sia della Core che degli Incrementi) -> con data [gg/mm]
