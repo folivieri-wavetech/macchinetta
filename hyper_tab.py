@@ -133,6 +133,22 @@ def inject_hyper_css():
             border-color: #94a3b8 !important;
             color: #ffffff !important;
         }
+        .btn-azzera-hyper div.stButton > button {
+            white-space: nowrap !important;
+            font-size: 0.82rem !important;
+            padding: 4px 12px !important;
+            height: 34px !important;
+            font-weight: 600 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+        .btn-azzera-hyper div.stButton > button p {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            margin: 0 !important;
+        }
         /* Forza la visibilità di tutte le sottotab di Hyper (30s e 5m) */
         div[data-testid="stTabsContent"] div[data-testid="stTabs"] div[role="tablist"] > button,
         div[data-testid="stTabsContent"] div[role="tablist"] > button {
@@ -290,15 +306,13 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 2. INDICATORI DI MERCATO (30S)
-    m1, m2, m3, m4 = st.columns([0.85, 2.15, 1.0, 1.0])
+    m1, m2, m3, m4 = st.columns([1.10, 1.90, 1.0, 1.0])
     with m1:
         px_str = f"{live_mid:.2f}" if live_mid else "--"
-        bid_ask_str = f"Bid: {live_bid:.2f} | Ask: {live_ask:.2f}" if (live_bid and live_ask) else ""
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px;'>
+        <div class='kpi-card-hyper' style='padding: 10px 14px; display: flex; flex-direction: column; justify-content: center;'>
             <div class='kpi-title-hyper'>Spot Gold 1€ (Mid Live)</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #22c55e;'>{px_str} €</div>
-            <div style='font-size: 0.70rem; color: #94a3b8;'>{bid_ask_str}</div>
+            <div style='font-size: 1.25rem; font-weight: 800; color: #22c55e; margin-top: 4px;'>{px_str} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -411,14 +425,16 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-        c_th1, c_th2 = st.columns([2.2, 1.2])
+        c_th1, c_th2 = st.columns([1.15, 1.85])
         with c_th1:
-            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (30s)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.90rem; font-weight: 700; white-space: nowrap;'>📋 Storico Operazioni (30s)</h4>", unsafe_allow_html=True)
         with c_th2:
+            st.markdown("<div class='btn-azzera-hyper'>", unsafe_allow_html=True)
             if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_30s_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
                 order_mgr.clear_trades_history(tf="30S")
                 engine.clear_session_trades()
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         closed_trades = history_30s
         if closed_trades:
             num_core_closed = 0
@@ -735,15 +751,13 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 2. INDICATORI DI MERCATO (5M)
-    m1, m2, m3, m4 = st.columns([0.85, 2.15, 1.0, 1.0])
+    m1, m2, m3, m4 = st.columns([1.10, 1.90, 1.0, 1.0])
     with m1:
         px_str = f"{live_mid:.2f}" if live_mid else "--"
-        bid_ask_str = f"Bid: {live_bid:.2f} | Ask: {live_ask:.2f}" if (live_bid and live_ask) else ""
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px;'>
+        <div class='kpi-card-hyper' style='padding: 10px 14px; display: flex; flex-direction: column; justify-content: center;'>
             <div class='kpi-title-hyper'>Spot Gold 1€ (Mid Live)</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #22c55e;'>{px_str} €</div>
-            <div style='font-size: 0.70rem; color: #94a3b8;'>{bid_ask_str}</div>
+            <div style='font-size: 1.25rem; font-weight: 800; color: #22c55e; margin-top: 4px;'>{px_str} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -849,14 +863,16 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-        c_th1, c_th2 = st.columns([2.2, 1.2])
+        c_th1, c_th2 = st.columns([1.15, 1.85])
         with c_th1:
-            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.95rem; font-weight: 700;'>📋 Storico Operazioni Chiuse (M5)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.90rem; font-weight: 700; white-space: nowrap;'>📋 Storico Operazioni (M5)</h4>", unsafe_allow_html=True)
         with c_th2:
+            st.markdown("<div class='btn-azzera-hyper'>", unsafe_allow_html=True)
             if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
                 order_mgr.clear_trades_history(tf="5M")
                 engine.clear_session_trades()
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         closed_trades = history_5m
         if closed_trades:
             num_core_closed = 0
