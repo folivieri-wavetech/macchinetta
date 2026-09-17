@@ -716,6 +716,8 @@ class HyperGoldM1Engine:
                         "balance": round(self.balance, 2),
                         "reason": reason
                     })
+                # Pausa prima degli incrementi
+                time.sleep(1.5)
 
             # 2. Chiudi incrementi residui
             for inc in incs_to_close:
@@ -754,6 +756,8 @@ class HyperGoldM1Engine:
                             "balance": round(self.balance, 2),
                             "reason": reason
                         })
+                    # Pausa prudenziale tra incrementi
+                    time.sleep(1.5)
 
             with self.lock:
                 self.save_state()

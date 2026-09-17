@@ -33,7 +33,7 @@ class HyperOrderManager:
         self.account_dir = account_dir
         self.lock = threading.RLock()
         self.last_request_time = 0.0
-        self.min_order_interval_sec = 1.0  # Minimo 1 secondo di pausa tra ordini successivi verso IG
+        self.min_order_interval_sec = 1.5  # Minimo 1.5 secondi di sicurezza tra ordini successivi verso IG
 
         # Credenziali e sessione IG
         self.is_real = "_REALE" in account_dir.upper()
@@ -148,7 +148,7 @@ class HyperOrderManager:
             return False
 
     def _throttle(self):
-        """Garantisce un intervallo minimo di sicurezza di 1.0 secondo tra chiamate operative consecutive a IG."""
+        """Garantisce un intervallo minimo di sicurezza di 1.5 secondi tra chiamate operative consecutive a IG."""
         elapsed = time.time() - self.last_request_time
         if elapsed < self.min_order_interval_sec:
             time.sleep(self.min_order_interval_sec - elapsed)
@@ -164,14 +164,14 @@ class HyperOrderManager:
             "Accept": "application/json; charset=UTF-8"
         }
 
-    def verify_deal_confirm(self, deal_ref: str, max_attempts: int = 5):
-        """Verifica la conferma dell'ordine tramite /confirms/{dealReference}."""
+    def verify_deal_confirm(self, deal_ref: str, max_attempts: int = 8):
+        """Verifica la conferma dell'ordine tramite /confirms/{dealReference} con pause rilassate."""
         if not deal_ref:
             return False, {}
 
         h = self._get_headers(version="1")
         for attempt in range(1, max_attempts + 1):
-            time.sleep(1.2)  # Pausa precauzionale per consentire a IG di finalizzare l'eseguito
+            time.sleep(1.5)  # Pausa precauzionale per consentire a IG di finalizzare l'eseguito senza stress
             try:
                 r = requests.get(f"{self.base_url}/confirms/{deal_ref}", headers=h, timeout=8)
                 if r.status_code == 200:

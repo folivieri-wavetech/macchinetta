@@ -596,6 +596,12 @@ class HyperGoldEngine:
                         })
                         self.save_state()
 
+                # Pausa prudenziale tra scalini per non ingolfare IG
+                time.sleep(1.5)
+
+            # Pausa prima del Core Runner
+            time.sleep(1.0)
+
             # 2. Apertura blocco Core Runner
             res_core = order_mgr.open_market_deal(
                 direction=direction,
@@ -730,6 +736,8 @@ class HyperGoldEngine:
                         "balance": round(self.balance, 2),
                         "reason": reason
                     })
+                # Pausa prima di procedere agli scalini residui
+                time.sleep(1.5)
 
             # 2. Chiudi gli scalini residui
             for inc in incs_to_close:
@@ -768,6 +776,8 @@ class HyperGoldEngine:
                             "balance": round(self.balance, 2),
                             "reason": reason
                         })
+                    # Pausa prudenziale tra scalini
+                    time.sleep(1.5)
 
             with self.lock:
                 self.save_state()
