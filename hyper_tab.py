@@ -252,7 +252,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         <div class='kpi-card-hyper'>
             <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
             <div class='kpi-val-hyper' style='color: #FFD700;'>{val_capitale} €</div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b> • Equity: <b style='color: #38bdf8;'>{val_equity} €</b></div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -298,7 +298,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
                 peak_px = pos.get("peak_price", pos["open_price"])
                 sub_text = f"🚀 TRAILING ATTIVO | Stop: {ts_px:.2f} (Peak: {peak_px:.2f}) | Incr: {num_inc}/{MAX_INCREMENTS_30S}"
             else:
-                sub_text = f"Core: {CORE_CONTRACTS_30S}c @ {pos['open_price']:.2f} (TS Trigger: +{CORE_TS_TRIGGER_PIPS_30S:.0f} pip) | Incr: {num_inc}/{MAX_INCREMENTS_30S}"
+                sub_text = f"Core: {CORE_CONTRACTS_30S}c @ {pos['open_price']:.2f} | Incr: {num_inc}/{MAX_INCREMENTS_30S}"
 
             st.markdown(f"""
             <div class='kpi-card-hyper'>
@@ -378,7 +378,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
             <div class='kpi-title-hyper'>Margine ({nome_clean})</div>
             <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{val_margine} €</div>
-            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} € ({total_contracts}c) • Marg. Conto</div>
+            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -429,6 +429,12 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
                 engine.set_trading(True)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div class='btn-azzera-hyper' style='margin-top: 6px;'>", unsafe_allow_html=True)
+            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_30s_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                order_mgr.clear_trades_history(tf="30S")
+                engine.clear_session_trades()
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
         with c_btn2:
             st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
@@ -437,17 +443,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-        c_th1, c_th2 = st.columns([1.15, 1.85])
-        with c_th1:
-            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.90rem; font-weight: 700; white-space: nowrap;'>📋 Storico Operazioni (30s)</h4>", unsafe_allow_html=True)
-        with c_th2:
-            st.markdown("<div class='btn-azzera-hyper'>", unsafe_allow_html=True)
-            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_30s_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
-                order_mgr.clear_trades_history(tf="30S")
-                engine.clear_session_trades()
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin: 12px 0 8px 0; font-size: 0.90rem; font-weight: 700;'>📋 Storico Operazioni (30s)</h4>", unsafe_allow_html=True)
         closed_trades = history_30s
         if closed_trades:
             num_core_closed = 0
@@ -492,7 +488,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
 
                 t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
                 rows_html.append(
-                    f"<tr><td>{t_str}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
+                    f"<tr><td style='white-space: nowrap;'>{t_str}</td><td style='white-space: nowrap;'>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
                 )
 
             summary_html = (
@@ -506,9 +502,9 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             rows_html.append(summary_html)
 
             st.markdown(f"""
-            <table class='table-dark-hyper'>
+            <table class='table-dark-hyper' style='width: 100%;'>
                 <thead>
-                    <tr><th>Orario</th><th>Posizione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Deal ID</th><th>Trigger Chiusura</th></tr>
+                    <tr><th style='width: 9%; white-space: nowrap;'>Orario</th><th style='width: 14%; white-space: nowrap;'>Posizione</th><th style='width: 9%; white-space: nowrap;'>Prezzo In</th><th style='width: 9%; white-space: nowrap;'>Prezzo Out</th><th style='width: 9%; white-space: nowrap;'>P&L</th><th style='width: 11%; white-space: nowrap;'>Deal ID</th><th style='width: 39%;'>Trigger Chiusura</th></tr>
                 </thead>
                 <tbody>{''.join(rows_html)}</tbody>
             </table>
@@ -700,7 +696,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         <div class='kpi-card-hyper'>
             <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
             <div class='kpi-val-hyper' style='color: #FFD700;'>{val_capitale} €</div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b> • Equity: <b style='color: #38bdf8;'>{val_equity} €</b></div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -741,7 +737,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
             dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
             num_inc = len(increments)
-            sub_text = f"Core: {CORE_CONTRACTS_5M}c @ {pos['open_price']:.2f} (TS Trigger: +{CORE_TS_TRIGGER_PIPS_5M:.0f}p) | Incr: {num_inc}/{MAX_INCREMENTS_5M}"
+            sub_text = f"Core: {CORE_CONTRACTS_5M}c @ {pos['open_price']:.2f} | Incr: {num_inc}/{MAX_INCREMENTS_5M}"
             st.markdown(f"""
             <div class='kpi-card-hyper'>
                 <div class='kpi-title-hyper'>Esposizione a Mercato</div>
@@ -820,7 +816,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
             <div class='kpi-title-hyper'>Margine ({nome_clean})</div>
             <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{val_margine} €</div>
-            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} € ({total_contracts}c) • Marg. Conto</div>
+            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -864,6 +860,12 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
                 engine.set_trading(True)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div class='btn-azzera-hyper' style='margin-top: 6px;'>", unsafe_allow_html=True)
+            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                order_mgr.clear_trades_history(tf="5M")
+                engine.clear_session_trades()
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
         with c_btn2:
             st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
@@ -872,17 +874,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-        c_th1, c_th2 = st.columns([1.15, 1.85])
-        with c_th1:
-            st.markdown("<h4 style='margin: 6px 0 8px 0; font-size: 0.90rem; font-weight: 700; white-space: nowrap;'>📋 Storico Operazioni (M5)</h4>", unsafe_allow_html=True)
-        with c_th2:
-            st.markdown("<div class='btn-azzera-hyper'>", unsafe_allow_html=True)
-            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
-                order_mgr.clear_trades_history(tf="5M")
-                engine.clear_session_trades()
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin: 12px 0 8px 0; font-size: 0.90rem; font-weight: 700;'>📋 Storico Operazioni (M5)</h4>", unsafe_allow_html=True)
         closed_trades = history_5m
         if closed_trades:
             num_core_closed = 0
@@ -927,7 +919,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
 
                 t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
                 rows_html.append(
-                    f"<tr><td>{t_str}</td><td>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
+                    f"<tr><td style='white-space: nowrap;'>{t_str}</td><td style='white-space: nowrap;'>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
                 )
 
             summary_html = (
@@ -941,9 +933,9 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
             rows_html.append(summary_html)
 
             st.markdown(f"""
-            <table class='table-dark-hyper'>
+            <table class='table-dark-hyper' style='width: 100%;'>
                 <thead>
-                    <tr><th>Orario</th><th>Posizione</th><th>Prezzo In</th><th>Prezzo Out</th><th style='white-space: nowrap;'>P&L</th><th style='white-space: nowrap;'>Deal ID</th><th>Trigger Chiusura</th></tr>
+                    <tr><th style='width: 9%; white-space: nowrap;'>Orario</th><th style='width: 14%; white-space: nowrap;'>Posizione</th><th style='width: 9%; white-space: nowrap;'>Prezzo In</th><th style='width: 9%; white-space: nowrap;'>Prezzo Out</th><th style='width: 9%; white-space: nowrap;'>P&L</th><th style='width: 11%; white-space: nowrap;'>Deal ID</th><th style='width: 39%;'>Trigger Chiusura</th></tr>
                 </thead>
                 <tbody>{''.join(rows_html)}</tbody>
             </table>
