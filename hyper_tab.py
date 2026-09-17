@@ -24,24 +24,51 @@ from hyper_gold_m1_engine import (
 )
 import json
 
-def get_account_saldo_info(conto_selezionato):
-    """Recupera saldo, disponibile e margine reale dal file stato_sistema.json del conto IG selezionato."""
+_sidebar_cache = {"time": 0.0, "conto": None, "data": {}}
+
+def get_sidebar_account_data(conto_selezionato):
+    """Recupera e sincronizza i dati patrimoniali (Capitale, Margine, Disponibile, Drawdown)
+    esattamente come mostrati nella Sidebar della Dashboard, con cache e aggiornamento ogni 15 secondi."""
+    now = time.time()
+    if _sidebar_cache["conto"] == conto_selezionato and (now - _sidebar_cache["time"]) < 15.0 and _sidebar_cache["data"]:
+        return _sidebar_cache["data"]
+
     candidates = []
     if conto_selezionato:
         candidates.append(os.path.join(conto_selezionato, "stato_sistema.json"))
     candidates.append("stato_sistema.json")
+
+    saldo_fl, disp_fl, marg_fl, dd_fl = 0.0, 0.0, 0.0, 0.0
     for p in candidates:
         if os.path.exists(p):
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     d = json.load(f)
-                    saldo = float(d.get("saldo", 0.0) or 0.0)
-                    disp = float(d.get("disponibile", 0.0) or 0.0)
-                    marg = float(d.get("margine", 0.0) or 0.0)
-                    return saldo, disp, marg
+                    saldo_fl = float(d.get("saldo", 0.0) or 0.0)
+                    disp_fl = float(d.get("disponibile", 0.0) or 0.0)
+                    marg_fl = float(d.get("margine", 0.0) or 0.0)
+                    dd_fl = float(d.get("drawdown", 0.0) or 0.0)
+                    break
             except Exception:
                 pass
-    return 0.0, 0.0, 0.0
+
+    def _fmt(v):
+        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    data = {
+        "saldo_float": saldo_fl,
+        "disp_float": disp_fl,
+        "marg_float": marg_fl,
+        "dd_float": dd_fl,
+        "saldo_str": _fmt(saldo_fl),
+        "disp_str": _fmt(disp_fl),
+        "marg_str": _fmt(marg_fl),
+        "dd_str": _fmt(dd_fl)
+    }
+    _sidebar_cache["time"] = now
+    _sidebar_cache["conto"] = conto_selezionato
+    _sidebar_cache["data"] = data
+    return data
 
 def inject_hyper_css():
     st.markdown("""
@@ -117,8 +144,11 @@ def inject_hyper_css():
 
 
 @st.fragment(run_every=2)
-def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
-    engine = HyperGoldEngine.get_instance(account_dir=conto_selezionato)
+def render_hyper_30s(conto_selezionato="DANY_DEMO"):
+    conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
+    nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
+
+    engine = HyperGoldEngine.get_instance(account_dir=conto_attivo)
     if engine.position is None and os.path.exists("hyper_gold_state.json"):
         engine.load_state()
 
@@ -131,8 +161,6 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         candles_count = len(engine.candles)
         kj = engine.kj55
         tk = engine.tk144
-        balance = engine.balance
-        init_bal = engine.initial_balance
         pos = engine.position
         increments = list(engine.increments)
         total_contracts = (pos.get("contracts", CORE_CONTRACTS_30S) + sum(i.get("contracts", INC_CONTRACTS_30S) for i in increments)) if pos else 0
@@ -140,15 +168,17 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         trades = list(engine.trades)
         curr_bar_t = engine.curr_bar_start_t
 
-    real_saldo, real_disp, real_marg = get_account_saldo_info(conto_selezionato)
+    # Dati patrimoniali sincronizzati con la Sidebar ogni 15s
+    acc_data = get_sidebar_account_data(conto_attivo)
     float_pnl = engine.get_floating_pnl()
 
-    # Saldo ed Equity collegati all'account IG reale
-    if real_saldo > 0:
-        balance = real_saldo
-        equity = real_saldo + float_pnl
-    else:
-        equity = balance + float_pnl
+    saldo_fl = acc_data["saldo_float"]
+    equity_fl = saldo_fl + float_pnl
+
+    val_capitale = acc_data["saldo_str"]
+    val_disp = acc_data["disp_str"]
+    val_margine = acc_data["marg_str"]
+    val_equity = f"{equity_fl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     session_realized_pnl = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades if t.get("close_price") is not None)
     num_closed = len([t for t in trades if t.get("close_price") is not None])
@@ -156,7 +186,7 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
     # Intestazione e Badge di Stato
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
-        st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_selezionato})</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_attivo})</span></h3>", unsafe_allow_html=True)
         st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (±2p) • Scalini Fast: 4c @ 2p + 4c @ 3p • Core Runner 2c (TS +10p din.)</div>", unsafe_allow_html=True)
 
     with c_badges:
@@ -184,23 +214,22 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        col_eq = "#38bdf8"
-        disp_txt = f"{real_disp:,.2f} €" if real_disp > 0 else "--"
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Equity Conto ({conto_selezionato})</div>
-            <div class='kpi-val-hyper' style='color: {col_eq};'>{equity:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Saldo: <b style='color: #f8fafc;'>{balance:,.2f} €</b> • Disp: <b style='color: #cbd5e1;'>{disp_txt}</b></div>
+            <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
+            <div class='kpi-val-hyper' style='color: #FFD700;'>{val_capitale} €</div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b> • Equity: <b style='color: #38bdf8;'>{val_equity} €</b></div>
         </div>
         """, unsafe_allow_html=True)
 
     with k2:
         col_real = "#22c55e" if session_realized_pnl >= 0 else ("#ef4444" if session_realized_pnl < 0 else "#94a3b8")
         sign_real = "+" if session_realized_pnl > 0 else ""
+        pnl_str = f"{session_realized_pnl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         st.markdown(f"""
         <div class='kpi-card-hyper'>
             <div class='kpi-title-hyper'>P&L Sessione Hyper (30s)</div>
-            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{session_realized_pnl:,.2f} €</div>
+            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{pnl_str} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{num_closed} operazioni concluse</div>
         </div>
         """, unsafe_allow_html=True)
@@ -313,11 +342,10 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
 
     with m3:
         hyper_margine = total_contracts * 220.0
-        tot_marg = real_marg if real_marg > 0 else hyper_margine
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
-            <div class='kpi-title-hyper'>Margine ({conto_selezionato})</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{tot_marg:,.2f} €</div>
+            <div class='kpi-title-hyper'>Margine ({nome_clean})</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{val_margine} €</div>
             <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} € ({total_contracts}c) • Marg. Conto</div>
         </div>
         """, unsafe_allow_html=True)
@@ -565,8 +593,11 @@ def render_hyper_30s(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
 
 
 @st.fragment(run_every=2)
-def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
-    engine = HyperGoldM1Engine.get_instance(account_dir=conto_selezionato)
+def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False):
+    conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
+    nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
+
+    engine = HyperGoldM1Engine.get_instance(account_dir=conto_attivo)
     if engine.position is None and os.path.exists("hyper_gold_m1_state.json"):
         engine.load_state()
 
@@ -579,8 +610,6 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         candles_count = len(engine.candles)
         kj = engine.kj55
         tk = engine.tk144
-        balance = engine.balance
-        init_bal = engine.initial_balance
         pos = engine.position
         increments = list(engine.increments)
         total_contracts = (pos.get("contracts", CORE_CONTRACTS_5M) + sum(i.get("contracts", INC_CONTRACTS_5M) for i in increments)) if pos else 0
@@ -588,15 +617,17 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
         trades = list(engine.trades)
         curr_bar_t = engine.curr_bar_start_t
 
-    real_saldo, real_disp, real_marg = get_account_saldo_info(conto_selezionato)
+    # Dati patrimoniali sincronizzati con la Sidebar ogni 15s
+    acc_data = get_sidebar_account_data(conto_attivo)
     float_pnl = engine.get_floating_pnl()
 
-    # Saldo ed Equity collegati all'account IG reale
-    if real_saldo > 0:
-        balance = real_saldo
-        equity = real_saldo + float_pnl
-    else:
-        equity = balance + float_pnl
+    saldo_fl = acc_data["saldo_float"]
+    equity_fl = saldo_fl + float_pnl
+
+    val_capitale = acc_data["saldo_str"]
+    val_disp = acc_data["disp_str"]
+    val_margine = acc_data["marg_str"]
+    val_equity = f"{equity_fl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     session_realized_pnl = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades if t.get("close_price") is not None)
     num_closed = len([t for t in trades if t.get("close_price") is not None])
@@ -604,7 +635,7 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
     # Intestazione e Badge di Stato
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
-        st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper Spot Gold 1€ <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>📊 TF 5 MIN</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_selezionato})</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper Spot Gold 1€ <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>📊 TF 5 MIN</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_attivo})</span></h3>", unsafe_allow_html=True)
         st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (Paracadute 6p, Candela Segnale 3p) • Core 5c • Incr 3c (TP +5p)</div>", unsafe_allow_html=True)
 
     with c_badges:
@@ -632,23 +663,22 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
     # 1. KPI PORTAFOGLIO PRINCIPALI
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        col_eq = "#38bdf8"
-        disp_txt = f"{real_disp:,.2f} €" if real_disp > 0 else "--"
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Equity Conto ({conto_selezionato})</div>
-            <div class='kpi-val-hyper' style='color: {col_eq};'>{equity:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Saldo: <b style='color: #f8fafc;'>{balance:,.2f} €</b> • Disp: <b style='color: #cbd5e1;'>{disp_txt}</b></div>
+            <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
+            <div class='kpi-val-hyper' style='color: #FFD700;'>{val_capitale} €</div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b> • Equity: <b style='color: #38bdf8;'>{val_equity} €</b></div>
         </div>
         """, unsafe_allow_html=True)
 
     with k2:
         col_real = "#22c55e" if session_realized_pnl >= 0 else ("#ef4444" if session_realized_pnl < 0 else "#94a3b8")
         sign_real = "+" if session_realized_pnl > 0 else ""
+        pnl_str = f"{session_realized_pnl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         st.markdown(f"""
         <div class='kpi-card-hyper'>
             <div class='kpi-title-hyper'>P&L Sessione Hyper (5m)</div>
-            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{session_realized_pnl:,.2f} €</div>
+            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{pnl_str} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{num_closed} operazioni concluse</div>
         </div>
         """, unsafe_allow_html=True)
@@ -755,11 +785,10 @@ def render_hyper_5m(conto_selezionato="FIORDOK_DEMO", is_other_active=False):
 
     with m3:
         hyper_margine = total_contracts * 220.0
-        tot_marg = real_marg if real_marg > 0 else hyper_margine
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
-            <div class='kpi-title-hyper'>Margine ({conto_selezionato})</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{tot_marg:,.2f} €</div>
+            <div class='kpi-title-hyper'>Margine ({nome_clean})</div>
+            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{val_margine} €</div>
             <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} € ({total_contracts}c) • Marg. Conto</div>
         </div>
         """, unsafe_allow_html=True)
