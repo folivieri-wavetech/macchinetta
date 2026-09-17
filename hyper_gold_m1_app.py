@@ -322,8 +322,10 @@ def render_live_desk():
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-    # 4. PANNELLO CONTROLLI (AVVIA / STOP / RESET)
-    col_btn1, col_btn2, col_btn3 = st.columns([1.5, 1.5, 2])
+    use_core_ts = getattr(engine, "use_core_trailing", False)
+
+    # 4. PANNELLO CONTROLLI (AVVIA / STOP / RESET / TOGGLE TS)
+    col_btn1, col_btn2, col_btn3, col_toggle = st.columns([1.3, 1.3, 1.4, 1.8])
     with col_btn1:
         st.markdown("<div class='btn-start'>", unsafe_allow_html=True)
         if st.button("🟢 AVVIA TRADING M5", key="btn_start_m5", disabled=trading_on, use_container_width=True):
@@ -339,8 +341,14 @@ def render_live_desk():
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_btn3:
-        if st.button("🔄 RESET SALDO A 10.000 €", key="btn_reset_m5", use_container_width=True):
+        if st.button("🔄 RESET SALDO (10k)", key="btn_reset_m5", use_container_width=True):
             engine.reset_portfolio()
+            st.rerun()
+
+    with col_toggle:
+        core_ts_active = st.toggle("🎯 Trailing Stop Core", value=use_core_ts, key="toggle_core_ts_m5", help="OFF (Soluzione 3): Core sempre aperta a cavalcare il trend (chiude/rigira solo su rottura KJ55) e incrementi a rotazione continua a TP (+5 pip). ON: Chiude Core + incrementi a FLAT sul Trailing Stop.")
+        if core_ts_active != use_core_ts:
+            engine.set_use_core_trailing(core_ts_active)
             st.rerun()
 
     st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)

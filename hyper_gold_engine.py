@@ -105,6 +105,7 @@ class HyperGoldEngine:
         self.point_value = 1.0   # 1 EUR per punto/pip per contratto
         self.num_contracts = CORE_CONTRACTS
         self.trading_enabled = False
+        self.use_core_trailing = False  # Soluzione 3: Core trend-follower puro su KJ55, incrementi continui a TP
 
         # Posizione Core aperta: None o {"direction": "LONG"/"SHORT", "open_price": float, "contracts": 5, "tp_price": float, "open_time": str}
         self.position = None
@@ -223,6 +224,7 @@ class HyperGoldEngine:
         with self.lock:
             self.balance = float(d.get("balance", 10000.0))
             self.trading_enabled = bool(d.get("trading_enabled", False))
+            self.use_core_trailing = bool(d.get("use_core_trailing", False))
             self.position = d.get("position")
             self.increments = d.get("increments", [])
             self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
@@ -236,6 +238,7 @@ class HyperGoldEngine:
             d = {
                 "balance": self.balance,
                 "trading_enabled": self.trading_enabled,
+                "use_core_trailing": getattr(self, "use_core_trailing", False),
                 "position": self.position,
                 "increments": self.increments,
                 "inc_tp_pips": self.inc_tp_pips,
@@ -260,6 +263,11 @@ class HyperGoldEngine:
             self.increments = []
             self.trades = []
             self.last_ts_cycle = None
+            self.save_state()
+
+    def set_use_core_trailing(self, enabled: bool):
+        with self.lock:
+            self.use_core_trailing = enabled
             self.save_state()
 
     def set_trading(self, enabled: bool):
@@ -549,11 +557,11 @@ class HyperGoldEngine:
                 if self.position or self.increments:
                     self._close_all_to_flat(mid, time_str, reason="Sospensione Notturna Gold (22:45 - 00:15) ➔ Chiusura automatica di sicurezza a FLAT")
             else:
-                # 1. Verifica Trailing Stop per la Core (Trigger a +10 pip, Lock +7 pip, Trail 3 pip)
-                if self.trading_enabled and self.position:
+                # 1. Verifica Trailing Stop per la Core (SOLO se abilitato; di default False - Soluzione 3: Core sempre in trend)
+                if self.trading_enabled and self.position and getattr(self, "use_core_trailing", False):
                     self._check_core_trailing_stop(mid, time_str)
 
-                # 2. Verifica Take Profit (2 pip) per gli incrementi aperti
+                # 2. Verifica Take Profit (2 pip) per gli incrementi aperti (Bancomat continuo)
                 if self.trading_enabled and self.increments:
                     self._check_increments_tp(mid, time_str)
 
