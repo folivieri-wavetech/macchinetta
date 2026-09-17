@@ -1,11 +1,20 @@
 {
-  "balance": 9905.870000000006,
+  "balance": 10061.059999999996,
   "trading_enabled": true,
   "use_core_trailing": true,
-  "core_size": 4,
-  "num_scalini": 6,
-  "scalino_size": 1,
-  "scalino_step_pips": 2.0,
+  "core_size": 2,
+  "scalini_plan": [
+    {
+      "step": 1,
+      "contracts": 4,
+      "tp_pips": 2.0
+    },
+    {
+      "step": 2,
+      "contracts": 4,
+      "tp_pips": 3.0
+    }
+  ],
   "position": null,
   "increments": [],
   "inc_tp_pips": 2.0,
@@ -14,3855 +23,297 @@
   "signal_ref_price": null,
   "trades": [
     {
-      "time": "15:10:36",
-      "action": "🪂 PARACADUTE SCALINO #6 LONG (FLAT)",
-      "open_price": 4368.11,
-      "close_price": 4364.06,
-      "contracts": 1,
-      "pnl": -4.05,
-      "balance": 9905.87,
-      "reason": "Uscita FLAT @ 4364.06 (Paracadute KJ)"
-    },
-    {
-      "time": "15:10:36",
-      "action": "🪂 PARACADUTE SCALINO #5 LONG (FLAT)",
-      "open_price": 4368.11,
-      "close_price": 4364.06,
-      "contracts": 1,
-      "pnl": -4.05,
-      "balance": 9909.92,
-      "reason": "Uscita FLAT @ 4364.06 (Paracadute KJ)"
-    },
-    {
-      "time": "15:10:36",
-      "action": "🪂 PARACADUTE SCALINO #4 LONG (FLAT)",
-      "open_price": 4368.11,
-      "close_price": 4364.06,
-      "contracts": 1,
-      "pnl": -4.05,
-      "balance": 9913.97,
-      "reason": "Uscita FLAT @ 4364.06 (Paracadute KJ)"
-    },
-    {
-      "time": "15:10:36",
-      "action": "🪂 PARACADUTE SCALINO #3 LONG (FLAT)",
-      "open_price": 4368.11,
-      "close_price": 4364.06,
-      "contracts": 1,
-      "pnl": -4.05,
-      "balance": 9918.02,
-      "reason": "Uscita FLAT @ 4364.06 (Paracadute KJ)"
-    },
-    {
-      "time": "15:10:36",
-      "action": "🪂 PARACADUTE SCALINO #2 LONG (FLAT)",
-      "open_price": 4368.11,
-      "close_price": 4364.06,
-      "contracts": 1,
-      "pnl": -4.05,
-      "balance": 9922.07,
-      "reason": "Uscita FLAT @ 4364.06 (Paracadute KJ)"
-    },
-    {
-      "time": "15:10:36",
+      "time": "18:16:26",
       "action": "🪂 PARACADUTE CORE LONG (FLAT)",
-      "open_price": 4368.11,
-      "close_price": 4364.06,
+      "open_price": 4363.84,
+      "close_price": 4366.24,
+      "contracts": 2,
+      "pnl": 4.8,
+      "balance": 10061.06,
+      "reason": "Paracadute KJ Intracandela: Mid live 4366.24 <= (KJ 4368.26 - 2p = 4366.26) ➔ FLAT"
+    },
+    {
+      "time": "17:49:56",
+      "action": "🎯 TP SCALINO #2 LONG (+3.0p)",
+      "open_price": 4363.84,
+      "close_price": 4366.84,
       "contracts": 4,
-      "pnl": -16.2,
-      "balance": 9926.12,
-      "reason": "Paracadute KJ Intracandela: Mid live 4364.06 <= (KJ 4367.24 - 3p = 4364.24) ➔ FLAT"
+      "pnl": 12.0,
+      "balance": 10056.26,
+      "reason": "Raggiunto TP Scalino #2: +3.0 pip @ 4366.84 (4c)"
     },
     {
-      "time": "15:08:13",
+      "time": "17:48:14",
       "action": "🎯 TP SCALINO #1 LONG (+2.0p)",
-      "open_price": 4368.11,
-      "close_price": 4370.11,
-      "contracts": 1,
-      "pnl": 2.0,
-      "balance": 9942.32,
-      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4370.11 (1c)"
+      "open_price": 4363.84,
+      "close_price": 4365.84,
+      "contracts": 4,
+      "pnl": 8.0,
+      "balance": 10044.26,
+      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4365.84 (4c)"
     },
     {
-      "time": "15:07:00",
-      "action": "OPEN CORE + 6 SCALINI LONG (Tot: 10c)",
-      "open_price": 4368.11,
+      "time": "17:47:30",
+      "action": "OPEN CORE + 2 SCALINI LONG (Tot: 10c)",
+      "open_price": 4363.84,
       "close_price": null,
       "contracts": 10,
       "pnl": 0.0,
-      "balance": 9940.32,
-      "reason": "Core 4c + 6 scalini da 1c (TP: +2p, +4p, +6p, +8p, +10p, +12p) | dist KJ 0.9p <= 3p | TS Trigger: +10p"
+      "balance": 10036.26,
+      "reason": "Core 2c + 2 scalini (#1 (4c @ +2p), #2 (4c @ +3p)) | dist KJ 2.5p <= 3p | TS Trigger: +10p"
     },
     {
-      "time": "15:06:11",
-      "action": "🪂 PARACADUTE SCALINO #6 LONG (FLAT)",
-      "open_price": 4370.66,
-      "close_price": 4364.16,
-      "contracts": 1,
-      "pnl": -6.5,
-      "balance": 9940.32,
-      "reason": "Uscita FLAT @ 4364.16 (Paracadute KJ)"
-    },
-    {
-      "time": "15:06:11",
-      "action": "🪂 PARACADUTE SCALINO #5 LONG (FLAT)",
-      "open_price": 4370.66,
-      "close_price": 4364.16,
-      "contracts": 1,
-      "pnl": -6.5,
-      "balance": 9946.82,
-      "reason": "Uscita FLAT @ 4364.16 (Paracadute KJ)"
-    },
-    {
-      "time": "15:06:11",
-      "action": "🪂 PARACADUTE SCALINO #4 LONG (FLAT)",
-      "open_price": 4370.66,
-      "close_price": 4364.16,
-      "contracts": 1,
-      "pnl": -6.5,
-      "balance": 9953.32,
-      "reason": "Uscita FLAT @ 4364.16 (Paracadute KJ)"
-    },
-    {
-      "time": "15:06:11",
-      "action": "🪂 PARACADUTE SCALINO #3 LONG (FLAT)",
-      "open_price": 4370.66,
-      "close_price": 4364.16,
-      "contracts": 1,
-      "pnl": -6.5,
-      "balance": 9959.82,
-      "reason": "Uscita FLAT @ 4364.16 (Paracadute KJ)"
-    },
-    {
-      "time": "15:06:11",
-      "action": "🪂 PARACADUTE CORE LONG (FLAT)",
-      "open_price": 4370.66,
-      "close_price": 4364.16,
+      "time": "17:35:27",
+      "action": "🪂 PARACADUTE SCALINO #2 SHORT (FLAT)",
+      "open_price": 4357.62,
+      "close_price": 4360.98,
       "contracts": 4,
-      "pnl": -26.0,
-      "balance": 9966.32,
-      "reason": "Paracadute KJ Intracandela: Mid live 4364.16 <= (KJ 4367.24 - 3p = 4364.24) ➔ FLAT"
+      "pnl": -13.44,
+      "balance": 10036.26,
+      "reason": "Uscita FLAT @ 4360.98 (Paracadute KJ)"
     },
     {
-      "time": "14:53:58",
-      "action": "🎯 TP SCALINO #2 LONG (+4.0p)",
-      "open_price": 4370.66,
-      "close_price": 4374.66,
-      "contracts": 1,
-      "pnl": 4.0,
-      "balance": 9992.32,
-      "reason": "Raggiunto TP Scalino #2: +4.0 pip @ 4374.66 (1c)"
+      "time": "17:35:27",
+      "action": "🪂 PARACADUTE CORE SHORT (FLAT)",
+      "open_price": 4357.62,
+      "close_price": 4360.98,
+      "contracts": 2,
+      "pnl": -6.72,
+      "balance": 10049.7,
+      "reason": "Paracadute KJ Intracandela: Mid live 4360.98 >= (KJ 4358.80 + 2p = 4360.80) ➔ FLAT"
     },
     {
-      "time": "14:52:48",
-      "action": "🎯 TP SCALINO #1 LONG (+2.0p)",
-      "open_price": 4370.66,
-      "close_price": 4372.66,
-      "contracts": 1,
-      "pnl": 2.0,
-      "balance": 9988.32,
-      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4372.66 (1c)"
+      "time": "17:32:59",
+      "action": "🎯 TP SCALINO #1 SHORT (+2.0p)",
+      "open_price": 4357.62,
+      "close_price": 4355.62,
+      "contracts": 4,
+      "pnl": 8.0,
+      "balance": 10056.42,
+      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4355.62 (4c)"
     },
     {
-      "time": "14:51:30",
-      "action": "OPEN CORE + 6 SCALINI LONG (Tot: 10c)",
-      "open_price": 4370.66,
+      "time": "17:26:30",
+      "action": "OPEN CORE + 2 SCALINI SHORT (Tot: 10c)",
+      "open_price": 4357.62,
       "close_price": null,
       "contracts": 10,
       "pnl": 0.0,
-      "balance": 9986.32,
-      "reason": "Core 4c + 6 scalini da 1c (TP: +2p, +4p, +6p, +8p, +10p, +12p) | dist KJ 0.3p <= 3p | TS Trigger: +10p"
+      "balance": 10048.42,
+      "reason": "Core 2c + 2 scalini (#1 (4c @ -2p), #2 (4c @ -3p)) | dist KJ 0.3p <= 3p | Paracadute: +2p"
     },
     {
-      "time": "14:42:25",
-      "action": "🪂 PARACADUTE SCALINO #6 LONG (FLAT)",
-      "open_price": 4366.41,
-      "close_price": 4363.95,
+      "time": "17:13:54",
+      "action": "🪂 PARACADUTE SCALINO #8 SHORT (FLAT)",
+      "open_price": 4357.38,
+      "close_price": 4360.4,
       "contracts": 1,
-      "pnl": -2.46,
-      "balance": 9986.32,
-      "reason": "Uscita FLAT @ 4363.95 (Paracadute KJ)"
+      "pnl": -3.02,
+      "balance": 10048.42,
+      "reason": "Uscita FLAT @ 4360.40 (Paracadute KJ)"
     },
     {
-      "time": "14:42:25",
-      "action": "🪂 PARACADUTE SCALINO #5 LONG (FLAT)",
-      "open_price": 4366.41,
-      "close_price": 4363.95,
+      "time": "17:13:54",
+      "action": "🪂 PARACADUTE SCALINO #7 SHORT (FLAT)",
+      "open_price": 4357.38,
+      "close_price": 4360.4,
       "contracts": 1,
-      "pnl": -2.46,
-      "balance": 9988.78,
-      "reason": "Uscita FLAT @ 4363.95 (Paracadute KJ)"
+      "pnl": -3.02,
+      "balance": 10051.44,
+      "reason": "Uscita FLAT @ 4360.40 (Paracadute KJ)"
     },
     {
-      "time": "14:42:25",
-      "action": "🪂 PARACADUTE SCALINO #4 LONG (FLAT)",
-      "open_price": 4366.41,
-      "close_price": 4363.95,
+      "time": "17:13:54",
+      "action": "🪂 PARACADUTE SCALINO #6 SHORT (FLAT)",
+      "open_price": 4357.38,
+      "close_price": 4360.4,
       "contracts": 1,
-      "pnl": -2.46,
-      "balance": 9991.24,
-      "reason": "Uscita FLAT @ 4363.95 (Paracadute KJ)"
+      "pnl": -3.02,
+      "balance": 10054.46,
+      "reason": "Uscita FLAT @ 4360.40 (Paracadute KJ)"
     },
     {
-      "time": "14:42:25",
-      "action": "🪂 PARACADUTE SCALINO #3 LONG (FLAT)",
-      "open_price": 4366.41,
-      "close_price": 4363.95,
+      "time": "17:13:54",
+      "action": "🪂 PARACADUTE SCALINO #5 SHORT (FLAT)",
+      "open_price": 4357.38,
+      "close_price": 4360.4,
       "contracts": 1,
-      "pnl": -2.46,
-      "balance": 9993.7,
-      "reason": "Uscita FLAT @ 4363.95 (Paracadute KJ)"
+      "pnl": -3.02,
+      "balance": 10057.48,
+      "reason": "Uscita FLAT @ 4360.40 (Paracadute KJ)"
     },
     {
-      "time": "14:42:25",
-      "action": "🪂 PARACADUTE CORE LONG (FLAT)",
-      "open_price": 4366.41,
-      "close_price": 4363.95,
-      "contracts": 4,
-      "pnl": -9.84,
-      "balance": 9996.16,
-      "reason": "Paracadute KJ Intracandela: Mid live 4363.95 <= (KJ 4366.96 - 3p = 4363.96) ➔ FLAT"
+      "time": "17:13:54",
+      "action": "🪂 PARACADUTE SCALINO #4 SHORT (FLAT)",
+      "open_price": 4357.38,
+      "close_price": 4360.4,
+      "contracts": 1,
+      "pnl": -3.02,
+      "balance": 10060.5,
+      "reason": "Uscita FLAT @ 4360.40 (Paracadute KJ)"
     },
     {
-      "time": "14:40:08",
-      "action": "🎯 TP SCALINO #2 LONG (+4.0p)",
-      "open_price": 4366.41,
-      "close_price": 4370.41,
+      "time": "17:13:54",
+      "action": "🪂 PARACADUTE CORE SHORT (FLAT)",
+      "open_price": 4357.38,
+      "close_price": 4360.4,
+      "contracts": 2,
+      "pnl": -6.04,
+      "balance": 10063.52,
+      "reason": "Paracadute KJ Intracandela: Mid live 4360.40 >= (KJ 4358.24 + 2p = 4360.24) ➔ FLAT"
+    },
+    {
+      "time": "17:12:11",
+      "action": "🎯 TP SCALINO #3 SHORT (+4.0p)",
+      "open_price": 4357.38,
+      "close_price": 4353.38,
       "contracts": 1,
       "pnl": 4.0,
-      "balance": 10006.0,
-      "reason": "Raggiunto TP Scalino #2: +4.0 pip @ 4370.41 (1c)"
+      "balance": 10069.56,
+      "reason": "Raggiunto TP Scalino #3: +4.0 pip @ 4353.38 (1c)"
     },
     {
-      "time": "14:39:27",
-      "action": "🎯 TP SCALINO #1 LONG (+2.0p)",
-      "open_price": 4366.41,
-      "close_price": 4368.41,
+      "time": "17:11:10",
+      "action": "🎯 TP SCALINO #2 SHORT (+3.0p)",
+      "open_price": 4357.38,
+      "close_price": 4354.38,
+      "contracts": 1,
+      "pnl": 3.0,
+      "balance": 10065.56,
+      "reason": "Raggiunto TP Scalino #2: +3.0 pip @ 4354.38 (1c)"
+    },
+    {
+      "time": "17:04:12",
+      "action": "🎯 TP SCALINO #1 SHORT (+2.0p)",
+      "open_price": 4357.38,
+      "close_price": 4355.38,
+      "contracts": 1,
+      "pnl": 2.0,
+      "balance": 10062.56,
+      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4355.38 (1c)"
+    },
+    {
+      "time": "17:03:30",
+      "action": "OPEN CORE + 8 SCALINI SHORT (Tot: 10c)",
+      "open_price": 4357.38,
+      "close_price": null,
+      "contracts": 10,
+      "pnl": 0.0,
+      "balance": 10060.56,
+      "reason": "Core 2c + 8 scalini (#1 (1c @ -2p), #2 (1c @ -3p), #3 (1c @ -4p), #4 (1c @ -5p), #5 (1c @ -6p), #6 (1c @ -7p), #7 (1c @ -8p), #8 (1c @ -9p)) | dist KJ 2.0p <= 3p | Paracadute: +2p"
+    },
+    {
+      "time": "17:03:04",
+      "action": "🏆 TS HIT CORE SHORT (+8.3 pip)",
+      "open_price": 4363.71,
+      "close_price": 4355.43,
+      "contracts": 2,
+      "pnl": 16.56,
+      "balance": 10060.56,
+      "reason": "Trailing Stop toccato @ 4355.43 (Peak: 4351.35) ➔ CICLO COMPLETATO: +8.3 pip (+16.56 €) | IN ATTESA RIENTRO KJ/TK"
+    },
+    {
+      "time": "16:57:16",
+      "action": "🚀 TRAILING ATTIVATO SHORT",
+      "open_price": 4363.71,
+      "close_price": 4353.7,
+      "contracts": 2,
+      "pnl": 20.02,
+      "balance": 10044.0,
+      "reason": "Raggiunti +10.0 pip @ 4353.70 ➔ Lock +6.0 pip @ 4357.71, Trail 4.0 pip"
+    },
+    {
+      "time": "16:56:07",
+      "action": "🎯 TP SCALINO #8 SHORT (+9.0p)",
+      "open_price": 4363.71,
+      "close_price": 4354.71,
+      "contracts": 1,
+      "pnl": 9.0,
+      "balance": 10044.0,
+      "reason": "Raggiunto TP Scalino #8: +9.0 pip @ 4354.71 (1c)"
+    },
+    {
+      "time": "16:55:54",
+      "action": "🎯 TP SCALINO #7 SHORT (+8.0p)",
+      "open_price": 4363.71,
+      "close_price": 4355.71,
+      "contracts": 1,
+      "pnl": 8.0,
+      "balance": 10035.0,
+      "reason": "Raggiunto TP Scalino #7: +8.0 pip @ 4355.71 (1c)"
+    },
+    {
+      "time": "16:53:49",
+      "action": "🎯 TP SCALINO #6 SHORT (+7.0p)",
+      "open_price": 4363.71,
+      "close_price": 4356.71,
+      "contracts": 1,
+      "pnl": 7.0,
+      "balance": 10027.0,
+      "reason": "Raggiunto TP Scalino #6: +7.0 pip @ 4356.71 (1c)"
+    },
+    {
+      "time": "16:53:35",
+      "action": "🎯 TP SCALINO #5 SHORT (+6.0p)",
+      "open_price": 4363.71,
+      "close_price": 4357.71,
+      "contracts": 1,
+      "pnl": 6.0,
+      "balance": 10020.0,
+      "reason": "Raggiunto TP Scalino #5: +6.0 pip @ 4357.71 (1c)"
+    },
+    {
+      "time": "16:49:01",
+      "action": "🎯 TP SCALINO #4 SHORT (+5.0p)",
+      "open_price": 4363.71,
+      "close_price": 4358.71,
+      "contracts": 1,
+      "pnl": 5.0,
+      "balance": 10014.0,
+      "reason": "Raggiunto TP Scalino #4: +5.0 pip @ 4358.71 (1c)"
+    },
+    {
+      "time": "16:47:56",
+      "action": "🎯 TP SCALINO #3 SHORT (+4.0p)",
+      "open_price": 4363.71,
+      "close_price": 4359.71,
+      "contracts": 1,
+      "pnl": 4.0,
+      "balance": 10009.0,
+      "reason": "Raggiunto TP Scalino #3: +4.0 pip @ 4359.71 (1c)"
+    },
+    {
+      "time": "16:47:48",
+      "action": "🎯 TP SCALINO #2 SHORT (+3.0p)",
+      "open_price": 4363.71,
+      "close_price": 4360.71,
+      "contracts": 1,
+      "pnl": 3.0,
+      "balance": 10005.0,
+      "reason": "Raggiunto TP Scalino #2: +3.0 pip @ 4360.71 (1c)"
+    },
+    {
+      "time": "16:47:01",
+      "action": "🎯 TP SCALINO #1 SHORT (+2.0p)",
+      "open_price": 4363.71,
+      "close_price": 4361.71,
       "contracts": 1,
       "pnl": 2.0,
       "balance": 10002.0,
-      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4368.41 (1c)"
+      "reason": "Raggiunto TP Scalino #1: +2.0 pip @ 4361.71 (1c)"
     },
     {
-      "time": "14:35:30",
-      "action": "OPEN CORE + 6 SCALINI LONG (Tot: 10c)",
-      "open_price": 4366.41,
+      "time": "16:46:00",
+      "action": "OPEN CORE + 8 SCALINI SHORT (Tot: 10c)",
+      "open_price": 4363.71,
       "close_price": null,
       "contracts": 10,
       "pnl": 0.0,
       "balance": 10000.0,
-      "reason": "Core 4c + 6 scalini da 1c (TP: +2p, +4p, +6p, +8p, +10p, +12p) | dist KJ 2.2p <= 3p | TS Trigger: +10p"
+      "reason": "Core 2c + 8 scalini (#1 (1c @ -2p), #2 (1c @ -3p), #3 (1c @ -4p), #4 (1c @ -5p), #5 (1c @ -6p), #6 (1c @ -7p), #7 (1c @ -8p), #8 (1c @ -9p)) | dist KJ 2.5p <= 3p | Paracadute: +3p"
     }
   ],
   "candles": [
-    {
-      "boundary": 1789635240,
-      "time": "10:54:00",
-      "open": 4314.39,
-      "high": 4314.45,
-      "low": 4313.59,
-      "close": 4314.11,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635270,
-      "time": "10:54:30",
-      "open": 4314.09,
-      "high": 4314.24,
-      "low": 4313.18,
-      "close": 4313.49,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635300,
-      "time": "10:55:00",
-      "open": 4313.47,
-      "high": 4313.47,
-      "low": 4311.7,
-      "close": 4312.52,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635330,
-      "time": "10:55:30",
-      "open": 4312.57,
-      "high": 4313.8,
-      "low": 4311.35,
-      "close": 4311.69,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635360,
-      "time": "10:56:00",
-      "open": 4311.58,
-      "high": 4312.9,
-      "low": 4311.5,
-      "close": 4312.68,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635390,
-      "time": "10:56:30",
-      "open": 4312.64,
-      "high": 4313.23,
-      "low": 4312.32,
-      "close": 4313.09,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635420,
-      "time": "10:57:00",
-      "open": 4313.17,
-      "high": 4313.9,
-      "low": 4313.01,
-      "close": 4313.18,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635450,
-      "time": "10:57:30",
-      "open": 4313.16,
-      "high": 4313.45,
-      "low": 4312.75,
-      "close": 4312.9,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635480,
-      "time": "10:58:00",
-      "open": 4312.92,
-      "high": 4313.18,
-      "low": 4311.85,
-      "close": 4312.39,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635510,
-      "time": "10:58:30",
-      "open": 4312.38,
-      "high": 4312.38,
-      "low": 4311.47,
-      "close": 4311.56,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635540,
-      "time": "10:59:00",
-      "open": 4311.49,
-      "high": 4311.85,
-      "low": 4310.44,
-      "close": 4311.85,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635570,
-      "time": "10:59:30",
-      "open": 4311.48,
-      "high": 4311.92,
-      "low": 4311.33,
-      "close": 4311.38,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635600,
-      "time": "11:00:00",
-      "open": 4311.43,
-      "high": 4313.77,
-      "low": 4311.43,
-      "close": 4313.43,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635630,
-      "time": "11:00:30",
-      "open": 4313.5,
-      "high": 4314.5,
-      "low": 4313.32,
-      "close": 4314.5,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635660,
-      "time": "11:01:00",
-      "open": 4314.47,
-      "high": 4315.31,
-      "low": 4314.16,
-      "close": 4315.0,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635690,
-      "time": "11:01:30",
-      "open": 4314.92,
-      "high": 4315.96,
-      "low": 4314.46,
-      "close": 4314.77,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635720,
-      "time": "11:02:00",
-      "open": 4314.76,
-      "high": 4315.74,
-      "low": 4313.01,
-      "close": 4315.37,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635750,
-      "time": "11:02:30",
-      "open": 4315.38,
-      "high": 4316.04,
-      "low": 4314.61,
-      "close": 4314.61,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635780,
-      "time": "11:03:00",
-      "open": 4314.73,
-      "high": 4314.93,
-      "low": 4314.07,
-      "close": 4314.21,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635810,
-      "time": "11:03:30",
-      "open": 4314.29,
-      "high": 4315.35,
-      "low": 4314.12,
-      "close": 4314.99,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635840,
-      "time": "11:04:00",
-      "open": 4315.05,
-      "high": 4315.62,
-      "low": 4314.91,
-      "close": 4314.96,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789635870,
-      "time": "11:04:30",
-      "open": 4314.9,
-      "high": 4315.48,
-      "low": 4314.13,
-      "close": 4314.97,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789636260,
-      "time": "11:11:00",
-      "open": 4317.77,
-      "high": 4318.02,
-      "low": 4317.14,
-      "close": 4317.39,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789636290,
-      "time": "11:11:30",
-      "open": 4317.41,
-      "high": 4317.47,
-      "low": 4315.98,
-      "close": 4316.89,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789636320,
-      "time": "11:12:00",
-      "open": 4316.9,
-      "high": 4317.11,
-      "low": 4316.34,
-      "close": 4316.93,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789636350,
-      "time": "11:12:30",
-      "open": 4316.88,
-      "high": 4317.6,
-      "low": 4316.64,
-      "close": 4317.07,
-      "kj55": 4315.25
-    },
-    {
-      "boundary": 1789636380,
-      "time": "11:13:00",
-      "open": 4317.08,
-      "high": 4318.89,
-      "low": 4317.08,
-      "close": 4317.86,
-      "kj55": 4315.03
-    },
-    {
-      "boundary": 1789636410,
-      "time": "11:13:30",
-      "open": 4317.94,
-      "high": 4317.94,
-      "low": 4316.75,
-      "close": 4316.92,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636440,
-      "time": "11:14:00",
-      "open": 4317.09,
-      "high": 4317.19,
-      "low": 4315.24,
-      "close": 4315.46,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636470,
-      "time": "11:14:30",
-      "open": 4315.43,
-      "high": 4316.5,
-      "low": 4315.02,
-      "close": 4316.3,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636500,
-      "time": "11:15:00",
-      "open": 4316.14,
-      "high": 4316.69,
-      "low": 4315.04,
-      "close": 4315.05,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636530,
-      "time": "11:15:30",
-      "open": 4315.22,
-      "high": 4315.86,
-      "low": 4313.73,
-      "close": 4313.73,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636560,
-      "time": "11:16:00",
-      "open": 4313.77,
-      "high": 4314.91,
-      "low": 4313.77,
-      "close": 4314.2,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636590,
-      "time": "11:16:30",
-      "open": 4314.19,
-      "high": 4314.39,
-      "low": 4313.32,
-      "close": 4313.56,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636620,
-      "time": "11:17:00",
-      "open": 4313.54,
-      "high": 4314.85,
-      "low": 4313.47,
-      "close": 4314.21,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636650,
-      "time": "11:17:30",
-      "open": 4314.17,
-      "high": 4314.17,
-      "low": 4312.25,
-      "close": 4312.95,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636680,
-      "time": "11:18:00",
-      "open": 4313.12,
-      "high": 4315.34,
-      "low": 4312.89,
-      "close": 4314.95,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636710,
-      "time": "11:18:30",
-      "open": 4315.04,
-      "high": 4315.42,
-      "low": 4313.58,
-      "close": 4314.15,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636740,
-      "time": "11:19:00",
-      "open": 4314.05,
-      "high": 4314.05,
-      "low": 4312.07,
-      "close": 4312.07,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636770,
-      "time": "11:19:30",
-      "open": 4312.27,
-      "high": 4312.61,
-      "low": 4312.01,
-      "close": 4312.01,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636800,
-      "time": "11:20:00",
-      "open": 4311.89,
-      "high": 4313.12,
-      "low": 4311.24,
-      "close": 4313.12,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636830,
-      "time": "11:20:30",
-      "open": 4313.06,
-      "high": 4313.71,
-      "low": 4311.31,
-      "close": 4311.45,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636860,
-      "time": "11:21:00",
-      "open": 4311.46,
-      "high": 4311.85,
-      "low": 4310.43,
-      "close": 4311.81,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636890,
-      "time": "11:21:30",
-      "open": 4311.82,
-      "high": 4312.21,
-      "low": 4310.83,
-      "close": 4312.1,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636920,
-      "time": "11:22:00",
-      "open": 4312.14,
-      "high": 4312.84,
-      "low": 4311.28,
-      "close": 4311.38,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636950,
-      "time": "11:22:30",
-      "open": 4311.54,
-      "high": 4312.18,
-      "low": 4311.34,
-      "close": 4311.54,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789636980,
-      "time": "11:23:00",
-      "open": 4311.51,
-      "high": 4311.93,
-      "low": 4311.01,
-      "close": 4311.01,
-      "kj55": 4314.66
-    },
-    {
-      "boundary": 1789637010,
-      "time": "11:23:30",
-      "open": 4311.04,
-      "high": 4311.45,
-      "low": 4310.18,
-      "close": 4310.89,
-      "kj55": 4314.53
-    },
-    {
-      "boundary": 1789637040,
-      "time": "11:24:00",
-      "open": 4310.8,
-      "high": 4312.96,
-      "low": 4310.55,
-      "close": 4311.33,
-      "kj55": 4314.53
-    },
-    {
-      "boundary": 1789637070,
-      "time": "11:24:30",
-      "open": 4311.31,
-      "high": 4311.42,
-      "low": 4310.19,
-      "close": 4310.95,
-      "kj55": 4314.53
-    },
-    {
-      "boundary": 1789637100,
-      "time": "11:25:00",
-      "open": 4311.02,
-      "high": 4311.9,
-      "low": 4310.26,
-      "close": 4311.75,
-      "kj55": 4314.53
-    },
-    {
-      "boundary": 1789637130,
-      "time": "11:25:30",
-      "open": 4311.76,
-      "high": 4312.76,
-      "low": 4311.71,
-      "close": 4312.24,
-      "kj55": 4314.53
-    },
-    {
-      "boundary": 1789637160,
-      "time": "11:26:00",
-      "open": 4312.0,
-      "high": 4312.05,
-      "low": 4310.29,
-      "close": 4310.37,
-      "kj55": 4314.53
-    },
-    {
-      "boundary": 1789637190,
-      "time": "11:26:30",
-      "open": 4310.36,
-      "high": 4310.93,
-      "low": 4308.67,
-      "close": 4308.79,
-      "kj55": 4313.78
-    },
-    {
-      "boundary": 1789637220,
-      "time": "11:27:00",
-      "open": 4308.62,
-      "high": 4309.39,
-      "low": 4308.6,
-      "close": 4308.77,
-      "kj55": 4313.75
-    },
-    {
-      "boundary": 1789637250,
-      "time": "11:27:30",
-      "open": 4309.0,
-      "high": 4309.1,
-      "low": 4307.26,
-      "close": 4307.64,
-      "kj55": 4313.08
-    },
-    {
-      "boundary": 1789637280,
-      "time": "11:28:00",
-      "open": 4307.6,
-      "high": 4307.7,
-      "low": 4306.67,
-      "close": 4307.57,
-      "kj55": 4312.78
-    },
-    {
-      "boundary": 1789637310,
-      "time": "11:28:30",
-      "open": 4307.58,
-      "high": 4308.19,
-      "low": 4306.74,
-      "close": 4307.8,
-      "kj55": 4312.78
-    },
-    {
-      "boundary": 1789637340,
-      "time": "11:29:00",
-      "open": 4307.6,
-      "high": 4308.38,
-      "low": 4306.95,
-      "close": 4306.97,
-      "kj55": 4312.78
-    },
-    {
-      "boundary": 1789637370,
-      "time": "11:29:30",
-      "open": 4307.08,
-      "high": 4307.16,
-      "low": 4306.19,
-      "close": 4307.16,
-      "kj55": 4312.54
-    },
-    {
-      "boundary": 1789637400,
-      "time": "11:30:00",
-      "open": 4307.18,
-      "high": 4307.18,
-      "low": 4305.72,
-      "close": 4305.72,
-      "kj55": 4312.31
-    },
-    {
-      "boundary": 1789637430,
-      "time": "11:30:30",
-      "open": 4305.97,
-      "high": 4307.25,
-      "low": 4305.44,
-      "close": 4305.8,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637460,
-      "time": "11:31:00",
-      "open": 4305.88,
-      "high": 4307.49,
-      "low": 4305.71,
-      "close": 4307.34,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637490,
-      "time": "11:31:30",
-      "open": 4307.33,
-      "high": 4308.08,
-      "low": 4306.09,
-      "close": 4306.82,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637520,
-      "time": "11:32:00",
-      "open": 4306.81,
-      "high": 4309.25,
-      "low": 4306.81,
-      "close": 4308.8,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637550,
-      "time": "11:32:30",
-      "open": 4308.81,
-      "high": 4309.3,
-      "low": 4308.07,
-      "close": 4308.98,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637580,
-      "time": "11:33:00",
-      "open": 4308.99,
-      "high": 4309.44,
-      "low": 4307.06,
-      "close": 4308.31,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637610,
-      "time": "11:33:30",
-      "open": 4308.27,
-      "high": 4308.68,
-      "low": 4307.67,
-      "close": 4307.67,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637640,
-      "time": "11:34:00",
-      "open": 4307.61,
-      "high": 4308.32,
-      "low": 4307.57,
-      "close": 4308.0,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637670,
-      "time": "11:34:30",
-      "open": 4307.96,
-      "high": 4308.33,
-      "low": 4307.71,
-      "close": 4307.79,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637700,
-      "time": "11:35:00",
-      "open": 4307.81,
-      "high": 4309.08,
-      "low": 4306.83,
-      "close": 4307.75,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637730,
-      "time": "11:35:30",
-      "open": 4307.64,
-      "high": 4308.27,
-      "low": 4306.61,
-      "close": 4308.18,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637760,
-      "time": "11:36:00",
-      "open": 4308.15,
-      "high": 4308.91,
-      "low": 4307.97,
-      "close": 4308.89,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637790,
-      "time": "11:36:30",
-      "open": 4308.88,
-      "high": 4309.01,
-      "low": 4308.37,
-      "close": 4309.01,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637820,
-      "time": "11:37:00",
-      "open": 4309.0,
-      "high": 4309.25,
-      "low": 4307.55,
-      "close": 4307.6,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637850,
-      "time": "11:37:30",
-      "open": 4307.59,
-      "high": 4309.14,
-      "low": 4307.55,
-      "close": 4308.4,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637880,
-      "time": "11:38:00",
-      "open": 4308.65,
-      "high": 4309.78,
-      "low": 4307.87,
-      "close": 4308.98,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637910,
-      "time": "11:38:30",
-      "open": 4308.99,
-      "high": 4309.33,
-      "low": 4308.43,
-      "close": 4308.85,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637940,
-      "time": "11:39:00",
-      "open": 4308.83,
-      "high": 4309.22,
-      "low": 4308.78,
-      "close": 4309.06,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789637970,
-      "time": "11:39:30",
-      "open": 4309.15,
-      "high": 4309.97,
-      "low": 4308.73,
-      "close": 4308.73,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789638000,
-      "time": "11:40:00",
-      "open": 4308.72,
-      "high": 4310.48,
-      "low": 4308.44,
-      "close": 4309.53,
-      "kj55": 4312.16
-    },
-    {
-      "boundary": 1789638030,
-      "time": "11:40:30",
-      "open": 4309.57,
-      "high": 4310.39,
-      "low": 4309.21,
-      "close": 4309.97,
-      "kj55": 4311.69
-    },
-    {
-      "boundary": 1789638060,
-      "time": "11:41:00",
-      "open": 4310.18,
-      "high": 4310.83,
-      "low": 4309.54,
-      "close": 4310.66,
-      "kj55": 4311.31
-    },
-    {
-      "boundary": 1789638090,
-      "time": "11:41:30",
-      "open": 4310.71,
-      "high": 4311.36,
-      "low": 4310.35,
-      "close": 4310.81,
-      "kj55": 4311.06
-    },
-    {
-      "boundary": 1789638120,
-      "time": "11:42:00",
-      "open": 4310.84,
-      "high": 4310.99,
-      "low": 4310.65,
-      "close": 4310.65,
-      "kj55": 4311.06
-    },
-    {
-      "boundary": 1789638150,
-      "time": "11:42:30",
-      "open": 4310.75,
-      "high": 4311.25,
-      "low": 4310.4,
-      "close": 4310.4,
-      "kj55": 4310.65
-    },
-    {
-      "boundary": 1789638180,
-      "time": "11:43:00",
-      "open": 4310.02,
-      "high": 4310.56,
-      "low": 4309.35,
-      "close": 4310.34,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789638210,
-      "time": "11:43:30",
-      "open": 4310.27,
-      "high": 4310.31,
-      "low": 4309.18,
-      "close": 4309.4,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789638240,
-      "time": "11:44:00",
-      "open": 4309.39,
-      "high": 4310.07,
-      "low": 4309.36,
-      "close": 4310.03,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789638270,
-      "time": "11:44:30",
-      "open": 4310.02,
-      "high": 4310.41,
-      "low": 4309.47,
-      "close": 4309.77,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789638300,
-      "time": "11:45:00",
-      "open": 4309.76,
-      "high": 4310.01,
-      "low": 4309.46,
-      "close": 4310.01,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789638330,
-      "time": "11:45:30",
-      "open": 4309.99,
-      "high": 4310.0,
-      "low": 4307.63,
-      "close": 4308.21,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789638360,
-      "time": "11:46:00",
-      "open": 4308.3,
-      "high": 4309.51,
-      "low": 4307.72,
-      "close": 4308.73,
-      "kj55": 4309.74
-    },
-    {
-      "boundary": 1789638390,
-      "time": "11:46:30",
-      "open": 4308.72,
-      "high": 4309.21,
-      "low": 4307.91,
-      "close": 4308.17,
-      "kj55": 4309.57
-    },
-    {
-      "boundary": 1789638420,
-      "time": "11:47:00",
-      "open": 4308.16,
-      "high": 4308.58,
-      "low": 4307.77,
-      "close": 4308.17,
-      "kj55": 4309.57
-    },
-    {
-      "boundary": 1789638450,
-      "time": "11:47:30",
-      "open": 4308.09,
-      "high": 4308.71,
-      "low": 4307.86,
-      "close": 4308.38,
-      "kj55": 4309.57
-    },
-    {
-      "boundary": 1789638480,
-      "time": "11:48:00",
-      "open": 4308.36,
-      "high": 4308.66,
-      "low": 4306.47,
-      "close": 4306.47,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638510,
-      "time": "11:48:30",
-      "open": 4306.4,
-      "high": 4308.31,
-      "low": 4306.35,
-      "close": 4308.31,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638540,
-      "time": "11:49:00",
-      "open": 4308.3,
-      "high": 4308.3,
-      "low": 4307.56,
-      "close": 4308.01,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638570,
-      "time": "11:49:30",
-      "open": 4308.02,
-      "high": 4310.04,
-      "low": 4308.02,
-      "close": 4309.98,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638600,
-      "time": "11:50:00",
-      "open": 4309.99,
-      "high": 4310.57,
-      "low": 4309.79,
-      "close": 4309.98,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638630,
-      "time": "11:50:30",
-      "open": 4310.0,
-      "high": 4310.23,
-      "low": 4308.84,
-      "close": 4309.73,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638660,
-      "time": "11:51:00",
-      "open": 4309.7,
-      "high": 4310.07,
-      "low": 4308.94,
-      "close": 4309.78,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789638690,
-      "time": "11:51:30",
-      "open": 4309.84,
-      "high": 4310.69,
-      "low": 4309.83,
-      "close": 4310.68,
-      "kj55": 4309.1
-    },
-    {
-      "boundary": 1789638720,
-      "time": "11:52:00",
-      "open": 4310.72,
-      "high": 4311.18,
-      "low": 4309.42,
-      "close": 4309.76,
-      "kj55": 4309.1
-    },
-    {
-      "boundary": 1789638750,
-      "time": "11:52:30",
-      "open": 4309.83,
-      "high": 4310.85,
-      "low": 4309.45,
-      "close": 4310.25,
-      "kj55": 4309.1
-    },
-    {
-      "boundary": 1789638780,
-      "time": "11:53:00",
-      "open": 4310.29,
-      "high": 4310.29,
-      "low": 4309.68,
-      "close": 4309.68,
-      "kj55": 4308.74
-    },
-    {
-      "boundary": 1789638810,
-      "time": "11:53:30",
-      "open": 4309.79,
-      "high": 4310.29,
-      "low": 4308.93,
-      "close": 4309.86,
-      "kj55": 4308.4
-    },
-    {
-      "boundary": 1789638840,
-      "time": "11:54:00",
-      "open": 4309.85,
-      "high": 4311.12,
-      "low": 4308.96,
-      "close": 4310.99,
-      "kj55": 4308.4
-    },
-    {
-      "boundary": 1789638870,
-      "time": "11:54:30",
-      "open": 4310.98,
-      "high": 4311.71,
-      "low": 4310.27,
-      "close": 4310.96,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789638900,
-      "time": "11:55:00",
-      "open": 4310.99,
-      "high": 4311.21,
-      "low": 4309.2,
-      "close": 4309.27,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789638930,
-      "time": "11:55:30",
-      "open": 4309.39,
-      "high": 4309.61,
-      "low": 4308.51,
-      "close": 4308.88,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789638960,
-      "time": "11:56:00",
-      "open": 4308.96,
-      "high": 4309.28,
-      "low": 4307.5,
-      "close": 4307.9,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789638990,
-      "time": "11:56:30",
-      "open": 4307.76,
-      "high": 4308.31,
-      "low": 4306.07,
-      "close": 4307.01,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789639020,
-      "time": "11:57:00",
-      "open": 4307.02,
-      "high": 4307.75,
-      "low": 4307.01,
-      "close": 4307.2,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789639050,
-      "time": "11:57:30",
-      "open": 4307.3,
-      "high": 4307.61,
-      "low": 4306.04,
-      "close": 4306.04,
-      "kj55": 4308.57
-    },
-    {
-      "boundary": 1789639080,
-      "time": "11:58:00",
-      "open": 4306.02,
-      "high": 4306.95,
-      "low": 4305.92,
-      "close": 4306.45,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639110,
-      "time": "11:58:30",
-      "open": 4306.43,
-      "high": 4306.56,
-      "low": 4306.1,
-      "close": 4306.33,
-      "kj55": 4308.82
-    },
-    {
-      "boundary": 1789639140,
-      "time": "11:59:00",
-      "open": 4306.32,
-      "high": 4307.0,
-      "low": 4306.2,
-      "close": 4306.9,
-      "kj55": 4308.82
-    },
-    {
-      "boundary": 1789639170,
-      "time": "11:59:30",
-      "open": 4306.85,
-      "high": 4307.05,
-      "low": 4306.67,
-      "close": 4306.67,
-      "kj55": 4308.82
-    },
-    {
-      "boundary": 1789639200,
-      "time": "12:00:00",
-      "open": 4306.59,
-      "high": 4306.69,
-      "low": 4305.54,
-      "close": 4305.75,
-      "kj55": 4308.62
-    },
-    {
-      "boundary": 1789639230,
-      "time": "12:00:30",
-      "open": 4305.76,
-      "high": 4307.38,
-      "low": 4305.76,
-      "close": 4307.13,
-      "kj55": 4308.62
-    },
-    {
-      "boundary": 1789639260,
-      "time": "12:01:00",
-      "open": 4307.24,
-      "high": 4307.47,
-      "low": 4305.92,
-      "close": 4307.32,
-      "kj55": 4308.62
-    },
-    {
-      "boundary": 1789639290,
-      "time": "12:01:30",
-      "open": 4307.17,
-      "high": 4307.41,
-      "low": 4306.7,
-      "close": 4307.03,
-      "kj55": 4308.62
-    },
-    {
-      "boundary": 1789639320,
-      "time": "12:02:00",
-      "open": 4307.01,
-      "high": 4307.57,
-      "low": 4306.79,
-      "close": 4307.42,
-      "kj55": 4308.62
-    },
-    {
-      "boundary": 1789639350,
-      "time": "12:02:30",
-      "open": 4306.94,
-      "high": 4307.11,
-      "low": 4305.45,
-      "close": 4306.11,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639380,
-      "time": "12:03:00",
-      "open": 4306.14,
-      "high": 4307.42,
-      "low": 4306.12,
-      "close": 4306.81,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639410,
-      "time": "12:03:30",
-      "open": 4306.84,
-      "high": 4308.07,
-      "low": 4306.84,
-      "close": 4308.07,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639440,
-      "time": "12:04:00",
-      "open": 4308.03,
-      "high": 4308.98,
-      "low": 4307.84,
-      "close": 4308.39,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639470,
-      "time": "12:04:30",
-      "open": 4308.62,
-      "high": 4309.31,
-      "low": 4307.24,
-      "close": 4307.24,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639500,
-      "time": "12:05:00",
-      "open": 4307.17,
-      "high": 4308.99,
-      "low": 4307.17,
-      "close": 4308.97,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639530,
-      "time": "12:05:30",
-      "open": 4309.06,
-      "high": 4309.6,
-      "low": 4308.15,
-      "close": 4309.05,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639560,
-      "time": "12:06:00",
-      "open": 4308.95,
-      "high": 4310.51,
-      "low": 4308.94,
-      "close": 4309.58,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639590,
-      "time": "12:06:30",
-      "open": 4309.6,
-      "high": 4310.73,
-      "low": 4309.6,
-      "close": 4310.7,
-      "kj55": 4308.58
-    },
-    {
-      "boundary": 1789639620,
-      "time": "12:07:00",
-      "open": 4310.97,
-      "high": 4311.97,
-      "low": 4310.55,
-      "close": 4311.54,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639650,
-      "time": "12:07:30",
-      "open": 4311.47,
-      "high": 4311.75,
-      "low": 4310.49,
-      "close": 4310.49,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639680,
-      "time": "12:08:00",
-      "open": 4310.41,
-      "high": 4310.8,
-      "low": 4310.32,
-      "close": 4310.34,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639710,
-      "time": "12:08:30",
-      "open": 4310.36,
-      "high": 4310.73,
-      "low": 4309.08,
-      "close": 4309.08,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639740,
-      "time": "12:09:00",
-      "open": 4309.09,
-      "high": 4309.61,
-      "low": 4307.83,
-      "close": 4309.16,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639770,
-      "time": "12:09:30",
-      "open": 4309.48,
-      "high": 4309.54,
-      "low": 4308.92,
-      "close": 4309.54,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639800,
-      "time": "12:10:00",
-      "open": 4309.6,
-      "high": 4310.15,
-      "low": 4309.4,
-      "close": 4310.08,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639830,
-      "time": "12:10:30",
-      "open": 4310.03,
-      "high": 4311.05,
-      "low": 4309.53,
-      "close": 4310.18,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639860,
-      "time": "12:11:00",
-      "open": 4310.06,
-      "high": 4310.63,
-      "low": 4309.95,
-      "close": 4310.42,
-      "kj55": 4308.71
-    },
-    {
-      "boundary": 1789639890,
-      "time": "12:11:30",
-      "open": 4310.49,
-      "high": 4312.95,
-      "low": 4310.49,
-      "close": 4311.77,
-      "kj55": 4309.2
-    },
-    {
-      "boundary": 1789639920,
-      "time": "12:12:00",
-      "open": 4311.62,
-      "high": 4313.76,
-      "low": 4311.62,
-      "close": 4312.52,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789639950,
-      "time": "12:12:30",
-      "open": 4312.48,
-      "high": 4312.6,
-      "low": 4311.65,
-      "close": 4311.98,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789639980,
-      "time": "12:13:00",
-      "open": 4311.97,
-      "high": 4312.66,
-      "low": 4311.78,
-      "close": 4312.62,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640010,
-      "time": "12:13:30",
-      "open": 4312.73,
-      "high": 4313.1,
-      "low": 4312.42,
-      "close": 4312.42,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640040,
-      "time": "12:14:00",
-      "open": 4312.43,
-      "high": 4312.8,
-      "low": 4311.85,
-      "close": 4312.01,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640070,
-      "time": "12:14:30",
-      "open": 4312.0,
-      "high": 4312.0,
-      "low": 4309.81,
-      "close": 4309.81,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640100,
-      "time": "12:15:00",
-      "open": 4309.77,
-      "high": 4310.76,
-      "low": 4309.56,
-      "close": 4310.22,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640130,
-      "time": "12:15:30",
-      "open": 4310.27,
-      "high": 4310.88,
-      "low": 4310.13,
-      "close": 4310.53,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640160,
-      "time": "12:16:00",
-      "open": 4310.57,
-      "high": 4310.7,
-      "low": 4309.36,
-      "close": 4309.78,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640190,
-      "time": "12:16:30",
-      "open": 4309.83,
-      "high": 4310.11,
-      "low": 4308.72,
-      "close": 4309.0,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640220,
-      "time": "12:17:00",
-      "open": 4309.07,
-      "high": 4309.36,
-      "low": 4308.41,
-      "close": 4309.36,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640250,
-      "time": "12:17:30",
-      "open": 4309.37,
-      "high": 4309.4,
-      "low": 4308.13,
-      "close": 4309.04,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640280,
-      "time": "12:18:00",
-      "open": 4309.36,
-      "high": 4310.58,
-      "low": 4309.08,
-      "close": 4309.51,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640310,
-      "time": "12:18:30",
-      "open": 4309.56,
-      "high": 4309.93,
-      "low": 4309.16,
-      "close": 4309.16,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640340,
-      "time": "12:19:00",
-      "open": 4309.08,
-      "high": 4309.08,
-      "low": 4307.47,
-      "close": 4308.0,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640370,
-      "time": "12:19:30",
-      "open": 4307.89,
-      "high": 4308.19,
-      "low": 4307.1,
-      "close": 4307.2,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640400,
-      "time": "12:20:00",
-      "open": 4307.42,
-      "high": 4309.05,
-      "low": 4307.16,
-      "close": 4308.53,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640430,
-      "time": "12:20:30",
-      "open": 4308.35,
-      "high": 4308.84,
-      "low": 4307.94,
-      "close": 4308.29,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640460,
-      "time": "12:21:00",
-      "open": 4308.09,
-      "high": 4309.37,
-      "low": 4308.09,
-      "close": 4308.94,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640490,
-      "time": "12:21:30",
-      "open": 4308.95,
-      "high": 4309.2,
-      "low": 4308.83,
-      "close": 4309.13,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640520,
-      "time": "12:22:00",
-      "open": 4309.14,
-      "high": 4309.93,
-      "low": 4309.14,
-      "close": 4309.91,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640550,
-      "time": "12:22:30",
-      "open": 4309.86,
-      "high": 4310.29,
-      "low": 4309.26,
-      "close": 4309.52,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640580,
-      "time": "12:23:00",
-      "open": 4309.36,
-      "high": 4309.99,
-      "low": 4309.24,
-      "close": 4309.91,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640610,
-      "time": "12:23:30",
-      "open": 4309.82,
-      "high": 4310.84,
-      "low": 4309.71,
-      "close": 4310.45,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640640,
-      "time": "12:24:00",
-      "open": 4310.43,
-      "high": 4311.79,
-      "low": 4310.09,
-      "close": 4311.79,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640670,
-      "time": "12:24:30",
-      "open": 4311.81,
-      "high": 4313.1,
-      "low": 4311.68,
-      "close": 4313.0,
-      "kj55": 4309.6
-    },
-    {
-      "boundary": 1789640700,
-      "time": "12:25:00",
-      "open": 4312.92,
-      "high": 4314.12,
-      "low": 4312.5,
-      "close": 4314.12,
-      "kj55": 4309.78
-    },
-    {
-      "boundary": 1789640730,
-      "time": "12:25:30",
-      "open": 4314.13,
-      "high": 4314.48,
-      "low": 4313.56,
-      "close": 4314.11,
-      "kj55": 4309.97
-    },
-    {
-      "boundary": 1789640760,
-      "time": "12:26:00",
-      "open": 4314.72,
-      "high": 4315.28,
-      "low": 4313.07,
-      "close": 4313.07,
-      "kj55": 4310.36
-    },
-    {
-      "boundary": 1789640790,
-      "time": "12:26:30",
-      "open": 4313.14,
-      "high": 4314.85,
-      "low": 4312.94,
-      "close": 4314.05,
-      "kj55": 4310.36
-    },
-    {
-      "boundary": 1789640820,
-      "time": "12:27:00",
-      "open": 4314.61,
-      "high": 4314.88,
-      "low": 4313.46,
-      "close": 4313.91,
-      "kj55": 4310.36
-    },
-    {
-      "boundary": 1789640850,
-      "time": "12:27:30",
-      "open": 4313.9,
-      "high": 4315.15,
-      "low": 4313.9,
-      "close": 4314.99,
-      "kj55": 4310.36
-    },
-    {
-      "boundary": 1789640880,
-      "time": "12:28:00",
-      "open": 4314.94,
-      "high": 4315.42,
-      "low": 4314.34,
-      "close": 4314.39,
-      "kj55": 4310.43
-    },
-    {
-      "boundary": 1789640910,
-      "time": "12:28:30",
-      "open": 4314.43,
-      "high": 4315.74,
-      "low": 4314.37,
-      "close": 4315.41,
-      "kj55": 4310.59
-    },
-    {
-      "boundary": 1789640940,
-      "time": "12:29:00",
-      "open": 4315.49,
-      "high": 4315.65,
-      "low": 4314.97,
-      "close": 4315.34,
-      "kj55": 4310.59
-    },
-    {
-      "boundary": 1789640970,
-      "time": "12:29:30",
-      "open": 4315.35,
-      "high": 4315.35,
-      "low": 4313.35,
-      "close": 4313.98,
-      "kj55": 4310.59
-    },
-    {
-      "boundary": 1789641000,
-      "time": "12:30:00",
-      "open": 4313.97,
-      "high": 4315.55,
-      "low": 4313.82,
-      "close": 4314.8,
-      "kj55": 4310.93
-    },
-    {
-      "boundary": 1789641030,
-      "time": "12:30:30",
-      "open": 4314.75,
-      "high": 4315.0,
-      "low": 4313.87,
-      "close": 4314.85,
-      "kj55": 4311.29
-    },
-    {
-      "boundary": 1789641060,
-      "time": "12:31:00",
-      "open": 4314.73,
-      "high": 4314.77,
-      "low": 4313.04,
-      "close": 4314.42,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641090,
-      "time": "12:31:30",
-      "open": 4314.32,
-      "high": 4314.35,
-      "low": 4312.11,
-      "close": 4313.23,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641120,
-      "time": "12:32:00",
-      "open": 4313.29,
-      "high": 4313.29,
-      "low": 4312.37,
-      "close": 4312.71,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641150,
-      "time": "12:32:30",
-      "open": 4312.7,
-      "high": 4313.26,
-      "low": 4312.58,
-      "close": 4313.01,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641180,
-      "time": "12:33:00",
-      "open": 4313.0,
-      "high": 4313.77,
-      "low": 4312.97,
-      "close": 4313.63,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641210,
-      "time": "12:33:30",
-      "open": 4313.7,
-      "high": 4314.27,
-      "low": 4312.65,
-      "close": 4313.04,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641240,
-      "time": "12:34:00",
-      "open": 4313.14,
-      "high": 4314.58,
-      "low": 4312.74,
-      "close": 4314.12,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641270,
-      "time": "12:34:30",
-      "open": 4314.17,
-      "high": 4314.87,
-      "low": 4314.07,
-      "close": 4314.42,
-      "kj55": 4311.42
-    },
-    {
-      "boundary": 1789641300,
-      "time": "12:35:00",
-      "open": 4314.48,
-      "high": 4315.77,
-      "low": 4314.46,
-      "close": 4315.77,
-      "kj55": 4311.44
-    },
-    {
-      "boundary": 1789641330,
-      "time": "12:35:30",
-      "open": 4316.14,
-      "high": 4317.53,
-      "low": 4316.1,
-      "close": 4316.85,
-      "kj55": 4312.32
-    },
-    {
-      "boundary": 1789641360,
-      "time": "12:36:00",
-      "open": 4316.86,
-      "high": 4318.04,
-      "low": 4316.86,
-      "close": 4317.79,
-      "kj55": 4312.57
-    },
-    {
-      "boundary": 1789641390,
-      "time": "12:36:30",
-      "open": 4317.84,
-      "high": 4319.0,
-      "low": 4317.34,
-      "close": 4318.1,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641420,
-      "time": "12:37:00",
-      "open": 4318.19,
-      "high": 4318.7,
-      "low": 4317.95,
-      "close": 4318.34,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641450,
-      "time": "12:37:30",
-      "open": 4318.36,
-      "high": 4318.99,
-      "low": 4317.12,
-      "close": 4317.12,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641480,
-      "time": "12:38:00",
-      "open": 4317.18,
-      "high": 4317.65,
-      "low": 4316.6,
-      "close": 4317.41,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641510,
-      "time": "12:38:30",
-      "open": 4317.43,
-      "high": 4317.43,
-      "low": 4316.65,
-      "close": 4317.01,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641540,
-      "time": "12:39:00",
-      "open": 4317.02,
-      "high": 4317.3,
-      "low": 4316.31,
-      "close": 4317.26,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641570,
-      "time": "12:39:30",
-      "open": 4317.21,
-      "high": 4317.52,
-      "low": 4317.09,
-      "close": 4317.18,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641600,
-      "time": "12:40:00",
-      "open": 4317.2,
-      "high": 4317.65,
-      "low": 4315.98,
-      "close": 4315.98,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641630,
-      "time": "12:40:30",
-      "open": 4316.04,
-      "high": 4317.15,
-      "low": 4315.14,
-      "close": 4315.6,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641660,
-      "time": "12:41:00",
-      "open": 4315.63,
-      "high": 4316.1,
-      "low": 4315.59,
-      "close": 4315.85,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641690,
-      "time": "12:41:30",
-      "open": 4315.94,
-      "high": 4316.11,
-      "low": 4314.48,
-      "close": 4314.48,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641720,
-      "time": "12:42:00",
-      "open": 4314.43,
-      "high": 4315.61,
-      "low": 4314.43,
-      "close": 4315.05,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641750,
-      "time": "12:42:30",
-      "open": 4315.04,
-      "high": 4315.11,
-      "low": 4314.82,
-      "close": 4314.82,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641780,
-      "time": "12:43:00",
-      "open": 4314.86,
-      "high": 4315.66,
-      "low": 4314.84,
-      "close": 4315.42,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641810,
-      "time": "12:43:30",
-      "open": 4315.4,
-      "high": 4317.41,
-      "low": 4315.4,
-      "close": 4317.15,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641840,
-      "time": "12:44:00",
-      "open": 4317.14,
-      "high": 4317.59,
-      "low": 4316.38,
-      "close": 4316.38,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641870,
-      "time": "12:44:30",
-      "open": 4316.24,
-      "high": 4317.01,
-      "low": 4316.23,
-      "close": 4316.84,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641900,
-      "time": "12:45:00",
-      "open": 4317.03,
-      "high": 4317.29,
-      "low": 4316.73,
-      "close": 4317.29,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641930,
-      "time": "12:45:30",
-      "open": 4317.25,
-      "high": 4317.68,
-      "low": 4316.82,
-      "close": 4317.22,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641960,
-      "time": "12:46:00",
-      "open": 4317.26,
-      "high": 4317.52,
-      "low": 4316.15,
-      "close": 4316.94,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789641990,
-      "time": "12:46:30",
-      "open": 4317.0,
-      "high": 4317.27,
-      "low": 4316.62,
-      "close": 4317.07,
-      "kj55": 4313.05
-    },
-    {
-      "boundary": 1789642020,
-      "time": "12:47:00",
-      "open": 4317.15,
-      "high": 4317.71,
-      "low": 4317.14,
-      "close": 4317.69,
-      "kj55": 4313.08
-    },
-    {
-      "boundary": 1789642050,
-      "time": "12:47:30",
-      "open": 4317.53,
-      "high": 4318.36,
-      "low": 4317.38,
-      "close": 4317.9,
-      "kj55": 4313.47
-    },
-    {
-      "boundary": 1789642080,
-      "time": "12:48:00",
-      "open": 4317.88,
-      "high": 4318.79,
-      "low": 4317.62,
-      "close": 4318.79,
-      "kj55": 4313.55
-    },
-    {
-      "boundary": 1789642110,
-      "time": "12:48:30",
-      "open": 4318.77,
-      "high": 4318.87,
-      "low": 4317.99,
-      "close": 4318.56,
-      "kj55": 4313.91
-    },
-    {
-      "boundary": 1789642140,
-      "time": "12:49:00",
-      "open": 4318.45,
-      "high": 4319.03,
-      "low": 4318.16,
-      "close": 4318.98,
-      "kj55": 4314.09
-    },
-    {
-      "boundary": 1789642170,
-      "time": "12:49:30",
-      "open": 4318.91,
-      "high": 4318.97,
-      "low": 4318.45,
-      "close": 4318.94,
-      "kj55": 4314.14
-    },
-    {
-      "boundary": 1789642200,
-      "time": "12:50:00",
-      "open": 4318.87,
-      "high": 4319.05,
-      "low": 4318.36,
-      "close": 4318.96,
-      "kj55": 4314.15
-    },
-    {
-      "boundary": 1789642230,
-      "time": "12:50:30",
-      "open": 4318.59,
-      "high": 4321.25,
-      "low": 4318.59,
-      "close": 4321.14,
-      "kj55": 4315.48
-    },
-    {
-      "boundary": 1789642260,
-      "time": "12:51:00",
-      "open": 4321.03,
-      "high": 4322.25,
-      "low": 4320.68,
-      "close": 4322.21,
-      "kj55": 4316.17
-    },
-    {
-      "boundary": 1789642290,
-      "time": "12:51:30",
-      "open": 4322.19,
-      "high": 4322.98,
-      "low": 4322.14,
-      "close": 4322.59,
-      "kj55": 4317.33
-    },
-    {
-      "boundary": 1789642320,
-      "time": "12:52:00",
-      "open": 4322.6,
-      "high": 4323.18,
-      "low": 4322.08,
-      "close": 4322.83,
-      "kj55": 4317.65
-    },
-    {
-      "boundary": 1789642350,
-      "time": "12:52:30",
-      "open": 4322.84,
-      "high": 4323.13,
-      "low": 4322.43,
-      "close": 4322.43,
-      "kj55": 4317.65
-    },
-    {
-      "boundary": 1789642380,
-      "time": "12:53:00",
-      "open": 4322.44,
-      "high": 4322.46,
-      "low": 4320.98,
-      "close": 4321.84,
-      "kj55": 4317.65
-    },
-    {
-      "boundary": 1789642410,
-      "time": "12:53:30",
-      "open": 4321.77,
-      "high": 4323.29,
-      "low": 4321.31,
-      "close": 4323.0,
-      "kj55": 4317.7
-    },
-    {
-      "boundary": 1789642440,
-      "time": "12:54:00",
-      "open": 4323.06,
-      "high": 4323.35,
-      "low": 4321.89,
-      "close": 4322.48,
-      "kj55": 4317.73
-    },
-    {
-      "boundary": 1789642470,
-      "time": "12:54:30",
-      "open": 4322.38,
-      "high": 4322.88,
-      "low": 4321.01,
-      "close": 4322.51,
-      "kj55": 4317.73
-    },
-    {
-      "boundary": 1789642500,
-      "time": "12:55:00",
-      "open": 4322.49,
-      "high": 4322.82,
-      "low": 4321.54,
-      "close": 4321.54,
-      "kj55": 4317.73
-    },
-    {
-      "boundary": 1789642530,
-      "time": "12:55:30",
-      "open": 4321.52,
-      "high": 4322.25,
-      "low": 4321.2,
-      "close": 4321.2,
-      "kj55": 4317.73
-    },
-    {
-      "boundary": 1789642560,
-      "time": "12:56:00",
-      "open": 4321.37,
-      "high": 4323.64,
-      "low": 4321.18,
-      "close": 4323.53,
-      "kj55": 4317.88,
-      "tk144": 4314.55
-    },
-    {
-      "boundary": 1789642590,
-      "time": "12:56:30",
-      "open": 4324.02,
-      "high": 4324.24,
-      "low": 4323.55,
-      "close": 4323.67,
-      "kj55": 4318.17,
-      "tk144": 4314.84
-    },
-    {
-      "boundary": 1789642620,
-      "time": "12:57:00",
-      "open": 4323.65,
-      "high": 4324.55,
-      "low": 4323.65,
-      "close": 4324.32,
-      "kj55": 4318.33,
-      "tk144": 4315.0
-    },
-    {
-      "boundary": 1789642650,
-      "time": "12:57:30",
-      "open": 4324.29,
-      "high": 4324.88,
-      "low": 4324.19,
-      "close": 4324.49,
-      "kj55": 4318.49,
-      "tk144": 4315.16
-    },
-    {
-      "boundary": 1789642680,
-      "time": "12:58:00",
-      "open": 4324.52,
-      "high": 4324.62,
-      "low": 4324.26,
-      "close": 4324.26,
-      "kj55": 4318.49,
-      "tk144": 4315.16
-    },
-    {
-      "boundary": 1789642710,
-      "time": "12:58:30",
-      "open": 4324.28,
-      "high": 4325.19,
-      "low": 4324.09,
-      "close": 4324.12,
-      "kj55": 4318.65,
-      "tk144": 4315.32
-    },
-    {
-      "boundary": 1789642740,
-      "time": "12:59:00",
-      "open": 4324.07,
-      "high": 4324.49,
-      "low": 4323.86,
-      "close": 4324.3,
-      "kj55": 4318.78,
-      "tk144": 4315.32
-    },
-    {
-      "boundary": 1789642770,
-      "time": "12:59:30",
-      "open": 4324.19,
-      "high": 4324.65,
-      "low": 4323.69,
-      "close": 4323.92,
-      "kj55": 4318.89,
-      "tk144": 4315.32
-    },
-    {
-      "boundary": 1789642800,
-      "time": "13:00:00",
-      "open": 4323.97,
-      "high": 4327.19,
-      "low": 4323.45,
-      "close": 4326.52,
-      "kj55": 4319.92,
-      "tk144": 4316.32
-    },
-    {
-      "boundary": 1789642830,
-      "time": "13:00:30",
-      "open": 4327.02,
-      "high": 4327.31,
-      "low": 4327.02,
-      "close": 4327.21,
-      "kj55": 4319.98,
-      "tk144": 4316.38
-    },
-    {
-      "boundary": 1789642860,
-      "time": "13:01:00",
-      "open": 4327.49,
-      "high": 4328.48,
-      "low": 4326.75,
-      "close": 4327.89,
-      "kj55": 4320.61,
-      "tk144": 4316.97
-    },
-    {
-      "boundary": 1789642890,
-      "time": "13:01:30",
-      "open": 4328.11,
-      "high": 4329.11,
-      "low": 4326.42,
-      "close": 4328.14,
-      "kj55": 4321.59,
-      "tk144": 4317.28
-    },
-    {
-      "boundary": 1789642920,
-      "time": "13:02:00",
-      "open": 4328.01,
-      "high": 4329.15,
-      "low": 4327.37,
-      "close": 4328.58,
-      "kj55": 4321.79,
-      "tk144": 4317.3
-    },
-    {
-      "boundary": 1789642950,
-      "time": "13:02:30",
-      "open": 4328.53,
-      "high": 4328.64,
-      "low": 4326.99,
-      "close": 4328.12,
-      "kj55": 4321.79,
-      "tk144": 4317.3
-    },
-    {
-      "boundary": 1789642980,
-      "time": "13:03:00",
-      "open": 4328.17,
-      "high": 4329.46,
-      "low": 4327.9,
-      "close": 4329.43,
-      "kj55": 4321.94,
-      "tk144": 4317.45
-    },
-    {
-      "boundary": 1789643010,
-      "time": "13:03:30",
-      "open": 4329.54,
-      "high": 4329.54,
-      "low": 4327.51,
-      "close": 4328.58,
-      "kj55": 4321.99,
-      "tk144": 4317.49
-    },
-    {
-      "boundary": 1789643040,
-      "time": "13:04:00",
-      "open": 4328.61,
-      "high": 4330.77,
-      "low": 4328.39,
-      "close": 4330.0,
-      "kj55": 4322.6,
-      "tk144": 4318.11
-    },
-    {
-      "boundary": 1789643070,
-      "time": "13:04:30",
-      "open": 4329.95,
-      "high": 4330.52,
-      "low": 4329.74,
-      "close": 4330.32,
-      "kj55": 4322.6,
-      "tk144": 4318.11
-    },
-    {
-      "boundary": 1789643100,
-      "time": "13:05:00",
-      "open": 4330.21,
-      "high": 4331.89,
-      "low": 4330.21,
-      "close": 4330.61,
-      "kj55": 4323.16,
-      "tk144": 4318.67
-    },
-    {
-      "boundary": 1789643130,
-      "time": "13:05:30",
-      "open": 4330.49,
-      "high": 4331.77,
-      "low": 4329.97,
-      "close": 4329.97,
-      "kj55": 4323.16,
-      "tk144": 4318.67
-    },
-    {
-      "boundary": 1789643160,
-      "time": "13:06:00",
-      "open": 4329.96,
-      "high": 4330.98,
-      "low": 4329.48,
-      "close": 4330.01,
-      "kj55": 4323.16,
-      "tk144": 4318.67
-    },
-    {
-      "boundary": 1789643190,
-      "time": "13:06:30",
-      "open": 4329.93,
-      "high": 4329.96,
-      "low": 4328.63,
-      "close": 4329.49,
-      "kj55": 4323.16,
-      "tk144": 4318.67
-    },
-    {
-      "boundary": 1789643220,
-      "time": "13:07:00",
-      "open": 4329.47,
-      "high": 4332.63,
-      "low": 4329.47,
-      "close": 4332.01,
-      "kj55": 4323.53,
-      "tk144": 4319.04
-    },
-    {
-      "boundary": 1789643250,
-      "time": "13:07:30",
-      "open": 4332.26,
-      "high": 4333.27,
-      "low": 4331.93,
-      "close": 4333.11,
-      "kj55": 4323.85,
-      "tk144": 4319.36
-    },
-    {
-      "boundary": 1789643280,
-      "time": "13:08:00",
-      "open": 4333.13,
-      "high": 4333.13,
-      "low": 4331.64,
-      "close": 4332.33,
-      "kj55": 4323.85,
-      "tk144": 4319.36
-    },
-    {
-      "boundary": 1789643310,
-      "time": "13:08:30",
-      "open": 4332.45,
-      "high": 4332.85,
-      "low": 4332.02,
-      "close": 4332.19,
-      "kj55": 4323.85,
-      "tk144": 4319.36
-    },
-    {
-      "boundary": 1789643340,
-      "time": "13:09:00",
-      "open": 4332.07,
-      "high": 4332.34,
-      "low": 4330.37,
-      "close": 4332.14,
-      "kj55": 4323.85,
-      "tk144": 4319.36
-    },
-    {
-      "boundary": 1789643370,
-      "time": "13:09:30",
-      "open": 4332.11,
-      "high": 4336.77,
-      "low": 4332.11,
-      "close": 4335.99,
-      "kj55": 4325.8,
-      "tk144": 4321.11
-    },
-    {
-      "boundary": 1789643400,
-      "time": "13:10:00",
-      "open": 4336.11,
-      "high": 4337.98,
-      "low": 4335.75,
-      "close": 4337.98,
-      "kj55": 4326.41,
-      "tk144": 4321.72
-    },
-    {
-      "boundary": 1789643430,
-      "time": "13:10:30",
-      "open": 4338.09,
-      "high": 4340.25,
-      "low": 4337.03,
-      "close": 4337.06,
-      "kj55": 4327.82,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643460,
-      "time": "13:11:00",
-      "open": 4336.85,
-      "high": 4336.85,
-      "low": 4334.31,
-      "close": 4334.68,
-      "kj55": 4328.2,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643490,
-      "time": "13:11:30",
-      "open": 4334.62,
-      "high": 4335.28,
-      "low": 4331.49,
-      "close": 4331.96,
-      "kj55": 4328.2,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643520,
-      "time": "13:12:00",
-      "open": 4332.0,
-      "high": 4332.75,
-      "low": 4331.46,
-      "close": 4332.61,
-      "kj55": 4328.2,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643550,
-      "time": "13:12:30",
-      "open": 4332.66,
-      "high": 4332.93,
-      "low": 4331.3,
-      "close": 4331.64,
-      "kj55": 4328.2,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643580,
-      "time": "13:13:00",
-      "open": 4331.68,
-      "high": 4332.77,
-      "low": 4331.53,
-      "close": 4332.04,
-      "kj55": 4328.2,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643610,
-      "time": "13:13:30",
-      "open": 4331.72,
-      "high": 4332.27,
-      "low": 4330.91,
-      "close": 4332.27,
-      "kj55": 4328.43,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643670,
-      "time": "13:14:30",
-      "open": 4332.92,
-      "high": 4333.04,
-      "low": 4332.05,
-      "close": 4332.76,
-      "kj55": 4328.69,
-      "tk144": 4322.85
-    },
-    {
-      "boundary": 1789643700,
-      "time": "13:15:00",
-      "open": 4332.85,
-      "high": 4333.94,
-      "low": 4332.81,
-      "close": 4332.93,
-      "kj55": 4328.82,
-      "tk144": 4323.18
-    },
-    {
-      "boundary": 1789643730,
-      "time": "13:15:30",
-      "open": 4332.83,
-      "high": 4334.4,
-      "low": 4332.77,
-      "close": 4333.45,
-      "kj55": 4328.93,
-      "tk144": 4323.55
-    },
-    {
-      "boundary": 1789643760,
-      "time": "13:16:00",
-      "open": 4333.51,
-      "high": 4335.03,
-      "low": 4333.47,
-      "close": 4334.01,
-      "kj55": 4329.12,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643790,
-      "time": "13:16:30",
-      "open": 4333.93,
-      "high": 4333.93,
-      "low": 4331.63,
-      "close": 4331.85,
-      "kj55": 4329.2,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643820,
-      "time": "13:17:00",
-      "open": 4331.84,
-      "high": 4331.84,
-      "low": 4330.22,
-      "close": 4330.49,
-      "kj55": 4329.31,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643850,
-      "time": "13:17:30",
-      "open": 4330.47,
-      "high": 4331.44,
-      "low": 4329.42,
-      "close": 4329.71,
-      "kj55": 4329.31,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643880,
-      "time": "13:18:00",
-      "open": 4329.61,
-      "high": 4330.11,
-      "low": 4329.05,
-      "close": 4329.65,
-      "kj55": 4329.42,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643910,
-      "time": "13:18:30",
-      "open": 4329.64,
-      "high": 4329.64,
-      "low": 4328.2,
-      "close": 4328.64,
-      "kj55": 4330.47,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643940,
-      "time": "13:19:00",
-      "open": 4328.65,
-      "high": 4329.29,
-      "low": 4328.36,
-      "close": 4328.7,
-      "kj55": 4330.61,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789643970,
-      "time": "13:19:30",
-      "open": 4328.56,
-      "high": 4328.77,
-      "low": 4326.99,
-      "close": 4327.28,
-      "kj55": 4330.61,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644000,
-      "time": "13:20:00",
-      "open": 4327.3,
-      "high": 4331.58,
-      "low": 4327.3,
-      "close": 4331.52,
-      "kj55": 4330.61,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644030,
-      "time": "13:20:30",
-      "open": 4331.25,
-      "high": 4331.98,
-      "low": 4331.03,
-      "close": 4331.98,
-      "kj55": 4330.61,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644060,
-      "time": "13:21:00",
-      "open": 4332.02,
-      "high": 4333.01,
-      "low": 4331.75,
-      "close": 4331.87,
-      "kj55": 4330.63,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644090,
-      "time": "13:21:30",
-      "open": 4331.83,
-      "high": 4332.81,
-      "low": 4331.32,
-      "close": 4332.55,
-      "kj55": 4330.63,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644120,
-      "time": "13:22:00",
-      "open": 4332.5,
-      "high": 4332.66,
-      "low": 4331.85,
-      "close": 4332.08,
-      "kj55": 4330.63,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644150,
-      "time": "13:22:30",
-      "open": 4332.1,
-      "high": 4333.19,
-      "low": 4331.52,
-      "close": 4331.52,
-      "kj55": 4330.72,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644180,
-      "time": "13:23:00",
-      "open": 4331.29,
-      "high": 4331.58,
-      "low": 4329.88,
-      "close": 4330.79,
-      "kj55": 4330.72,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644210,
-      "time": "13:23:30",
-      "open": 4330.6,
-      "high": 4331.47,
-      "low": 4330.33,
-      "close": 4330.38,
-      "kj55": 4330.72,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644240,
-      "time": "13:24:00",
-      "open": 4330.44,
-      "high": 4330.72,
-      "low": 4329.81,
-      "close": 4330.15,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644270,
-      "time": "13:24:30",
-      "open": 4330.17,
-      "high": 4330.17,
-      "low": 4328.46,
-      "close": 4328.52,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644300,
-      "time": "13:25:00",
-      "open": 4328.56,
-      "high": 4329.89,
-      "low": 4327.92,
-      "close": 4328.29,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644330,
-      "time": "13:25:30",
-      "open": 4328.22,
-      "high": 4328.34,
-      "low": 4326.92,
-      "close": 4327.15,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644360,
-      "time": "13:26:00",
-      "open": 4327.12,
-      "high": 4327.98,
-      "low": 4326.55,
-      "close": 4327.76,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644390,
-      "time": "13:26:30",
-      "open": 4327.81,
-      "high": 4328.12,
-      "low": 4327.15,
-      "close": 4327.79,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644420,
-      "time": "13:27:00",
-      "open": 4327.82,
-      "high": 4328.07,
-      "low": 4327.13,
-      "close": 4327.33,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644450,
-      "time": "13:27:30",
-      "open": 4327.28,
-      "high": 4327.91,
-      "low": 4326.85,
-      "close": 4326.85,
-      "kj55": 4331.85,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644480,
-      "time": "13:28:00",
-      "open": 4326.86,
-      "high": 4329.04,
-      "low": 4326.71,
-      "close": 4328.34,
-      "kj55": 4333.34,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644510,
-      "time": "13:28:30",
-      "open": 4328.24,
-      "high": 4328.63,
-      "low": 4327.81,
-      "close": 4328.08,
-      "kj55": 4333.34,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644540,
-      "time": "13:29:00",
-      "open": 4328.16,
-      "high": 4329.26,
-      "low": 4328.11,
-      "close": 4328.27,
-      "kj55": 4333.34,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644570,
-      "time": "13:29:30",
-      "open": 4328.31,
-      "high": 4328.61,
-      "low": 4328.02,
-      "close": 4328.45,
-      "kj55": 4333.4,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644600,
-      "time": "13:30:00",
-      "open": 4328.64,
-      "high": 4328.98,
-      "low": 4327.94,
-      "close": 4328.56,
-      "kj55": 4333.4,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644630,
-      "time": "13:30:30",
-      "open": 4328.69,
-      "high": 4328.82,
-      "low": 4327.35,
-      "close": 4327.71,
-      "kj55": 4333.4,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644660,
-      "time": "13:31:00",
-      "open": 4327.63,
-      "high": 4327.81,
-      "low": 4326.62,
-      "close": 4326.79,
-      "kj55": 4333.4,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644690,
-      "time": "13:31:30",
-      "open": 4326.93,
-      "high": 4327.8,
-      "low": 4326.55,
-      "close": 4327.68,
-      "kj55": 4333.4,
-      "tk144": 4323.68
-    },
-    {
-      "boundary": 1789644720,
-      "time": "13:32:00",
-      "open": 4327.62,
-      "high": 4328.43,
-      "low": 4327.23,
-      "close": 4328.25,
-      "kj55": 4333.4,
-      "tk144": 4323.7
-    },
-    {
-      "boundary": 1789644750,
-      "time": "13:32:30",
-      "open": 4328.27,
-      "high": 4328.38,
-      "low": 4326.96,
-      "close": 4327.7,
-      "kj55": 4333.4,
-      "tk144": 4324.09
-    },
-    {
-      "boundary": 1789644780,
-      "time": "13:33:00",
-      "open": 4327.65,
-      "high": 4327.65,
-      "low": 4326.11,
-      "close": 4326.3,
-      "kj55": 4333.18,
-      "tk144": 4324.17
-    },
-    {
-      "boundary": 1789644810,
-      "time": "13:33:30",
-      "open": 4326.31,
-      "high": 4327.13,
-      "low": 4325.47,
-      "close": 4326.77,
-      "kj55": 4332.86,
-      "tk144": 4324.54
-    },
-    {
-      "boundary": 1789644840,
-      "time": "13:34:00",
-      "open": 4326.75,
-      "high": 4328.08,
-      "low": 4326.19,
-      "close": 4327.91,
-      "kj55": 4332.86,
-      "tk144": 4324.69
-    },
-    {
-      "boundary": 1789644870,
-      "time": "13:34:30",
-      "open": 4327.38,
-      "high": 4327.6,
-      "low": 4326.0,
-      "close": 4326.28,
-      "kj55": 4332.86,
-      "tk144": 4324.74
-    },
-    {
-      "boundary": 1789644900,
-      "time": "13:35:00",
-      "open": 4326.33,
-      "high": 4326.46,
-      "low": 4324.99,
-      "close": 4326.37,
-      "kj55": 4332.62,
-      "tk144": 4324.74
-    },
-    {
-      "boundary": 1789644930,
-      "time": "13:35:30",
-      "open": 4326.37,
-      "high": 4327.11,
-      "low": 4325.79,
-      "close": 4326.65,
-      "kj55": 4332.62,
-      "tk144": 4324.98
-    },
-    {
-      "boundary": 1789644960,
-      "time": "13:36:00",
-      "open": 4326.68,
-      "high": 4327.52,
-      "low": 4325.86,
-      "close": 4325.87,
-      "kj55": 4332.62,
-      "tk144": 4325.17
-    },
-    {
-      "boundary": 1789644990,
-      "time": "13:36:30",
-      "open": 4325.85,
-      "high": 4326.98,
-      "low": 4325.85,
-      "close": 4326.24,
-      "kj55": 4332.62,
-      "tk144": 4325.97
-    },
-    {
-      "boundary": 1789645020,
-      "time": "13:37:00",
-      "open": 4326.35,
-      "high": 4326.54,
-      "low": 4325.49,
-      "close": 4326.37,
-      "kj55": 4332.62,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645050,
-      "time": "13:37:30",
-      "open": 4326.36,
-      "high": 4326.37,
-      "low": 4324.55,
-      "close": 4325.2,
-      "kj55": 4332.4,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645080,
-      "time": "13:38:00",
-      "open": 4325.23,
-      "high": 4325.3,
-      "low": 4323.76,
-      "close": 4324.45,
-      "kj55": 4332.01,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645110,
-      "time": "13:38:30",
-      "open": 4324.56,
-      "high": 4325.28,
-      "low": 4324.37,
-      "close": 4324.96,
-      "kj55": 4330.31,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645140,
-      "time": "13:39:00",
-      "open": 4324.9,
-      "high": 4325.59,
-      "low": 4324.9,
-      "close": 4325.07,
-      "kj55": 4329.52,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645170,
-      "time": "13:39:30",
-      "open": 4325.31,
-      "high": 4326.54,
-      "low": 4325.31,
-      "close": 4326.03,
-      "kj55": 4329.4,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645200,
-      "time": "13:40:00",
-      "open": 4326.14,
-      "high": 4326.14,
-      "low": 4325.09,
-      "close": 4325.09,
-      "kj55": 4329.4,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645230,
-      "time": "13:40:30",
-      "open": 4325.11,
-      "high": 4325.11,
-      "low": 4323.12,
-      "close": 4324.13,
-      "kj55": 4329.07,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645260,
-      "time": "13:41:00",
-      "open": 4324.17,
-      "high": 4324.46,
-      "low": 4323.89,
-      "close": 4324.15,
-      "kj55": 4329.07,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645290,
-      "time": "13:41:30",
-      "open": 4324.3,
-      "high": 4324.41,
-      "low": 4323.89,
-      "close": 4324.19,
-      "kj55": 4329.07,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645320,
-      "time": "13:42:00",
-      "open": 4324.14,
-      "high": 4324.88,
-      "low": 4323.89,
-      "close": 4323.96,
-      "kj55": 4329.07,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645350,
-      "time": "13:42:30",
-      "open": 4324.12,
-      "high": 4325.4,
-      "low": 4323.72,
-      "close": 4325.19,
-      "kj55": 4329.07,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645380,
-      "time": "13:43:00",
-      "open": 4325.16,
-      "high": 4326.27,
-      "low": 4325.03,
-      "close": 4325.34,
-      "kj55": 4329.07,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645410,
-      "time": "13:43:30",
-      "open": 4325.33,
-      "high": 4326.84,
-      "low": 4325.02,
-      "close": 4325.96,
-      "kj55": 4328.52,
-      "tk144": 4326.18
-    },
-    {
-      "boundary": 1789645440,
-      "time": "13:44:00",
-      "open": 4325.72,
-      "high": 4326.86,
-      "low": 4325.66,
-      "close": 4326.56,
-      "kj55": 4328.15,
-      "tk144": 4326.31
-    },
-    {
-      "boundary": 1789645470,
-      "time": "13:44:30",
-      "open": 4326.48,
-      "high": 4326.73,
-      "low": 4324.62,
-      "close": 4325.1,
-      "kj55": 4328.15,
-      "tk144": 4326.41
-    },
-    {
-      "boundary": 1789645500,
-      "time": "13:45:00",
-      "open": 4325.13,
-      "high": 4325.31,
-      "low": 4324.59,
-      "close": 4324.62,
-      "kj55": 4328.15,
-      "tk144": 4326.45
-    },
-    {
-      "boundary": 1789645530,
-      "time": "13:45:30",
-      "open": 4324.63,
-      "high": 4326.94,
-      "low": 4324.59,
-      "close": 4326.93,
-      "kj55": 4328.15,
-      "tk144": 4326.45
-    },
-    {
-      "boundary": 1789645560,
-      "time": "13:46:00",
-      "open": 4326.92,
-      "high": 4328.13,
-      "low": 4326.88,
-      "close": 4328.13,
-      "kj55": 4328.15,
-      "tk144": 4326.49
-    },
-    {
-      "boundary": 1789645590,
-      "time": "13:46:30",
-      "open": 4328.14,
-      "high": 4328.14,
-      "low": 4327.62,
-      "close": 4327.68,
-      "kj55": 4328.15,
-      "tk144": 4327.16
-    },
-    {
-      "boundary": 1789645620,
-      "time": "13:47:00",
-      "open": 4327.7,
-      "high": 4328.25,
-      "low": 4327.4,
-      "close": 4328.25,
-      "kj55": 4328.15,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645650,
-      "time": "13:47:30",
-      "open": 4328.35,
-      "high": 4331.54,
-      "low": 4327.75,
-      "close": 4330.55,
-      "kj55": 4328.15,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645680,
-      "time": "13:48:00",
-      "open": 4330.66,
-      "high": 4332.36,
-      "low": 4330.66,
-      "close": 4331.13,
-      "kj55": 4328.15,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645710,
-      "time": "13:48:30",
-      "open": 4330.96,
-      "high": 4332.7,
-      "low": 4330.91,
-      "close": 4331.64,
-      "kj55": 4328.15,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645740,
-      "time": "13:49:00",
-      "open": 4331.54,
-      "high": 4332.32,
-      "low": 4330.86,
-      "close": 4331.51,
-      "kj55": 4328.15,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645770,
-      "time": "13:49:30",
-      "open": 4331.55,
-      "high": 4333.16,
-      "low": 4331.3,
-      "close": 4332.31,
-      "kj55": 4328.15,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645830,
-      "time": "13:50:30",
-      "open": 4332.8,
-      "high": 4335.84,
-      "low": 4332.8,
-      "close": 4335.1,
-      "kj55": 4329.48,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645860,
-      "time": "13:51:00",
-      "open": 4335.27,
-      "high": 4336.17,
-      "low": 4334.78,
-      "close": 4336.11,
-      "kj55": 4329.65,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645890,
-      "time": "13:51:30",
-      "open": 4336.13,
-      "high": 4338.51,
-      "low": 4336.13,
-      "close": 4338.48,
-      "kj55": 4330.82,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645920,
-      "time": "13:52:00",
-      "open": 4338.42,
-      "high": 4338.59,
-      "low": 4336.75,
-      "close": 4337.44,
-      "kj55": 4330.85,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645950,
-      "time": "13:52:30",
-      "open": 4337.41,
-      "high": 4338.22,
-      "low": 4336.57,
-      "close": 4337.57,
-      "kj55": 4330.85,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789645980,
-      "time": "13:53:00",
-      "open": 4337.34,
-      "high": 4338.14,
-      "low": 4337.1,
-      "close": 4337.84,
-      "kj55": 4330.85,
-      "tk144": 4327.34
-    },
-    {
-      "boundary": 1789646010,
-      "time": "13:53:30",
-      "open": 4337.83,
-      "high": 4340.61,
-      "low": 4337.77,
-      "close": 4340.32,
-      "kj55": 4331.86,
-      "tk144": 4327.52
-    },
-    {
-      "boundary": 1789646040,
-      "time": "13:54:00",
-      "open": 4340.36,
-      "high": 4340.42,
-      "low": 4339.32,
-      "close": 4339.96,
-      "kj55": 4331.86,
-      "tk144": 4327.52
-    },
-    {
-      "boundary": 1789646070,
-      "time": "13:54:30",
-      "open": 4340.0,
-      "high": 4341.82,
-      "low": 4339.88,
-      "close": 4341.13,
-      "kj55": 4332.47,
-      "tk144": 4328.12
-    },
-    {
-      "boundary": 1789646100,
-      "time": "13:55:00",
-      "open": 4341.15,
-      "high": 4343.08,
-      "low": 4340.62,
-      "close": 4342.97,
-      "kj55": 4333.1,
-      "tk144": 4328.95
-    },
-    {
-      "boundary": 1789646130,
-      "time": "13:55:30",
-      "open": 4342.79,
-      "high": 4343.78,
-      "low": 4342.54,
-      "close": 4342.97,
-      "kj55": 4333.45,
-      "tk144": 4329.31
-    },
-    {
-      "boundary": 1789646160,
-      "time": "13:56:00",
-      "open": 4343.17,
-      "high": 4343.2,
-      "low": 4340.02,
-      "close": 4341.57,
-      "kj55": 4333.45,
-      "tk144": 4329.59
-    },
-    {
-      "boundary": 1789646190,
-      "time": "13:56:30",
-      "open": 4341.56,
-      "high": 4342.63,
-      "low": 4341.16,
-      "close": 4342.54,
-      "kj55": 4333.45,
-      "tk144": 4329.97
-    },
-    {
-      "boundary": 1789646220,
-      "time": "13:57:00",
-      "open": 4342.66,
-      "high": 4344.7,
-      "low": 4342.59,
-      "close": 4344.46,
-      "kj55": 4333.91,
-      "tk144": 4330.42
-    },
-    {
-      "boundary": 1789646250,
-      "time": "13:57:30",
-      "open": 4344.38,
-      "high": 4347.0,
-      "low": 4343.91,
-      "close": 4346.38,
-      "kj55": 4335.06,
-      "tk144": 4331.57
-    },
-    {
-      "boundary": 1789646280,
-      "time": "13:58:00",
-      "open": 4346.22,
-      "high": 4350.37,
-      "low": 4345.76,
-      "close": 4349.93,
-      "kj55": 4336.74,
-      "tk144": 4333.26
-    },
-    {
-      "boundary": 1789646310,
-      "time": "13:58:30",
-      "open": 4350.32,
-      "high": 4351.35,
-      "low": 4349.52,
-      "close": 4349.62,
-      "kj55": 4337.24,
-      "tk144": 4333.75
-    },
-    {
-      "boundary": 1789646340,
-      "time": "13:59:00",
-      "open": 4349.73,
-      "high": 4350.37,
-      "low": 4347.25,
-      "close": 4347.57,
-      "kj55": 4337.24,
-      "tk144": 4333.99
-    },
-    {
-      "boundary": 1789646370,
-      "time": "13:59:30",
-      "open": 4347.76,
-      "high": 4350.02,
-      "low": 4347.76,
-      "close": 4349.22,
-      "kj55": 4337.24,
-      "tk144": 4334.25
-    },
-    {
-      "boundary": 1789646400,
-      "time": "14:00:00",
-      "open": 4349.03,
-      "high": 4350.43,
-      "low": 4348.14,
-      "close": 4349.63,
-      "kj55": 4337.24,
-      "tk144": 4334.36
-    },
-    {
-      "boundary": 1789646430,
-      "time": "14:00:30",
-      "open": 4349.53,
-      "high": 4353.92,
-      "low": 4348.9,
-      "close": 4352.6,
-      "kj55": 4338.52,
-      "tk144": 4335.77
-    },
-    {
-      "boundary": 1789646460,
-      "time": "14:01:00",
-      "open": 4352.61,
-      "high": 4353.63,
-      "low": 4351.01,
-      "close": 4351.89,
-      "kj55": 4338.52,
-      "tk144": 4335.95
-    },
-    {
-      "boundary": 1789646490,
-      "time": "14:01:30",
-      "open": 4351.9,
-      "high": 4352.27,
-      "low": 4348.77,
-      "close": 4349.62,
-      "kj55": 4338.52,
-      "tk144": 4336.04
-    },
-    {
-      "boundary": 1789646520,
-      "time": "14:02:00",
-      "open": 4348.21,
-      "high": 4348.22,
-      "low": 4347.74,
-      "close": 4347.74,
-      "kj55": 4338.52,
-      "tk144": 4336.14
-    },
-    {
-      "boundary": 1789646550,
-      "time": "14:02:30",
-      "open": 4347.37,
-      "high": 4348.98,
-      "low": 4345.45,
-      "close": 4348.98,
-      "kj55": 4338.52,
-      "tk144": 4336.14
-    },
-    {
-      "boundary": 1789646580,
-      "time": "14:03:00",
-      "open": 4348.97,
-      "high": 4349.29,
-      "low": 4344.69,
-      "close": 4345.86,
-      "kj55": 4338.52,
-      "tk144": 4336.26
-    },
-    {
-      "boundary": 1789646610,
-      "time": "14:03:30",
-      "open": 4345.83,
-      "high": 4348.22,
-      "low": 4343.5,
-      "close": 4348.22,
-      "kj55": 4338.52,
-      "tk144": 4337.3
-    },
-    {
-      "boundary": 1789646640,
-      "time": "14:04:00",
-      "open": 4349.73,
-      "high": 4351.55,
-      "low": 4347.71,
-      "close": 4350.67,
-      "kj55": 4338.52,
-      "tk144": 4337.45
-    },
-    {
-      "boundary": 1789646670,
-      "time": "14:04:30",
-      "open": 4350.46,
-      "high": 4350.46,
-      "low": 4344.44,
-      "close": 4345.62,
-      "kj55": 4338.52,
-      "tk144": 4337.45
-    },
-    {
-      "boundary": 1789646700,
-      "time": "14:05:00",
-      "open": 4345.92,
-      "high": 4348.05,
-      "low": 4345.76,
-      "close": 4347.85,
-      "kj55": 4338.52,
-      "tk144": 4337.45
-    },
-    {
-      "boundary": 1789646730,
-      "time": "14:05:30",
-      "open": 4347.98,
-      "high": 4351.33,
-      "low": 4346.79,
-      "close": 4349.42,
-      "kj55": 4338.52,
-      "tk144": 4337.45
-    },
-    {
-      "boundary": 1789646760,
-      "time": "14:06:00",
-      "open": 4349.32,
-      "high": 4349.32,
-      "low": 4346.67,
-      "close": 4346.88,
-      "kj55": 4338.52,
-      "tk144": 4337.47
-    },
-    {
-      "boundary": 1789646790,
-      "time": "14:06:30",
-      "open": 4347.13,
-      "high": 4349.29,
-      "low": 4347.13,
-      "close": 4347.9,
-      "kj55": 4338.52,
-      "tk144": 4337.47
-    },
-    {
-      "boundary": 1789646820,
-      "time": "14:07:00",
-      "open": 4347.76,
-      "high": 4347.9,
-      "low": 4346.24,
-      "close": 4346.77,
-      "kj55": 4338.52,
-      "tk144": 4337.47
-    },
-    {
-      "boundary": 1789646850,
-      "time": "14:07:30",
-      "open": 4346.57,
-      "high": 4347.6,
-      "low": 4345.36,
-      "close": 4347.52,
-      "kj55": 4338.52,
-      "tk144": 4337.55
-    },
-    {
-      "boundary": 1789646880,
-      "time": "14:08:00",
-      "open": 4347.11,
-      "high": 4350.42,
-      "low": 4347.0,
-      "close": 4348.55,
-      "kj55": 4338.52,
-      "tk144": 4337.55
-    },
-    {
-      "boundary": 1789646910,
-      "time": "14:08:30",
-      "open": 4348.84,
-      "high": 4350.13,
-      "low": 4348.65,
-      "close": 4349.99,
-      "kj55": 4338.82,
-      "tk144": 4337.55
-    },
-    {
-      "boundary": 1789646940,
-      "time": "14:09:00",
-      "open": 4349.97,
-      "high": 4353.97,
-      "low": 4349.97,
-      "close": 4353.82,
-      "kj55": 4338.85,
-      "tk144": 4338.55
-    },
-    {
-      "boundary": 1789646970,
-      "time": "14:09:30",
-      "open": 4353.73,
-      "high": 4354.4,
-      "low": 4352.61,
-      "close": 4352.86,
-      "kj55": 4339.06,
-      "tk144": 4338.76
-    },
-    {
-      "boundary": 1789647000,
-      "time": "14:10:00",
-      "open": 4353.05,
-      "high": 4353.55,
-      "low": 4351.84,
-      "close": 4353.19,
-      "kj55": 4339.06,
-      "tk144": 4338.76
-    },
-    {
-      "boundary": 1789647030,
-      "time": "14:10:30",
-      "open": 4353.39,
-      "high": 4354.82,
-      "low": 4351.48,
-      "close": 4351.76,
-      "kj55": 4339.7,
-      "tk144": 4338.97
-    },
-    {
-      "boundary": 1789647060,
-      "time": "14:11:00",
-      "open": 4351.75,
-      "high": 4355.34,
-      "low": 4351.75,
-      "close": 4354.36,
-      "kj55": 4339.97,
-      "tk144": 4339.23
-    },
-    {
-      "boundary": 1789647090,
-      "time": "14:11:30",
-      "open": 4354.3,
-      "high": 4355.06,
-      "low": 4353.23,
-      "close": 4354.52,
-      "kj55": 4339.97,
-      "tk144": 4339.23
-    },
-    {
-      "boundary": 1789647120,
-      "time": "14:12:00",
-      "open": 4354.64,
-      "high": 4355.46,
-      "low": 4353.64,
-      "close": 4353.64,
-      "kj55": 4340.02,
-      "tk144": 4339.29
-    },
-    {
-      "boundary": 1789647150,
-      "time": "14:12:30",
-      "open": 4353.52,
-      "high": 4354.22,
-      "low": 4352.6,
-      "close": 4353.18,
-      "kj55": 4340.02,
-      "tk144": 4339.29
-    },
     {
       "boundary": 1789647180,
       "time": "14:13:00",
@@ -5022,7 +1473,3854 @@
       "close": 4363.0,
       "kj55": 4367.24,
       "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650660,
+      "time": "15:11:00",
+      "open": 4363.08,
+      "high": 4365.89,
+      "low": 4363.08,
+      "close": 4364.75,
+      "kj55": 4367.24,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650690,
+      "time": "15:11:30",
+      "open": 4364.83,
+      "high": 4365.09,
+      "low": 4364.01,
+      "close": 4364.63,
+      "kj55": 4367.24,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650720,
+      "time": "15:12:00",
+      "open": 4364.66,
+      "high": 4364.81,
+      "low": 4363.5,
+      "close": 4363.69,
+      "kj55": 4367.24,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650750,
+      "time": "15:12:30",
+      "open": 4363.62,
+      "high": 4363.62,
+      "low": 4361.34,
+      "close": 4362.41,
+      "kj55": 4367.3,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650780,
+      "time": "15:13:00",
+      "open": 4362.4,
+      "high": 4362.53,
+      "low": 4361.7,
+      "close": 4361.86,
+      "kj55": 4367.56,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650810,
+      "time": "15:13:30",
+      "open": 4361.85,
+      "high": 4361.89,
+      "low": 4360.58,
+      "close": 4361.06,
+      "kj55": 4367.56,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650840,
+      "time": "15:14:00",
+      "open": 4361.03,
+      "high": 4364.41,
+      "low": 4360.62,
+      "close": 4364.32,
+      "kj55": 4367.56,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650870,
+      "time": "15:14:30",
+      "open": 4364.42,
+      "high": 4366.87,
+      "low": 4363.97,
+      "close": 4366.21,
+      "kj55": 4367.56,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650900,
+      "time": "15:15:00",
+      "open": 4366.35,
+      "high": 4366.89,
+      "low": 4365.54,
+      "close": 4366.56,
+      "kj55": 4367.85,
+      "tk144": 4362.44
+    },
+    {
+      "boundary": 1789650930,
+      "time": "15:15:30",
+      "open": 4366.3,
+      "high": 4370.45,
+      "low": 4366.3,
+      "close": 4370.37,
+      "kj55": 4367.85,
+      "tk144": 4362.91
+    },
+    {
+      "boundary": 1789650960,
+      "time": "15:16:00",
+      "open": 4370.31,
+      "high": 4370.53,
+      "low": 4368.51,
+      "close": 4370.36,
+      "kj55": 4367.85,
+      "tk144": 4362.91
+    },
+    {
+      "boundary": 1789650990,
+      "time": "15:16:30",
+      "open": 4370.24,
+      "high": 4371.41,
+      "low": 4369.65,
+      "close": 4371.15,
+      "kj55": 4367.85,
+      "tk144": 4363.37
+    },
+    {
+      "boundary": 1789651020,
+      "time": "15:17:00",
+      "open": 4371.3,
+      "high": 4371.3,
+      "low": 4369.51,
+      "close": 4369.66,
+      "kj55": 4367.85,
+      "tk144": 4363.37
+    },
+    {
+      "boundary": 1789651050,
+      "time": "15:17:30",
+      "open": 4369.7,
+      "high": 4372.14,
+      "low": 4369.7,
+      "close": 4372.12,
+      "kj55": 4367.85,
+      "tk144": 4363.37
+    },
+    {
+      "boundary": 1789651080,
+      "time": "15:18:00",
+      "open": 4371.96,
+      "high": 4372.92,
+      "low": 4371.51,
+      "close": 4372.92,
+      "kj55": 4367.85,
+      "tk144": 4363.37
+    },
+    {
+      "boundary": 1789651110,
+      "time": "15:18:30",
+      "open": 4373.14,
+      "high": 4374.86,
+      "low": 4372.85,
+      "close": 4374.17,
+      "kj55": 4367.85,
+      "tk144": 4363.37
+    },
+    {
+      "boundary": 1789651140,
+      "time": "15:19:00",
+      "open": 4374.01,
+      "high": 4375.51,
+      "low": 4373.4,
+      "close": 4373.7,
+      "kj55": 4368.05,
+      "tk144": 4363.37
+    },
+    {
+      "boundary": 1789651170,
+      "time": "15:19:30",
+      "open": 4373.59,
+      "high": 4373.59,
+      "low": 4371.12,
+      "close": 4372.84,
+      "kj55": 4368.05,
+      "tk144": 4364.19
+    },
+    {
+      "boundary": 1789651200,
+      "time": "15:20:00",
+      "open": 4372.87,
+      "high": 4375.32,
+      "low": 4372.41,
+      "close": 4375.25,
+      "kj55": 4368.05,
+      "tk144": 4365.01
+    },
+    {
+      "boundary": 1789651230,
+      "time": "15:20:30",
+      "open": 4375.44,
+      "high": 4375.44,
+      "low": 4373.67,
+      "close": 4373.81,
+      "kj55": 4368.05,
+      "tk144": 4365.68
+    },
+    {
+      "boundary": 1789651260,
+      "time": "15:21:00",
+      "open": 4374.03,
+      "high": 4375.16,
+      "low": 4373.63,
+      "close": 4374.37,
+      "kj55": 4368.05,
+      "tk144": 4366.43
+    },
+    {
+      "boundary": 1789651290,
+      "time": "15:21:30",
+      "open": 4374.18,
+      "high": 4374.39,
+      "low": 4373.16,
+      "close": 4373.66,
+      "kj55": 4368.05,
+      "tk144": 4366.43
+    },
+    {
+      "boundary": 1789651320,
+      "time": "15:22:00",
+      "open": 4373.98,
+      "high": 4374.77,
+      "low": 4373.32,
+      "close": 4374.33,
+      "kj55": 4368.05,
+      "tk144": 4366.43
+    },
+    {
+      "boundary": 1789651350,
+      "time": "15:22:30",
+      "open": 4374.33,
+      "high": 4374.46,
+      "low": 4371.58,
+      "close": 4371.58,
+      "kj55": 4368.05,
+      "tk144": 4366.57
+    },
+    {
+      "boundary": 1789651380,
+      "time": "15:23:00",
+      "open": 4371.36,
+      "high": 4371.99,
+      "low": 4370.18,
+      "close": 4370.87,
+      "kj55": 4368.05,
+      "tk144": 4366.89
+    },
+    {
+      "boundary": 1789651410,
+      "time": "15:23:30",
+      "open": 4370.91,
+      "high": 4370.96,
+      "low": 4367.75,
+      "close": 4368.86,
+      "kj55": 4368.05,
+      "tk144": 4366.89
+    },
+    {
+      "boundary": 1789651440,
+      "time": "15:24:00",
+      "open": 4368.98,
+      "high": 4369.22,
+      "low": 4366.27,
+      "close": 4366.9,
+      "kj55": 4368.05,
+      "tk144": 4366.89
+    },
+    {
+      "boundary": 1789651470,
+      "time": "15:24:30",
+      "open": 4366.98,
+      "high": 4367.67,
+      "low": 4366.62,
+      "close": 4367.12,
+      "kj55": 4368.05,
+      "tk144": 4366.89
+    },
+    {
+      "boundary": 1789651500,
+      "time": "15:25:00",
+      "open": 4367.14,
+      "high": 4368.24,
+      "low": 4366.13,
+      "close": 4367.98,
+      "kj55": 4368.05,
+      "tk144": 4366.89
+    },
+    {
+      "boundary": 1789651530,
+      "time": "15:25:30",
+      "open": 4368.1,
+      "high": 4368.18,
+      "low": 4366.37,
+      "close": 4367.04,
+      "kj55": 4368.05,
+      "tk144": 4366.89
+    },
+    {
+      "boundary": 1789651560,
+      "time": "15:26:00",
+      "open": 4367.09,
+      "high": 4367.66,
+      "low": 4366.29,
+      "close": 4367.6,
+      "kj55": 4368.05,
+      "tk144": 4366.96
+    },
+    {
+      "boundary": 1789651590,
+      "time": "15:26:30",
+      "open": 4367.54,
+      "high": 4368.35,
+      "low": 4366.99,
+      "close": 4368.02,
+      "kj55": 4368.05,
+      "tk144": 4367.39
+    },
+    {
+      "boundary": 1789651620,
+      "time": "15:27:00",
+      "open": 4368.05,
+      "high": 4368.73,
+      "low": 4367.42,
+      "close": 4367.54,
+      "kj55": 4368.05,
+      "tk144": 4367.45
+    },
+    {
+      "boundary": 1789651650,
+      "time": "15:27:30",
+      "open": 4367.38,
+      "high": 4368.07,
+      "low": 4366.21,
+      "close": 4366.56,
+      "kj55": 4368.05,
+      "tk144": 4368.44
+    },
+    {
+      "boundary": 1789651680,
+      "time": "15:28:00",
+      "open": 4366.51,
+      "high": 4366.92,
+      "low": 4365.27,
+      "close": 4365.91,
+      "kj55": 4368.05,
+      "tk144": 4369.41
+    },
+    {
+      "boundary": 1789651710,
+      "time": "15:28:30",
+      "open": 4365.92,
+      "high": 4366.81,
+      "low": 4365.83,
+      "close": 4366.02,
+      "kj55": 4368.05,
+      "tk144": 4369.41
+    },
+    {
+      "boundary": 1789651740,
+      "time": "15:29:00",
+      "open": 4365.96,
+      "high": 4366.84,
+      "low": 4365.53,
+      "close": 4366.05,
+      "kj55": 4368.05,
+      "tk144": 4369.91
+    },
+    {
+      "boundary": 1789651770,
+      "time": "15:29:30",
+      "open": 4366.11,
+      "high": 4368.05,
+      "low": 4366.1,
+      "close": 4368.05,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651800,
+      "time": "15:30:00",
+      "open": 4367.97,
+      "high": 4368.12,
+      "low": 4366.24,
+      "close": 4366.5,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651830,
+      "time": "15:30:30",
+      "open": 4366.57,
+      "high": 4369.8,
+      "low": 4366.2,
+      "close": 4368.83,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651860,
+      "time": "15:31:00",
+      "open": 4368.92,
+      "high": 4369.74,
+      "low": 4367.34,
+      "close": 4367.78,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651890,
+      "time": "15:31:30",
+      "open": 4367.76,
+      "high": 4367.76,
+      "low": 4363.37,
+      "close": 4364.59,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651920,
+      "time": "15:32:00",
+      "open": 4364.56,
+      "high": 4367.35,
+      "low": 4364.56,
+      "close": 4365.94,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651950,
+      "time": "15:32:30",
+      "open": 4365.88,
+      "high": 4369.25,
+      "low": 4365.62,
+      "close": 4367.33,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789651980,
+      "time": "15:33:00",
+      "open": 4367.31,
+      "high": 4369.5,
+      "low": 4367.04,
+      "close": 4367.72,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652010,
+      "time": "15:33:30",
+      "open": 4367.65,
+      "high": 4368.13,
+      "low": 4365.57,
+      "close": 4367.55,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652040,
+      "time": "15:34:00",
+      "open": 4367.97,
+      "high": 4368.4,
+      "low": 4366.71,
+      "close": 4368.39,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652070,
+      "time": "15:34:30",
+      "open": 4368.37,
+      "high": 4371.77,
+      "low": 4368.37,
+      "close": 4371.65,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652100,
+      "time": "15:35:00",
+      "open": 4371.6,
+      "high": 4374.53,
+      "low": 4371.41,
+      "close": 4374.17,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652130,
+      "time": "15:35:30",
+      "open": 4373.66,
+      "high": 4373.88,
+      "low": 4370.13,
+      "close": 4370.62,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652160,
+      "time": "15:36:00",
+      "open": 4370.55,
+      "high": 4371.44,
+      "low": 4370.01,
+      "close": 4370.21,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652190,
+      "time": "15:36:30",
+      "open": 4370.19,
+      "high": 4370.19,
+      "low": 4366.42,
+      "close": 4366.46,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652220,
+      "time": "15:37:00",
+      "open": 4366.3,
+      "high": 4369.49,
+      "low": 4366.24,
+      "close": 4368.41,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652250,
+      "time": "15:37:30",
+      "open": 4368.77,
+      "high": 4370.63,
+      "low": 4366.03,
+      "close": 4366.03,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652280,
+      "time": "15:38:00",
+      "open": 4366.22,
+      "high": 4367.6,
+      "low": 4365.5,
+      "close": 4366.85,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652310,
+      "time": "15:38:30",
+      "open": 4366.85,
+      "high": 4366.9,
+      "low": 4363.46,
+      "close": 4363.56,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652340,
+      "time": "15:39:00",
+      "open": 4363.26,
+      "high": 4366.43,
+      "low": 4363.26,
+      "close": 4364.38,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652370,
+      "time": "15:39:30",
+      "open": 4364.37,
+      "high": 4364.37,
+      "low": 4361.65,
+      "close": 4361.8,
+      "kj55": 4368.05,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652400,
+      "time": "15:40:00",
+      "open": 4361.87,
+      "high": 4362.21,
+      "low": 4359.66,
+      "close": 4361.36,
+      "kj55": 4367.59,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652430,
+      "time": "15:40:30",
+      "open": 4361.3,
+      "high": 4362.35,
+      "low": 4360.78,
+      "close": 4362.07,
+      "kj55": 4367.59,
+      "tk144": 4370.37
+    },
+    {
+      "boundary": 1789652460,
+      "time": "15:41:00",
+      "open": 4362.11,
+      "high": 4363.09,
+      "low": 4358.53,
+      "close": 4358.73,
+      "kj55": 4367.02,
+      "tk144": 4369.95
+    },
+    {
+      "boundary": 1789652490,
+      "time": "15:41:30",
+      "open": 4358.67,
+      "high": 4359.7,
+      "low": 4358.11,
+      "close": 4358.93,
+      "kj55": 4366.81,
+      "tk144": 4369.14
+    },
+    {
+      "boundary": 1789652520,
+      "time": "15:42:00",
+      "open": 4358.9,
+      "high": 4359.66,
+      "low": 4358.07,
+      "close": 4359.35,
+      "kj55": 4366.79,
+      "tk144": 4367.98
+    },
+    {
+      "boundary": 1789652550,
+      "time": "15:42:30",
+      "open": 4359.36,
+      "high": 4361.21,
+      "low": 4358.74,
+      "close": 4360.17,
+      "kj55": 4366.79,
+      "tk144": 4367.82
+    },
+    {
+      "boundary": 1789652580,
+      "time": "15:43:00",
+      "open": 4360.03,
+      "high": 4360.43,
+      "low": 4356.4,
+      "close": 4359.79,
+      "kj55": 4365.95,
+      "tk144": 4365.95
+    },
+    {
+      "boundary": 1789652610,
+      "time": "15:43:30",
+      "open": 4359.83,
+      "high": 4361.64,
+      "low": 4359.18,
+      "close": 4359.18,
+      "kj55": 4365.95,
+      "tk144": 4365.95
+    },
+    {
+      "boundary": 1789652640,
+      "time": "15:44:00",
+      "open": 4359.17,
+      "high": 4359.48,
+      "low": 4356.93,
+      "close": 4356.93,
+      "kj55": 4365.95,
+      "tk144": 4365.95
+    },
+    {
+      "boundary": 1789652670,
+      "time": "15:44:30",
+      "open": 4356.69,
+      "high": 4358.68,
+      "low": 4356.47,
+      "close": 4358.68,
+      "kj55": 4365.95,
+      "tk144": 4365.95
+    },
+    {
+      "boundary": 1789652700,
+      "time": "15:45:00",
+      "open": 4358.34,
+      "high": 4358.36,
+      "low": 4355.16,
+      "close": 4357.66,
+      "kj55": 4365.34,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652730,
+      "time": "15:45:30",
+      "open": 4357.28,
+      "high": 4360.18,
+      "low": 4356.75,
+      "close": 4358.14,
+      "kj55": 4365.34,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652760,
+      "time": "15:46:00",
+      "open": 4358.13,
+      "high": 4362.34,
+      "low": 4357.99,
+      "close": 4362.29,
+      "kj55": 4365.34,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652790,
+      "time": "15:46:30",
+      "open": 4362.49,
+      "high": 4364.46,
+      "low": 4361.72,
+      "close": 4363.78,
+      "kj55": 4365.3,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652820,
+      "time": "15:47:00",
+      "open": 4363.92,
+      "high": 4367.86,
+      "low": 4363.92,
+      "close": 4367.62,
+      "kj55": 4365.3,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652850,
+      "time": "15:47:30",
+      "open": 4367.7,
+      "high": 4369.24,
+      "low": 4367.05,
+      "close": 4367.91,
+      "kj55": 4365.3,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652880,
+      "time": "15:48:00",
+      "open": 4367.78,
+      "high": 4368.25,
+      "low": 4364.01,
+      "close": 4364.84,
+      "kj55": 4365.16,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652910,
+      "time": "15:48:30",
+      "open": 4364.82,
+      "high": 4367.3,
+      "low": 4363.89,
+      "close": 4365.6,
+      "kj55": 4364.97,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652940,
+      "time": "15:49:00",
+      "open": 4365.4,
+      "high": 4367.87,
+      "low": 4364.99,
+      "close": 4367.87,
+      "kj55": 4364.97,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789652970,
+      "time": "15:49:30",
+      "open": 4367.83,
+      "high": 4368.4,
+      "low": 4365.8,
+      "close": 4367.09,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653000,
+      "time": "15:50:00",
+      "open": 4367.05,
+      "high": 4370.2,
+      "low": 4366.66,
+      "close": 4369.82,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653030,
+      "time": "15:50:30",
+      "open": 4369.92,
+      "high": 4370.35,
+      "low": 4369.02,
+      "close": 4370.35,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653060,
+      "time": "15:51:00",
+      "open": 4370.34,
+      "high": 4372.03,
+      "low": 4368.94,
+      "close": 4368.94,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653090,
+      "time": "15:51:30",
+      "open": 4369.09,
+      "high": 4369.78,
+      "low": 4368.53,
+      "close": 4369.15,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653120,
+      "time": "15:52:00",
+      "open": 4369.2,
+      "high": 4369.94,
+      "low": 4368.07,
+      "close": 4368.86,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653150,
+      "time": "15:52:30",
+      "open": 4369.21,
+      "high": 4369.55,
+      "low": 4367.5,
+      "close": 4368.26,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653180,
+      "time": "15:53:00",
+      "open": 4368.04,
+      "high": 4368.04,
+      "low": 4366.3,
+      "close": 4366.84,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653210,
+      "time": "15:53:30",
+      "open": 4366.89,
+      "high": 4368.15,
+      "low": 4366.8,
+      "close": 4367.55,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653240,
+      "time": "15:54:00",
+      "open": 4367.23,
+      "high": 4368.97,
+      "low": 4366.05,
+      "close": 4368.9,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653270,
+      "time": "15:54:30",
+      "open": 4368.89,
+      "high": 4368.96,
+      "low": 4365.91,
+      "close": 4366.34,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653300,
+      "time": "15:55:00",
+      "open": 4366.35,
+      "high": 4368.29,
+      "low": 4366.35,
+      "close": 4368.05,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653330,
+      "time": "15:55:30",
+      "open": 4367.86,
+      "high": 4368.57,
+      "low": 4367.02,
+      "close": 4367.56,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653360,
+      "time": "15:56:00",
+      "open": 4367.54,
+      "high": 4370.31,
+      "low": 4366.86,
+      "close": 4369.03,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653390,
+      "time": "15:56:30",
+      "open": 4368.78,
+      "high": 4369.78,
+      "low": 4368.58,
+      "close": 4368.77,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653420,
+      "time": "15:57:00",
+      "open": 4368.78,
+      "high": 4368.78,
+      "low": 4366.25,
+      "close": 4366.25,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653450,
+      "time": "15:57:30",
+      "open": 4366.29,
+      "high": 4367.39,
+      "low": 4365.51,
+      "close": 4366.33,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653480,
+      "time": "15:58:00",
+      "open": 4365.89,
+      "high": 4366.68,
+      "low": 4364.38,
+      "close": 4366.09,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653510,
+      "time": "15:58:30",
+      "open": 4366.12,
+      "high": 4367.4,
+      "low": 4365.47,
+      "close": 4367.24,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653540,
+      "time": "15:59:00",
+      "open": 4367.14,
+      "high": 4367.67,
+      "low": 4366.47,
+      "close": 4367.24,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653570,
+      "time": "15:59:30",
+      "open": 4367.38,
+      "high": 4367.68,
+      "low": 4366.52,
+      "close": 4367.68,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653600,
+      "time": "16:00:00",
+      "open": 4368.02,
+      "high": 4368.56,
+      "low": 4365.25,
+      "close": 4365.28,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653630,
+      "time": "16:00:30",
+      "open": 4365.43,
+      "high": 4366.78,
+      "low": 4364.55,
+      "close": 4366.35,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653660,
+      "time": "16:01:00",
+      "open": 4366.46,
+      "high": 4366.7,
+      "low": 4364.66,
+      "close": 4365.94,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653690,
+      "time": "16:01:30",
+      "open": 4365.87,
+      "high": 4368.37,
+      "low": 4365.09,
+      "close": 4367.85,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653720,
+      "time": "16:02:00",
+      "open": 4367.98,
+      "high": 4369.36,
+      "low": 4366.44,
+      "close": 4369.01,
+      "kj55": 4364.84,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653750,
+      "time": "16:02:30",
+      "open": 4368.85,
+      "high": 4369.42,
+      "low": 4367.67,
+      "close": 4368.84,
+      "kj55": 4364.52,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653780,
+      "time": "16:03:00",
+      "open": 4368.95,
+      "high": 4369.76,
+      "low": 4368.54,
+      "close": 4368.72,
+      "kj55": 4363.59,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653810,
+      "time": "16:03:30",
+      "open": 4368.75,
+      "high": 4370.53,
+      "low": 4367.93,
+      "close": 4369.86,
+      "kj55": 4363.59,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653840,
+      "time": "16:04:00",
+      "open": 4369.88,
+      "high": 4370.56,
+      "low": 4369.05,
+      "close": 4369.7,
+      "kj55": 4363.59,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653870,
+      "time": "16:04:30",
+      "open": 4369.46,
+      "high": 4370.2,
+      "low": 4368.5,
+      "close": 4369.39,
+      "kj55": 4363.59,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653900,
+      "time": "16:05:00",
+      "open": 4369.22,
+      "high": 4369.38,
+      "low": 4366.85,
+      "close": 4368.44,
+      "kj55": 4363.59,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653930,
+      "time": "16:05:30",
+      "open": 4368.48,
+      "high": 4369.94,
+      "low": 4368.12,
+      "close": 4369.8,
+      "kj55": 4363.59,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653960,
+      "time": "16:06:00",
+      "open": 4368.99,
+      "high": 4375.19,
+      "low": 4368.99,
+      "close": 4374.55,
+      "kj55": 4365.17,
+      "tk144": 4365.34
+    },
+    {
+      "boundary": 1789653990,
+      "time": "16:06:30",
+      "open": 4374.48,
+      "high": 4375.86,
+      "low": 4372.21,
+      "close": 4375.47,
+      "kj55": 4365.51,
+      "tk144": 4365.51
+    },
+    {
+      "boundary": 1789654020,
+      "time": "16:07:00",
+      "open": 4375.44,
+      "high": 4377.42,
+      "low": 4374.88,
+      "close": 4374.88,
+      "kj55": 4366.29,
+      "tk144": 4366.29
+    },
+    {
+      "boundary": 1789654050,
+      "time": "16:07:30",
+      "open": 4374.76,
+      "high": 4376.06,
+      "low": 4373.93,
+      "close": 4375.02,
+      "kj55": 4366.29,
+      "tk144": 4366.29
+    },
+    {
+      "boundary": 1789654080,
+      "time": "16:08:00",
+      "open": 4374.89,
+      "high": 4376.49,
+      "low": 4373.98,
+      "close": 4376.49,
+      "kj55": 4366.29,
+      "tk144": 4366.29
+    },
+    {
+      "boundary": 1789654110,
+      "time": "16:08:30",
+      "open": 4376.48,
+      "high": 4378.05,
+      "low": 4375.59,
+      "close": 4377.84,
+      "kj55": 4366.6,
+      "tk144": 4366.6
+    },
+    {
+      "boundary": 1789654140,
+      "time": "16:09:00",
+      "open": 4377.99,
+      "high": 4379.82,
+      "low": 4377.72,
+      "close": 4379.58,
+      "kj55": 4367.49,
+      "tk144": 4367.49
+    },
+    {
+      "boundary": 1789654170,
+      "time": "16:09:30",
+      "open": 4379.46,
+      "high": 4380.33,
+      "low": 4377.0,
+      "close": 4377.0,
+      "kj55": 4367.74,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654230,
+      "time": "16:10:30",
+      "open": 4379.5,
+      "high": 4379.5,
+      "low": 4376.16,
+      "close": 4376.46,
+      "kj55": 4367.74,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654260,
+      "time": "16:11:00",
+      "open": 4376.25,
+      "high": 4376.25,
+      "low": 4374.12,
+      "close": 4374.35,
+      "kj55": 4367.74,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654290,
+      "time": "16:11:30",
+      "open": 4374.52,
+      "high": 4374.6,
+      "low": 4372.03,
+      "close": 4372.1,
+      "kj55": 4367.74,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654320,
+      "time": "16:12:00",
+      "open": 4372.15,
+      "high": 4372.15,
+      "low": 4368.46,
+      "close": 4369.95,
+      "kj55": 4367.74,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654350,
+      "time": "16:12:30",
+      "open": 4369.81,
+      "high": 4370.45,
+      "low": 4368.27,
+      "close": 4369.88,
+      "kj55": 4367.74,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654380,
+      "time": "16:13:00",
+      "open": 4369.94,
+      "high": 4372.09,
+      "low": 4369.94,
+      "close": 4371.37,
+      "kj55": 4368.54,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654410,
+      "time": "16:13:30",
+      "open": 4371.31,
+      "high": 4372.41,
+      "low": 4371.04,
+      "close": 4372.26,
+      "kj55": 4369.16,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654440,
+      "time": "16:14:00",
+      "open": 4372.27,
+      "high": 4373.32,
+      "low": 4372.05,
+      "close": 4372.89,
+      "kj55": 4371.02,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654470,
+      "time": "16:14:30",
+      "open": 4372.99,
+      "high": 4373.59,
+      "low": 4371.44,
+      "close": 4372.28,
+      "kj55": 4372.11,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654500,
+      "time": "16:15:00",
+      "open": 4371.91,
+      "high": 4372.17,
+      "low": 4369.93,
+      "close": 4371.02,
+      "kj55": 4372.11,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654530,
+      "time": "16:15:30",
+      "open": 4371.07,
+      "high": 4371.09,
+      "low": 4369.7,
+      "close": 4369.7,
+      "kj55": 4372.11,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654560,
+      "time": "16:16:00",
+      "open": 4369.94,
+      "high": 4372.57,
+      "low": 4369.86,
+      "close": 4371.74,
+      "kj55": 4372.11,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654590,
+      "time": "16:16:30",
+      "open": 4371.82,
+      "high": 4372.09,
+      "low": 4368.86,
+      "close": 4369.26,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654620,
+      "time": "16:17:00",
+      "open": 4369.38,
+      "high": 4370.57,
+      "low": 4368.77,
+      "close": 4369.49,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654650,
+      "time": "16:17:30",
+      "open": 4369.38,
+      "high": 4369.38,
+      "low": 4367.53,
+      "close": 4368.01,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654680,
+      "time": "16:18:00",
+      "open": 4368.22,
+      "high": 4368.52,
+      "low": 4365.86,
+      "close": 4368.47,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654710,
+      "time": "16:18:30",
+      "open": 4368.37,
+      "high": 4368.8,
+      "low": 4367.16,
+      "close": 4367.16,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654740,
+      "time": "16:19:00",
+      "open": 4367.12,
+      "high": 4369.64,
+      "low": 4367.12,
+      "close": 4367.6,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654770,
+      "time": "16:19:30",
+      "open": 4367.67,
+      "high": 4369.4,
+      "low": 4367.06,
+      "close": 4369.4,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654800,
+      "time": "16:20:00",
+      "open": 4369.24,
+      "high": 4370.11,
+      "low": 4366.87,
+      "close": 4366.87,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654830,
+      "time": "16:20:30",
+      "open": 4367.04,
+      "high": 4368.53,
+      "low": 4365.66,
+      "close": 4366.02,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654860,
+      "time": "16:21:00",
+      "open": 4366.15,
+      "high": 4366.73,
+      "low": 4365.66,
+      "close": 4366.66,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654890,
+      "time": "16:21:30",
+      "open": 4366.67,
+      "high": 4367.92,
+      "low": 4366.67,
+      "close": 4367.75,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654920,
+      "time": "16:22:00",
+      "open": 4367.86,
+      "high": 4369.97,
+      "low": 4367.86,
+      "close": 4369.8,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654950,
+      "time": "16:22:30",
+      "open": 4369.86,
+      "high": 4370.55,
+      "low": 4368.63,
+      "close": 4368.84,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789654980,
+      "time": "16:23:00",
+      "open": 4368.78,
+      "high": 4370.28,
+      "low": 4368.4,
+      "close": 4369.87,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655010,
+      "time": "16:23:30",
+      "open": 4369.86,
+      "high": 4370.9,
+      "low": 4369.19,
+      "close": 4369.34,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655040,
+      "time": "16:24:00",
+      "open": 4369.28,
+      "high": 4370.6,
+      "low": 4368.97,
+      "close": 4370.6,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655070,
+      "time": "16:24:30",
+      "open": 4370.44,
+      "high": 4370.61,
+      "low": 4369.06,
+      "close": 4369.59,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655100,
+      "time": "16:25:00",
+      "open": 4369.53,
+      "high": 4370.89,
+      "low": 4368.82,
+      "close": 4369.02,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655130,
+      "time": "16:25:30",
+      "open": 4369.1,
+      "high": 4372.15,
+      "low": 4369.08,
+      "close": 4372.15,
+      "kj55": 4372.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655160,
+      "time": "16:26:00",
+      "open": 4372.13,
+      "high": 4372.6,
+      "low": 4371.16,
+      "close": 4371.69,
+      "kj55": 4372.44,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655190,
+      "time": "16:26:30",
+      "open": 4371.83,
+      "high": 4373.36,
+      "low": 4371.61,
+      "close": 4372.44,
+      "kj55": 4372.44,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655220,
+      "time": "16:27:00",
+      "open": 4372.45,
+      "high": 4372.62,
+      "low": 4369.21,
+      "close": 4369.48,
+      "kj55": 4372.44,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655250,
+      "time": "16:27:30",
+      "open": 4369.57,
+      "high": 4370.69,
+      "low": 4368.33,
+      "close": 4369.77,
+      "kj55": 4372.44,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655280,
+      "time": "16:28:00",
+      "open": 4369.66,
+      "high": 4370.1,
+      "low": 4366.75,
+      "close": 4368.09,
+      "kj55": 4372.44,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655310,
+      "time": "16:28:30",
+      "open": 4367.85,
+      "high": 4369.2,
+      "low": 4367.02,
+      "close": 4368.74,
+      "kj55": 4372.49,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655340,
+      "time": "16:29:00",
+      "open": 4368.49,
+      "high": 4368.61,
+      "low": 4367.41,
+      "close": 4368.34,
+      "kj55": 4372.71,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655370,
+      "time": "16:29:30",
+      "open": 4368.33,
+      "high": 4368.75,
+      "low": 4366.15,
+      "close": 4366.83,
+      "kj55": 4372.99,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655400,
+      "time": "16:30:00",
+      "open": 4366.84,
+      "high": 4366.84,
+      "low": 4364.29,
+      "close": 4364.5,
+      "kj55": 4372.31,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655430,
+      "time": "16:30:30",
+      "open": 4364.48,
+      "high": 4366.9,
+      "low": 4364.11,
+      "close": 4366.81,
+      "kj55": 4372.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655460,
+      "time": "16:31:00",
+      "open": 4366.73,
+      "high": 4367.54,
+      "low": 4366.04,
+      "close": 4366.29,
+      "kj55": 4372.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655490,
+      "time": "16:31:30",
+      "open": 4366.1,
+      "high": 4366.71,
+      "low": 4365.37,
+      "close": 4365.62,
+      "kj55": 4372.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655520,
+      "time": "16:32:00",
+      "open": 4365.61,
+      "high": 4365.99,
+      "low": 4362.39,
+      "close": 4362.88,
+      "kj55": 4371.36,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655550,
+      "time": "16:32:30",
+      "open": 4362.73,
+      "high": 4364.29,
+      "low": 4362.1,
+      "close": 4364.17,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655580,
+      "time": "16:33:00",
+      "open": 4364.18,
+      "high": 4364.94,
+      "low": 4363.92,
+      "close": 4364.18,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655610,
+      "time": "16:33:30",
+      "open": 4364.19,
+      "high": 4365.15,
+      "low": 4363.37,
+      "close": 4365.11,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655640,
+      "time": "16:34:00",
+      "open": 4365.09,
+      "high": 4366.28,
+      "low": 4364.43,
+      "close": 4366.2,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655670,
+      "time": "16:34:30",
+      "open": 4366.25,
+      "high": 4367.49,
+      "low": 4365.96,
+      "close": 4367.25,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655700,
+      "time": "16:35:00",
+      "open": 4367.26,
+      "high": 4368.09,
+      "low": 4366.09,
+      "close": 4366.95,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655730,
+      "time": "16:35:30",
+      "open": 4366.83,
+      "high": 4368.13,
+      "low": 4366.82,
+      "close": 4367.24,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655760,
+      "time": "16:36:00",
+      "open": 4367.18,
+      "high": 4367.45,
+      "low": 4365.68,
+      "close": 4365.79,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655790,
+      "time": "16:36:30",
+      "open": 4365.76,
+      "high": 4367.36,
+      "low": 4365.37,
+      "close": 4366.4,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655820,
+      "time": "16:37:00",
+      "open": 4366.42,
+      "high": 4366.49,
+      "low": 4364.0,
+      "close": 4364.44,
+      "kj55": 4371.22,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655850,
+      "time": "16:37:30",
+      "open": 4364.65,
+      "high": 4365.8,
+      "low": 4363.93,
+      "close": 4365.52,
+      "kj55": 4370.8,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655880,
+      "time": "16:38:00",
+      "open": 4365.66,
+      "high": 4366.08,
+      "low": 4364.05,
+      "close": 4364.3,
+      "kj55": 4369.18,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655910,
+      "time": "16:38:30",
+      "open": 4364.09,
+      "high": 4364.86,
+      "low": 4363.14,
+      "close": 4363.37,
+      "kj55": 4368.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655940,
+      "time": "16:39:00",
+      "open": 4363.27,
+      "high": 4363.84,
+      "low": 4362.32,
+      "close": 4363.38,
+      "kj55": 4367.85,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789655970,
+      "time": "16:39:30",
+      "open": 4363.42,
+      "high": 4363.73,
+      "low": 4361.0,
+      "close": 4361.12,
+      "kj55": 4367.3,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656000,
+      "time": "16:40:00",
+      "open": 4361.2,
+      "high": 4363.17,
+      "low": 4361.2,
+      "close": 4362.57,
+      "kj55": 4367.3,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656030,
+      "time": "16:40:30",
+      "open": 4362.55,
+      "high": 4363.67,
+      "low": 4361.75,
+      "close": 4363.54,
+      "kj55": 4367.3,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656060,
+      "time": "16:41:00",
+      "open": 4363.45,
+      "high": 4363.87,
+      "low": 4362.31,
+      "close": 4363.72,
+      "kj55": 4367.3,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656090,
+      "time": "16:41:30",
+      "open": 4363.75,
+      "high": 4364.52,
+      "low": 4362.9,
+      "close": 4362.91,
+      "kj55": 4367.3,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656120,
+      "time": "16:42:00",
+      "open": 4362.73,
+      "high": 4363.39,
+      "low": 4361.58,
+      "close": 4362.96,
+      "kj55": 4367.18,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656150,
+      "time": "16:42:30",
+      "open": 4363.13,
+      "high": 4363.36,
+      "low": 4361.97,
+      "close": 4362.14,
+      "kj55": 4367.18,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656180,
+      "time": "16:43:00",
+      "open": 4362.13,
+      "high": 4362.13,
+      "low": 4359.27,
+      "close": 4359.83,
+      "kj55": 4366.32,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656210,
+      "time": "16:43:30",
+      "open": 4359.77,
+      "high": 4360.84,
+      "low": 4359.12,
+      "close": 4359.25,
+      "kj55": 4366.24,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656240,
+      "time": "16:44:00",
+      "open": 4359.34,
+      "high": 4360.07,
+      "low": 4358.99,
+      "close": 4359.55,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656270,
+      "time": "16:44:30",
+      "open": 4359.38,
+      "high": 4361.41,
+      "low": 4359.38,
+      "close": 4361.35,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656300,
+      "time": "16:45:00",
+      "open": 4361.4,
+      "high": 4362.25,
+      "low": 4359.74,
+      "close": 4361.68,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656330,
+      "time": "16:45:30",
+      "open": 4361.69,
+      "high": 4363.75,
+      "low": 4361.2,
+      "close": 4363.72,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656360,
+      "time": "16:46:00",
+      "open": 4363.71,
+      "high": 4365.13,
+      "low": 4363.71,
+      "close": 4363.95,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656390,
+      "time": "16:46:30",
+      "open": 4363.97,
+      "high": 4363.97,
+      "low": 4362.0,
+      "close": 4362.1,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656420,
+      "time": "16:47:00",
+      "open": 4362.05,
+      "high": 4363.82,
+      "low": 4361.18,
+      "close": 4362.43,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656450,
+      "time": "16:47:30",
+      "open": 4362.5,
+      "high": 4362.57,
+      "low": 4359.12,
+      "close": 4360.21,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656480,
+      "time": "16:48:00",
+      "open": 4360.26,
+      "high": 4361.74,
+      "low": 4359.86,
+      "close": 4359.9,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656510,
+      "time": "16:48:30",
+      "open": 4359.94,
+      "high": 4360.73,
+      "low": 4358.99,
+      "close": 4358.99,
+      "kj55": 4366.17,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656540,
+      "time": "16:49:00",
+      "open": 4359.02,
+      "high": 4359.91,
+      "low": 4358.1,
+      "close": 4359.89,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656570,
+      "time": "16:49:30",
+      "open": 4359.81,
+      "high": 4362.05,
+      "low": 4359.7,
+      "close": 4361.97,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656600,
+      "time": "16:50:00",
+      "open": 4361.53,
+      "high": 4362.49,
+      "low": 4361.49,
+      "close": 4361.8,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656630,
+      "time": "16:50:30",
+      "open": 4361.67,
+      "high": 4361.84,
+      "low": 4359.4,
+      "close": 4359.95,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656660,
+      "time": "16:51:00",
+      "open": 4359.83,
+      "high": 4361.0,
+      "low": 4359.56,
+      "close": 4360.88,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656690,
+      "time": "16:51:30",
+      "open": 4360.95,
+      "high": 4362.38,
+      "low": 4360.82,
+      "close": 4361.41,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656720,
+      "time": "16:52:00",
+      "open": 4361.3,
+      "high": 4361.41,
+      "low": 4358.21,
+      "close": 4358.88,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656750,
+      "time": "16:52:30",
+      "open": 4359.04,
+      "high": 4359.95,
+      "low": 4358.9,
+      "close": 4359.59,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656780,
+      "time": "16:53:00",
+      "open": 4359.55,
+      "high": 4360.28,
+      "low": 4359.21,
+      "close": 4359.43,
+      "kj55": 4365.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656810,
+      "time": "16:53:30",
+      "open": 4359.36,
+      "high": 4359.36,
+      "low": 4356.1,
+      "close": 4356.31,
+      "kj55": 4364.73,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656840,
+      "time": "16:54:00",
+      "open": 4356.48,
+      "high": 4357.27,
+      "low": 4355.97,
+      "close": 4356.65,
+      "kj55": 4364.3,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656870,
+      "time": "16:54:30",
+      "open": 4356.61,
+      "high": 4359.13,
+      "low": 4356.57,
+      "close": 4356.93,
+      "kj55": 4363.33,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656900,
+      "time": "16:55:00",
+      "open": 4357.0,
+      "high": 4357.16,
+      "low": 4356.13,
+      "close": 4356.77,
+      "kj55": 4363.03,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656930,
+      "time": "16:55:30",
+      "open": 4356.78,
+      "high": 4357.25,
+      "low": 4355.5,
+      "close": 4356.16,
+      "kj55": 4362.35,
+      "tk144": 4367.74
+    },
+    {
+      "boundary": 1789656960,
+      "time": "16:56:00",
+      "open": 4356.08,
+      "high": 4356.87,
+      "low": 4353.74,
+      "close": 4356.79,
+      "kj55": 4361.24,
+      "tk144": 4367.03
+    },
+    {
+      "boundary": 1789656990,
+      "time": "16:56:30",
+      "open": 4356.75,
+      "high": 4356.81,
+      "low": 4354.25,
+      "close": 4354.47,
+      "kj55": 4361.24,
+      "tk144": 4367.03
+    },
+    {
+      "boundary": 1789657020,
+      "time": "16:57:00",
+      "open": 4354.56,
+      "high": 4354.69,
+      "low": 4353.63,
+      "close": 4354.19,
+      "kj55": 4360.88,
+      "tk144": 4366.98
+    },
+    {
+      "boundary": 1789657050,
+      "time": "16:57:30",
+      "open": 4354.13,
+      "high": 4354.73,
+      "low": 4352.95,
+      "close": 4353.12,
+      "kj55": 4360.54,
+      "tk144": 4366.64
+    },
+    {
+      "boundary": 1789657080,
+      "time": "16:58:00",
+      "open": 4353.35,
+      "high": 4354.5,
+      "low": 4353.33,
+      "close": 4353.8,
+      "kj55": 4360.54,
+      "tk144": 4366.64
+    },
+    {
+      "boundary": 1789657110,
+      "time": "16:58:30",
+      "open": 4353.86,
+      "high": 4354.1,
+      "low": 4352.21,
+      "close": 4352.77,
+      "kj55": 4360.17,
+      "tk144": 4366.27
+    },
+    {
+      "boundary": 1789657140,
+      "time": "16:59:00",
+      "open": 4352.67,
+      "high": 4353.79,
+      "low": 4352.46,
+      "close": 4353.25,
+      "kj55": 4360.17,
+      "tk144": 4366.27
+    },
+    {
+      "boundary": 1789657170,
+      "time": "16:59:30",
+      "open": 4353.29,
+      "high": 4354.56,
+      "low": 4352.91,
+      "close": 4353.96,
+      "kj55": 4360.17,
+      "tk144": 4366.27
+    },
+    {
+      "boundary": 1789657200,
+      "time": "17:00:00",
+      "open": 4353.97,
+      "high": 4354.96,
+      "low": 4352.74,
+      "close": 4352.88,
+      "kj55": 4360.17,
+      "tk144": 4366.27
+    },
+    {
+      "boundary": 1789657230,
+      "time": "17:00:30",
+      "open": 4352.87,
+      "high": 4354.37,
+      "low": 4351.35,
+      "close": 4354.03,
+      "kj55": 4359.74,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657260,
+      "time": "17:01:00",
+      "open": 4353.99,
+      "high": 4353.99,
+      "low": 4352.29,
+      "close": 4353.29,
+      "kj55": 4359.74,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657290,
+      "time": "17:01:30",
+      "open": 4353.27,
+      "high": 4353.29,
+      "low": 4351.77,
+      "close": 4352.26,
+      "kj55": 4359.74,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657320,
+      "time": "17:02:00",
+      "open": 4352.24,
+      "high": 4353.23,
+      "low": 4351.54,
+      "close": 4353.18,
+      "kj55": 4359.74,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657350,
+      "time": "17:02:30",
+      "open": 4353.09,
+      "high": 4354.75,
+      "low": 4352.65,
+      "close": 4354.68,
+      "kj55": 4359.74,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657380,
+      "time": "17:03:00",
+      "open": 4354.49,
+      "high": 4357.57,
+      "low": 4354.31,
+      "close": 4357.4,
+      "kj55": 4359.4,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657410,
+      "time": "17:03:30",
+      "open": 4357.38,
+      "high": 4357.89,
+      "low": 4356.3,
+      "close": 4356.52,
+      "kj55": 4359.35,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657440,
+      "time": "17:04:00",
+      "open": 4356.45,
+      "high": 4356.84,
+      "low": 4355.21,
+      "close": 4355.38,
+      "kj55": 4358.92,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657470,
+      "time": "17:04:30",
+      "open": 4355.32,
+      "high": 4357.61,
+      "low": 4355.02,
+      "close": 4356.3,
+      "kj55": 4358.72,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657500,
+      "time": "17:05:00",
+      "open": 4356.24,
+      "high": 4359.07,
+      "low": 4355.99,
+      "close": 4359.07,
+      "kj55": 4358.72,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657530,
+      "time": "17:05:30",
+      "open": 4359.06,
+      "high": 4359.2,
+      "low": 4356.91,
+      "close": 4357.34,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657560,
+      "time": "17:06:00",
+      "open": 4357.51,
+      "high": 4358.23,
+      "low": 4357.51,
+      "close": 4358.22,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657590,
+      "time": "17:06:30",
+      "open": 4358.14,
+      "high": 4358.68,
+      "low": 4357.58,
+      "close": 4357.72,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657620,
+      "time": "17:07:00",
+      "open": 4357.73,
+      "high": 4358.97,
+      "low": 4356.78,
+      "close": 4358.08,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657650,
+      "time": "17:07:30",
+      "open": 4358.09,
+      "high": 4358.74,
+      "low": 4357.58,
+      "close": 4358.19,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657680,
+      "time": "17:08:00",
+      "open": 4358.2,
+      "high": 4358.2,
+      "low": 4355.8,
+      "close": 4356.37,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657710,
+      "time": "17:08:30",
+      "open": 4356.48,
+      "high": 4357.9,
+      "low": 4356.27,
+      "close": 4357.52,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657740,
+      "time": "17:09:00",
+      "open": 4357.53,
+      "high": 4357.72,
+      "low": 4355.22,
+      "close": 4356.27,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657770,
+      "time": "17:09:30",
+      "open": 4356.32,
+      "high": 4357.26,
+      "low": 4356.15,
+      "close": 4356.89,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657800,
+      "time": "17:10:00",
+      "open": 4356.9,
+      "high": 4357.4,
+      "low": 4356.56,
+      "close": 4357.34,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657830,
+      "time": "17:10:30",
+      "open": 4357.33,
+      "high": 4357.87,
+      "low": 4354.9,
+      "close": 4354.92,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657860,
+      "time": "17:11:00",
+      "open": 4354.87,
+      "high": 4356.16,
+      "low": 4353.88,
+      "close": 4354.7,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657890,
+      "time": "17:11:30",
+      "open": 4354.74,
+      "high": 4355.65,
+      "low": 4354.16,
+      "close": 4354.17,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657920,
+      "time": "17:12:00",
+      "open": 4354.22,
+      "high": 4356.32,
+      "low": 4353.09,
+      "close": 4356.24,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657950,
+      "time": "17:12:30",
+      "open": 4356.18,
+      "high": 4356.68,
+      "low": 4355.5,
+      "close": 4355.51,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789657980,
+      "time": "17:13:00",
+      "open": 4355.56,
+      "high": 4358.76,
+      "low": 4355.53,
+      "close": 4358.4,
+      "kj55": 4358.24,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658010,
+      "time": "17:13:30",
+      "open": 4358.34,
+      "high": 4361.24,
+      "low": 4358.19,
+      "close": 4361.13,
+      "kj55": 4357.66,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658040,
+      "time": "17:14:00",
+      "open": 4361.16,
+      "high": 4361.54,
+      "low": 4360.55,
+      "close": 4360.83,
+      "kj55": 4357.59,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658070,
+      "time": "17:14:30",
+      "open": 4361.22,
+      "high": 4362.29,
+      "low": 4361.16,
+      "close": 4361.74,
+      "kj55": 4356.96,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658100,
+      "time": "17:15:00",
+      "open": 4361.56,
+      "high": 4362.56,
+      "low": 4361.04,
+      "close": 4361.7,
+      "kj55": 4356.95,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658130,
+      "time": "17:15:30",
+      "open": 4361.98,
+      "high": 4362.34,
+      "low": 4360.48,
+      "close": 4362.25,
+      "kj55": 4356.95,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658160,
+      "time": "17:16:00",
+      "open": 4362.06,
+      "high": 4362.55,
+      "low": 4361.25,
+      "close": 4362.01,
+      "kj55": 4356.95,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658190,
+      "time": "17:16:30",
+      "open": 4361.96,
+      "high": 4363.47,
+      "low": 4361.91,
+      "close": 4363.38,
+      "kj55": 4357.41,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658220,
+      "time": "17:17:00",
+      "open": 4363.18,
+      "high": 4364.0,
+      "low": 4362.4,
+      "close": 4362.87,
+      "kj55": 4357.68,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658280,
+      "time": "17:18:00",
+      "open": 4364.14,
+      "high": 4364.48,
+      "low": 4363.65,
+      "close": 4364.3,
+      "kj55": 4357.91,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658310,
+      "time": "17:18:30",
+      "open": 4364.25,
+      "high": 4364.5,
+      "low": 4363.95,
+      "close": 4364.19,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658340,
+      "time": "17:19:00",
+      "open": 4364.2,
+      "high": 4364.49,
+      "low": 4362.95,
+      "close": 4364.05,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658370,
+      "time": "17:19:30",
+      "open": 4364.18,
+      "high": 4364.34,
+      "low": 4362.77,
+      "close": 4363.44,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658400,
+      "time": "17:20:00",
+      "open": 4363.38,
+      "high": 4363.5,
+      "low": 4361.93,
+      "close": 4362.55,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658430,
+      "time": "17:20:30",
+      "open": 4362.5,
+      "high": 4362.69,
+      "low": 4361.24,
+      "close": 4361.24,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658460,
+      "time": "17:21:00",
+      "open": 4361.27,
+      "high": 4361.95,
+      "low": 4360.86,
+      "close": 4361.33,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658490,
+      "time": "17:21:30",
+      "open": 4361.3,
+      "high": 4363.05,
+      "low": 4361.3,
+      "close": 4362.19,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658520,
+      "time": "17:22:00",
+      "open": 4362.24,
+      "high": 4362.58,
+      "low": 4361.32,
+      "close": 4361.95,
+      "kj55": 4357.93,
+      "tk144": 4365.84
+    },
+    {
+      "boundary": 1789658550,
+      "time": "17:22:30",
+      "open": 4361.97,
+      "high": 4362.62,
+      "low": 4361.7,
+      "close": 4362.21,
+      "kj55": 4357.93,
+      "tk144": 4365.43
+    },
+    {
+      "boundary": 1789658580,
+      "time": "17:23:00",
+      "open": 4362.37,
+      "high": 4362.67,
+      "low": 4361.06,
+      "close": 4362.65,
+      "kj55": 4357.93,
+      "tk144": 4363.8
+    },
+    {
+      "boundary": 1789658610,
+      "time": "17:23:30",
+      "open": 4362.1,
+      "high": 4362.95,
+      "low": 4361.64,
+      "close": 4361.77,
+      "kj55": 4357.93,
+      "tk144": 4362.98
+    },
+    {
+      "boundary": 1789658640,
+      "time": "17:24:00",
+      "open": 4361.53,
+      "high": 4361.95,
+      "low": 4361.41,
+      "close": 4361.93,
+      "kj55": 4357.93,
+      "tk144": 4362.47
+    },
+    {
+      "boundary": 1789658670,
+      "time": "17:24:30",
+      "open": 4361.94,
+      "high": 4362.14,
+      "low": 4359.27,
+      "close": 4359.87,
+      "kj55": 4357.93,
+      "tk144": 4362.47
+    },
+    {
+      "boundary": 1789658700,
+      "time": "17:25:00",
+      "open": 4359.88,
+      "high": 4362.48,
+      "low": 4359.72,
+      "close": 4362.48,
+      "kj55": 4357.93,
+      "tk144": 4362.47
+    },
+    {
+      "boundary": 1789658730,
+      "time": "17:25:30",
+      "open": 4362.55,
+      "high": 4363.25,
+      "low": 4359.73,
+      "close": 4360.58,
+      "kj55": 4357.93,
+      "tk144": 4362.47
+    },
+    {
+      "boundary": 1789658760,
+      "time": "17:26:00",
+      "open": 4360.59,
+      "high": 4360.72,
+      "low": 4357.6,
+      "close": 4357.68,
+      "kj55": 4357.93,
+      "tk144": 4362.47
+    },
+    {
+      "boundary": 1789658790,
+      "time": "17:26:30",
+      "open": 4357.62,
+      "high": 4358.57,
+      "low": 4356.01,
+      "close": 4356.58,
+      "kj55": 4357.93,
+      "tk144": 4362.47
+    },
+    {
+      "boundary": 1789658820,
+      "time": "17:27:00",
+      "open": 4356.71,
+      "high": 4357.9,
+      "low": 4356.45,
+      "close": 4357.61,
+      "kj55": 4357.93,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789658850,
+      "time": "17:27:30",
+      "open": 4357.6,
+      "high": 4357.99,
+      "low": 4356.82,
+      "close": 4356.89,
+      "kj55": 4357.93,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789658880,
+      "time": "17:28:00",
+      "open": 4356.94,
+      "high": 4357.95,
+      "low": 4356.8,
+      "close": 4357.09,
+      "kj55": 4357.93,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789658910,
+      "time": "17:28:30",
+      "open": 4357.17,
+      "high": 4358.77,
+      "low": 4357.08,
+      "close": 4358.7,
+      "kj55": 4358.02,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789658940,
+      "time": "17:29:00",
+      "open": 4358.72,
+      "high": 4358.99,
+      "low": 4357.56,
+      "close": 4357.72,
+      "kj55": 4358.02,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789658970,
+      "time": "17:29:30",
+      "open": 4357.68,
+      "high": 4358.24,
+      "low": 4357.06,
+      "close": 4358.03,
+      "kj55": 4358.02,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659000,
+      "time": "17:30:00",
+      "open": 4358.04,
+      "high": 4358.94,
+      "low": 4357.04,
+      "close": 4357.95,
+      "kj55": 4358.57,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659030,
+      "time": "17:30:30",
+      "open": 4357.97,
+      "high": 4358.51,
+      "low": 4357.14,
+      "close": 4357.76,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659060,
+      "time": "17:31:00",
+      "open": 4357.65,
+      "high": 4358.69,
+      "low": 4357.04,
+      "close": 4358.39,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659090,
+      "time": "17:31:30",
+      "open": 4357.88,
+      "high": 4359.02,
+      "low": 4357.58,
+      "close": 4358.7,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659120,
+      "time": "17:32:00",
+      "open": 4358.68,
+      "high": 4358.7,
+      "low": 4355.75,
+      "close": 4356.2,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659150,
+      "time": "17:32:30",
+      "open": 4356.31,
+      "high": 4357.26,
+      "low": 4355.56,
+      "close": 4355.56,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659180,
+      "time": "17:33:00",
+      "open": 4355.54,
+      "high": 4356.57,
+      "low": 4355.22,
+      "close": 4356.23,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659210,
+      "time": "17:33:30",
+      "open": 4356.16,
+      "high": 4357.47,
+      "low": 4355.96,
+      "close": 4355.96,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659240,
+      "time": "17:34:00",
+      "open": 4356.03,
+      "high": 4358.06,
+      "low": 4355.99,
+      "close": 4358.06,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659270,
+      "time": "17:34:30",
+      "open": 4358.22,
+      "high": 4359.89,
+      "low": 4357.55,
+      "close": 4359.3,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659300,
+      "time": "17:35:00",
+      "open": 4359.28,
+      "high": 4361.11,
+      "low": 4358.19,
+      "close": 4360.53,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659330,
+      "time": "17:35:30",
+      "open": 4360.52,
+      "high": 4361.57,
+      "low": 4360.07,
+      "close": 4360.64,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659360,
+      "time": "17:36:00",
+      "open": 4360.65,
+      "high": 4361.69,
+      "low": 4360.59,
+      "close": 4361.15,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659390,
+      "time": "17:36:30",
+      "open": 4361.17,
+      "high": 4362.08,
+      "low": 4360.72,
+      "close": 4361.77,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659420,
+      "time": "17:37:00",
+      "open": 4361.76,
+      "high": 4363.02,
+      "low": 4361.5,
+      "close": 4362.8,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659450,
+      "time": "17:37:30",
+      "open": 4362.59,
+      "high": 4363.27,
+      "low": 4361.73,
+      "close": 4362.87,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659480,
+      "time": "17:38:00",
+      "open": 4362.9,
+      "high": 4363.29,
+      "low": 4362.28,
+      "close": 4363.28,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659510,
+      "time": "17:38:30",
+      "open": 4363.25,
+      "high": 4363.61,
+      "low": 4361.75,
+      "close": 4362.67,
+      "kj55": 4358.8,
+      "tk144": 4362.35
+    },
+    {
+      "boundary": 1789659540,
+      "time": "17:39:00",
+      "open": 4362.96,
+      "high": 4363.18,
+      "low": 4361.51,
+      "close": 4362.24,
+      "kj55": 4358.8,
+      "tk144": 4361.99
+    },
+    {
+      "boundary": 1789659570,
+      "time": "17:39:30",
+      "open": 4362.67,
+      "high": 4362.92,
+      "low": 4361.88,
+      "close": 4362.45,
+      "kj55": 4358.8,
+      "tk144": 4361.02
+    },
+    {
+      "boundary": 1789659600,
+      "time": "17:40:00",
+      "open": 4362.43,
+      "high": 4363.9,
+      "low": 4361.9,
+      "close": 4363.83,
+      "kj55": 4359.86,
+      "tk144": 4360.73
+    },
+    {
+      "boundary": 1789659630,
+      "time": "17:40:30",
+      "open": 4363.89,
+      "high": 4365.19,
+      "low": 4363.61,
+      "close": 4364.61,
+      "kj55": 4360.2,
+      "tk144": 4360.27
+    },
+    {
+      "boundary": 1789659660,
+      "time": "17:41:00",
+      "open": 4364.4,
+      "high": 4364.44,
+      "low": 4363.08,
+      "close": 4363.68,
+      "kj55": 4360.2,
+      "tk144": 4360.05
+    },
+    {
+      "boundary": 1789659690,
+      "time": "17:41:30",
+      "open": 4363.69,
+      "high": 4364.73,
+      "low": 4363.33,
+      "close": 4364.68,
+      "kj55": 4360.2,
+      "tk144": 4360.05
+    },
+    {
+      "boundary": 1789659720,
+      "time": "17:42:00",
+      "open": 4364.72,
+      "high": 4366.13,
+      "low": 4364.55,
+      "close": 4364.62,
+      "kj55": 4360.68,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659750,
+      "time": "17:42:30",
+      "open": 4364.49,
+      "high": 4364.78,
+      "low": 4363.87,
+      "close": 4364.37,
+      "kj55": 4360.68,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659780,
+      "time": "17:43:00",
+      "open": 4364.15,
+      "high": 4364.84,
+      "low": 4363.63,
+      "close": 4364.17,
+      "kj55": 4360.68,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659810,
+      "time": "17:43:30",
+      "open": 4364.23,
+      "high": 4365.17,
+      "low": 4364.21,
+      "close": 4364.97,
+      "kj55": 4360.68,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659840,
+      "time": "17:44:00",
+      "open": 4365.08,
+      "high": 4366.76,
+      "low": 4365.06,
+      "close": 4366.62,
+      "kj55": 4360.99,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659870,
+      "time": "17:44:30",
+      "open": 4366.81,
+      "high": 4367.53,
+      "low": 4365.32,
+      "close": 4366.41,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659900,
+      "time": "17:45:00",
+      "open": 4366.38,
+      "high": 4366.58,
+      "low": 4365.1,
+      "close": 4365.36,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659930,
+      "time": "17:45:30",
+      "open": 4366.14,
+      "high": 4367.08,
+      "low": 4365.77,
+      "close": 4366.24,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659960,
+      "time": "17:46:00",
+      "open": 4366.29,
+      "high": 4366.76,
+      "low": 4366.19,
+      "close": 4366.23,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789659990,
+      "time": "17:46:30",
+      "open": 4366.36,
+      "high": 4366.36,
+      "low": 4365.53,
+      "close": 4365.87,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789660020,
+      "time": "17:47:00",
+      "open": 4365.81,
+      "high": 4365.81,
+      "low": 4363.66,
+      "close": 4363.96,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789660050,
+      "time": "17:47:30",
+      "open": 4363.84,
+      "high": 4365.17,
+      "low": 4363.78,
+      "close": 4365.16,
+      "kj55": 4361.38,
+      "tk144": 4359.74
+    },
+    {
+      "boundary": 1789660080,
+      "time": "17:48:00",
+      "open": 4365.18,
+      "high": 4366.63,
+      "low": 4364.98,
+      "close": 4366.36,
+      "kj55": 4361.38,
+      "tk144": 4359.44
+    },
+    {
+      "boundary": 1789660110,
+      "time": "17:48:30",
+      "open": 4366.33,
+      "high": 4366.42,
+      "low": 4364.97,
+      "close": 4364.97,
+      "kj55": 4361.38,
+      "tk144": 4359.44
+    },
+    {
+      "boundary": 1789660140,
+      "time": "17:49:00",
+      "open": 4364.9,
+      "high": 4365.62,
+      "low": 4364.79,
+      "close": 4365.62,
+      "kj55": 4361.38,
+      "tk144": 4359.44
+    },
+    {
+      "boundary": 1789660170,
+      "time": "17:49:30",
+      "open": 4365.63,
+      "high": 4367.9,
+      "low": 4365.02,
+      "close": 4365.83,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660200,
+      "time": "17:50:00",
+      "open": 4365.72,
+      "high": 4367.02,
+      "low": 4365.61,
+      "close": 4365.94,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660230,
+      "time": "17:50:30",
+      "open": 4365.83,
+      "high": 4365.83,
+      "low": 4363.87,
+      "close": 4364.96,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660260,
+      "time": "17:51:00",
+      "open": 4365.11,
+      "high": 4366.48,
+      "low": 4364.59,
+      "close": 4365.79,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660290,
+      "time": "17:51:30",
+      "open": 4365.87,
+      "high": 4366.76,
+      "low": 4365.63,
+      "close": 4366.36,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660320,
+      "time": "17:52:00",
+      "open": 4366.35,
+      "high": 4367.74,
+      "low": 4366.25,
+      "close": 4367.54,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660350,
+      "time": "17:52:30",
+      "open": 4367.46,
+      "high": 4367.71,
+      "low": 4366.83,
+      "close": 4367.48,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660380,
+      "time": "17:53:00",
+      "open": 4367.46,
+      "high": 4367.46,
+      "low": 4366.82,
+      "close": 4366.99,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660410,
+      "time": "17:53:30",
+      "open": 4367.13,
+      "high": 4367.17,
+      "low": 4365.86,
+      "close": 4365.92,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660440,
+      "time": "17:54:00",
+      "open": 4365.97,
+      "high": 4366.42,
+      "low": 4365.84,
+      "close": 4366.34,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660470,
+      "time": "17:54:30",
+      "open": 4366.35,
+      "high": 4367.16,
+      "low": 4366.04,
+      "close": 4366.87,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660500,
+      "time": "17:55:00",
+      "open": 4366.79,
+      "high": 4366.79,
+      "low": 4365.54,
+      "close": 4365.89,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660530,
+      "time": "17:55:30",
+      "open": 4366.18,
+      "high": 4367.46,
+      "low": 4366.01,
+      "close": 4366.85,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660560,
+      "time": "17:56:00",
+      "open": 4366.88,
+      "high": 4367.5,
+      "low": 4366.58,
+      "close": 4366.6,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660590,
+      "time": "17:56:30",
+      "open": 4366.59,
+      "high": 4366.64,
+      "low": 4365.51,
+      "close": 4366.4,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660620,
+      "time": "17:57:00",
+      "open": 4366.32,
+      "high": 4366.98,
+      "low": 4366.27,
+      "close": 4366.93,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660650,
+      "time": "17:57:30",
+      "open": 4366.94,
+      "high": 4367.02,
+      "low": 4366.42,
+      "close": 4366.74,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660680,
+      "time": "17:58:00",
+      "open": 4366.69,
+      "high": 4367.62,
+      "low": 4366.66,
+      "close": 4367.55,
+      "kj55": 4361.56,
+      "tk144": 4359.62
+    },
+    {
+      "boundary": 1789660710,
+      "time": "17:58:30",
+      "open": 4367.62,
+      "high": 4368.87,
+      "low": 4367.62,
+      "close": 4368.37,
+      "kj55": 4362.05,
+      "tk144": 4360.11
+    },
+    {
+      "boundary": 1789660740,
+      "time": "17:59:00",
+      "open": 4368.35,
+      "high": 4369.46,
+      "low": 4367.7,
+      "close": 4369.34,
+      "kj55": 4362.34,
+      "tk144": 4360.41
+    },
+    {
+      "boundary": 1789660770,
+      "time": "17:59:30",
+      "open": 4369.41,
+      "high": 4370.41,
+      "low": 4369.39,
+      "close": 4370.03,
+      "kj55": 4362.82,
+      "tk144": 4360.88
+    },
+    {
+      "boundary": 1789660800,
+      "time": "18:00:00",
+      "open": 4370.09,
+      "high": 4371.55,
+      "low": 4369.25,
+      "close": 4370.56,
+      "kj55": 4363.39,
+      "tk144": 4361.45
+    },
+    {
+      "boundary": 1789660830,
+      "time": "18:00:30",
+      "open": 4370.47,
+      "high": 4372.0,
+      "low": 4369.8,
+      "close": 4372.0,
+      "kj55": 4363.98,
+      "tk144": 4361.68
+    },
+    {
+      "boundary": 1789660860,
+      "time": "18:01:00",
+      "open": 4372.02,
+      "high": 4372.66,
+      "low": 4371.68,
+      "close": 4371.94,
+      "kj55": 4364.32,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789660890,
+      "time": "18:01:30",
+      "open": 4371.9,
+      "high": 4372.42,
+      "low": 4371.65,
+      "close": 4372.02,
+      "kj55": 4365.1,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789660920,
+      "time": "18:02:00",
+      "open": 4372.03,
+      "high": 4372.2,
+      "low": 4371.13,
+      "close": 4371.48,
+      "kj55": 4365.42,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789660950,
+      "time": "18:02:30",
+      "open": 4371.32,
+      "high": 4371.48,
+      "low": 4369.78,
+      "close": 4370.94,
+      "kj55": 4366.36,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789660980,
+      "time": "18:03:00",
+      "open": 4371.01,
+      "high": 4372.26,
+      "low": 4370.81,
+      "close": 4371.38,
+      "kj55": 4366.62,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661010,
+      "time": "18:03:30",
+      "open": 4371.43,
+      "high": 4371.43,
+      "low": 4369.93,
+      "close": 4370.74,
+      "kj55": 4366.69,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661040,
+      "time": "18:04:00",
+      "open": 4370.61,
+      "high": 4370.87,
+      "low": 4369.05,
+      "close": 4369.09,
+      "kj55": 4367.08,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661070,
+      "time": "18:04:30",
+      "open": 4368.97,
+      "high": 4369.99,
+      "low": 4368.55,
+      "close": 4369.91,
+      "kj55": 4367.09,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661100,
+      "time": "18:05:00",
+      "open": 4370.0,
+      "high": 4371.37,
+      "low": 4369.97,
+      "close": 4370.52,
+      "kj55": 4367.09,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661130,
+      "time": "18:05:30",
+      "open": 4370.6,
+      "high": 4371.39,
+      "low": 4370.47,
+      "close": 4370.47,
+      "kj55": 4367.09,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661160,
+      "time": "18:06:00",
+      "open": 4370.46,
+      "high": 4370.55,
+      "low": 4369.0,
+      "close": 4369.78,
+      "kj55": 4367.09,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661190,
+      "time": "18:06:30",
+      "open": 4369.82,
+      "high": 4370.12,
+      "low": 4369.06,
+      "close": 4369.82,
+      "kj55": 4367.27,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661220,
+      "time": "18:07:00",
+      "open": 4369.86,
+      "high": 4369.89,
+      "low": 4368.38,
+      "close": 4368.64,
+      "kj55": 4367.28,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661250,
+      "time": "18:07:30",
+      "open": 4368.63,
+      "high": 4369.4,
+      "low": 4367.72,
+      "close": 4369.21,
+      "kj55": 4367.87,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661280,
+      "time": "18:08:00",
+      "open": 4369.23,
+      "high": 4369.72,
+      "low": 4368.26,
+      "close": 4369.17,
+      "kj55": 4367.87,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661310,
+      "time": "18:08:30",
+      "open": 4369.24,
+      "high": 4369.24,
+      "low": 4367.37,
+      "close": 4367.73,
+      "kj55": 4367.99,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661340,
+      "time": "18:09:00",
+      "open": 4367.64,
+      "high": 4369.24,
+      "low": 4367.51,
+      "close": 4369.17,
+      "kj55": 4368.15,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661370,
+      "time": "18:09:30",
+      "open": 4369.16,
+      "high": 4370.01,
+      "low": 4369.16,
+      "close": 4369.93,
+      "kj55": 4368.15,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661400,
+      "time": "18:10:00",
+      "open": 4370.04,
+      "high": 4370.47,
+      "low": 4368.98,
+      "close": 4369.29,
+      "kj55": 4368.15,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661430,
+      "time": "18:10:30",
+      "open": 4369.23,
+      "high": 4369.47,
+      "low": 4368.67,
+      "close": 4368.88,
+      "kj55": 4368.16,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661460,
+      "time": "18:11:00",
+      "open": 4368.9,
+      "high": 4369.66,
+      "low": 4368.38,
+      "close": 4368.64,
+      "kj55": 4368.16,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661490,
+      "time": "18:11:30",
+      "open": 4368.65,
+      "high": 4369.69,
+      "low": 4368.64,
+      "close": 4368.68,
+      "kj55": 4368.16,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661520,
+      "time": "18:12:00",
+      "open": 4368.93,
+      "high": 4369.49,
+      "low": 4368.3,
+      "close": 4368.52,
+      "kj55": 4368.16,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661550,
+      "time": "18:12:30",
+      "open": 4368.47,
+      "high": 4369.97,
+      "low": 4368.4,
+      "close": 4369.78,
+      "kj55": 4368.16,
+      "tk144": 4362.01
+    },
+    {
+      "boundary": 1789661580,
+      "time": "18:13:00",
+      "open": 4368.6,
+      "high": 4368.62,
+      "low": 4367.22,
+      "close": 4368.14,
+      "kj55": 4368.16,
+      "tk144": 4362.1
+    },
+    {
+      "boundary": 1789661610,
+      "time": "18:13:30",
+      "open": 4368.25,
+      "high": 4368.25,
+      "low": 4367.22,
+      "close": 4367.32,
+      "kj55": 4368.16,
+      "tk144": 4362.1
+    },
+    {
+      "boundary": 1789661640,
+      "time": "18:14:00",
+      "open": 4367.86,
+      "high": 4368.92,
+      "low": 4367.54,
+      "close": 4368.08,
+      "kj55": 4368.16,
+      "tk144": 4362.1
+    },
+    {
+      "boundary": 1789661670,
+      "time": "18:14:30",
+      "open": 4367.95,
+      "high": 4368.47,
+      "low": 4367.68,
+      "close": 4368.47,
+      "kj55": 4368.22,
+      "tk144": 4362.65
+    },
+    {
+      "boundary": 1789661700,
+      "time": "18:15:00",
+      "open": 4368.61,
+      "high": 4368.9,
+      "low": 4367.99,
+      "close": 4368.55,
+      "kj55": 4368.26,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661730,
+      "time": "18:15:30",
+      "open": 4368.59,
+      "high": 4368.78,
+      "low": 4368.01,
+      "close": 4368.04,
+      "kj55": 4368.26,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661760,
+      "time": "18:16:00",
+      "open": 4368.08,
+      "high": 4368.11,
+      "low": 4366.24,
+      "close": 4366.61,
+      "kj55": 4368.26,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661790,
+      "time": "18:16:30",
+      "open": 4366.64,
+      "high": 4367.81,
+      "low": 4366.57,
+      "close": 4367.39,
+      "kj55": 4368.26,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661820,
+      "time": "18:17:00",
+      "open": 4367.5,
+      "high": 4367.74,
+      "low": 4367.21,
+      "close": 4367.36,
+      "kj55": 4368.26,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661850,
+      "time": "18:17:30",
+      "open": 4367.33,
+      "high": 4367.37,
+      "low": 4366.72,
+      "close": 4367.09,
+      "kj55": 4368.26,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661880,
+      "time": "18:18:00",
+      "open": 4367.12,
+      "high": 4367.15,
+      "low": 4366.4,
+      "close": 4366.65,
+      "kj55": 4368.62,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661910,
+      "time": "18:18:30",
+      "open": 4366.66,
+      "high": 4367.36,
+      "low": 4366.01,
+      "close": 4366.68,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661940,
+      "time": "18:19:00",
+      "open": 4366.69,
+      "high": 4367.4,
+      "low": 4365.64,
+      "close": 4367.34,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789661970,
+      "time": "18:19:30",
+      "open": 4367.32,
+      "high": 4367.59,
+      "low": 4366.83,
+      "close": 4366.93,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662000,
+      "time": "18:20:00",
+      "open": 4366.98,
+      "high": 4367.64,
+      "low": 4366.28,
+      "close": 4366.68,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662030,
+      "time": "18:20:30",
+      "open": 4366.69,
+      "high": 4367.52,
+      "low": 4366.65,
+      "close": 4367.28,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662060,
+      "time": "18:21:00",
+      "open": 4367.25,
+      "high": 4367.53,
+      "low": 4367.0,
+      "close": 4367.45,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662090,
+      "time": "18:21:30",
+      "open": 4367.44,
+      "high": 4367.46,
+      "low": 4366.84,
+      "close": 4366.84,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662120,
+      "time": "18:22:00",
+      "open": 4366.83,
+      "high": 4367.54,
+      "low": 4365.65,
+      "close": 4367.2,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662150,
+      "time": "18:22:30",
+      "open": 4367.21,
+      "high": 4367.71,
+      "low": 4367.05,
+      "close": 4367.58,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662180,
+      "time": "18:23:00",
+      "open": 4367.52,
+      "high": 4368.23,
+      "low": 4367.37,
+      "close": 4368.02,
+      "kj55": 4369.09,
+      "tk144": 4362.88
+    },
+    {
+      "boundary": 1789662210,
+      "time": "18:23:30",
+      "open": 4368.03,
+      "high": 4368.54,
+      "low": 4368.03,
+      "close": 4368.06,
+      "kj55": 4369.09,
+      "tk144": 4362.88
     }
   ],
-  "last_ts_cycle": null
-}}
+  "last_ts_cycle": {
+    "time": "17:03:04",
+    "direction": "SHORT",
+    "core_pips": 8.28,
+    "total_pnl": 16.56,
+    "peak_price": 4351.35,
+    "close_price": 4355.43
+  }
+}

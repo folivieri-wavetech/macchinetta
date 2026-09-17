@@ -152,6 +152,9 @@ CONFIG_STRUMENTI = {
     "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1}
 }
 
+# Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
+STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold"]
+
 def pips_to_price(nome, pips):
     """Restituisce il delta di prezzo corrispondente a N pips reali per lo strumento."""
     mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
@@ -1970,6 +1973,10 @@ def esegui_ciclo_trend():
 
     for nome, dati in parametri.items():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
+            continue
+
+        # Operatività Trend disabilitata temporaneamente (riservata ad HYPER)
+        if nome in STRUMENTI_ESCLUSIVI_HYPER:
             continue
             
         epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")

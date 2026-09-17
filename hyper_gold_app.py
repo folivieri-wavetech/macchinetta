@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import time
-from hyper_gold_engine import HyperGoldEngine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, CORE_TS_TRIGGER_PIPS, CORE_TS_LOCK_PIPS, CORE_TS_DISTANCE_PIPS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CANDELA_SEGNALE_OFFSET_PIPS, TK_FILTER_PIPS, is_gold_trading_suspended, is_gold_feed_suspended
+from hyper_gold_engine import HyperGoldEngine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, CORE_TS_TRIGGER_PIPS, CORE_TS_LOCK_PIPS, CORE_TS_DISTANCE_PIPS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CANDELA_SEGNALE_OFFSET_PIPS, TK_FILTER_PIPS, DEFAULT_SCALINI_PLAN_30S, is_gold_trading_suspended, is_gold_feed_suspended
 
 # Configurazione Pagina Streamlit
 st.set_page_config(
@@ -132,7 +132,7 @@ def render_live_desk():
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
         st.markdown("<h3 style='margin: 0; font-size: 1.08rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8; font-weight: 500;'>(TK144 / KJ55)</span></h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (Paracadute 3p, Candela Segnale 3p) • Core 4c (TS a +10p, Lock +6p, Trail 4p) • Incr 2c (TP +2p, Max 4) • Porta 8501</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (Paracadute 2p, Candela Segnale 2p) • Scalini Fast: 4c @ 2p + 4c @ 3p • Core Runner 2c (TS a +10p) • Totale 10c • Porta 8501</div>", unsafe_allow_html=True)
 
     with c_badges:
         is_feed_closed = is_gold_feed_suspended()
@@ -250,7 +250,7 @@ def render_live_desk():
             st.markdown(f"""
             <div class='kpi-card'>
                 <div class='kpi-title'>Esposizione a Mercato</div>
-                <div class='kpi-val' style='color: {dir_col};'>{dir_icon} {pos['direction']} ({total_contracts}/12 Contr.)</div>
+                <div class='kpi-val' style='color: {dir_col}; font-size: 1.12rem; white-space: nowrap;'>{dir_icon} {pos['direction']} <span style='font-size: 0.92rem; font-weight: 600; opacity: 0.88;'>({total_contracts}/10 Contr.)</span></div>
                 <div class='kpi-sub' style='color: #cbd5e1;'>{sub_text}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -258,7 +258,7 @@ def render_live_desk():
             st.markdown(f"""
             <div class='kpi-card'>
                 <div class='kpi-title'>Esposizione a Mercato</div>
-                <div class='kpi-val' style='color: #94a3b8;'>⚪ FLAT (0)</div>
+                <div class='kpi-val' style='color: #94a3b8; font-size: 1.12rem;'>⚪ FLAT (0)</div>
                 <div class='kpi-sub' style='color: #64748b;'>In attesa automatica nuovo segnale</div>
             </div>
             """, unsafe_allow_html=True)
@@ -317,7 +317,7 @@ def render_live_desk():
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±3p (Live)</div>
+            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±2p (Live)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -361,27 +361,25 @@ def render_live_desk():
     col_left, col_right = st.columns([1.60, 1.60])
 
     with col_left:
-        # Configurazione Parametri Partenza Scalini 30S: Core + N Scalini (Default: 4, 6, 1)
-        cur_core = int(getattr(engine, "core_size", 4))
-        cur_n_sc = int(getattr(engine, "num_scalini", 6))
-        cur_sc_sz = int(getattr(engine, "scalino_size", 1))
+        # Configurazione Scalini 30S: Fast Scalping (4c @ 2p + 4c @ 3p + Core Runner 2c [TS a +10p])
+        cur_core = int(getattr(engine, "core_size", 2))
+        cur_plan = getattr(engine, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
+        tot_plan_c = sum(it["contracts"] for it in cur_plan)
+        tot_all_c = cur_core + tot_plan_c
 
-        with st.expander("⚙️ Configurazione Partenza Scalini 30S (Default: 4, 6, 1)", expanded=True):
-            cfg_c1, cfg_c2, cfg_c3 = st.columns(3)
-            with cfg_c1:
-                new_core = st.number_input("Size Core", min_value=1, max_value=20, value=cur_core, step=1, key="cfg_core_sz_30s")
-            with cfg_c2:
-                new_n_sc = st.number_input("N° Incrementi", min_value=1, max_value=15, value=cur_n_sc, step=1, key="cfg_n_sc_30s")
-            with cfg_c3:
-                new_sc_sz = st.number_input("Size x Scalino", min_value=1, max_value=10, value=cur_sc_sz, step=1, key="cfg_sc_sz_30s")
-
-            if new_core != cur_core or new_n_sc != cur_n_sc or new_sc_sz != cur_sc_sz:
-                engine.update_scalini_config(new_core, new_n_sc, new_sc_sz)
-                st.rerun()
-
-            tot_init = new_core + (new_n_sc * new_sc_sz)
-            tp_list = ", ".join([f"+{i*2}p" for i in range(1, new_n_sc + 1)])
-            st.markdown(f"<div style='font-size: 0.74rem; color: #94a3b8; margin-top: 4px;'>Totale a mercato: <span style='color: #38bdf8; font-weight: 700;'>{tot_init}c</span> ({new_core}c Core + {new_n_sc}x{new_sc_sz}c Scalini) • TP scalettati: <span style='color: #fed7aa; font-weight: 600;'>{tp_list}</span></div>", unsafe_allow_html=True)
+        with st.expander("⚙️ Assetto Scalini 30S: Fast Scalping (Totale 10 Contratti)", expanded=True):
+            st.markdown(f"""
+            <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; font-size: 0.80rem; line-height: 1.6;'>
+                <div style='color: #38bdf8; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi Fast Scalping (De-leveraging Fulmineo):</div>
+                <div>• <b>Scalino #1</b>: <span style='color: #f59e0b; font-weight: 600;'>4 contratti</span> @ <b>TP 2 pip</b> (+8.00 €)</div>
+                <div>• <b>Scalino #2</b>: <span style='color: #f59e0b; font-weight: 600;'>4 contratti</span> @ <b>TP 3 pip</b> (+12.00 €)</div>
+                <div style='margin-top: 4px;'>• <b>Core Runner</b>: <span style='color: #4ade80; font-weight: 600;'>{cur_core} contratti</span> (Trailing Stop attivo a <b>+10 pip</b>, Lock +6 pip, Trail dinamico base 4 pip [+1p ogni 10p])</div>
+                <div style='border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px; display: flex; justify-content: space-between;'>
+                    <span style='color: #94a3b8;'>Esposizione iniziale: <b style='color: #f8fafc;'>{tot_all_c} contratti</b> (Margine: {tot_all_c*220:,.0f} €)</span>
+                    <span style='color: #4ade80; font-weight: 700;'>Incasso Scalini (2p + 3p): +20.00 €</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
@@ -496,7 +494,7 @@ def render_live_desk():
                 else:
                     sig_ref = sig_px
             sign_op = "-" if (pos and pos.get("direction") == "LONG") else "+"
-            sig_badge = f"<span style='font-size: 0.94rem; font-weight: 700; color: #f97316; white-space: nowrap;'>Candela Segnale: <span style='font-weight: 800; color: #fb923c;'>{sig_px:.2f}</span> <span style='font-size: 0.88rem; color: #fed7aa; font-weight: 600;'>({sig_ref:.2f} {sign_op} 3 pip)</span></span>"
+            sig_badge = f"<span style='font-size: 0.94rem; font-weight: 700; color: #f97316; white-space: nowrap;'>Candela Segnale: <span style='font-weight: 800; color: #fb923c;'>{sig_px:.2f}</span> <span style='font-size: 0.88rem; color: #fed7aa; font-weight: 600;'>({sig_ref:.2f} {sign_op} {CANDELA_SEGNALE_OFFSET_PIPS:.0f} pip)</span></span>"
         else:
             sig_badge = "<span style='font-size: 0.94rem; font-weight: 700; color: #64748b; white-space: nowrap;'>---</span>"
 
@@ -511,13 +509,15 @@ def render_live_desk():
             dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
             dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core {dir_pos}</span> <span style='font-size: 0.82rem; color: #cbd5e1; font-weight: 600;'>({pos['open_price']:.2f})</span>"
 
-            # TS Info Core: punto di attivazione (TS In) o livello di stop una volta entrato (TS Stop)
+            # TS Info Core
             if pos.get("ts_active"):
                 ts_stop_px = pos.get("ts_price", 0.0)
-                ts_badge = f"<div style='font-size: 0.70rem; color: #4ade80; font-weight: 700; margin-top: 2px;'>🚀 TS Stop: {ts_stop_px:.2f}</div>"
+                ts_dist = pos.get("ts_distance", CORE_TS_DISTANCE_PIPS)
+                ts_cell = f"<span style='color: #4ade80; font-weight: 700; white-space: nowrap;'>TS {ts_stop_px:.2f}</span> <span style='font-size: 0.70rem; color: #86efac; font-weight: 600;'>(Dist: {ts_dist:.0f}p)</span>"
             else:
                 ts_target = round((pos["open_price"] + CORE_TS_TRIGGER_PIPS) if dir_pos == "LONG" else (pos["open_price"] - CORE_TS_TRIGGER_PIPS), 2)
-                ts_badge = f"<div style='font-size: 0.70rem; color: #94a3b8; margin-top: 2px;'>TS In: <span style='color: #38bdf8; font-weight: 600;'>{ts_target:.2f}</span> (+{CORE_TS_TRIGGER_PIPS:.0f}p)</div>"
+                ts_sign = "+" if dir_pos == "LONG" else "-"
+                ts_cell = f"<span style='color: #38bdf8; font-weight: 600; white-space: nowrap;'>{ts_target:.2f}</span> <span style='font-size: 0.70rem; color: #94a3b8;'>({ts_sign}{CORE_TS_TRIGGER_PIPS:.0f}p)</span>"
 
             # PnL Core
             if live_mid is not None:
@@ -531,9 +531,10 @@ def render_live_desk():
 
             p_rows = [
                 f"<tr>"
-                f"<td>{dir_badge}{ts_badge}</td>"
+                f"<td>{dir_badge}</td>"
                 f"<td style='text-align: center; font-weight: 700; white-space: nowrap;'>{pos.get('contracts', CORE_CONTRACTS)}c</td>"
                 f"<td style='text-align: right; font-weight: 600; white-space: nowrap;'>{pos['open_price']:.2f}</td>"
+                f"<td style='text-align: right; white-space: nowrap;'>{ts_cell}</td>"
                 f"<td style='text-align: right; color: {col_core_pnl}; font-weight: 700; white-space: nowrap;'>{sign_core}{core_pnl_val:,.2f}&nbsp;€</td>"
                 f"</tr>"
             ]
@@ -551,12 +552,14 @@ def render_live_desk():
                 step_i = inc.get("step_idx", idx)
                 tp_dist_p = inc.get("tp_dist_pips", step_i * 2.0)
                 tp_val = inc.get("tp_price", 0.0)
+                tp_cell = f"<span style='color: #38bdf8; font-weight: 700; white-space: nowrap;'>{tp_val:.2f}</span> <span style='font-size: 0.70rem; color: #fed7aa; font-weight: 600;'>(+{tp_dist_p:.0f}p)</span>"
 
                 p_rows.append(
                     f"<tr>"
-                    f"<td><span style='color: #f59e0b; font-weight: 600; white-space: nowrap;'>➕ Scalino #{step_i}</span><div style='font-size: 0.68rem; color: #38bdf8;'>TP: {tp_val:.2f} (+{tp_dist_p:.0f}p)</div></td>"
+                    f"<td><span style='color: #f59e0b; font-weight: 600; white-space: nowrap;'>➕ Scalino #{step_i}</span></td>"
                     f"<td style='text-align: center; font-weight: 700; white-space: nowrap;'>{inc.get('contracts', 1)}c</td>"
                     f"<td style='text-align: right; font-weight: 600; white-space: nowrap;'>{inc['open_price']:.2f}</td>"
+                    f"<td style='text-align: right; white-space: nowrap;'>{tp_cell}</td>"
                     f"<td style='text-align: right; color: {col_inc_pnl}; font-weight: 700; white-space: nowrap;'>{sign_inc}{inc_pnl_val:,.2f}&nbsp;€</td>"
                     f"</tr>"
                 )
@@ -570,13 +573,14 @@ def render_live_desk():
                 f"<td style='color: #f8fafc;'>TOTALE</td>"
                 f"<td style='text-align: center; color: #38bdf8; white-space: nowrap;'>{total_contracts}c</td>"
                 f"<td style='text-align: right; color: #94a3b8; white-space: nowrap;'>Live: {px_live_str}</td>"
+                f"<td style='text-align: right; color: #64748b; white-space: nowrap;'>--</td>"
                 f"<td style='text-align: right; color: {col_tot_pnl}; white-space: nowrap;'>{sign_tot}{float_pnl:,.2f}&nbsp;€</td>"
                 f"</tr>"
             )
 
             tbl_port = (
                 "<table class='table-dark'>"
-                "<thead><tr><th>Posizione</th><th style='text-align: center; white-space: nowrap;'>Size</th><th style='text-align: right; white-space: nowrap;'>Open</th><th style='text-align: right; white-space: nowrap;'>P&L (€)</th></tr></thead>"
+                "<thead><tr><th>Posizione</th><th style='text-align: center; white-space: nowrap;'>Size</th><th style='text-align: right; white-space: nowrap;'>Open</th><th style='text-align: right; white-space: nowrap;'>TP / TS</th><th style='text-align: right; white-space: nowrap;'>P&L (€)</th></tr></thead>"
                 f"<tbody>{''.join(p_rows)}</tbody>"
                 "</table>"
             )

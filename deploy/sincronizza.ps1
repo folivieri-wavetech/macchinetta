@@ -5,7 +5,7 @@ param (
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "1. VERIFICA SINTASSI PYTHON" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
-python -m py_compile Dashboard.py Motore.py Motore_Trend.py
+python -m py_compile Dashboard.py Motore.py Motore_Trend.py hyper_tab.py hyper_gold_engine.py hyper_gold_m1_engine.py lightstreamer_client.py
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Errore di sintassi Python. Sincronizzazione interrotta." -ForegroundColor Red
     exit 1
@@ -51,6 +51,16 @@ try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore_Trend.py "macchinetta/${POD_DASH}:/data/Motore_Trend.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp ig_request_manager.py "macchinetta/${POD_DASH}:/data/ig_request_manager.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp ig_quota_status.json "macchinetta/${POD_DASH}:/data/ig_quota_status.json"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_tab.py "macchinetta/${POD_DASH}:/data/hyper_tab.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_engine.py "macchinetta/${POD_DASH}:/data/hyper_gold_engine.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_m1_engine.py "macchinetta/${POD_DASH}:/data/hyper_gold_m1_engine.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp lightstreamer_client.py "macchinetta/${POD_DASH}:/data/lightstreamer_client.py"
+    if (Test-Path "hyper_gold_state.json") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_state.json "macchinetta/${POD_DASH}:/data/hyper_gold_state.json"
+    }
+    if (Test-Path "hyper_gold_m1_state.json") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_m1_state.json "macchinetta/${POD_DASH}:/data/hyper_gold_m1_state.json"
+    }
     Get-ChildItem -Path "macchinetta_trend" -File | ForEach-Object {
         $fname = $_.Name
         & $KUBECTL --kubeconfig=$KUBECONFIG cp "macchinetta_trend/$fname" "macchinetta/${POD_DASH}:/data/macchinetta_trend/$fname"

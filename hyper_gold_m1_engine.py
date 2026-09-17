@@ -75,13 +75,16 @@ class HyperGoldM1Engine:
     _lock = threading.RLock()
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, account_dir: str = None):
         with cls._lock:
             if cls._instance is None:
-                cls._instance = cls()
+                cls._instance = cls(account_dir=account_dir)
+            elif account_dir:
+                cls._instance.account_dir = account_dir
             return cls._instance
 
-    def __init__(self):
+    def __init__(self, account_dir: str = None):
+        self.account_dir = account_dir
         self.lock = threading.RLock()
         self.running = True
         self.ls_connected = False
@@ -144,13 +147,24 @@ class HyperGoldM1Engine:
 
     def _get_ig_credentials(self):
         user, pwd, api_key = None, None, None
-        if os.path.exists(ENV_PATH):
-            with open(ENV_PATH, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
-                    elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
-                    elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
+        candidates = []
+        if getattr(self, "account_dir", None):
+            candidates.append(os.path.join(self.account_dir, ".env"))
+        candidates.append(ENV_PATH)
+        candidates.append(".env")
+        for p in candidates:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
+                            elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
+                            elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
+                    if user and pwd and api_key:
+                        break
+                except Exception:
+                    pass
         return user, pwd, api_key
 
     def _fetch_historical_m5_bars_from_ig(self):

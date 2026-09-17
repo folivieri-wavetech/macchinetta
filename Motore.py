@@ -119,6 +119,9 @@ CONFIG_STRUMENTI = {
     "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1, "decimali": 1, "valuta": "EUR", "valore_punto": 1}
 }
 
+# Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
+STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold"]
+
 # --- STATO GLOBALE ---
 falsi_allarmi_tracker = {}
 
@@ -1153,6 +1156,10 @@ def esegui_motore():
                             
                 for nome, param in dati.items():
                     if param.get("tipo_strategia", "RANGE") == "TREND":
+                        continue
+
+                    # Operatività Range disabilitata temporaneamente (riservata ad HYPER)
+                    if nome in STRUMENTI_ESCLUSIVI_HYPER:
                         continue
                         
                     epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")

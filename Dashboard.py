@@ -85,6 +85,9 @@ CONFIG_STRUMENTI = {
     "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 900}
 }
 
+# Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
+STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold"]
+
 
 config = dotenv_values(".env")
 DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
@@ -2327,12 +2330,12 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Sintesi Trend", "📈 Trend", "📋 Sintesi Range", "🛡️ Range", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_radar, tab_sintesi_trend, tab_trend, tab_sintesi, tab_operativa, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "📈 Sintesi Tnd", "🛡️ Range", "📋 Sintesi Rng", "⚡ Hyper", "🛑 Rec", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_radar, tab_trend, tab_sintesi_trend, tab_operativa, tab_sintesi, tab_hyper, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Sintesi Trend", "📋 Sintesi Range", "📄 Report"])
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Sintesi Tnd", "📋 Sintesi Rng", "📄 Report"])
         tab_portafoglio, tab_radar, tab_sintesi_trend, tab_sintesi, tab_report = tabs
-        tab_operativa = tab_trend = tab_restore = tab_console = tab_autorizzazioni = tab_statistiche = None
+        tab_operativa = tab_trend = tab_restore = tab_hyper = tab_console = tab_autorizzazioni = tab_statistiche = None
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
     target_tab_js = target_tab_to_open if target_tab_to_open else ""
@@ -2358,6 +2361,11 @@ else:
                             }}
                         }} else if (target === "Radar") {{
                             if (txt.includes("Radar")) {{
+                                t.click();
+                                break;
+                            }}
+                        }} else if (target === "Hyper") {{
+                            if (txt.includes("Hyper")) {{
                                 t.click();
                                 break;
                             }}
@@ -2962,7 +2970,9 @@ else:
                             if stato == "FASE_2_STANDBY":
                                 stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
                     else:
-                        if stato == "MANUALE":
+                        if nome in STRUMENTI_ESCLUSIVI_HYPER:
+                            stato_visivo = f"<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ RISERVATO HYPER</span>"
+                        elif stato == "MANUALE":
                             stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚠️ MANUALE</span>"
                         else:
                             stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏸️ IN ATTESA</span>"
@@ -3049,7 +3059,7 @@ else:
                 
                 st.html("""
                 <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
-                    <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Trend</h3></div>
+                    <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Tnd</h3></div>
                 </div>
                 """)
                 
@@ -3203,9 +3213,12 @@ else:
                             else:
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span></div>", unsafe_allow_html=True)
                         elif is_attivo and tipo_strat == "RANGE":
-                            c2.markdown("<span style='background-color: rgba(23,162,184,0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
+                            c2.markdown("<span style='background-color: rgba(23, 162, 184, 0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
-                            c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
+                            if nome in STRUMENTI_ESCLUSIVI_HYPER:
+                                c2.markdown("<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ RISERVATO HYPER</span>", unsafe_allow_html=True)
+                            else:
+                                c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
                             
                         c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
                         
@@ -3403,13 +3416,16 @@ else:
                             is_roll_r = is_rollover_active()
                             is_wkd_r = is_weekend_active()
 
-                            if is_roll_r:
+                            is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
+                            if is_hyper_exclusive:
+                                st.warning("⚡ **Operatività Range sospesa:** strumento riservato ad HYPER.")
+                            elif is_roll_r:
                                 st.warning("🌙 Avvio disabilitato fino alle 00:15.")
                             elif is_wkd_r:
                                 st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
 
-                            dis_btn_range = is_roll_r or is_wkd_r
-                            help_range = "Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None)
+                            dis_btn_range = is_hyper_exclusive or is_roll_r or is_wkd_r
+                            help_range = "Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None))
 
                             col_l, col_s = st.columns(2)
                             with col_l:
@@ -3652,7 +3668,10 @@ else:
                         if tipo_strategia == "RANGE" and stato_attivo:
                             st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
                         elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
-                            if is_roll:
+                            is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
+                            if is_hyper_exclusive:
+                                st.warning("⚡ **Operatività Trend sospesa:** strumento riservato ad HYPER.")
+                            elif is_roll:
                                 st.warning("🌙 Avvio disabilitato fino alle 00:15.")
                             elif is_wkd:
                                 st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
@@ -3664,7 +3683,9 @@ else:
 
                             c_btn1, c_btn2 = st.columns(2)
                             with c_btn1:
-                                if is_roll:
+                                if is_hyper_exclusive:
+                                    help_l = "Operatività disabilitata: strumento riservato ad HYPER."
+                                elif is_roll:
                                     help_l = "Avvio disabilitato fino alle 00:15."
                                 elif is_wkd:
                                     help_l = "Bloccato durante il Weekend (mercati chiusi)"
@@ -3673,7 +3694,10 @@ else:
                                 else:
                                     help_l = None
 
-                                if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=is_long_bloccato, help=help_l):
+                                if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=(is_long_bloccato or is_hyper_exclusive), help=help_l):
+                                    if is_hyper_exclusive:
+                                        st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
+                                        st.rerun()
                                     if is_roll:
                                         st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
                                         st.rerun()
@@ -3708,7 +3732,9 @@ else:
                                     st.session_state.target_tab = "Trend"
                                     st.rerun()
                             with c_btn2:
-                                if is_roll:
+                                if is_hyper_exclusive:
+                                    help_s = "Operatività disabilitata: strumento riservato ad HYPER."
+                                elif is_roll:
                                     help_s = "Avvio disabilitato fino alle 00:15."
                                 elif is_wkd:
                                     help_s = "Bloccato durante il Weekend (mercati chiusi)"
@@ -3717,9 +3743,9 @@ else:
                                 else:
                                     help_s = None
 
-                                if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=is_short_bloccato, help=help_s):
-                                    if is_roll:
-                                        st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
+                                if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=(is_short_bloccato or is_hyper_exclusive), help=help_s):
+                                    if is_hyper_exclusive:
+                                        st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                         st.rerun()
                                     if is_wkd:
                                         st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare SHORT durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
@@ -3752,7 +3778,7 @@ else:
                                     st.session_state.target_tab = "Trend"
                                     st.rerun()
 
-                            if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True):
+                            if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=is_hyper_exclusive, help="Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else None):
                                 st.session_state[f"sync_trend_open_{nome}"] = True
                                 st.rerun()
                             
@@ -3867,6 +3893,11 @@ else:
                             crea_riquadro_trend(tutti_strumenti[i+1])
 
             renderizza_dati_trend()
+
+    if tab_hyper is not None:
+        with tab_hyper:
+            import hyper_tab
+            hyper_tab.render_hyper_tab(conto_selezionato=conto_selezionato)
 
     if tab_restore is not None:
         with tab_restore:

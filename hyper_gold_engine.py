@@ -21,20 +21,26 @@ STATE_FILE = "hyper_gold_state.json"
 ENV_PATH = os.path.join("FIORDOK_DEMO", ".env")
 
 # Parametri Strategia: Core + Incrementi + Trailing Stop
-CORE_CONTRACTS = 4          # Size iniziale Core: 4 contratti
+CORE_CONTRACTS = 2          # Size Core Runner: 2 contratti (Trailing Stop a +10 pip)
 CORE_TS_TRIGGER_PIPS = 10.0 # Attivazione Trailing Stop: a +10 pip di guadagno
-CORE_TS_LOCK_PIPS = 6.0     # Lock profit iniziale: +6 pip garantiti subito (+24.00 €)
+CORE_TS_LOCK_PIPS = 6.0     # Lock profit iniziale: +6 pip garantiti subito (+12.00 €)
 CORE_TS_DISTANCE_PIPS = 4.0 # Distanza trailing: 4 pip continui dal picco massimo/minimo
-INC_CONTRACTS = 2           # Incrementi: 2 contratti ciascuno
-MAX_INCREMENTS = 4          # Max 4 incrementi x 2c = 8 contratti (Totale max 12 con core)
-INC_TP_PIPS = 2.0           # TP incrementi su 30S: 2 pip
-KJ_TOLERANCE_PIPS = 3.0     # Tolleranza di 3 pip su rottura Kijun 55
+INC_CONTRACTS = 1           # Incrementi: 1 contratto ciascuno
+MAX_INCREMENTS = 8          # 8 scalini x 1c = 8 contratti (Totale 10 con core)
+INC_TP_PIPS = 2.0           # TP incrementi su 30S: a partire da 2 pip
+KJ_TOLERANCE_PIPS = 2.0     # Tolleranza di 2 pip su rottura Kijun 55
 MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <= 5 pip
-MIN_DIST_INCR_PIPS = 2.0       # Distanza minima tra incrementi consecutivi: >= 2 pip
-PARACADUTE_KJ_PIPS = 3.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 3 pip
-CANDELA_SEGNALE_OFFSET_PIPS = 3.0 # Candela Segnale: Stop confermato su rottura Massimo/Minimo +- 3 pip
+MIN_DIST_INCR_PIPS = 1.0       # Distanza minima tra incrementi: 1 pip
+PARACADUTE_KJ_PIPS = 2.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 2 pip
+CANDELA_SEGNALE_OFFSET_PIPS = 2.0 # Candela Segnale: Stop confermato su rottura Massimo/Minimo +- 2 pip
 TK_FILTER_PIPS = 3.0              # Filtro Macro TK 144: Conferma cambio direzione a TK +- 3 pip
 CORE_REENTRY_KJ_DIST_PIPS = 3.0   # Max distanza da KJ per ingresso/rientro Core 30S: <= 3 pip
+
+# Modello Fast Scalping 30S (Totale 10 Contratti: 4c @ 2p + 4c @ 3p + Core Runner 2c [TS a +10p])
+DEFAULT_SCALINI_PLAN_30S = [
+    {"step": 1, "contracts": 4, "tp_pips": 2.0},
+    {"step": 2, "contracts": 4, "tp_pips": 3.0},
+]
 
 # Orari Sospensione Gold:
 # 1. Chiusura Feed IG Spot Gold (Nessun tick disponibile dalle 22:45 alle 00:00)
@@ -75,13 +81,16 @@ class HyperGoldEngine:
     _lock = threading.RLock()
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, account_dir: str = None):
         with cls._lock:
             if cls._instance is None:
-                cls._instance = cls()
+                cls._instance = cls(account_dir=account_dir)
+            elif account_dir:
+                cls._instance.account_dir = account_dir
             return cls._instance
 
-    def __init__(self):
+    def __init__(self, account_dir: str = None):
+        self.account_dir = account_dir
         self.lock = threading.RLock()
         self.running = True
         self.ls_connected = False
@@ -115,11 +124,9 @@ class HyperGoldEngine:
         self.trading_enabled = False
         self.use_core_trailing = True   # Trailing Stop Core attivo di default (+10 pip trigger, +6 pip lock, 4 pip trail)
 
-        # Configurazione Scalini 30S: Core + N Scalini simultanei (Default: 4, 6, 1)
-        self.core_size = CORE_CONTRACTS     # Size Core iniziale (es. 4)
-        self.num_scalini = 6                # N° Scalini/Incrementi (es. 6)
-        self.scalino_size = 1               # Size di ciascun scalino (es. 1)
-        self.scalino_step_pips = 2.0        # Step tra i TP dei singoli scalini (es. 2 pip: 2, 4, 6, 8, 10, 12 pip)
+        # Configurazione Scalini 30S: Core + Scalini Opzione 2 (Default: Core 4c + [3c@2p, 2c@3p, 2c@4p, 1c@5p])
+        self.core_size = CORE_CONTRACTS     # Size Core iniziale: 4
+        self.scalini_plan = [dict(x) for x in DEFAULT_SCALINI_PLAN_30S]
 
         # Posizione Core aperta: None o {"direction": "LONG"/"SHORT", "open_price": float, "contracts": 4, "open_time": str}
         self.position = None
@@ -266,9 +273,7 @@ class HyperGoldEngine:
             self.candles = d.get("candles", [])
             self.last_ts_cycle = d.get("last_ts_cycle")
             self.core_size = int(d.get("core_size", CORE_CONTRACTS))
-            self.num_scalini = int(d.get("num_scalini", 6))
-            self.scalino_size = int(d.get("scalino_size", 1))
-            self.scalino_step_pips = float(d.get("scalino_step_pips", 2.0))
+            self.scalini_plan = d.get("scalini_plan", [dict(x) for x in DEFAULT_SCALINI_PLAN_30S])
             self.signal_candle_active = bool(d.get("signal_candle_active", False))
             self.signal_stop_price = d.get("signal_stop_price")
             self.signal_ref_price = d.get("signal_ref_price")
@@ -281,9 +286,7 @@ class HyperGoldEngine:
                 "trading_enabled": self.trading_enabled,
                 "use_core_trailing": True,
                 "core_size": getattr(self, "core_size", CORE_CONTRACTS),
-                "num_scalini": getattr(self, "num_scalini", 6),
-                "scalino_size": getattr(self, "scalino_size", 1),
-                "scalino_step_pips": getattr(self, "scalino_step_pips", 2.0),
+                "scalini_plan": getattr(self, "scalini_plan", [dict(x) for x in DEFAULT_SCALINI_PLAN_30S]),
                 "position": self.position,
                 "increments": self.increments,
                 "inc_tp_pips": self.inc_tp_pips,
@@ -318,13 +321,21 @@ class HyperGoldEngine:
             self.use_core_trailing = enabled
             self.save_state()
 
-    def update_scalini_config(self, core_size: int, num_scalini: int, scalino_size: int, step_pips: float = 2.0):
-        """Aggiorna i parametri di partenza degli scalini (es. Core=4, Scalini=6, Size=1, Step=2p)"""
+    def update_scalini_plan(self, core_size: int, plan: list):
+        """Aggiorna il piano scalini a piramide (es. Opzione 2)"""
         with self.lock:
             self.core_size = max(1, int(core_size))
-            self.num_scalini = max(1, int(num_scalini))
-            self.scalino_size = max(1, int(scalino_size))
-            self.scalino_step_pips = max(0.5, float(step_pips))
+            self.scalini_plan = list(plan)
+            self.save_state()
+
+    def update_scalini_config(self, core_size: int, num_scalini: int, scalino_size: int, step_pips: float = 2.0):
+        """Metodo retrocompatibile: genera scalini equidistanti"""
+        with self.lock:
+            self.core_size = max(1, int(core_size))
+            self.scalini_plan = [
+                {"step": i, "contracts": max(1, int(scalino_size)), "tp_pips": round(i * float(step_pips), 2)}
+                for i in range(1, max(1, int(num_scalini)) + 1)
+            ]
             self.save_state()
 
     def set_trading(self, enabled: bool):
@@ -340,13 +351,24 @@ class HyperGoldEngine:
 
     def _get_ig_credentials(self):
         user, pwd, api_key = None, None, None
-        if os.path.exists(ENV_PATH):
-            with open(ENV_PATH, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
-                    elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
-                    elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
+        candidates = []
+        if getattr(self, "account_dir", None):
+            candidates.append(os.path.join(self.account_dir, ".env"))
+        candidates.append(ENV_PATH)
+        candidates.append(".env")
+        for p in candidates:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
+                            elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
+                            elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
+                    if user and pwd and api_key:
+                        break
+                except Exception:
+                    pass
         return user, pwd, api_key
 
     def _run_streaming_loop(self):
@@ -450,6 +472,7 @@ class HyperGoldEngine:
             if profit_pips >= CORE_TS_TRIGGER_PIPS:
                 pos["ts_active"] = True
                 pos["peak_price"] = current_price
+                pos["ts_distance"] = CORE_TS_DISTANCE_PIPS
                 if direction == "LONG":
                     pos["ts_price"] = round(open_px + CORE_TS_LOCK_PIPS, 2)
                 else:
@@ -463,7 +486,7 @@ class HyperGoldEngine:
                     "contracts": pos["contracts"],
                     "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
                     "balance": round(self.balance, 2),
-                    "reason": f"Raggiunti +{profit_pips:.1f} pip @ {current_price:.2f} ➔ Lock +{CORE_TS_LOCK_PIPS:.1f} pip @ {pos['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f} pip"
+                    "reason": f"Raggiunti +{profit_pips:.1f} pip @ {current_price:.2f} ➔ Lock +{CORE_TS_LOCK_PIPS:.1f} pip @ {pos['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f} pip (dinamico +1p ogni 10p)"
                 })
                 self.save_state()
 
@@ -475,9 +498,18 @@ class HyperGoldEngine:
                 # Nuovo picco massimo
                 if current_price > peak_px:
                     pos["peak_price"] = current_price
-                    new_ts = round(current_price - CORE_TS_DISTANCE_PIPS, 2)
-                    if new_ts > pos["ts_price"]:
-                        pos["ts_price"] = new_ts
+                    peak_px = current_price
+
+                # Calcolo distanza dinamica: +1 pip ogni 10 pip oltre il trigger (+10 pip)
+                # Es. 10-19.9p: 4p | 20-29.9p: 5p | 30-39.9p: 6p ...
+                peak_gain = max(0.0, peak_px - open_px)
+                extra_dist = max(0, int((peak_gain - CORE_TS_TRIGGER_PIPS) // 10.0))
+                current_ts_dist = CORE_TS_DISTANCE_PIPS + float(extra_dist)
+                pos["ts_distance"] = current_ts_dist
+
+                new_ts = round(peak_px - current_ts_dist, 2)
+                if new_ts > pos.get("ts_price", 0.0):
+                    pos["ts_price"] = new_ts
 
                 # Verifica tocco Trailing Stop
                 if current_price <= pos["ts_price"]:
@@ -487,9 +519,18 @@ class HyperGoldEngine:
                 # Nuovo picco minimo
                 if current_price < peak_px:
                     pos["peak_price"] = current_price
-                    new_ts = round(current_price + CORE_TS_DISTANCE_PIPS, 2)
-                    if new_ts < pos["ts_price"]:
-                        pos["ts_price"] = new_ts
+                    peak_px = current_price
+
+                # Calcolo distanza dinamica: +1 pip ogni 10 pip oltre il trigger (+10 pip)
+                # Es. 10-19.9p: 4p | 20-29.9p: 5p | 30-39.9p: 6p ...
+                peak_gain = max(0.0, open_px - peak_px)
+                extra_dist = max(0, int((peak_gain - CORE_TS_TRIGGER_PIPS) // 10.0))
+                current_ts_dist = CORE_TS_DISTANCE_PIPS + float(extra_dist)
+                pos["ts_distance"] = current_ts_dist
+
+                new_ts = round(peak_px + current_ts_dist, 2)
+                if new_ts < pos.get("ts_price", 999999.0):
+                    pos["ts_price"] = new_ts
 
                 # Verifica tocco Trailing Stop
                 if current_price >= pos["ts_price"]:
@@ -769,9 +810,9 @@ class HyperGoldEngine:
                         self.signal_stop_price = None
                         self.signal_ref_price = None
                         c_sz = getattr(self, "core_size", CORE_CONTRACTS)
-                        n_sc = getattr(self, "num_scalini", 6)
-                        sc_sz = getattr(self, "scalino_size", 1)
-                        st_p = getattr(self, "scalino_step_pips", 2.0)
+                        plan = getattr(self, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
+                        tot_incr_c = sum(it["contracts"] for it in plan)
+                        tot_c = c_sz + tot_incr_c
 
                         self.position = {
                             "direction": "LONG",
@@ -782,32 +823,33 @@ class HyperGoldEngine:
                             "ts_price": None,
                             "peak_price": exec_price
                         }
-                        # Apertura simultanea di N scalini con TP scalettati
+                        # Apertura simultanea degli scalini a piramide (Opzione 2)
                         self.increments = []
-                        for i in range(1, n_sc + 1):
-                            tp_d = round(i * st_p, 2)
-                            tp_px = round(exec_price + tp_d, 2)
+                        for it in plan:
+                            st_idx = it["step"]
+                            st_sz = it["contracts"]
+                            st_tp_dist = it["tp_pips"]
+                            tp_px = round(exec_price + st_tp_dist, 2)
                             self.increments.append({
-                                "id": int(time.time() * 1000) + i,
+                                "id": int(time.time() * 1000) + st_idx,
                                 "direction": "LONG",
                                 "open_price": exec_price,
-                                "contracts": sc_sz,
+                                "contracts": st_sz,
                                 "tp_price": tp_px,
-                                "tp_dist_pips": tp_d,
-                                "step_idx": i,
+                                "tp_dist_pips": st_tp_dist,
+                                "step_idx": st_idx,
                                 "open_time": time_str
                             })
-                        tot_c = c_sz + (n_sc * sc_sz)
-                        tp_targets_str = ", ".join([f"+{i*st_p:.0f}p" for i in range(1, n_sc + 1)])
+                        tp_targets_str = ", ".join([f"#{it['step']} ({it['contracts']}c @ +{it['tp_pips']:.0f}p)" for it in plan])
                         self.trades.insert(0, {
                             "time": time_str,
-                            "action": f"OPEN CORE + {n_sc} SCALINI LONG (Tot: {tot_c}c)",
+                            "action": f"OPEN CORE + {len(plan)} SCALINI LONG (Tot: {tot_c}c)",
                             "open_price": exec_price,
                             "close_price": None,
                             "contracts": tot_c,
                             "pnl": 0.0,
                             "balance": round(self.balance, 2),
-                            "reason": f"Core {c_sz}c + {n_sc} scalini da {sc_sz}c (TP: {tp_targets_str}) | dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p"
+                            "reason": f"Core {c_sz}c + {len(plan)} scalini ({tp_targets_str}) | dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p"
                         })
                         self.save_state()
                 elif self.position and self.position["direction"] == "LONG":
@@ -843,9 +885,9 @@ class HyperGoldEngine:
                         self.signal_stop_price = None
                         self.signal_ref_price = None
                         c_sz = getattr(self, "core_size", CORE_CONTRACTS)
-                        n_sc = getattr(self, "num_scalini", 6)
-                        sc_sz = getattr(self, "scalino_size", 1)
-                        st_p = getattr(self, "scalino_step_pips", 2.0)
+                        plan = getattr(self, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
+                        tot_incr_c = sum(it["contracts"] for it in plan)
+                        tot_c = c_sz + tot_incr_c
 
                         self.position = {
                             "direction": "SHORT",
@@ -856,32 +898,33 @@ class HyperGoldEngine:
                             "ts_price": None,
                             "peak_price": exec_price
                         }
-                        # Apertura simultanea di N scalini con TP scalettati
+                        # Apertura simultanea degli scalini a piramide (Opzione 2)
                         self.increments = []
-                        for i in range(1, n_sc + 1):
-                            tp_d = round(i * st_p, 2)
-                            tp_px = round(exec_price - tp_d, 2)
+                        for it in plan:
+                            st_idx = it["step"]
+                            st_sz = it["contracts"]
+                            st_tp_dist = it["tp_pips"]
+                            tp_px = round(exec_price - st_tp_dist, 2)
                             self.increments.append({
-                                "id": int(time.time() * 1000) + i,
+                                "id": int(time.time() * 1000) + st_idx,
                                 "direction": "SHORT",
                                 "open_price": exec_price,
-                                "contracts": sc_sz,
+                                "contracts": st_sz,
                                 "tp_price": tp_px,
-                                "tp_dist_pips": tp_d,
-                                "step_idx": i,
+                                "tp_dist_pips": st_tp_dist,
+                                "step_idx": st_idx,
                                 "open_time": time_str
                             })
-                        tot_c = c_sz + (n_sc * sc_sz)
-                        tp_targets_str = ", ".join([f"-{i*st_p:.0f}p" for i in range(1, n_sc + 1)])
+                        tp_targets_str = ", ".join([f"#{it['step']} ({it['contracts']}c @ -{it['tp_pips']:.0f}p)" for it in plan])
                         self.trades.insert(0, {
                             "time": time_str,
-                            "action": f"OPEN CORE + {n_sc} SCALINI SHORT (Tot: {tot_c}c)",
+                            "action": f"OPEN CORE + {len(plan)} SCALINI SHORT (Tot: {tot_c}c)",
                             "open_price": exec_price,
                             "close_price": None,
                             "contracts": tot_c,
                             "pnl": 0.0,
                             "balance": round(self.balance, 2),
-                            "reason": f"Core {c_sz}c + {n_sc} scalini da {sc_sz}c (TP: {tp_targets_str}) | dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | Paracadute: +{PARACADUTE_KJ_PIPS:.0f}p"
+                            "reason": f"Core {c_sz}c + {len(plan)} scalini ({tp_targets_str}) | dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | Paracadute: +{PARACADUTE_KJ_PIPS:.0f}p"
                         })
                         self.save_state()
                 elif self.position and self.position["direction"] == "SHORT":
