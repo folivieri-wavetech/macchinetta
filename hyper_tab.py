@@ -23,6 +23,7 @@ from hyper_gold_m1_engine import (
     TK_FILTER_PIPS as TK_FILTER_PIPS_5M
 )
 import json
+from hyper_order_manager import HyperOrderManager
 
 _sidebar_cache = {"time": 0.0, "conto": None, "data": {}}
 
@@ -1021,8 +1022,139 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False):
             st.info("Portafoglio Flat. Nessun contratto a mercato.")
 
 
+def render_sintesi_hyp(conto_selezionato="DANY_DEMO"):
+    """Visualizza il riepilogo analitico delle operazioni reali chiuse su IG divise per TimeFrame."""
+    conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
+    nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
+    mgr = HyperOrderManager.get_instance(conto_attivo)
+
+    trades_all = mgr.get_trades_history()
+    trades_30s = [t for t in trades_all if t.get("tf") == "30S"]
+    trades_5m = [t for t in trades_all if t.get("tf") == "5M"]
+
+    tot_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_all)
+    tot_30s = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_30s)
+    tot_5m = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_5m)
+
+    n_tot = len(trades_all)
+    n_win = len([t for t in trades_all if float(t.get("pnl_eur", 0.0) or 0.0) > 0])
+    wr = (n_win / n_tot * 100.0) if n_tot > 0 else 0.0
+
+    st.markdown(f"<h3 style='margin: 0 0 10px 0; font-size: 1.05rem; font-weight: 700;'>📋 Sintesi Eseguiti Reali Hyper <span style='font-size: 0.80rem; color: #94a3b8;'>({nome_clean})</span></h3>", unsafe_allow_html=True)
+
+    # 1. KPI SINTESI
+    s1, s2, s3, s4 = st.columns(4)
+    with s1:
+        col_pnl = "#22c55e" if tot_pnl > 0 else ("#ef4444" if tot_pnl < 0 else "#94a3b8")
+        sign_p = "+" if tot_pnl > 0 else ""
+        st.markdown(f"""
+        <div class='kpi-card-hyper'>
+            <div class='kpi-title-hyper'>P&L Totale Reale Hyper</div>
+            <div class='kpi-val-hyper' style='color: {col_pnl};'>{sign_p}{tot_pnl:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Somma 30S + 5M su IG</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with s2:
+        col_wr = "#22c55e" if wr >= 50 else ("#f59e0b" if wr > 0 else "#94a3b8")
+        st.markdown(f"""
+        <div class='kpi-card-hyper'>
+            <div class='kpi-title-hyper'>Operazioni Chiuse / Win Rate</div>
+            <div class='kpi-val-hyper' style='color: {col_wr};'>{wr:.1f}%</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{n_win} vincenti su {n_tot} concluse</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with s3:
+        col_30 = "#22c55e" if tot_30s > 0 else ("#ef4444" if tot_30s < 0 else "#94a3b8")
+        sign_30 = "+" if tot_30s > 0 else ""
+        st.markdown(f"""
+        <div class='kpi-card-hyper'>
+            <div class='kpi-title-hyper'>P&L Hyper 30S (Scalping)</div>
+            <div class='kpi-val-hyper' style='color: {col_30};'>{sign_30}{tot_30s:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{len(trades_30s)} operazioni concluse</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with s4:
+        col_5m = "#22c55e" if tot_5m > 0 else ("#ef4444" if tot_5m < 0 else "#94a3b8")
+        sign_5m = "+" if tot_5m > 0 else ""
+        st.markdown(f"""
+        <div class='kpi-card-hyper'>
+            <div class='kpi-title-hyper'>P&L Hyper 5M (Trend)</div>
+            <div class='kpi-val-hyper' style='color: {col_5m};'>{sign_5m}{tot_5m:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{len(trades_5m)} operazioni concluse</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+
+    tab_s30, tab_s5m, tab_s_all = st.tabs([
+        f"⚡ Eseguiti 30S ({len(trades_30s)})",
+        f"📊 Eseguiti 5M ({len(trades_5m)})",
+        f"📜 Tutti i Trade ({len(trades_all)})"
+    ])
+
+    def _render_trades_table(trade_list, empty_msg):
+        if not trade_list:
+            st.info(empty_msg)
+            return
+        rows = []
+        for t in trade_list:
+            pnl = float(t.get("pnl_eur", 0.0) or 0.0)
+            col_p = "#22c55e" if pnl > 0 else ("#ef4444" if pnl < 0 else "#94a3b8")
+            sign = "+" if pnl > 0 else ""
+            d_col = "#22c55e" if t.get("direction") == "LONG" else "#ef4444"
+            deal = t.get("deal_id", "--")
+            deal_short = deal[:10] + "..." if len(deal) > 12 else deal
+            rows.append(
+                f"<tr>"
+                f"<td style='white-space: nowrap;'>{t.get('time_close', '--')}</td>"
+                f"<td style='font-family: monospace; color: #94a3b8;'>{deal_short}</td>"
+                f"<td style='color: {d_col}; font-weight: 700;'>{t.get('direction', '--')}</td>"
+                f"<td style='text-align: center;'>{t.get('contracts', 0)}c</td>"
+                f"<td style='text-align: right;'>{float(t.get('open_price', 0.0)):.2f}</td>"
+                f"<td style='text-align: right;'>{float(t.get('close_price', 0.0)):.2f}</td>"
+                f"<td style='text-align: right; color: {col_p}; font-weight: 700;'>{sign}{pnl:,.2f} €</td>"
+                f"<td style='color: #cbd5e1; font-size: 0.72rem;'>{t.get('reason', '--')}</td>"
+                f"</tr>"
+            )
+        st.markdown(f"""
+        <table class='table-dark-hyper'>
+            <thead>
+                <tr>
+                    <th>Data/Ora Chiusura</th>
+                    <th>Deal ID IG</th>
+                    <th>Direzione</th>
+                    <th style='text-align: center;'>Contratti</th>
+                    <th style='text-align: right;'>Open</th>
+                    <th style='text-align: right;'>Close</th>
+                    <th style='text-align: right;'>P&L Netto</th>
+                    <th>Motivo Uscita</th>
+                </tr>
+            </thead>
+            <tbody>{''.join(rows)}</tbody>
+        </table>
+        """, unsafe_allow_html=True)
+
+    with tab_s30:
+        _render_trades_table(trades_30s, "Nessuna operazione reale chiusa su Hyper 30S.")
+
+    with tab_s5m:
+        _render_trades_table(trades_5m, "Nessuna operazione reale chiusa su Hyper 5M.")
+
+    with tab_s_all:
+        _render_trades_table(trades_all, "Nessuna operazione registrata.")
+        if trades_all:
+            c_cl1, c_cl2 = st.columns([3, 1])
+            with c_cl2:
+                if st.button("🗑️ Azzera Archivio Sintesi", key="btn_clear_sintesi"):
+                    mgr.clear_trades_history()
+                    st.rerun()
+
+
 def render_hyper_tab(conto_selezionato="FIORDOK_DEMO"):
-    """Pannello principale integrato per la nuova tab HYPER nella Dashboard principale."""
+    """Pannello principale integrato per la tab HYPER nella Dashboard principale."""
     inject_hyper_css()
 
     engine_30s = HyperGoldEngine.get_instance(account_dir=conto_selezionato)
@@ -1031,9 +1163,10 @@ def render_hyper_tab(conto_selezionato="FIORDOK_DEMO"):
     is_30s_on = engine_30s.trading_enabled
     is_5m_on = engine_5m.trading_enabled
 
-    tab_h30, tab_h5m = st.tabs([
+    tab_h30, tab_h5m, tab_sintesi = st.tabs([
         "⚡ Hyper 30s (Fast Scalping)" + (" 🟢 ATTIVO" if is_30s_on else ""),
-        "📊 Hyper 5m (Trend Scalping)" + (" 🟢 ATTIVO" if is_5m_on else "")
+        "📊 Hyper 5m (Trend Scalping)" + (" 🟢 ATTIVO" if is_5m_on else ""),
+        "📋 Sintesi Hyp (Eseguiti)"
     ])
 
     with tab_h30:
@@ -1041,3 +1174,7 @@ def render_hyper_tab(conto_selezionato="FIORDOK_DEMO"):
 
     with tab_h5m:
         render_hyper_5m(conto_selezionato=conto_selezionato, is_other_active=is_30s_on)
+
+    with tab_sintesi:
+        render_sintesi_hyp(conto_selezionato=conto_selezionato)
+

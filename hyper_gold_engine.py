@@ -6,6 +6,10 @@ import json
 import threading
 import datetime
 import requests
+import logging
+from hyper_order_manager import HyperOrderManager
+
+logger = logging.getLogger("HyperGoldEngine")
 
 # Disabilita controllo revoca Windows su Lightstreamer Demo (evita timeout WinError 10060)
 try:
@@ -144,6 +148,10 @@ class HyperGoldEngine:
         self.trades = []
         self.last_ts_cycle = None
 
+        # Flag controllo esecuzione ordini reali IG (evita collisioni e ordini multipli)
+        self.entry_in_progress = False
+        self.closing_in_progress = False
+
         # 1. Carica stato persistito
         self.load_state()
 
@@ -239,13 +247,19 @@ class HyperGoldEngine:
         else:
             self.tk144 = None
 
+    def _get_state_file(self):
+        if getattr(self, "account_dir", None):
+            return os.path.join(self.account_dir, STATE_FILE)
+        return STATE_FILE
+
     def load_state(self):
-        if not os.path.exists(STATE_FILE):
+        st_file = self._get_state_file()
+        if not os.path.exists(st_file):
             return
         d = None
         for _ in range(5):
             try:
-                with open(STATE_FILE, "r", encoding="utf-8", errors="ignore") as f:
+                with open(st_file, "r", encoding="utf-8", errors="ignore") as f:
                     text = f.read()
                 if not text.strip():
                     return
@@ -280,6 +294,7 @@ class HyperGoldEngine:
             self._recalculate_indicators()
 
     def save_state(self):
+        st_file = self._get_state_file()
         with self.lock:
             d = {
                 "balance": self.balance,
@@ -300,7 +315,7 @@ class HyperGoldEngine:
             # Scrittura diretta con truncate e retry per compatibilità Windows
             for _ in range(5):
                 try:
-                    with open(STATE_FILE, "w", encoding="utf-8") as f:
+                    with open(st_file, "w", encoding="utf-8") as f:
                         json.dump(d, f, indent=2, ensure_ascii=False)
                         f.flush()
                     break
@@ -542,77 +557,242 @@ class HyperGoldEngine:
                 if current_price >= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
 
+    def _execute_entry_sequence(self, direction: str, exec_price: float, time_str: str):
+        """Esegue l'apertura a mercato reale su IG dei 3 blocchi (Scalino 1, Scalino 2, Core Runner)
+        in un thread separato senza bloccare il flusso Lightstreamer, rispettando il pacing di sicurezza."""
+        try:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            plan = getattr(self, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
+            c_sz = getattr(self, "core_size", CORE_CONTRACTS)
+
+            # 1. Apertura blocchi scalini a mercato
+            for it in plan:
+                st_idx = it["step"]
+                st_sz = it["contracts"]
+                st_tp_dist = it["tp_pips"]
+                tp_px = round(exec_price + st_tp_dist if direction == "LONG" else exec_price - st_tp_dist, 2)
+
+                res = order_mgr.open_market_deal(
+                    direction=direction,
+                    size=st_sz,
+                    limit_level=tp_px,
+                    label=f"Scalino #{st_idx} (30S)"
+                )
+                if res.get("success"):
+                    deal_id = res.get("deal_id")
+                    real_open = float(res.get("level") or exec_price)
+                    with self.lock:
+                        self.increments.append({
+                            "id": int(time.time() * 1000) + st_idx,
+                            "deal_id": deal_id,
+                            "deal_reference": res.get("deal_reference"),
+                            "direction": direction,
+                            "open_price": real_open,
+                            "contracts": st_sz,
+                            "tp_price": tp_px,
+                            "tp_dist_pips": st_tp_dist,
+                            "step_idx": st_idx,
+                            "open_time": res.get("time") or time_str
+                        })
+                        self.save_state()
+
+            # 2. Apertura blocco Core Runner
+            res_core = order_mgr.open_market_deal(
+                direction=direction,
+                size=c_sz,
+                limit_level=None,
+                label="Core Runner (30S)"
+            )
+            if res_core.get("success"):
+                deal_id_c = res_core.get("deal_id")
+                real_open_c = float(res_core.get("level") or exec_price)
+                with self.lock:
+                    self.position = {
+                        "deal_id": deal_id_c,
+                        "deal_reference": res_core.get("deal_reference"),
+                        "direction": direction,
+                        "open_price": real_open_c,
+                        "contracts": c_sz,
+                        "open_time": res_core.get("time") or time_str,
+                        "ts_active": False,
+                        "ts_price": None,
+                        "peak_price": real_open_c
+                    }
+                    self.trades.insert(0, {
+                        "time": time_str,
+                        "action": f"🚀 OPEN REAL IG {direction} ({c_sz}c Core + Scalini)",
+                        "open_price": real_open_c,
+                        "close_price": None,
+                        "contracts": c_sz,
+                        "pnl": 0.0,
+                        "balance": round(self.balance, 2),
+                        "reason": f"Ingresso IG Reale {direction} @ {real_open_c:.2f} € (Deal ID Core: {deal_id_c})"
+                    })
+                    self.save_state()
+        except Exception as e:
+            logger.error(f"Eccezione durante esecuzione ordine IG: {e}")
+        finally:
+            with self.lock:
+                self.entry_in_progress = False
+
+    def _execute_close_scalino(self, inc: dict, current_price: float, time_str: str):
+        """Chiude a mercato reale un singolo scalino quando tocca il Take Profit."""
+        try:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            deal_id = inc.get("deal_id")
+            res = order_mgr.close_market_deal(
+                deal_id=deal_id,
+                direction_open=inc["direction"],
+                size=inc["contracts"],
+                label=f"TP Scalino #{inc.get('step_idx')}",
+                reason_note=f"Raggiunto TP a +{inc.get('tp_dist_pips', 0):.1f}p @ {current_price:.2f}"
+            )
+            profit = float(res.get("profit") or 0.0)
+            close_px = float(res.get("close_level") or current_price)
+
+            with self.lock:
+                # Rimuovi l'incremento chiuso
+                self.increments = [i for i in self.increments if i.get("deal_id") != deal_id and i.get("id") != inc.get("id")]
+                self.balance += profit
+
+                # Registra trade nello storico di Sintesi
+                order_mgr.record_closed_trade(
+                    tf="30S",
+                    direction=inc["direction"],
+                    contracts=inc["contracts"],
+                    open_price=inc["open_price"],
+                    close_price=close_px,
+                    pnl_eur=profit,
+                    deal_id=deal_id,
+                    reason=f"TP Scalino #{inc.get('step_idx')} (+{inc.get('tp_dist_pips', 0):.1f}p)",
+                    time_open=inc.get("open_time", time_str),
+                    label=f"Scalino #{inc.get('step_idx')}"
+                )
+
+                self.trades.insert(0, {
+                    "time": time_str,
+                    "action": f"🎯 TP SCALINO #{inc.get('step_idx')} {inc['direction']} (+{profit:+.2f} €)",
+                    "open_price": inc["open_price"],
+                    "close_price": close_px,
+                    "contracts": inc["contracts"],
+                    "pnl": profit,
+                    "balance": round(self.balance, 2),
+                    "reason": f"Chiusura IG Deal {deal_id}: TP raggiunto @ {close_px:.2f}"
+                })
+                self.save_state()
+        except Exception as e:
+            logger.error(f"Errore chiusura scalino IG: {e}")
+
+    def _execute_close_all_flat(self, exec_price: float, time_str: str, reason: str):
+        """Chiude a mercato reale tutte le posizioni aperte su IG (Core + Scalini)."""
+        try:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            with self.lock:
+                pos_to_close = dict(self.position) if self.position else None
+                incs_to_close = [dict(i) for i in self.increments]
+                self.position = None
+                self.increments = []
+                self.save_state()
+
+            # 1. Chiudi la Core se presente
+            if pos_to_close and pos_to_close.get("deal_id"):
+                deal_c = pos_to_close["deal_id"]
+                res_c = order_mgr.close_market_deal(
+                    deal_id=deal_c,
+                    direction_open=pos_to_close["direction"],
+                    size=pos_to_close["contracts"],
+                    label="Chiusura Core Flat",
+                    reason_note=reason
+                )
+                prof_c = float(res_c.get("profit") or 0.0)
+                cl_c = float(res_c.get("close_level") or exec_price)
+                order_mgr.record_closed_trade(
+                    tf="30S",
+                    direction=pos_to_close["direction"],
+                    contracts=pos_to_close["contracts"],
+                    open_price=pos_to_close["open_price"],
+                    close_price=cl_c,
+                    pnl_eur=prof_c,
+                    deal_id=deal_c,
+                    reason=reason,
+                    time_open=pos_to_close.get("open_time", time_str),
+                    label="Core Runner"
+                )
+                with self.lock:
+                    self.balance += prof_c
+                    self.trades.insert(0, {
+                        "time": time_str,
+                        "action": f"CLOSE CORE {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                        "open_price": pos_to_close["open_price"],
+                        "close_price": cl_c,
+                        "contracts": pos_to_close["contracts"],
+                        "pnl": prof_c,
+                        "balance": round(self.balance, 2),
+                        "reason": reason
+                    })
+
+            # 2. Chiudi gli scalini residui
+            for inc in incs_to_close:
+                deal_i = inc.get("deal_id")
+                if deal_i:
+                    res_i = order_mgr.close_market_deal(
+                        deal_id=deal_i,
+                        direction_open=inc["direction"],
+                        size=inc["contracts"],
+                        label=f"Chiusura Scalino #{inc.get('step_idx')}",
+                        reason_note=reason
+                    )
+                    prof_i = float(res_i.get("profit") or 0.0)
+                    cl_i = float(res_i.get("close_level") or exec_price)
+                    order_mgr.record_closed_trade(
+                        tf="30S",
+                        direction=inc["direction"],
+                        contracts=inc["contracts"],
+                        open_price=inc["open_price"],
+                        close_price=cl_i,
+                        pnl_eur=prof_i,
+                        deal_id=deal_i,
+                        reason=reason,
+                        time_open=inc.get("open_time", time_str),
+                        label=f"Scalino #{inc.get('step_idx')}"
+                    )
+                    with self.lock:
+                        self.balance += prof_i
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"CLOSE SCALINO #{inc.get('step_idx')} ({prof_i:+.2f} €)",
+                            "open_price": inc["open_price"],
+                            "close_price": cl_i,
+                            "contracts": inc["contracts"],
+                            "pnl": prof_i,
+                            "balance": round(self.balance, 2),
+                            "reason": reason
+                        })
+
+            with self.lock:
+                self.save_state()
+        except Exception as e:
+            logger.error(f"Errore chiusura posizioni flat IG: {e}")
+        finally:
+            with self.lock:
+                self.closing_in_progress = False
+
     def _close_cycle_trailing_hit(self, current_price: float, time_str: str):
-        """Chiusura completa a FLAT all'entrata del Trailing Stop:
-        - Chiude Core e tutti gli incrementi
-        - Disattiva il trading (STOP TRADING) lasciando all'utente la ripartenza"""
-        pos = self.position
-        if not pos:
+        """Chiusura completa a FLAT all'entrata del Trailing Stop"""
+        if not self.position or getattr(self, "closing_in_progress", False):
             return
-
-        direction = pos["direction"]
-        open_px = pos["open_price"]
-        if direction == "LONG":
-            core_pips = round(current_price - open_px, 2)
-        else:
-            core_pips = round(open_px - current_price, 2)
-
-        core_pnl = round(core_pips * pos["contracts"] * self.point_value, 2)
-        self.balance += core_pnl
-
-        # Chiudi tutti gli scalini residui per Trailing Stop
-        inc_pnl_tot = 0.0
-        for inc in self.increments:
-            if inc["direction"] == "LONG":
-                pnl_i = round((current_price - inc["open_price"]) * inc["contracts"] * self.point_value, 2)
-            else:
-                pnl_i = round((inc["open_price"] - current_price) * inc["contracts"] * self.point_value, 2)
-            self.balance += pnl_i
-            inc_pnl_tot += pnl_i
-            step_idx = inc.get("step_idx", "")
-            step_label = f" #{step_idx}" if step_idx else ""
-            self.trades.insert(0, {
-                "time": time_str,
-                "action": f"CLOSE SCALINO{step_label} {inc['direction']} (TS CORE)",
-                "open_price": inc["open_price"],
-                "close_price": current_price,
-                "contracts": inc["contracts"],
-                "pnl": pnl_i,
-                "balance": round(self.balance, 2),
-                "reason": f"Chiusura scalino per Trailing Stop Core scattato @ {current_price:.2f}"
-            })
-        self.increments = []
-
-        tot_cycle_pnl = round(core_pnl + inc_pnl_tot, 2)
-        self.trades.insert(0, {
-            "time": time_str,
-            "action": f"🏆 TS HIT CORE {direction} (+{core_pips:.1f} pip)",
-            "open_price": open_px,
-            "close_price": current_price,
-            "contracts": pos["contracts"],
-            "pnl": core_pnl,
-            "balance": round(self.balance, 2),
-            "reason": f"Trailing Stop toccato @ {current_price:.2f} (Peak: {pos.get('peak_price', current_price):.2f}) ➔ CICLO COMPLETATO: +{core_pips:.1f} pip (+{tot_cycle_pnl:,.2f} €) | IN ATTESA RIENTRO KJ/TK"
-        })
-
-        self.last_ts_cycle = {
-            "time": time_str,
-            "direction": direction,
-            "core_pips": core_pips,
-            "total_pnl": tot_cycle_pnl,
-            "peak_price": pos.get("peak_price", current_price),
-            "close_price": current_price
-        }
-
-        self.position = None
-        # Il trading rimane ATTIVO: attende il riavvicinamento a KJ (<= 3 pip) o inversione TK
-        self.save_state()
+        self.closing_in_progress = True
+        threading.Thread(
+            target=self._execute_close_all_flat,
+            args=(current_price, time_str, f"Trailing Stop toccato @ {current_price:.2f}"),
+            daemon=True
+        ).start()
 
     def _check_increments_tp(self, current_price: float, time_str: str):
-        """Controlla se qualcuno degli scalini attivi ha toccato il proprio Take Profit scalettato (es. +2, +4, +6 pip...)"""
-        remaining = []
-        closed_any = False
-        for inc in self.increments:
+        """Controlla se qualcuno degli scalini attivi ha toccato il proprio Take Profit scalettato"""
+        for inc in list(self.increments):
+            if inc.get("closing"):
+                continue
             hit_tp = False
             if inc["direction"] == "LONG" and current_price >= inc["tp_price"]:
                 hit_tp = True
@@ -620,29 +800,12 @@ class HyperGoldEngine:
                 hit_tp = True
 
             if hit_tp:
-                pips_gained = round(abs(inc["tp_price"] - inc["open_price"]), 2)
-                pnl = round(pips_gained * inc["contracts"] * self.point_value, 2)
-                self.balance += pnl
-                step_idx = inc.get("step_idx", "")
-                step_label = f" #{step_idx}" if step_idx else ""
-                trade_log = {
-                    "time": time_str,
-                    "action": f"🎯 TP SCALINO{step_label} {inc['direction']} (+{pips_gained:.1f}p)",
-                    "open_price": inc["open_price"],
-                    "close_price": inc["tp_price"],
-                    "contracts": inc["contracts"],
-                    "pnl": pnl,
-                    "balance": round(self.balance, 2),
-                    "reason": f"Raggiunto TP Scalino{step_label}: +{pips_gained:.1f} pip @ {inc['tp_price']:.2f} ({inc['contracts']}c)"
-                }
-                self.trades.insert(0, trade_log)
-                closed_any = True
-            else:
-                remaining.append(inc)
-
-        if closed_any:
-            self.increments = remaining
-            self.save_state()
+                inc["closing"] = True
+                threading.Thread(
+                    target=self._execute_close_scalino,
+                    args=(inc, current_price, time_str),
+                    daemon=True
+                ).start()
 
     def _check_paracadute_kj(self, mid: float, time_str: str):
         """Paracadute KJ Intracandela (Tick-by-Tick):
@@ -812,52 +975,16 @@ class HyperGoldEngine:
                     # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
                     dist_kj = abs(exec_price - kj)
                     if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
-                        self.signal_candle_active = False
-                        self.signal_stop_price = None
-                        self.signal_ref_price = None
-                        c_sz = getattr(self, "core_size", CORE_CONTRACTS)
-                        plan = getattr(self, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
-                        tot_incr_c = sum(it["contracts"] for it in plan)
-                        tot_c = c_sz + tot_incr_c
-
-                        self.position = {
-                            "direction": "LONG",
-                            "open_price": exec_price,
-                            "contracts": c_sz,
-                            "open_time": time_str,
-                            "ts_active": False,
-                            "ts_price": None,
-                            "peak_price": exec_price
-                        }
-                        # Apertura simultanea degli scalini a piramide (Opzione 2)
-                        self.increments = []
-                        for it in plan:
-                            st_idx = it["step"]
-                            st_sz = it["contracts"]
-                            st_tp_dist = it["tp_pips"]
-                            tp_px = round(exec_price + st_tp_dist, 2)
-                            self.increments.append({
-                                "id": int(time.time() * 1000) + st_idx,
-                                "direction": "LONG",
-                                "open_price": exec_price,
-                                "contracts": st_sz,
-                                "tp_price": tp_px,
-                                "tp_dist_pips": st_tp_dist,
-                                "step_idx": st_idx,
-                                "open_time": time_str
-                            })
-                        tp_targets_str = ", ".join([f"#{it['step']} ({it['contracts']}c @ +{it['tp_pips']:.0f}p)" for it in plan])
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"OPEN CORE + {len(plan)} SCALINI LONG (Tot: {tot_c}c)",
-                            "open_price": exec_price,
-                            "close_price": None,
-                            "contracts": tot_c,
-                            "pnl": 0.0,
-                            "balance": round(self.balance, 2),
-                            "reason": f"Core {c_sz}c + {len(plan)} scalini ({tp_targets_str}) | dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | TS Trigger: +{CORE_TS_TRIGGER_PIPS:.0f}p"
-                        })
-                        self.save_state()
+                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                            self.entry_in_progress = True
+                            self.signal_candle_active = False
+                            self.signal_stop_price = None
+                            self.signal_ref_price = None
+                            threading.Thread(
+                                target=self._execute_entry_sequence,
+                                args=("LONG", exec_price, time_str),
+                                daemon=True
+                            ).start()
                 elif self.position and self.position["direction"] == "LONG":
                     # Core già LONG: azzera eventuale Candela Segnale. Nessun incremento successivo (già tutti aperti alla partenza)
                     self.signal_candle_active = False
@@ -887,52 +1014,16 @@ class HyperGoldEngine:
                     # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
                     dist_kj = abs(exec_price - kj)
                     if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
-                        self.signal_candle_active = False
-                        self.signal_stop_price = None
-                        self.signal_ref_price = None
-                        c_sz = getattr(self, "core_size", CORE_CONTRACTS)
-                        plan = getattr(self, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
-                        tot_incr_c = sum(it["contracts"] for it in plan)
-                        tot_c = c_sz + tot_incr_c
-
-                        self.position = {
-                            "direction": "SHORT",
-                            "open_price": exec_price,
-                            "contracts": c_sz,
-                            "open_time": time_str,
-                            "ts_active": False,
-                            "ts_price": None,
-                            "peak_price": exec_price
-                        }
-                        # Apertura simultanea degli scalini a piramide (Opzione 2)
-                        self.increments = []
-                        for it in plan:
-                            st_idx = it["step"]
-                            st_sz = it["contracts"]
-                            st_tp_dist = it["tp_pips"]
-                            tp_px = round(exec_price - st_tp_dist, 2)
-                            self.increments.append({
-                                "id": int(time.time() * 1000) + st_idx,
-                                "direction": "SHORT",
-                                "open_price": exec_price,
-                                "contracts": st_sz,
-                                "tp_price": tp_px,
-                                "tp_dist_pips": st_tp_dist,
-                                "step_idx": st_idx,
-                                "open_time": time_str
-                            })
-                        tp_targets_str = ", ".join([f"#{it['step']} ({it['contracts']}c @ -{it['tp_pips']:.0f}p)" for it in plan])
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"OPEN CORE + {len(plan)} SCALINI SHORT (Tot: {tot_c}c)",
-                            "open_price": exec_price,
-                            "close_price": None,
-                            "contracts": tot_c,
-                            "pnl": 0.0,
-                            "balance": round(self.balance, 2),
-                            "reason": f"Core {c_sz}c + {len(plan)} scalini ({tp_targets_str}) | dist KJ {dist_kj:.1f}p <= {CORE_REENTRY_KJ_DIST_PIPS:.0f}p | Paracadute: +{PARACADUTE_KJ_PIPS:.0f}p"
-                        })
-                        self.save_state()
+                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                            self.entry_in_progress = True
+                            self.signal_candle_active = False
+                            self.signal_stop_price = None
+                            self.signal_ref_price = None
+                            threading.Thread(
+                                target=self._execute_entry_sequence,
+                                args=("SHORT", exec_price, time_str),
+                                daemon=True
+                            ).start()
                 elif self.position and self.position["direction"] == "SHORT":
                     # Core già SHORT: azzera eventuale Candela Segnale. Nessun incremento successivo
                     self.signal_candle_active = False
@@ -955,55 +1046,19 @@ class HyperGoldEngine:
                     self.save_state()
 
     def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
-        """Chiude la Core e tutti gli incrementi tornando a FLAT"""
+        """Chiude la Core e tutti gli incrementi tornando a FLAT su IG tramite chiamate a mercato reali"""
+        if getattr(self, "closing_in_progress", False):
+            return
         self.signal_candle_active = False
         self.signal_stop_price = None
         self.signal_ref_price = None
-        is_paracadute = "Paracadute" in reason
-
-        if self.position:
-            p = self.position
-            if p["direction"] == "LONG":
-                pnl = round((exec_price - p["open_price"]) * p["contracts"] * self.point_value, 2)
-            else:
-                pnl = round((p["open_price"] - exec_price) * p["contracts"] * self.point_value, 2)
-
-            self.balance += pnl
-            act_core = f"🪂 PARACADUTE CORE {p['direction']} (FLAT)" if is_paracadute else f"CLOSE CORE {p['direction']} (FLAT)"
-            self.trades.insert(0, {
-                "time": time_str,
-                "action": act_core,
-                "open_price": p["open_price"],
-                "close_price": exec_price,
-                "contracts": p["contracts"],
-                "pnl": pnl,
-                "balance": round(self.balance, 2),
-                "reason": reason
-            })
-            self.position = None
-
-        for inc in self.increments:
-            if inc["direction"] == "LONG":
-                inc_pnl = round((exec_price - inc["open_price"]) * inc["contracts"] * self.point_value, 2)
-            else:
-                inc_pnl = round((inc["open_price"] - exec_price) * inc["contracts"] * self.point_value, 2)
-
-            self.balance += inc_pnl
-            step_idx = inc.get("step_idx", "")
-            step_label = f" #{step_idx}" if step_idx else ""
-            act_inc = f"🪂 PARACADUTE SCALINO{step_label} {inc['direction']} (FLAT)" if is_paracadute else f"CLOSE SCALINO{step_label} {inc['direction']} (FLAT)"
-            self.trades.insert(0, {
-                "time": time_str,
-                "action": act_inc,
-                "open_price": inc["open_price"],
-                "close_price": exec_price,
-                "contracts": inc["contracts"],
-                "pnl": inc_pnl,
-                "balance": round(self.balance, 2),
-                "reason": f"Uscita FLAT @ {exec_price:.2f}" + (" (Paracadute KJ)" if is_paracadute else "")
-            })
-        self.increments = []
-        self.save_state()
+        if self.position or self.increments:
+            self.closing_in_progress = True
+            threading.Thread(
+                target=self._execute_close_all_flat,
+                args=(exec_price, time_str, reason),
+                daemon=True
+            ).start()
 
     def get_floating_pnl(self):
         with self.lock:
