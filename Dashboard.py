@@ -4374,12 +4374,12 @@ else:
                     # 2. Candele chiuse (standard senza data)
                     if "CANDELA" in r_up or "🕯️" in r_std:
                         candele_lines.append(r_std)
-                    # 3. Conferme tecniche API IG / Ricevute esecuzione (es. "✅ Chiusura [INCREMENT_CLOSED] eseguita con successo.")
+                    # 3. Conferme tecniche API IG / Ricevute esecuzione e protezioni BE (es. "✅ Chiusura ... eseguita", "🛡️ BE Incr ... protetto")
                     elif any(k in r_up for k in [
                         "ESEGUITA CON SUCCESSO", "ESEGUITO CON SUCCESSO", "INVIATA.", 
                         "GIÀ CHIUSA", "GIÀ LIQUIDATA", "GIA CHIUSA", "GIA LIQUIDATA", 
-                        "PULIZIA [TICKET", "CONFERMA DEAL"
-                    ]) or ("CHIUSURA" in r_up and any(k in r_up for k in ["[INCREMENT_CLOSED]", "[CORE_CLOSED]", "[ORFANA]", "ESEGUIT"])):
+                        "PULIZIA [TICKET", "CONFERMA DEAL", "PROTETTO", "PROTEZIONE"
+                    ]) or "🛡️" in r_std or ("CHIUSURA" in r_up and any(k in r_up for k in ["[INCREMENT_CLOSED]", "[CORE_CLOSED]", "[ORFANA]", "ESEGUIT"])):
                         conferme_lines.append(r_data)
                     # 4. Chiusure con P&L reale (uscite economiche, TP, Bancomat, FIFO, Stop TK/KJ, Trailing, ecc.)
                     elif any(k in r_up for k in [
