@@ -22,7 +22,6 @@ CANDLE_SECONDS = 30     # 30 Secondi per barra
 WARMUP_BARS_KJ = 55     # Kijun 55 periodi
 WARMUP_BARS_TK = 144    # Tenkan/Macro 144 periodi
 STATE_FILE = "hyper_gold_state.json"
-ENV_PATH = os.path.join("FIORDOK_DEMO", ".env")
 
 # Parametri Strategia: Core + Incrementi + Trailing Stop
 CORE_CONTRACTS = 2          # Size Core Runner: 2 contratti (Trailing Stop a +10 pip)
@@ -378,7 +377,6 @@ class HyperGoldEngine:
         candidates = []
         if getattr(self, "account_dir", None):
             candidates.append(os.path.join(self.account_dir, ".env"))
-        candidates.append(ENV_PATH)
         candidates.append(".env")
         for p in candidates:
             if os.path.exists(p):

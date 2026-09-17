@@ -1183,12 +1183,14 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", **kwargs):
                     st.rerun()
 
 
-def render_hyper_tab(conto_selezionato="FIORDOK_DEMO"):
+def render_hyper_tab(conto_selezionato="DANY_DEMO"):
     """Pannello principale integrato per la tab HYPER nella Dashboard principale."""
     inject_hyper_css()
 
-    engine_30s = HyperGoldEngine.get_instance(account_dir=conto_selezionato)
-    engine_5m = HyperGoldM1Engine.get_instance(account_dir=conto_selezionato)
+    conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
+
+    engine_30s = HyperGoldEngine.get_instance(account_dir=conto_attivo)
+    engine_5m = HyperGoldM1Engine.get_instance(account_dir=conto_attivo)
 
     is_30s_on = engine_30s.trading_enabled
     is_5m_on = engine_5m.trading_enabled
@@ -1200,11 +1202,11 @@ def render_hyper_tab(conto_selezionato="FIORDOK_DEMO"):
     ])
 
     with tab_h30:
-        render_hyper_30s(conto_selezionato=conto_selezionato, is_other_active=is_5m_on)
+        render_hyper_30s(conto_selezionato=conto_attivo, is_other_active=is_5m_on)
 
     with tab_h5m:
-        render_hyper_5m(conto_selezionato=conto_selezionato, is_other_active=is_30s_on)
+        render_hyper_5m(conto_selezionato=conto_attivo, is_other_active=is_30s_on)
 
     with tab_sintesi:
-        render_sintesi_hyp(conto_selezionato=conto_selezionato)
+        render_sintesi_hyp(conto_selezionato=conto_attivo)
 

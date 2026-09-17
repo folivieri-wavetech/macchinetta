@@ -50,7 +50,6 @@ try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore_Trend.py "macchinetta/${POD_DASH}:/data/Motore_Trend.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp ig_request_manager.py "macchinetta/${POD_DASH}:/data/ig_request_manager.py"
-    & $KUBECTL --kubeconfig=$KUBECONFIG cp ig_quota_status.json "macchinetta/${POD_DASH}:/data/ig_quota_status.json"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_tab.py "macchinetta/${POD_DASH}:/data/hyper_tab.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_order_manager.py "macchinetta/${POD_DASH}:/data/hyper_order_manager.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_engine.py "macchinetta/${POD_DASH}:/data/hyper_gold_engine.py"
