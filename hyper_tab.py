@@ -145,7 +145,7 @@ def inject_hyper_css():
 
 
 @st.fragment(run_every=2)
-def render_hyper_30s(conto_selezionato="DANY_DEMO"):
+def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwargs):
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
@@ -594,7 +594,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO"):
 
 
 @st.fragment(run_every=2)
-def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False):
+def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwargs):
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
@@ -1022,7 +1022,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False):
             st.info("Portafoglio Flat. Nessun contratto a mercato.")
 
 
-def render_sintesi_hyp(conto_selezionato="DANY_DEMO"):
+def render_sintesi_hyp(conto_selezionato="DANY_DEMO", **kwargs):
     """Visualizza il riepilogo analitico delle operazioni reali chiuse su IG divise per TimeFrame."""
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
