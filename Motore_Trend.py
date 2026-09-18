@@ -574,6 +574,23 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
     attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=600)
     return False
 
+def aggiorna_stop_posizione(deal_id, stop_level, headers, nome_strumento=""):
+    """Invia a IG una richiesta PUT per aggiornare o impostare lo Stop Loss reale del deal."""
+    url = f"{BASE_URL}/positions/otc/{deal_id}"
+    payload = {"stopLevel": str(stop_level)} if stop_level is not None else {"stopLevel": None}
+    try:
+        r = ig_api_request('PUT', url, headers, payload=payload, timeout=10, logger_func=print_log)
+        if r and r.status_code == 200:
+            print_log(nome_strumento, f"🛡️ [IG STOP AGGIORNATO] Deal {deal_id}: Stop Loss fissato su IG a {stop_level}")
+            return True
+        else:
+            msg_err = r.text if r else "Nessuna risposta"
+            print_log(nome_strumento, f"ℹ️ [IG STOP INFO] Deal {deal_id}: {msg_err}")
+            return False
+    except Exception as e:
+        print_log(nome_strumento, f"⚠️ Eccezione aggiorna_stop_posizione: {e}")
+        return False
+
 def conta_posizioni_aperte_epic(epic, headers):
     """Conta quante posizioni reali sono attualmente aperte su IG per questo epic."""
     try:
@@ -1699,9 +1716,9 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                         dist_p = reversal_ev.get("dist_kj_pips", 100)
                         tag_motivo = f"TP Estensione KJ (+{dist_p}p)"
                         tag_title = "TP ESTENSIONE KJ"
-                    elif "trailing" in r_reason:
-                        tag_motivo = "Trailing Core"
-                        tag_title = "TRAILING CORE"
+                    elif "trailing" in r_reason or "live_stop_trailing_core" in r_reason or "close_below_trailing_sl_core" in r_reason or "close_above_trailing_sl_core" in r_reason:
+                        tag_motivo = "Trailing Core H1"
+                        tag_title = "TRAILING CORE H1"
                     elif "live_stop_kj_break_min" in r_reason:
                         tag_motivo = "Stop KJ (Break Min -5p)"
                         tag_title = "STOP KJ (BREAK MIN)"
@@ -1808,6 +1825,23 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             storico.append(f"[{ora_str}] {msg}")
             ha_fatto_eventi = True
 
+        elif tipo == 'trailing_core_updated':
+            stop_lvl = ev.get('stop_level')
+            dist_p = ev.get('dist_kj_pips', 0)
+            trail_p = ev.get('trail_pips', 30)
+            px_str = f" a {stop_lvl:.{dec}f}" if (stop_lvl is not None and isinstance(stop_lvl, (int, float))) else ""
+            msg_ts = f"🎯 Trailing Core H1 ({trail_p}p) impostato{px_str} (Distanza KJ: {dist_p:.1f}p)"
+            print_log(nome, msg_ts)
+            invia_notifica(f"🎯 TRAILING CORE {tf_label}", f"[{nome}] {msg_ts}", "dart")
+            storico.append(f"[{ora_str}] {msg_ts}")
+            ha_fatto_eventi = True
+            aggiorna_memoria(nome, {"trailing_sl_core": stop_lvl})
+
+            # Fissa / Rettifica Stop Loss reale su server IG se Core ha dealId
+            if engine.pm.core_position and engine.pm.core_position.ticket:
+                deal_id_core = engine.pm.core_position.ticket
+                aggiorna_stop_posizione(deal_id_core, formatta_numero(stop_lvl, dec), headers, nome_strumento=nome)
+
         elif tipo == 'reversal':
             new_d = ev.get("new_direction", "FLAT")
             reason_str = ev.get("reason", "")
@@ -1818,6 +1852,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 if "tp_kj_extension" in reason_str:
                     dist_p = ev.get("dist_kj_pips", 100)
                     tag_motivo = f"TP Estensione KJ (+{dist_p}p)"
+                elif "trailing" in reason_str or "live_stop_trailing_core" in reason_str or "close_below_trailing_sl_core" in reason_str or "close_above_trailing_sl_core" in reason_str:
+                    tag_motivo = "Trailing Core H1"
                 elif "break_min" in reason_str:
                     tag_motivo = "Stop KJ (Break Min -5p)"
                 elif "break_max" in reason_str:

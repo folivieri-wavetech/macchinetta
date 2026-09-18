@@ -179,33 +179,42 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            # 0. Take Profit Estensione Trend H1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
+            # 0. Trailing Stop Estensione Trend H1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
             dist_kj_pips = (c_close - kj) / pip_val
-            default_tp_h1 = 250 if "Oil" in str(self.config.get("nome", "")) else 100
+            nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
+            is_oil = ("OIL" in nome_str or "CRUDE" in nome_str)
+            default_tp_h1 = 250 if is_oil else 100
             tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
+            trail_pips = 65 if is_oil else 30
+
             if is_h1 and dist_kj_pips >= tp_kj_threshold:
-                self.trailing_sl_core = None
-                self.trailing_sl_incr = None
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_candle_tk_active = False
-                self.signal_stop_price_tk = None
-                events.extend(self.pm.close_all_increments(exec_price))
-                ev = self.pm.close_core(exec_price)
-                if ev: events.append(ev)
-                events.append({
-                    "type": "reversal",
-                    "reason": f"tp_kj_extension_{int(tp_kj_threshold)}p",
-                    "new_direction": "FLAT",
-                    "price": exec_price,
-                    "dist_kj_pips": round(dist_kj_pips, 1)
-                })
-                self.current_direction = "FLAT"
-                self.retracement_start_price = None
+                # Si attiva / aggiorna il Trailing SL Core a trail_pips dalla chiusura (picco confermato)
+                nuovo_sl = c_close - (trail_pips * pip_val)
+                if self.trailing_sl_core is None:
+                    self.trailing_sl_core = nuovo_sl
+                    events.append({
+                        "type": "trailing_core_updated",
+                        "direction": "LONG",
+                        "stop_level": nuovo_sl,
+                        "trail_pips": trail_pips,
+                        "dist_kj_pips": round(dist_kj_pips, 1),
+                        "reason": f"Attivazione Trailing Core Estensione H1 (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
+                    })
+                elif nuovo_sl > self.trailing_sl_core:
+                    self.trailing_sl_core = nuovo_sl
+                    events.append({
+                        "type": "trailing_core_updated",
+                        "direction": "LONG",
+                        "stop_level": nuovo_sl,
+                        "trail_pips": trail_pips,
+                        "dist_kj_pips": round(dist_kj_pips, 1),
+                        "reason": f"Rettifica Trailing Core Estensione H1 a {nuovo_sl:.5f}"
+                    })
+
             # 1. Chiusura Trailing SL Core a fine candela se attivo
-            elif self.trailing_sl_core is not None and c_close < self.trailing_sl_core:
+            if self.trailing_sl_core is not None and c_close < self.trailing_sl_core:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
@@ -213,7 +222,7 @@ class CoreEngine:
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_below_trailing_sl_core", "new_direction": "FLAT"})
+                events.append({"type": "reversal", "reason": "close_below_trailing_sl_core", "new_direction": "FLAT", "price": exec_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
             elif c_close < kj:
@@ -341,33 +350,42 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            # 0. Take Profit Estensione Trend H1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
+            # 0. Trailing Stop Estensione Trend H1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
             dist_kj_pips = (kj - c_close) / pip_val
-            default_tp_h1 = 250 if "Oil" in str(self.config.get("nome", "")) else 100
+            nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
+            is_oil = ("OIL" in nome_str or "CRUDE" in nome_str)
+            default_tp_h1 = 250 if is_oil else 100
             tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
+            trail_pips = 65 if is_oil else 30
+
             if is_h1 and dist_kj_pips >= tp_kj_threshold:
-                self.trailing_sl_core = None
-                self.trailing_sl_incr = None
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_candle_tk_active = False
-                self.signal_stop_price_tk = None
-                events.extend(self.pm.close_all_increments(exec_price))
-                ev = self.pm.close_core(exec_price)
-                if ev: events.append(ev)
-                events.append({
-                    "type": "reversal",
-                    "reason": f"tp_kj_extension_{int(tp_kj_threshold)}p",
-                    "new_direction": "FLAT",
-                    "price": exec_price,
-                    "dist_kj_pips": round(dist_kj_pips, 1)
-                })
-                self.current_direction = "FLAT"
-                self.retracement_start_price = None
+                # Si attiva / aggiorna il Trailing SL Core a trail_pips dalla chiusura (picco confermato)
+                nuovo_sl = c_close + (trail_pips * pip_val)
+                if self.trailing_sl_core is None:
+                    self.trailing_sl_core = nuovo_sl
+                    events.append({
+                        "type": "trailing_core_updated",
+                        "direction": "SHORT",
+                        "stop_level": nuovo_sl,
+                        "trail_pips": trail_pips,
+                        "dist_kj_pips": round(dist_kj_pips, 1),
+                        "reason": f"Attivazione Trailing Core Estensione H1 (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
+                    })
+                elif nuovo_sl < self.trailing_sl_core:
+                    self.trailing_sl_core = nuovo_sl
+                    events.append({
+                        "type": "trailing_core_updated",
+                        "direction": "SHORT",
+                        "stop_level": nuovo_sl,
+                        "trail_pips": trail_pips,
+                        "dist_kj_pips": round(dist_kj_pips, 1),
+                        "reason": f"Rettifica Trailing Core Estensione H1 a {nuovo_sl:.5f}"
+                    })
+
             # 1. Chiusura Trailing SL Core a fine candela se attivo
-            elif self.trailing_sl_core is not None and c_close > self.trailing_sl_core:
+            if self.trailing_sl_core is not None and c_close > self.trailing_sl_core:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
@@ -375,7 +393,7 @@ class CoreEngine:
                 events.extend(self.pm.close_all_increments(exec_price))
                 ev = self.pm.close_core(exec_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_above_trailing_sl_core", "new_direction": "FLAT"})
+                events.append({"type": "reversal", "reason": "close_above_trailing_sl_core", "new_direction": "FLAT", "price": exec_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
             elif c_close > kj:
