@@ -679,6 +679,347 @@ def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
     except Exception as e:
         return False, str(e), []
 
+def scrivi_console_log(messaggio, conto):
+    try:
+        path_log = os.path.join(conto, CONSOLE_LOG_FILE)
+        t_str = now_it().strftime("%H:%M:%S")
+        with open(path_log, "a", encoding="utf-8") as f:
+            f.write(f"[{t_str}] {messaggio}\n")
+    except Exception:
+        pass
+
+def carica_stati_hyper(conto):
+    hyper_30s_state = {}
+    hyper_5m_state = {}
+    for p_30s in [os.path.join(conto, "hyper_gold_state.json"), "hyper_gold_state.json"]:
+        if os.path.exists(p_30s):
+            try:
+                with open(p_30s, "r", encoding="utf-8") as f:
+                    hyper_30s_state = json.load(f)
+                    if hyper_30s_state: break
+            except Exception: pass
+
+    for p_5m in [os.path.join(conto, "hyper_gold_m1_state.json"), "hyper_gold_m1_state.json"]:
+        if os.path.exists(p_5m):
+            try:
+                with open(p_5m, "r", encoding="utf-8") as f:
+                    hyper_5m_state = json.load(f)
+                    if hyper_5m_state: break
+            except Exception: pass
+    return hyper_30s_state, hyper_5m_state
+
+def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state=None, hyper_5m_state=None, pos_data=None):
+    if hyper_30s_state is None: hyper_30s_state = {}
+    if hyper_5m_state is None: hyper_5m_state = {}
+    if pos_data is None: pos_data = []
+    deal_id = pos_dict.get("dealId") or pos_dict.get("deal_id")
+    is_gold = (
+        nome_strum in ("Spot Gold", "ORO")
+        or "GOLD" in str(nome_strum).upper()
+        or "CFEGOLD" in str(pos_dict.get("epic", ""))
+    )
+
+    # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold 1€) ---
+    pos_30s = hyper_30s_state.get("position") or {}
+    incs_30s = hyper_30s_state.get("increments") or []
+    pos_5m = hyper_5m_state.get("position") or {}
+    incs_5m = hyper_5m_state.get("increments") or []
+
+    if deal_id:
+        if deal_id == pos_30s.get("deal_id"):
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
+        for idx_30, inc in enumerate(incs_30s):
+            if inc.get("deal_id") == deal_id:
+                st_num = inc.get("step_idx", idx_30 + 1)
+                return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {st_num}</span>"
+
+        if deal_id == pos_5m.get("deal_id"):
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
+        for idx_5, inc in enumerate(incs_5m):
+            if inc.get("deal_id") == deal_id:
+                return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {idx_5 + 1}</span>"
+
+    if is_gold:
+        if abs(sz_pos - 2.0) < 0.001:
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
+        elif abs(sz_pos - 5.0) < 0.001:
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
+        elif abs(sz_pos - 4.0) < 0.001:
+            matching_4c = [p for p in pos_data if abs(float(p['position']['size']) - 4.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
+            try:
+                sc_idx = matching_4c.index(next(p for p in matching_4c if p['position'].get('dealId') == deal_id)) + 1
+            except Exception:
+                sc_idx = 1
+            return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {sc_idx}</span>"
+        elif abs(sz_pos - 3.0) < 0.001:
+            matching_3c = [p for p in pos_data if abs(float(p['position']['size']) - 3.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
+            try:
+                inc_idx = matching_3c.index(next(p for p in matching_3c if p['position'].get('dealId') == deal_id)) + 1
+            except Exception:
+                inc_idx = 1
+            return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {inc_idx}</span>"
+
+    tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
+    
+    if tipo_strategia == "TREND":
+        tf_val = param_memoria.get("timeframe", "HOUR")
+        tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+        tf_str = tf_map.get(tf_val, tf_val)
+        
+        pos_core = param_memoria.get("posizioni_core", [])
+        pos_incr = param_memoria.get("posizioni_incr", [])
+        dir_str = 'LONG' if dir_pos in ('BUY', 'LONG') else 'SHORT'
+        
+        if deal_id and any(str(c.get("ticket")) == str(deal_id) for c in pos_core):
+            return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+        
+        if deal_id:
+            for idx, i_d in enumerate(pos_incr):
+                if str(i_d.get("ticket")) == str(deal_id):
+                    return f"<span style='color: #38bdf8; font-weight: bold;'>Incremento n. {idx+1} <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+        
+        s_c = float(param_memoria.get("size", 1))
+        if abs(sz_pos - s_c) < 0.001:
+            return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+        return f"<span style='color: #38bdf8; font-weight: bold;'>Incremento <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+        
+    s_c = float(param_memoria.get("size", 0))
+    if s_c <= 0: return "-"
+    stato_sys = param_memoria.get("stato", "")
+    s_m = max(1.0, s_c / 2)
+    s_q = max(0.1, s_c / 4)
+    
+    has_limits = bool(pos_dict.get('limitLevel') or pos_dict.get('limitDistance') or pos_dict.get('stopLevel') or pos_dict.get('stopDistance'))
+    dir_label = "LONG" if dir_pos in ('BUY', 'LONG') else "SHORT"
+    
+    if abs(sz_pos - s_c) < 0.001: 
+        return f"Core ({dir_label})"
+    elif abs(sz_pos - s_m) < 0.001:
+        if "FASE_1" in stato_sys: 
+            return "Micro" if has_limits else "Assicurazione"
+        if "TICKET1" in stato_sys: return "Ticket1"
+        if param_memoria.get("ticket2_active") and dir_pos == param_memoria.get("ticket2_dir") and not pos_dict.get('stopLevel'):
+            return "Ticket2"
+        if "SATELLITE" in stato_sys: return "SAT1" if dir_pos == param_memoria.get("sat_dir", "") else "OverGain"
+        if "FASE_3" in stato_sys: return "Ultima"
+        return "SAT1" if "FASE_2" in stato_sys else ("Micro" if has_limits else "Assicurazione")
+    elif abs(sz_pos - s_q) < 0.001: 
+        if "SATELLIT" in stato_sys:
+            if "OL" in stato_sys:
+                sat_price = float(param_memoria.get("sat_price", 0))
+                tp = float(param_memoria.get("tp", 0))
+                c = CONFIG_STRUMENTI.get(nome_strum, {})
+                mult = c.get("moltiplicatore", 1)
+                if sat_price > 0 and tp > 0:
+                    pos_level = float(pos_dict.get('level', 0))
+                    distance_pts = abs(pos_level - sat_price) / mult
+                    if distance_pts > (tp / 8):
+                        return "OverLoss"
+                return "SAT2"
+            return "Posizione (1/4)"
+    elif abs(sz_pos - s_c * 0.15) < 0.001: return "Ultima"
+    elif abs(sz_pos - s_c * 0.35) < 0.001: return f"Core ({dir_label}) (Taglio 1)"
+    elif abs(sz_pos - s_c * 0.50) < 0.001: return f"Core ({dir_label}) (Taglio 2)"
+    return "Posizione Orfana"
+
+def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, size, ruolo_label=""):
+    """
+    Chiude a mercato una singola posizione su IG tramite DELETE /positions/otc con verifica conferma,
+    riconciliazione della memoria (Core / Incr per Trend, Hyper, Range), registrazione in storico CSV,
+    aggiornamento del diario WIP per la Sintesi Trend e invio notifica push.
+    """
+    h = get_ig_headers(conto)
+    if not h:
+        return False, "Headers IG non disponibili", None
+
+    base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto.upper() else "https://demo-api.ig.com/gateway/deal"
+    h_del = h.copy()
+    h_del["VERSION"] = "1"
+    h_del["_method"] = "DELETE"
+
+    dir_chiusura = "SELL" if str(direction_open).upper() in ("BUY", "LONG") else "BUY"
+    sz_num = float(size)
+    sz_str = str(int(sz_num)) if sz_num.is_integer() else str(sz_num)
+
+    body = {
+        "dealId": str(deal_id),
+        "direction": dir_chiusura,
+        "size": sz_str,
+        "orderType": "MARKET"
+    }
+
+    from ig_request_manager import ig_api_request
+    try:
+        r_c = ig_api_request("POST", f"{base_url}/positions/otc", headers=h_del, payload=body, timeout=10)
+        if not r_c or r_c.status_code != 200:
+            err_code = r_c.status_code if r_c else "Timeout"
+            return False, f"Errore invio chiusura IG (HTTP {err_code})", None
+
+        ref = r_c.json().get("dealReference")
+        if not ref:
+            return False, "Nessun dealReference ricevuto da IG", None
+
+        accettato = False
+        c_data = {}
+        for _ in range(5):
+            time.sleep(1.0)
+            try:
+                r_conf = ig_api_request(
+                    "GET",
+                    f"{base_url}/confirms/{ref}",
+                    headers={
+                        "X-IG-API-KEY": h.get("X-IG-API-KEY"),
+                        "CST": h.get("CST"),
+                        "X-SECURITY-TOKEN": h.get("X-SECURITY-TOKEN"),
+                        "VERSION": "1"
+                    },
+                    timeout=5
+                )
+                if r_conf and r_conf.status_code == 200:
+                    c_data = r_conf.json()
+                    status = c_data.get("dealStatus")
+                    if status == "ACCEPTED":
+                        accettato = True
+                        break
+                    elif status == "REJECTED":
+                        return False, f"Chiusura rifiutata da IG: {c_data.get('reason', 'REJECTED')}", None
+            except Exception:
+                pass
+
+        if not accettato:
+            return False, "Conferma chiusura non pervenuta da IG (possibile ritardo)", None
+
+        close_lvl = float(c_data.get("level") or 0.0)
+        c_prof = c_data.get("profit")
+        profit = float(c_prof) if c_prof is not None else 0.0
+
+        ora_dt = now_it()
+        ora_str = ora_dt.strftime("%d/%m %H:%M:%S")
+        sign_p = "+" if profit >= 0 else ""
+        dec = CONFIG_STRUMENTI.get(nome_strumento, {}).get("decimali", 2)
+        px_str = f" @ {close_lvl:.{dec}f}" if close_lvl > 0 else ""
+        ruolo_clean = re.sub(r"<[^>]+>", "", ruolo_label).strip() if ruolo_label else "Manuale"
+
+        # 1. Riconciliazione Memoria Locale (Trend, Range)
+        memoria = carica_memoria(conto)
+        if nome_strumento in memoria:
+            dati_inst = memoria[nome_strumento]
+            tipo_strat = dati_inst.get("tipo_strategia", "RANGE")
+            
+            if tipo_strat == "TREND":
+                storico = dati_inst.get("storico_wip_trend", [])
+                pos_core = dati_inst.get("posizioni_core", [])
+                pos_incr = dati_inst.get("posizioni_incr", [])
+
+                is_incr = any(str(p.get("ticket")) == str(deal_id) for p in pos_incr)
+                is_core = any(str(p.get("ticket")) == str(deal_id) for p in pos_core)
+
+                if is_incr:
+                    dati_inst["posizioni_incr"] = [p for p in pos_incr if str(p.get("ticket")) != str(deal_id)]
+                    msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
+                    storico.append(msg_wip)
+                    dati_inst["storico_wip_trend"] = storico[-30:]
+                elif is_core:
+                    dati_inst["posizioni_core"] = []
+                    dati_inst["trailing_sl_core"] = None
+                    if not dati_inst.get("posizioni_incr"):
+                        dati_inst["stato"] = "FLAT"
+                        dati_inst["attivo"] = False
+                        dati_inst["direzione"] = ""
+                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €] ➡️ FLAT"
+                    else:
+                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
+                    storico.append(msg_wip)
+                    dati_inst["storico_wip_trend"] = storico[-30:]
+                else:
+                    core_sz = float(dati_inst.get("size", 1))
+                    if abs(sz_num - core_sz) < 0.001 and pos_core:
+                        dati_inst["posizioni_core"] = []
+                        if not dati_inst.get("posizioni_incr"):
+                            dati_inst["stato"] = "FLAT"
+                            dati_inst["attivo"] = False
+                            dati_inst["direzione"] = ""
+                            msg_wip = f"[{ora_str}] 🛑 STOP MANUALE Core ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €] ➡️ FLAT"
+                        else:
+                            msg_wip = f"[{ora_str}] 🛑 STOP MANUALE Core ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
+                    else:
+                        if pos_incr:
+                            dati_inst["posizioni_incr"] = pos_incr[1:]
+                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
+                    storico.append(msg_wip)
+                    dati_inst["storico_wip_trend"] = storico[-30:]
+            else:
+                storico = dati_inst.get("storico_wip", [])
+                msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [Parziale: {sign_p}{profit:.0f} €]"
+                storico.append(msg_wip)
+                dati_inst["storico_wip"] = storico[-30:]
+                if "SAT" in ruolo_clean.upper() or "OVER" in ruolo_clean.upper():
+                    dati_inst["sat_attivo"] = False
+                    dati_inst.pop("sat_deal_id", None)
+
+            salva_memoria(conto, memoria)
+
+        # 2. Riconciliazione Hyper Gold (30S e 5M)
+        for f_hyp, is_m1 in [("hyper_gold_state.json", False), ("hyper_gold_m1_state.json", True)]:
+            for p_hyp in [os.path.join(conto, f_hyp), f_hyp]:
+                if os.path.exists(p_hyp):
+                    try:
+                        with open(p_hyp, "r", encoding="utf-8") as fh:
+                            hyp_st = json.load(fh)
+                        modified = False
+                        pos_h = hyp_st.get("position") or {}
+                        if str(pos_h.get("deal_id")) == str(deal_id):
+                            hyp_st["position"] = None
+                            modified = True
+                        incs_h = hyp_st.get("increments") or []
+                        if any(str(i.get("deal_id")) == str(deal_id) for i in incs_h):
+                            hyp_st["increments"] = [i for i in incs_h if str(i.get("deal_id")) != str(deal_id)]
+                            modified = True
+                        if modified:
+                            with open(p_hyp, "w", encoding="utf-8") as fh:
+                                json.dump(hyp_st, fh, indent=2)
+                    except Exception:
+                        pass
+
+        # 3. Scrittura su storico_operazioni.csv
+        path_csv = os.path.join(conto, FILE_STORICO)
+        try:
+            file_esiste = os.path.exists(path_csv)
+            with open(path_csv, "a", encoding="utf-8") as fc:
+                if not file_esiste:
+                    fc.write("Data,Strumento,Fase,Profitto_EUR,DealID\n")
+                fc.write(f"{ora_dt.strftime('%Y-%m-%d %H:%M:%S')},{nome_strumento},Chiusura Manuale ({ruolo_clean}),{profit:.2f},{deal_id}\n")
+        except Exception:
+            pass
+
+        # 4. Scrittura Console Live Log
+        try:
+            scrivi_console_log(f"[{nome_strumento}] 🛑 CHIUSURA MANUALE: {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.2f} €]", conto=conto)
+        except Exception:
+            pass
+
+        # 5. Notifica Push NTFY
+        try:
+            env_p = os.path.join(conto, ".env")
+            if not os.path.exists(env_p): env_p = ".env"
+            cfg_env = dotenv_values(env_p)
+            topic = cfg_env.get("NTFY_TOPIC")
+            if topic:
+                t_str = ora_dt.strftime("%H:%M:%S")
+                body_notif = f"[{t_str}] [{nome_strumento}] Chiusa manualmente posizione {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.2f} €]"
+                headers_ntfy = {
+                    "Title": f"[{conto}] 🛑 CHIUSURA MANUALE: {nome_strumento}".encode('utf-8'),
+                    "Tags": "octagonal_sign"
+                }
+                requests.post(f"https://ntfy.sh/{topic}", data=body_notif.encode('utf-8'), headers=headers_ntfy, timeout=5)
+        except Exception:
+            pass
+
+        return True, f"Posizione {deal_id} ({ruolo_clean}) chiusa con successo! PnL: {sign_p}{profit:.2f} €", profit
+
+    except Exception as e:
+        return False, f"Eccezione durante la chiusura: {e}", None
+
 def carica_radar_trend_dash(conto=None):
     """Carica i dati freschi da radar_trend.json come Unica Fonte di Verità per KJ e TK."""
     candidates = []
@@ -2347,12 +2688,12 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "⚡ Hyper", "🛑 Rec", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_hyper, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "⚡ Hyper", "📋 Posizioni", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_hyper, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
         tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📄 Report"])
         tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_report = tabs
-        tab_restore = tab_hyper = tab_console = tab_autorizzazioni = tab_statistiche = None
+        tab_restore = tab_posizioni = tab_hyper = tab_console = tab_autorizzazioni = tab_statistiche = None
 
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
@@ -2384,6 +2725,16 @@ else:
                             }}
                         }} else if (target === "Hyper") {{
                             if (txt.includes("Hyper")) {{
+                                t.click();
+                                break;
+                            }}
+                        }} else if (target === "Posizioni") {{
+                            if (txt.includes("Posizioni")) {{
+                                t.click();
+                                break;
+                            }}
+                        }} else if (target === "Recovery" || target === "Rec") {{
+                            if (txt.includes("Recovery") || txt.includes("Rec")) {{
                                 t.click();
                                 break;
                             }}
@@ -2433,143 +2784,12 @@ else:
             memoria_attuale = carica_memoria(conto_selezionato)
 
             # --- Caricamento Stati Hyper Gold (30S e 5M) per riconoscimento ruoli ---
-            hyper_30s_state = {}
-            hyper_5m_state = {}
-            for p_30s in [os.path.join(conto_selezionato, "hyper_gold_state.json"), "hyper_gold_state.json"]:
-                if os.path.exists(p_30s):
-                    try:
-                        with open(p_30s, "r", encoding="utf-8") as f:
-                            hyper_30s_state = json.load(f)
-                            if hyper_30s_state:
-                                break
-                    except Exception:
-                        pass
-
-            for p_5m in [os.path.join(conto_selezionato, "hyper_gold_m1_state.json"), "hyper_gold_m1_state.json"]:
-                if os.path.exists(p_5m):
-                    try:
-                        with open(p_5m, "r", encoding="utf-8") as f:
-                            hyper_5m_state = json.load(f)
-                            if hyper_5m_state:
-                                break
-                    except Exception:
-                        pass
+            hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
             
             # --- HELPER: Riconoscimento Ruolo Chirurgico ---
-            def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
-                deal_id = pos_dict.get("dealId") or pos_dict.get("deal_id")
-                is_gold = (
-                    nome_strum in ("Spot Gold", "ORO")
-                    or "GOLD" in str(nome_strum).upper()
-                    or "CFEGOLD" in str(pos_dict.get("epic", ""))
-                )
-
-                # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold 1€) ---
-                pos_30s = hyper_30s_state.get("position") or {}
-                incs_30s = hyper_30s_state.get("increments") or []
-                pos_5m = hyper_5m_state.get("position") or {}
-                incs_5m = hyper_5m_state.get("increments") or []
-
-                # Verifica tramite dealId esatto registrato da Hyper
-                if deal_id:
-                    if deal_id == pos_30s.get("deal_id"):
-                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
-                    for idx_30, inc in enumerate(incs_30s):
-                        if inc.get("deal_id") == deal_id:
-                            st_num = inc.get("step_idx", idx_30 + 1)
-                            return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {st_num}</span>"
-
-                    if deal_id == pos_5m.get("deal_id"):
-                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
-                    for idx_5, inc in enumerate(incs_5m):
-                        if inc.get("deal_id") == deal_id:
-                            return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {idx_5 + 1}</span>"
-
-                # Fallback per size su Spot Gold
-                if is_gold:
-                    if abs(sz_pos - 2.0) < 0.001:
-                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
-                    elif abs(sz_pos - 5.0) < 0.001:
-                        return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
-                    elif abs(sz_pos - 4.0) < 0.001:
-                        matching_4c = [p for p in pos_data if abs(float(p['position']['size']) - 4.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
-                        try:
-                            sc_idx = matching_4c.index(next(p for p in matching_4c if p['position'].get('dealId') == deal_id)) + 1
-                        except Exception:
-                            sc_idx = 1
-                        return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {sc_idx}</span>"
-                    elif abs(sz_pos - 3.0) < 0.001:
-                        matching_3c = [p for p in pos_data if abs(float(p['position']['size']) - 3.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
-                        try:
-                            inc_idx = matching_3c.index(next(p for p in matching_3c if p['position'].get('dealId') == deal_id)) + 1
-                        except Exception:
-                            inc_idx = 1
-                        return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {inc_idx}</span>"
-
-                tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
-                
-                if tipo_strategia == "TREND":
-                    tf_val = param_memoria.get("timeframe", "HOUR")
-                    tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
-                    tf_str = tf_map.get(tf_val, tf_val)
-                    
-                    pos_core = param_memoria.get("posizioni_core", [])
-                    pos_incr = param_memoria.get("posizioni_incr", [])
-                    dir_str = 'LONG' if dir_pos=='BUY' else 'SHORT'
-                    
-                    if deal_id and any(c.get("ticket") == deal_id for c in pos_core):
-                        return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
-                    
-                    if deal_id:
-                        for idx, i_d in enumerate(pos_incr):
-                            if i_d.get("ticket") == deal_id:
-                                return f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {idx+1}</span>"
-                    
-                    # Fallback per size
-                    s_c = float(param_memoria.get("size", 1))
-                    if abs(sz_pos - s_c) < 0.001:
-                        return f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
-                    return f"<span style='color: #FF8C00; font-weight: bold;'>Incremento</span>"
-                    
-                s_c = float(param_memoria.get("size", 0))
-                if s_c <= 0: return "-"
-                stato_sys = param_memoria.get("stato", "")
-                s_m = max(1.0, s_c / 2)
-                s_q = max(0.1, s_c / 4)
-                
-                has_limits = bool(pos_dict.get('limitLevel') or pos_dict.get('limitDistance') or pos_dict.get('stopLevel') or pos_dict.get('stopDistance'))
-                
-                dir_label = "LONG" if dir_pos == "BUY" else "SHORT"
-                
-                if abs(sz_pos - s_c) < 0.001: 
-                    return f"Core ({dir_label})"
-                elif abs(sz_pos - s_m) < 0.001:
-                    if "FASE_1" in stato_sys: 
-                        return "Micro" if has_limits else "Assicurazione"
-                    if "TICKET1" in stato_sys: return "Ticket1"
-                    if param_memoria.get("ticket2_active") and dir_pos == param_memoria.get("ticket2_dir") and not pos_dict.get('stopLevel'):
-                        return "Ticket2"
-                    if "SATELLITE" in stato_sys: return "SAT1" if dir_pos == param_memoria.get("sat_dir", "") else "OverGain"
-                    if "FASE_3" in stato_sys: return "Ultima"
-                    return "SAT1" if "FASE_2" in stato_sys else ("Micro" if has_limits else "Assicurazione")
-                elif abs(sz_pos - s_q) < 0.001: 
-                    if "SATELLIT" in stato_sys:
-                        if "OL" in stato_sys:
-                            sat_price = float(param_memoria.get("sat_price", 0))
-                            tp = float(param_memoria.get("tp", 0))
-                            c = CONFIG_STRUMENTI.get(nome_strum, {})
-                            mult = c.get("moltiplicatore", 1)
-                            if sat_price > 0 and tp > 0:
-                                pos_level = float(pos_dict.get('level', 0))
-                                distance_pts = abs(pos_level - sat_price) / mult
-                                if distance_pts > (tp / 8):
-                                    return "OverLoss"
-                            return "SAT2"
-                        return "Posizione (1/4)"
-                elif abs(sz_pos - s_c * 0.15) < 0.001: return "Ultima"
-                elif abs(sz_pos - s_c * 0.35) < 0.001: return f"Core ({dir_label}) (Taglio 1)"
-                elif abs(sz_pos - s_c * 0.50) < 0.001: return f"Core ({dir_label}) (Taglio 2)"
-                return "Posizione Orfana"
+            def get_role_pos_inner(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
+                return get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state, hyper_5m_state, pos_data)
+            get_role_pos = get_role_pos_inner
 
             def get_role_ord(nome_strum, dir_pos, sz_pos, param_memoria, ord_dict):
                 is_gold = (
@@ -3995,6 +4215,156 @@ else:
         with tab_hyper:
             import hyper_tab
             hyper_tab.render_hyper_tab(conto_selezionato=conto_selezionato)
+
+    if tab_posizioni is not None:
+        with tab_posizioni:
+            @st.fragment(run_every=10)
+            def renderizza_tab_posizioni():
+                st.markdown("<h2 style='text-align: center; color: #00FFCC;'>📋 Gestione Posizioni Aperte</h2>", unsafe_allow_html=True)
+                st.markdown(f"<p style='text-align: center; color: #888; font-size: 0.9rem;'>Monitoraggio live e chiusura manuale a mercato delle posizioni aperte su IG per il conto <b>{conto_selezionato}</b>.</p>", unsafe_allow_html=True)
+                
+                h = get_ig_headers(conto_selezionato)
+                if not h:
+                    st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
+                    return
+
+                base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto_selezionato.upper() else "https://demo-api.ig.com/gateway/deal"
+                try:
+                    r_pos = requests.get(f"{base_url}/positions", headers=h, timeout=8)
+                    pos_data = r_pos.json().get('positions', []) if r_pos.status_code == 200 else []
+                except Exception as e:
+                    st.error(f"Errore recupero posizioni da IG: {e}")
+                    return
+
+                stato = leggi_stato_sistema(conto_selezionato)
+                prezzi_live = stato.get("prezzi_live", {})
+                memoria_attuale = carica_memoria(conto_selezionato)
+                hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
+                epic_to_name = {v['epic']: k for k, v in CONFIG_STRUMENTI.items()}
+
+                c_top1, c_top2 = st.columns([4, 1], vertical_alignment="center")
+                with c_top1:
+                    if pos_data:
+                        tot_pnl = 0.0
+                        for p in pos_data:
+                            mkt = p.get('market', {})
+                            pos = p.get('position', {})
+                            n = epic_to_name.get(mkt.get('epic'), mkt.get('instrumentName', ''))
+                            cf = CONFIG_STRUMENTI.get(n, {})
+                            vp = cf.get("valore_punto", 1)
+                            ml = cf.get("moltiplicatore", 1)
+                            val = cf.get("valuta", "USD")
+                            px = prezzi_live.get(n)
+                            rt = get_eur_rate(val, prezzi_live)
+                            if px and ml > 0:
+                                d = pos.get('direction', 'BUY')
+                                lv = float(pos.get('level', 0.0))
+                                sz = float(pos.get('size', 1.0))
+                                pt = (px - lv) / ml if d == 'BUY' else (lv - px) / ml
+                                tot_pnl += (pt * sz * vp * rt)
+                        col_pnl_tot = "#4ade80" if tot_pnl > 0 else ("#ff6b6b" if tot_pnl < 0 else "#aaa")
+                        sign_tot = "+" if tot_pnl > 0 else ""
+                        st.markdown(f"**Posizioni Aperte:** <b style='color: #FFD700;'>{len(pos_data)}</b> &nbsp;&nbsp;|&nbsp;&nbsp; **P/L Fluttuante Totale:** <b style='color: {col_pnl_tot}; font-size: 1.1rem;'>{sign_tot}{formatta_eur(tot_pnl)} €</b>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<span style='color: #888;'>Nessuna operazione a mercato.</span>", unsafe_allow_html=True)
+                with c_top2:
+                    if st.button("🔄 Aggiorna Live", key=f"btn_refresh_pos_{conto_selezionato}", use_container_width=True):
+                        st.rerun()
+
+                if not pos_data:
+                    st.markdown("""
+                    <div style='text-align: center; padding: 45px 20px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; margin-top: 25px;'>
+                        <div style='font-size: 2.2rem; margin-bottom: 8px;'>🛡️</div>
+                        <h3 style='color: #ddd; margin-bottom: 6px;'>Nessuna posizione aperta</h3>
+                        <p style='color: #888; font-size: 0.9rem;'>Al momento non risultano posizioni attive a mercato sui server IG per questo conto.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    return
+
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+                c_h1, c_h2, c_h3, c_h4, c_h5, c_h6, c_h7 = st.columns([1.8, 0.8, 1.2, 1.2, 2.2, 1.3, 1.1])
+                with c_h1: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase;'>MERCATO</b>", unsafe_allow_html=True)
+                with c_h2: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase;'>SIZE</b>", unsafe_allow_html=True)
+                with c_h3: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase;'>APERTURA</b>", unsafe_allow_html=True)
+                with c_h4: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase;'>ULTIMO</b>", unsafe_allow_html=True)
+                with c_h5: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase;'>TIPO / RUOLO</b>", unsafe_allow_html=True)
+                with c_h6: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase;'>P/L (EUR)</b>", unsafe_allow_html=True)
+                with c_h7: st.markdown("<b style='color: #888; font-size: 0.8rem; text-transform: uppercase; text-align: center;'>AZIONE</b>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin-top: 4px; margin-bottom: 12px; border-top: 1px solid rgba(255, 255, 255, 0.12);'>", unsafe_allow_html=True)
+
+                for p in pos_data:
+                    mkt = p.get('market', {})
+                    pos = p.get('position', {})
+                    deal_id = pos.get('dealId')
+                    epic = mkt.get('epic', '')
+                    nome = epic_to_name.get(epic, mkt.get('instrumentName', epic))
+                    
+                    cfg = CONFIG_STRUMENTI.get(nome, {})
+                    dec = cfg.get("decimali", 2)
+                    mult = cfg.get("moltiplicatore", 1)
+                    valore_punto = cfg.get("valore_punto", 1)
+                    valuta = cfg.get("valuta", "USD")
+                    
+                    dir_pos = pos.get('direction', 'BUY')
+                    sz = float(pos.get('size', 1.0))
+                    sz_int = int(sz) if sz.is_integer() else sz
+                    lvl_open = float(pos.get('level') or pos.get('openLevel') or 0.0)
+                    created_str = pos.get('createdDate', '') or pos.get('createdDateUTC', '')
+                    time_part = created_str.split("T")[-1].split(" ")[-1][:8] if created_str else ""
+
+                    px_live = prezzi_live.get(nome)
+                    rate_eur = get_eur_rate(valuta, prezzi_live)
+                    if px_live and mult > 0:
+                        pts = (px_live - lvl_open)/mult if dir_pos == 'BUY' else (lvl_open - px_live)/mult
+                        pnl_eur = pts * sz * valore_punto * rate_eur
+                    else:
+                        pnl_eur = 0.0
+                        
+                    param_inst = memoria_attuale.get(nome, {})
+                    role_html = get_role_pos(nome, dir_pos, sz, param_inst, pos, hyper_30s_state, hyper_5m_state, pos_data)
+                    role_clean = re.sub(r"<[^>]+>", "", role_html).strip()
+
+                    with st.container(border=True):
+                        col1, col2, col3, col4, col5, col6, col7 = st.columns([1.8, 0.8, 1.2, 1.2, 2.2, 1.3, 1.1], vertical_alignment="center")
+                        with col1:
+                            dir_col = "#4ade80" if dir_pos == "BUY" else "#ff6b6b"
+                            dir_tag = "🟢 LONG" if dir_pos == "BUY" else "🔴 SHORT"
+                            st.markdown(f"<div style='font-size: 1.0rem; font-weight: bold; color: white;'>{nome}</div><span style='color: {dir_col}; font-size: 0.78rem; font-weight: bold;'>{dir_tag}</span>", unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(f"<div style='font-size: 1.05rem; font-weight: 600; color: #eee;'>{sz_int} c</div>", unsafe_allow_html=True)
+                        with col3:
+                            open_str = f"{lvl_open:.{dec}f}"
+                            st.markdown(f"<div style='font-family: monospace; font-size: 0.98rem; color: #fff;'>{open_str}</div><div style='font-size: 0.72rem; color: #888;'>{time_part}</div>", unsafe_allow_html=True)
+                        with col4:
+                            px_str = f"{px_live:.{dec}f}" if px_live else "-"
+                            st.markdown(f"<div style='font-family: monospace; font-size: 1.05rem; color: #FFD700; font-weight: bold;'>{px_str}</div>", unsafe_allow_html=True)
+                        with col5:
+                            st.markdown(f"<div style='font-size: 0.92rem; line-height: 1.3;'>{role_html}</div>", unsafe_allow_html=True)
+                        with col6:
+                            pnl_col = "#4ade80" if pnl_eur > 0 else ("#ff6b6b" if pnl_eur < 0 else "#aaa")
+                            sign_e = "+" if pnl_eur > 0 else ""
+                            st.markdown(f"<div style='font-size: 1.15rem; font-weight: bold; color: {pnl_col};'>{sign_e}{formatta_eur(pnl_eur)} €</div>", unsafe_allow_html=True)
+                        with col7:
+                            with st.popover("❌ Chiudi", use_container_width=True):
+                                st.markdown(f"<div style='font-size: 0.85rem; margin-bottom: 8px;'>Confermi la chiusura a mercato?<br><b>{nome}</b> {dir_tag} <b>{sz_int}c</b></div>", unsafe_allow_html=True)
+                                if st.button("Conferma Chiusura", key=f"btn_close_p_{deal_id}", type="primary", use_container_width=True):
+                                    with st.spinner("Chiusura IG in corso..."):
+                                        ok_c, msg_c, pnl_c = chiudi_singola_posizione_ig(
+                                            conto=conto_selezionato,
+                                            deal_id=deal_id,
+                                            nome_strumento=nome,
+                                            direction_open=dir_pos,
+                                            size=sz,
+                                            ruolo_label=role_clean
+                                        )
+                                        if ok_c:
+                                            st.toast(f"✅ {msg_c}", icon="🎉")
+                                            time.sleep(0.8)
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ {msg_c}")
+            renderizza_tab_posizioni()
 
     if tab_restore is not None:
         with tab_restore:
