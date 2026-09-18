@@ -332,15 +332,15 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     with m2:
         tk_str = f"{tk:.2f}" if tk else "--"
         kj_str = f"{kj:.2f}" if kj else "--"
-        if live_mid and tk:
-            if live_mid > (tk + TK_FILTER_PIPS_30S):
-                regime = "🟢 BULLISH (SOLO LONG)"
+        if live_mid and tk and kj:
+            if live_mid > tk and live_mid > kj:
+                regime = "🟢 BULLISH (SOPRA KJ & TK)"
                 col_reg = "#22c55e"
-            elif live_mid < (tk - TK_FILTER_PIPS_30S):
-                regime = "🔴 BEARISH (SOLO SHORT)"
+            elif live_mid < tk and live_mid < kj:
+                regime = "🔴 BEARISH (SOTTO KJ & TK)"
                 col_reg = "#ef4444"
             else:
-                regime = "⚪ ZONA NEUTRA TK (±3p)"
+                regime = "⚪ ZONA MISTA (NEUTRA)"
                 col_reg = "#f59e0b"
         else:
             regime = "Inizializzazione..."
@@ -368,7 +368,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±2p</div>
+            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Macro TK144 • Trigger Taglio KJ55 • 🪂 Paracadute KJ: ±2p</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -409,7 +409,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
             st.markdown(f"""
             <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; font-size: 0.80rem; line-height: 1.6;'>
                 <div style='color: #38bdf8; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi Chirurgico 70/30 (10 Contratti in Ordine Unico):</div>
-                <div>• <b>Ingresso</b>: Ordine unico da 10 contratti su pullback entro <b>≤ 3.0 pip da KJ 55</b></div>
+                <div>• <b>Ingresso Core</b>: Ordine da 10 contratti su <b>Taglio KJ 55</b> (prezzo sopra KJ & TK per Long, sotto per Short)</div>
                 <div>• <b>Cassa Sicura (70%)</b>: <span style='color: #f59e0b; font-weight: 600;'>7 contratti</span> @ <b>TP +5.0 pip</b> (+35.00 € netti)</div>
                 <div style='margin-top: 4px;'>• <b>Core Runner (30%)</b>: <span style='color: #4ade80; font-weight: 600;'>3 contratti</span> (Al tocco di +5p: <b>Break-Even protetto a +1.0p</b> + Trailing dinamico 4.0p dal picco)</div>
                 <div style='border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px; display: flex; justify-content: space-between;'>

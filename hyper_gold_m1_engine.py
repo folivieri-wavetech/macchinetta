@@ -147,9 +147,8 @@ class HyperGoldM1Engine:
         # 1. Carica eventuale stato persistito
         self.load_state()
 
-        # 2. Se non abbiamo abbastanza candele storiche M5 (meno di 150), recupero rapido una tantum da IG REST
-        if len(self.candles) < WARMUP_BARS_TK:
-            self._fetch_historical_m5_bars_from_ig()
+        # 2. Sincronizzazione candele M5 contigue direttamente da IG REST all'avvio (elimina buchi da riavvii)
+        self._fetch_historical_m5_bars_from_ig()
 
         # 3. Avvia thread di streaming Lightstreamer in background
         self.stream_thread = threading.Thread(target=self._run_streaming_loop, daemon=True)

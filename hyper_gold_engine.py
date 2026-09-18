@@ -1083,49 +1083,70 @@ class HyperGoldEngine:
         prev_close = closed_candle["close"]
         prev_open = closed_candle["open"]
 
-        tk_bullish_threshold = round(tk + TK_FILTER_PIPS, 2)
-        tk_bearish_threshold = round(tk - TK_FILTER_PIPS, 2)
+        # =============================================================
+        # 1. CONTROLLO INVERSIONE MACRO SU POSIZIONI ESISTENTI (TK 144)
+        # =============================================================
+        if self.position and self.position["direction"] == "SHORT" and prev_close > tk:
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > TK144 {tk:.2f} ➔ FLAT")
+
+        elif self.position and self.position["direction"] == "LONG" and prev_close < tk:
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < TK144 {tk:.2f} ➔ FLAT")
 
         # =============================================================
-        # 1. CONTROLLO INVERSIONE MACRO SU POSIZIONI ESISTENTI (FILTRO 3 PIP)
+        # 2. RILEVAMENTO TAGLIO (CROSSOVER) FRESCO DELLA KIJUN 55
         # =============================================================
-        if self.position and self.position["direction"] == "SHORT" and prev_close > tk_bullish_threshold:
-            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > (TK144 {tk:.2f} + {TK_FILTER_PIPS:.0f}p = {tk_bullish_threshold:.2f})")
+        # Candela precedente nello storico: closed_candle è self.candles[-1], self.candles[-2] è la precedente
+        prev_bar_close = self.candles[-2]["close"] if len(self.candles) >= 2 else prev_open
 
-        elif self.position and self.position["direction"] == "LONG" and prev_close < tk_bearish_threshold:
-            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < (TK144 {tk:.2f} - {TK_FILTER_PIPS:.0f}p = {tk_bearish_threshold:.2f})")
+        # Taglio Kijun al rialzo: chiusura sopra KJ, provenendo da sotto o a contatto con KJ
+        taglio_kj_long = (prev_close > kj) and (prev_open <= kj or prev_bar_close <= kj)
+
+        # Taglio Kijun al ribasso: chiusura sotto KJ, provenendo da sopra o a contatto con KJ
+        taglio_kj_short = (prev_close < kj) and (prev_open >= kj or prev_bar_close >= kj)
 
         # =============================================================
-        # 2. GESTIONE OPERATIVA SECONDO IL REGIME
+        # 3. GESTIONE INGRESSI ED OPERATIVITÀ
         # =============================================================
-        # A) REGIME BULLISH (Close > TK144 + 3 pip) o POSIZIONE LONG RESIDUA (non ancora invertita)
-        if prev_close > tk_bullish_threshold or (self.position and self.position["direction"] == "LONG"):
-            if prev_close > kj:
-                if self.position is None and prev_close > tk_bullish_threshold:
-                    # Verifica condizione rientro Core LONG:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
-                    dist_kj = abs(exec_price - kj)
-                    if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
-                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                            self.entry_in_progress = True
-                            self.signal_candle_active = False
-                            self.signal_stop_price = None
-                            self.signal_ref_price = None
-                            threading.Thread(
-                                target=self._execute_entry_sequence,
-                                args=("LONG", exec_price, time_str),
-                                daemon=True
-                            ).start()
-                elif self.position and self.position["direction"] == "LONG":
-                    # Core già LONG: azzera eventuale Candela Segnale. Nessun incremento successivo (già tutti aperti alla partenza)
+        if self.position is None:
+            # A) INGRESSO LONG: Prezzo sopra sia a KJ55 che a TK144 + Taglio Kijun Long
+            if prev_close > tk and prev_close > kj and taglio_kj_long:
+                if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                    self.entry_in_progress = True
                     self.signal_candle_active = False
                     self.signal_stop_price = None
                     self.signal_ref_price = None
+                    threading.Thread(
+                        target=self._execute_entry_sequence,
+                        args=("LONG", exec_price, time_str),
+                        daemon=True
+                    ).start()
 
-            else:
-                # prev_close <= kj in Regime Bullish: Candela Segnale se siamo LONG!
-                # Non chiude subito all'Open: imposta stop confermato su Minimo - 3 pip
-                if self.position and self.position["direction"] == "LONG":
+            # B) INGRESSO SHORT: Prezzo sotto sia a KJ55 che a TK144 + Taglio Kijun Short
+            elif prev_close < tk and prev_close < kj and taglio_kj_short:
+                if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                    self.entry_in_progress = True
+                    self.signal_candle_active = False
+                    self.signal_stop_price = None
+                    self.signal_ref_price = None
+                    threading.Thread(
+                        target=self._execute_entry_sequence,
+                        args=("SHORT", exec_price, time_str),
+                        daemon=True
+                    ).start()
+
+        # =============================================================
+        # 4. GESTIONE POSIZIONI ESISTENTI (CANDELA SEGNALE KJ)
+        # =============================================================
+        elif self.position:
+            if self.position["direction"] == "LONG":
+                if prev_close > kj:
+                    # Chiusura confermata sopra KJ: azzera eventuale Candela Segnale
+                    self.signal_candle_active = False
+                    self.signal_stop_price = None
+                    self.signal_ref_price = None
+                else:
+                    # Chiusura sotto Kijun: Candela Segnale!
+                    # Imposta stop confermato su Minimo - 2 pip
                     stop_livello = round(closed_candle["low"] - CANDELA_SEGNALE_OFFSET_PIPS, 2)
                     if self.signal_candle_active and self.signal_stop_price is not None:
                         if stop_livello < self.signal_stop_price:
@@ -1137,34 +1158,15 @@ class HyperGoldEngine:
                         self.signal_ref_price = closed_candle["low"]
                     self.save_state()
 
-        # B) REGIME BEARISH (Close < TK144 - 3 pip) o POSIZIONE SHORT RESIDUA (non ancora invertita)
-        elif prev_close < tk_bearish_threshold or (self.position and self.position["direction"] == "SHORT"):
-            if prev_close < kj:
-                if self.position is None and prev_close < tk_bearish_threshold:
-                    # Verifica condizione rientro Core SHORT:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
-                    dist_kj = abs(exec_price - kj)
-                    if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
-                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                            self.entry_in_progress = True
-                            self.signal_candle_active = False
-                            self.signal_stop_price = None
-                            self.signal_ref_price = None
-                            threading.Thread(
-                                target=self._execute_entry_sequence,
-                                args=("SHORT", exec_price, time_str),
-                                daemon=True
-                            ).start()
-                elif self.position and self.position["direction"] == "SHORT":
-                    # Core già SHORT: azzera eventuale Candela Segnale. Nessun incremento successivo
+            elif self.position["direction"] == "SHORT":
+                if prev_close < kj:
+                    # Chiusura confermata sotto KJ: azzera eventuale Candela Segnale
                     self.signal_candle_active = False
                     self.signal_stop_price = None
                     self.signal_ref_price = None
-
-            else:
-                # prev_close >= kj in Regime Bearish: Candela Segnale se siamo SHORT!
-                # Non chiude subito all'Open: imposta stop confermato su Massimo + 3 pip
-                if self.position and self.position["direction"] == "SHORT":
+                else:
+                    # Chiusura sopra Kijun: Candela Segnale!
+                    # Imposta stop confermato su Massimo + 2 pip
                     stop_livello = round(closed_candle["high"] + CANDELA_SEGNALE_OFFSET_PIPS, 2)
                     if self.signal_candle_active and self.signal_stop_price is not None:
                         if stop_livello > self.signal_stop_price:
