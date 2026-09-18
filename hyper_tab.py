@@ -2,6 +2,7 @@ import os
 import time
 import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 
 from hyper_gold_engine import (
     HyperGoldEngine, CANDLE_SECONDS as CANDLE_SECONDS_30S, WARMUP_BARS_KJ as WARMUP_BARS_KJ_30S,
@@ -172,6 +173,31 @@ def inject_hyper_css():
             display: none !important;
             visibility: hidden !important;
         }
+
+        /* Expander compatto e proporzionato in Hyper */
+        div[data-testid="stTabsContent"] details[data-testid="stExpander"] {
+            border: 1px solid #334155 !important;
+            border-radius: 6px !important;
+            background: rgba(15, 23, 42, 0.45) !important;
+            margin-bottom: 4px !important;
+        }
+        div[data-testid="stTabsContent"] details[data-testid="stExpander"] summary {
+            padding: 3px 8px !important;
+            min-height: 28px !important;
+        }
+        div[data-testid="stTabsContent"] details[data-testid="stExpander"] summary p {
+            font-size: 0.74rem !important;
+            font-weight: 600 !important;
+            color: #94a3b8 !important;
+            margin: 0 !important;
+        }
+        div[data-testid="stTabsContent"] details[data-testid="stExpander"] summary svg {
+            width: 13px !important;
+            height: 13px !important;
+        }
+        div[data-testid="stTabsContent"] details[data-testid="stExpander"] div[data-testid="stExpanderDetails"] {
+            padding: 4px 8px 6px 8px !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -319,17 +345,9 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 2. INDICATORI DI MERCATO (30S)
-    m1, m2, m3, m4 = st.columns([1.10, 1.90, 1.0, 1.0])
+    m1, m2, m3 = st.columns([2.0, 1.0, 1.0])
     with m1:
         px_str = f"{live_mid:.2f}" if live_mid else "--"
-        st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px; display: flex; flex-direction: column; justify-content: center;'>
-            <div class='kpi-title-hyper'>Spot Gold 1€ (Mid Live)</div>
-            <div style='font-size: 1.25rem; font-weight: 800; color: #22c55e; margin-top: 4px;'>{px_str} €</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with m2:
         tk_str = f"{tk:.2f}" if tk else "--"
         kj_str = f"{kj:.2f}" if kj else "--"
         if live_mid and tk and kj:
@@ -372,7 +390,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         </div>
         """, unsafe_allow_html=True)
 
-    with m3:
+    with m2:
         hyper_margine = total_contracts * 220.0
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
@@ -382,15 +400,16 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         </div>
         """, unsafe_allow_html=True)
 
-    with m4:
+    with m3:
         sec_elapsed = 0
         if curr_bar_t:
             sec_elapsed = min(30, int(time.time() - curr_bar_t))
+        sec_left = max(0, 30 - sec_elapsed)
+        sec_left_str = f"00:{sec_left:02d}"
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px;'>
+        <div class='kpi-card-hyper' style='padding: 10px 14px; text-align: center;'>
             <div class='kpi-title-hyper'>Tempo Barra (30s)</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #cbd5e1;'>{sec_elapsed}s / 30s</div>
-            <div style='font-size: 0.70rem; color: #94a3b8;'>Prossima chiusura: {30 - sec_elapsed}s</div>
+            <div style='font-size: 1.30rem; font-weight: 800; font-family: monospace; color: #38bdf8; margin-top: 2px;'>{sec_left_str}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -405,16 +424,16 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         tot_plan_c = sum(it["contracts"] for it in cur_plan)
         tot_all_c = cur_core + tot_plan_c
 
-        with st.expander("⚙️ Assetto 30S: Modello 70/30 (10 Contratti in Ordine Unico)", expanded=False):
+        with st.expander("⚙️ Assetto 30S: Modello 70/30 (10 Contratti)", expanded=False):
             st.markdown(f"""
-            <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; font-size: 0.80rem; line-height: 1.6;'>
-                <div style='color: #38bdf8; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi Chirurgico 70/30 (10 Contratti in Ordine Unico):</div>
-                <div>• <b>Ingresso Core</b>: Ordine da 10 contratti su <b>Taglio KJ 55</b> (prezzo sopra KJ & TK per Long, sotto per Short)</div>
+            <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.73rem; line-height: 1.45;'>
+                <div style='color: #38bdf8; font-weight: 700; margin-bottom: 3px; font-size: 0.75rem;'>🎯 Piano Ingressi Chirurgico 70/30 (10 Contratti in Ordine Unico):</div>
+                <div>• <b>Ingresso Core</b>: 10c su <b>Taglio KJ 55</b> (prezzo sopra KJ & TK per Long, sotto per Short)</div>
                 <div>• <b>Cassa Sicura (70%)</b>: <span style='color: #f59e0b; font-weight: 600;'>7 contratti</span> @ <b>TP +5.0 pip</b> (+35.00 € netti)</div>
-                <div style='margin-top: 4px;'>• <b>Core Runner (30%)</b>: <span style='color: #4ade80; font-weight: 600;'>3 contratti</span> (Al tocco di +5p: <b>Break-Even protetto a +1.0p</b> + Trailing dinamico 4.0p dal picco)</div>
-                <div style='border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px; display: flex; justify-content: space-between;'>
-                    <span style='color: #94a3b8;'>Esposizione iniziale: <b style='color: #f8fafc;'>10 contratti</b> (Margine: 2.200 €)</span>
-                    <span style='color: #4ade80; font-weight: 700;'>Incasso Target 70%: +35.00 €</span>
+                <div>• <b>Core Runner (30%)</b>: <span style='color: #4ade80; font-weight: 600;'>3 contratti</span> (A +5p: <b>BE +1.0p</b> + Trailing 4.0p)</div>
+                <div style='border-top: 1px solid #334155; margin-top: 4px; padding-top: 3px; display: flex; justify-content: space-between;'>
+                    <span style='color: #94a3b8;'>Esposizione: <b style='color: #f8fafc;'>10 contratti</b> (Margine: 2.200 €)</span>
+                    <span style='color: #4ade80; font-weight: 700;'>Target 70%: +35.00 €</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -426,11 +445,13 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         with c_btn1:
             st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
             if st.button("🟢 AVVIA 30S", key=f"btn_start_30s_{conto_selezionato}", disabled=dis_start, use_container_width=True):
+                st.session_state["hyper_target_subtab"] = "30s"
                 engine.set_trading(True)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("<div class='btn-azzera-hyper' style='margin-top: 6px;'>", unsafe_allow_html=True)
             if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_30s_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                st.session_state["hyper_target_subtab"] = "30s"
                 order_mgr.clear_trades_history(tf="30S")
                 engine.clear_session_trades()
                 st.rerun()
@@ -439,6 +460,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         with c_btn2:
             st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
             if st.button("🔴 STOP 30S", key=f"btn_stop_30s_{conto_selezionato}", disabled=(not trading_on), use_container_width=True):
+                st.session_state["hyper_target_subtab"] = "30s"
                 engine.set_trading(False)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -757,17 +779,9 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 2. INDICATORI DI MERCATO (5M)
-    m1, m2, m3, m4 = st.columns([1.10, 1.90, 1.0, 1.0])
+    m1, m2, m3 = st.columns([2.0, 1.0, 1.0])
     with m1:
         px_str = f"{live_mid:.2f}" if live_mid else "--"
-        st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px; display: flex; flex-direction: column; justify-content: center;'>
-            <div class='kpi-title-hyper'>Spot Gold 1€ (Mid Live)</div>
-            <div style='font-size: 1.25rem; font-weight: 800; color: #22c55e; margin-top: 4px;'>{px_str} €</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with m2:
         tk_str = f"{tk:.2f}" if tk else "--"
         kj_str = f"{kj:.2f}" if kj else "--"
         if kj and tk:
@@ -811,7 +825,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         </div>
         """, unsafe_allow_html=True)
 
-    with m3:
+    with m2:
         hyper_margine = total_contracts * 220.0
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 10px 14px;'>
@@ -821,7 +835,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         </div>
         """, unsafe_allow_html=True)
 
-    with m4:
+    with m3:
         sec_elapsed = 0
         if curr_bar_t:
             sec_elapsed = min(300, int(time.time() - curr_bar_t))
@@ -840,14 +854,14 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     col_left, col_right = st.columns([1.15, 1.85])
 
     with col_left:
-        with st.expander("⚙️ Assetto Contratti M5 (Core 5c + Incr 3c)", expanded=False):
+        with st.expander("⚙️ Assetto M5: Core 5c + Incr 3c", expanded=False):
             st.markdown(f"""
-            <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; font-size: 0.80rem; line-height: 1.6;'>
-                <div style='color: #f59e0b; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi M5 Trend Scalping:</div>
+            <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.73rem; line-height: 1.45;'>
+                <div style='color: #f59e0b; font-weight: 700; margin-bottom: 3px; font-size: 0.75rem;'>🎯 Piano Ingressi M5 Trend Scalping:</div>
                 <div>• <b>Regime</b>: LONG se KJ55 > TK233 (+3p) | SHORT se KJ55 < TK233 (-3p)</div>
-                <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{CORE_CONTRACTS_5M} contratti</span> su stacco Prezzo - KJ >= 2 pip</div>
-                <div>• <b>Incrementi</b>: fino a <b>{MAX_INCREMENTS_5M}</b> da <span style='color: #f59e0b; font-weight: 600;'>{INC_CONTRACTS_5M} contratti</span> (TP +{INC_TP_PIPS_5M:.0f} pip)</div>
-                <div style='border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px;'>
+                <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{CORE_CONTRACTS_5M}c</span> su stacco Prezzo - KJ >= 2 pip</div>
+                <div>• <b>Incrementi</b>: fino a <b>{MAX_INCREMENTS_5M}</b> da <span style='color: #f59e0b; font-weight: 600;'>{INC_CONTRACTS_5M}c</span> (TP +{INC_TP_PIPS_5M:.0f}p)</div>
+                <div style='border-top: 1px solid #334155; margin-top: 4px; padding-top: 3px;'>
                     <span style='color: #94a3b8;'>Paracadute KJ55: <b>±6 pip</b> • Candela Segnale: <b>±3 pip</b></span>
                 </div>
             </div>
@@ -860,11 +874,13 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         with c_btn1:
             st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
             if st.button("🟢 AVVIA 5M", key=f"btn_start_m5_{conto_selezionato}", disabled=dis_start, use_container_width=True):
+                st.session_state["hyper_target_subtab"] = "5m"
                 engine.set_trading(True)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("<div class='btn-azzera-hyper' style='margin-top: 6px;'>", unsafe_allow_html=True)
             if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{conto_selezionato}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
+                st.session_state["hyper_target_subtab"] = "5m"
                 order_mgr.clear_trades_history(tf="5M")
                 engine.clear_session_trades()
                 st.rerun()
@@ -873,6 +889,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         with c_btn2:
             st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
             if st.button("🔴 STOP 5M", key=f"btn_stop_m5_{conto_selezionato}", disabled=(not trading_on), use_container_width=True):
+                st.session_state["hyper_target_subtab"] = "5m"
                 engine.set_trading(False)
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1174,6 +1191,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", **kwargs):
             c_cl1, c_cl2 = st.columns([3, 1])
             with c_cl2:
                 if st.button("🗑️ Azzera Archivio Sintesi", key="btn_clear_sintesi"):
+                    st.session_state["hyper_target_subtab"] = "sintesi"
                     mgr.clear_trades_history()
                     st.rerun()
 
@@ -1204,4 +1222,82 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
 
     with tab_sintesi:
         render_sintesi_hyp(conto_selezionato=conto_attivo)
+
+    target_subtab = st.session_state.pop("hyper_target_subtab", None)
+    target_js = target_subtab if target_subtab else ""
+
+    components.html(f"""
+        <script>
+        (function() {{
+            function gestisciHyperTabs() {{
+                try {{
+                    const tabs = window.parent.document.querySelectorAll('div[data-testid="stTabs"] button[role="tab"]');
+                    let target = "{target_js}";
+                    if (target) {{
+                        sessionStorage.setItem("hyper_active_subtab", target);
+                    }} else {{
+                        target = sessionStorage.getItem("hyper_active_subtab") || "";
+                    }}
+
+                    for (let t of tabs) {{
+                        const txt = (t.innerText || t.textContent || "").trim();
+                        if (txt.includes("Hyper 30s") && !t._hyper_listener) {{
+                            t._hyper_listener = true;
+                            t.addEventListener("click", function() {{
+                                sessionStorage.setItem("hyper_active_subtab", "30s");
+                            }});
+                        }} else if (txt.includes("Hyper 5m") && !t._hyper_listener) {{
+                            t._hyper_listener = true;
+                            t.addEventListener("click", function() {{
+                                sessionStorage.setItem("hyper_active_subtab", "5m");
+                            }});
+                        }} else if (txt.includes("Sintesi Hyp") && !t._hyper_listener) {{
+                            t._hyper_listener = true;
+                            t.addEventListener("click", function() {{
+                                sessionStorage.setItem("hyper_active_subtab", "sintesi");
+                            }});
+                        }}
+                    }}
+
+                    if (target === "5m") {{
+                        for (let t of tabs) {{
+                            const txt = (t.innerText || t.textContent || "").trim();
+                            if (txt.includes("Hyper 5m")) {{
+                                if (t.getAttribute("aria-selected") !== "true") {{
+                                    t.click();
+                                }}
+                                break;
+                            }}
+                        }}
+                    }} else if (target === "30s") {{
+                        for (let t of tabs) {{
+                            const txt = (t.innerText || t.textContent || "").trim();
+                            if (txt.includes("Hyper 30s")) {{
+                                if (t.getAttribute("aria-selected") !== "true") {{
+                                    t.click();
+                                }}
+                                break;
+                            }}
+                        }}
+                    }} else if (target === "sintesi") {{
+                        for (let t of tabs) {{
+                            const txt = (t.innerText || t.textContent || "").trim();
+                            if (txt.includes("Sintesi Hyp")) {{
+                                if (t.getAttribute("aria-selected") !== "true") {{
+                                    t.click();
+                                }}
+                                break;
+                            }}
+                        }}
+                    }}
+                }} catch(e) {{
+                    console.error("Hyper tab switcher error:", e);
+                }}
+            }}
+            gestisciHyperTabs();
+            setTimeout(gestisciHyperTabs, 60);
+            setTimeout(gestisciHyperTabs, 180);
+        }})();
+        </script>
+    """, height=0, width=0)
 

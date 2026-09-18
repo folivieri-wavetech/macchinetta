@@ -2347,12 +2347,13 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "📈 Sintesi Tnd", "🛡️ Range", "📋 Sintesi Rng", "⚡ Hyper", "🛑 Rec", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_radar, tab_trend, tab_sintesi_trend, tab_operativa, tab_sintesi, tab_hyper, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "⚡ Hyper", "🛑 Rec", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_hyper, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Sintesi Tnd", "📋 Sintesi Rng", "📄 Report"])
-        tab_portafoglio, tab_radar, tab_sintesi_trend, tab_sintesi, tab_report = tabs
-        tab_operativa = tab_trend = tab_restore = tab_hyper = tab_console = tab_autorizzazioni = tab_statistiche = None
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📄 Report"])
+        tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_report = tabs
+        tab_restore = tab_hyper = tab_console = tab_autorizzazioni = tab_statistiche = None
+
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
     target_tab_js = target_tab_to_open if target_tab_to_open else ""
@@ -2951,665 +2952,6 @@ else:
             renderizza_schermata_radar(conto_selezionato)
         renderizza_tab_radar()
 
-    with tab_sintesi:
-        @st.fragment(run_every=15)
-        def renderizza_sintesi():
-            memoria = carica_memoria(conto_selezionato)
-            stato_sys = leggi_stato_sistema(conto_selezionato)
-            prezzi_live = stato_sys.get("prezzi_live", {})
-            
-            motore_attivo = False
-            path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
-            if os.path.exists(path_stato):
-                if (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
-            
-            badge_motore = "🟢 Connesso" if motore_attivo else "🔴 Offline"
-            saldo_val = formatta_eur(stato_sys.get('saldo', '0'))
-            dd_val = formatta_eur(stato_sys.get('drawdown', '0'))
-            
-            try:
-                color_dd = "#ff4b4b" if float(stato_sys.get('drawdown', '0')) < 0 else ("#09ab3b" if float(stato_sys.get('drawdown', '0')) > 0 else "inherit")
-            except: color_dd = "inherit"
-
-            ultima_operazione_testo = ""
-            path_storico = os.path.join(conto_selezionato, "storico_operazioni.csv")
-            try:
-                if os.path.exists(path_storico):
-                    with open(path_storico, "r", encoding="utf-8") as f:
-                        last_line = None
-                        for riga in f:
-                            if riga.strip(): last_line = riga
-                        if last_line and not last_line.startswith("Data,"):
-                            parti = last_line.strip().split(",")
-                            if len(parti) >= 4:
-                                dt, strum, fase, pnl = parti[0], parti[1], parti[2], float(parti[3])
-                                try:
-                                    dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-                                    dt_fmt = dt_obj.strftime("%d/%m %H:%M")
-                                except:
-                                    dt_fmt = dt
-                                segno = "+" if pnl > 0 else ""
-                                col_pnl = "#09ab3b" if pnl > 0 else "#ff4b4b"
-                                ultima_operazione_testo = f"<div style='font-size: 1rem; color: #FFD700; margin-top: 5px; font-weight: 500;'>⏱️ Ultima Op: <b>{strum}</b> - {fase} ({dt_fmt}) | <span style='color:{col_pnl}; font-weight:bold;'>{segno}{pnl:.0f} €</span></div>"
-            except Exception:
-                pass
-
-            st.html(f"""
-            <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
-                <div>
-                    <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Trading Range</h3>
-                    {ultima_operazione_testo}
-                </div>
-                <div style='font-size: 1.05rem; font-weight: 500; display: flex; gap: 20px; align-items: center;'>
-                    <span><span style='color: #888;'>Saldo:</span> {saldo_val} €</span>
-                    <span><span style='color: #888;'>P/L:</span> <span style='color: {color_dd};'>{dd_val} €</span></span>
-                </div>
-            </div>
-            """)
-            
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
-                c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento (WIP)</div>", unsafe_allow_html=True)
-                c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Fase Attuale</div>", unsafe_allow_html=True)
-                c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>LIVE</div>", unsafe_allow_html=True)
-                c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
-                st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
-                
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
-                strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
-                
-                for nome in strumenti_ordinati:
-                    dati = memoria.get(nome, {})
-                    stato = dati.get("stato", "IN_ATTESA")
-                    is_attivo = dati.get("attivo", False)
-                    tipo_strategia = dati.get("tipo_strategia", "RANGE")
-                    storico = dati.get("storico_wip", [])
-                    prezzo = prezzi_live.get(nome, "In aggiornamento...")
-                    spia = ""
-                    stato_display = stato.replace("OverGain", "OG").replace("OverLoss", "OL")
-                    
-                    if is_attivo and isinstance(prezzo, (int, float)):
-                        mult = 1 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude", "Ethereum"] else (0.01 if "JPY" in nome else 0.0001)
-                        if stato == "FASE_1 + Micro":
-                            dir_core = dati.get("direzione")
-                            base = dati.get("prezzo_base")
-                            tp = dati.get("tp", 50)
-                            if dir_core and base is not None:
-                                stato_display = f"FASE_1 + Micro ({'SHORT' if dir_core == 'LONG' else 'LONG'})"
-                                spia = " 🟢" if (prezzo < base + (tp/4)*mult if dir_core == 'LONG' else prezzo > base - (tp/4)*mult) else " 🔴"
-                        elif stato == "FASE_2_TICKET1":
-                            t_dir, t_entry = dati.get("ticket1_dir"), dati.get("ticket1_entry", dati.get("ticket1_base")) 
-                            if t_dir and t_entry is not None:
-                                spia = " 🟢" if (prezzo > t_entry if t_dir == "BUY" else prezzo < t_entry) else " 🔴"
-                        elif stato in ["FASE_2_SATELLITE_OG", "FASE_2_SATELLITE_OL"]:
-                            s_dir, s_base = dati.get("sat_dir"), dati.get("sat_price")
-                            if s_dir and s_base is not None:
-                                spia = " 🟢" if (prezzo > s_base if s_dir == "BUY" else prezzo < s_base) else " 🔴"
-                        elif stato == "FASE_3 + Ultima":
-                            f3_dir, f3_base = dati.get("fase3_dir"), dati.get("fase3_current_base")
-                            if f3_dir and f3_base is not None:
-                                spia = " 🟢" if (prezzo < f3_base + (dati.get("tp", 50)/4)*mult if f3_dir == "BUY" else prezzo > f3_base - (dati.get("tp", 50)/4)*mult) else " 🔴"
-                        elif stato == "FASE_2_SATELLITI":
-                            pos_live = st.session_state.get("live_pos_data", [])
-                            c = CONFIG_STRUMENTI.get(nome, {})
-                            if c and c.get("epic"):
-                                s_core = float(dati.get("size", 4))
-                                s_mezzo = max(1.0, s_core / 2)
-                                t_epic = c.get("epic")
-                                for p in pos_live:
-                                    if p['market']['epic'] == t_epic and float(p['position']['size']) == s_mezzo:
-                                        p_dir = p['position']['direction']
-                                        p_level = float(p['position']['level'])
-                                        spia = " 🟢" if (prezzo > p_level if p_dir == "BUY" else prezzo < p_level) else " 🔴"
-                                        break
-                    
-                    if dati.get("ticket2_active"):
-                        stato_display += " [+ Ticket2]"
-
-                    if is_attivo:
-                        if tipo_strategia == "TREND":
-                            stato_visivo = f"<span style='background-color: rgba(0, 191, 255, 0.15); color: #00BFFF; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>📈 IN TREND</span>"
-                        else:
-                            stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
-                            if stato == "FASE_2_STANDBY":
-                                stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
-                    else:
-                        if nome in STRUMENTI_ESCLUSIVI_HYPER:
-                            stato_visivo = f"<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ RISERVATO HYPER</span>"
-                        elif stato == "MANUALE":
-                            stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚠️ MANUALE</span>"
-                        else:
-                            stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏸️ IN ATTESA</span>"
-                    
-                    has_anomalia = bool(dati.get("alert_falso_allarme") or dati.get("errore_avvio") or dati.get("errore_ripristino") or dati.get("msg_manuale"))
-                    
-                    if has_anomalia:
-                        bg_color = "#FFC107" # Giallo
-                        text_color = "black"
-                    elif is_attivo and tipo_strategia == "RANGE":
-                        bg_color = "#198754" # Verde
-                        text_color = "white"
-                    elif is_attivo and tipo_strategia == "TREND":
-                        bg_color = "#00BFFF" # Azzurro
-                        text_color = "white"
-                    else:
-                        bg_color = "#495057" # Grigio scuro
-                        text_color = "white"
-                        
-                    if not is_attivo or stato == "IN_ATTESA":
-                        html_tot_wip = "<div style='font-size: 0.71rem; color: #888; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: #888;'>WIP</b></div>"
-                    else:
-                        totale_wip = 0.0
-                        if storico:
-                            for riga in storico:
-                                match = re.search(r"\[Parziale:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
-                                if match:
-                                    totale_wip += float(match.group(1).replace(",", "."))
-                        
-                        segno_wip = "+" if totale_wip > 0 else ""
-                        col_tot_wip = "#4ade80" if totale_wip > 0 else ("#ff6b6b" if totale_wip < 0 else "#aaa")
-                        valore_tot_str = f"{segno_wip}{totale_wip:.2f} €".replace(".", ",")
-                        html_tot_wip = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: {col_tot_wip};'>{valore_tot_str}</b></div>"
-
-                    marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
-                    css_marker = f"""<style>
-                    div[data-testid="stHorizontalBlock"]:has(.{marker_class}) {{
-                        margin-bottom: -15px !important;
-                    }}
-                    div[data-testid="stColumn"]:has(.{marker_class}) div[data-testid="stButton"] > button {{
-                        background-color: {bg_color} !important; border-color: {bg_color} !important; color: {text_color} !important;
-                    }}
-                    </style>"""
-                    
-                    c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
-                    with c1:
-                        st.markdown(f"<span class='{marker_class}'></span>{css_marker}", unsafe_allow_html=True)
-                        st.markdown(html_tot_wip, unsafe_allow_html=True)
-                        if st.button(nome, key=f"wip_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
-                            mostra_diario_wip(nome, storico, conto=conto_selezionato)
-                    
-                    c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
-                    
-                    if has_anomalia:
-                        btn_label = "🚨 Visto Emergenza" if (dati.get("errore_avvio") or dati.get("errore_ripristino") or (dati.get("msg_manuale") and ("Fallit" in str(dati.get("msg_manuale")) or "Emergenza" in str(dati.get("msg_manuale")) or "Rifiuto" in str(dati.get("msg_manuale"))))) else "👁️ Visto Anomalia"
-                        if c2.button(btn_label, key=f"ack_all_{conto_selezionato}_{nome}"):
-                            p = carica_memoria(conto_selezionato)
-                            if nome in p:
-                                p[nome].pop("alert_falso_allarme", None)
-                                p[nome]["errore_ripristino"] = False
-                                p[nome]["errore_avvio"] = False
-                                p[nome]["msg_manuale"] = ""
-                                salva_memoria(conto_selezionato, p)
-                                st.rerun()
-                            
-                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
-                    ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
-                    ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
-                    c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
-                    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-                    
-        renderizza_sintesi()
-
-    if tab_sintesi_trend is not None:
-        with tab_sintesi_trend:
-            @st.fragment(run_every=15)
-            def renderizza_sintesi_trend():
-                memoria = carica_memoria(conto_selezionato)
-                stato_sys = leggi_stato_sistema(conto_selezionato)
-                prezzi_live = stato_sys.get("prezzi_live", {})
-                
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
-                strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
-                
-                st.html("""
-                <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
-                    <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Tnd</h3></div>
-                </div>
-                """)
-                
-                with st.container(border=True):
-                    c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
-                    c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento</div>", unsafe_allow_html=True)
-                    c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Stato Trend</div>", unsafe_allow_html=True)
-                    c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>LIVE</div>", unsafe_allow_html=True)
-                    c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
-                    
-                    for nome in strumenti_ordinati:
-                        dati = memoria.get(nome, {})
-                        stato = dati.get("stato", "FLAT")
-                        is_attivo = dati.get("attivo", False)
-                        dir_t = dati.get("direzione", "")
-                        tf = dati.get("timeframe", "HOUR")
-                        sz = dati.get("size", 1)
-                        storico = dati.get("storico_wip_trend", [])
-                        prezzo = prezzi_live.get(nome, "In aggiornamento...")
-                        
-                        posizioni_core = dati.get("posizioni_core", [])
-                        posizioni_incr = dati.get("posizioni_incr", [])
-                        
-                        core_count = len(posizioni_core)
-                        core_entry = posizioni_core[0].get("entry", 0) if core_count > 0 else 0
-                        
-                        incr_count = len(posizioni_incr)
-                        incr_avg = sum(p.get("entry", 0) for p in posizioni_incr) / incr_count if incr_count > 0 else 0
-                        
-                        tipo_strat = dati.get("tipo_strategia", "RANGE")
-                        
-                        # Colore e stile del pulsante Strumento WIP
-                        if is_attivo and tipo_strat == "TREND":
-                            if dir_t == "LONG":
-                                bg_color_t = "#198754" # Verde
-                            elif dir_t == "SHORT":
-                                bg_color_t = "#dc3545" # Rosso
-                            else:
-                                bg_color_t = "#00BFFF" # Azzurro
-                            text_color_t = "white"
-                        elif is_attivo and tipo_strat == "RANGE":
-                            bg_color_t = "#17a2b8"
-                            text_color_t = "white"
-                        else:
-                            bg_color_t = "#495057"
-                            text_color_t = "white"
-                            
-                        totale_wip_t = 0.0
-                        if storico:
-                            for riga in storico:
-                                match = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
-                                if match:
-                                    totale_wip_t += float(match.group(1).replace(",", "."))
-                        
-                        segno_t = "+" if totale_wip_t > 0 else ""
-                        col_tot_t = "#4ade80" if totale_wip_t > 0 else ("#ff6b6b" if totale_wip_t < 0 else "#aaa")
-                        valore_tot_t_str = f"{segno_t}{totale_wip_t:.0f} €"
-                        
-                        # Calcolo PnL Live Core + Incrementi (derivante da Pfoglio)
-                        c_conf = CONFIG_STRUMENTI.get(nome, {})
-                        c_mult = c_conf.get("moltiplicatore", 1)
-                        c_valore_punto = c_conf.get("valore_punto", 1)
-                        c_valuta = c_conf.get("valuta", "USD")
-                        c_rate = get_eur_rate(c_valuta, prezzi_live)
-                        c_epic = c_conf.get("epic")
-                        
-                        pnl_live_trend = 0.0
-                        has_live_pos = False
-                        
-                        pos_live_all = st.session_state.get("live_pos_data", [])
-                        if pos_live_all and c_epic:
-                            for p in pos_live_all:
-                                if p.get('market', {}).get('epic') == c_epic:
-                                    sz_p = float(p.get('position', {}).get('size', 0))
-                                    lvl_p = float(p.get('position', {}).get('level', 0))
-                                    dir_p = p.get('position', {}).get('direction')
-                                    if isinstance(prezzo, (int, float)):
-                                        pts = (prezzo - lvl_p)/c_mult if dir_p == 'BUY' else (lvl_p - prezzo)/c_mult
-                                        pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
-                                        has_live_pos = True
-                                        
-                        if not has_live_pos and isinstance(prezzo, (int, float)):
-                            for cp in posizioni_core:
-                                sz_p = float(cp.get("size", 0))
-                                lvl_p = float(cp.get("entry", 0))
-                                dir_p = cp.get("direction", dir_t)
-                                pts = (prezzo - lvl_p)/c_mult if dir_p == 'LONG' else (lvl_p - prezzo)/c_mult
-                                pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
-                                has_live_pos = True
-                            for ip in posizioni_incr:
-                                sz_p = float(ip.get("size", 0))
-                                lvl_p = float(ip.get("entry", 0))
-                                dir_p = ip.get("direction", dir_t)
-                                pts = (prezzo - lvl_p)/c_mult if dir_p == 'LONG' else (lvl_p - prezzo)/c_mult
-                                pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
-                                has_live_pos = True
-                                
-                        if has_live_pos:
-                            segno_live = "+" if pnl_live_trend > 0 else ""
-                            # Verde erba (#00E676) o Rosso salmone (#FA8072)
-                            col_live = "#00E676" if pnl_live_trend >= 0 else "#FA8072"
-                            valore_live_str = f"{segno_live}{pnl_live_trend:.0f} €"
-                        else:
-                            col_live = "#888888"
-                            valore_live_str = "0 €"
-                        
-                        html_tot_wip_t = f"""<div style='font-size: 0.70rem; color: #bbb; margin-top: 0px; margin-bottom: 3px; padding-left: 2px; line-height: 1.15; white-space: nowrap;'>
-<div>Live: <b style='color: {col_live};'>{valore_live_str}</b></div>
-<div>Totale: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>
-</div>"""
-
-                        marker_class_t = f"btn-trend-{nome.replace('/', '').replace(' ', '')}"
-                        css_marker_t = f"""<style>
-                        div[data-testid="stHorizontalBlock"]:has(.{marker_class_t}) {{
-                            margin-bottom: -15px !important;
-                        }}
-                        div[data-testid="stColumn"]:has(.{marker_class_t}) {{
-                            margin-top: -22px !important;
-                        }}
-                        div[data-testid="stColumn"]:has(.{marker_class_t}) div[data-testid="stButton"] > button {{
-                            background-color: {bg_color_t} !important; border-color: {bg_color_t} !important; color: {text_color_t} !important;
-                        }}
-                        </style>"""
-
-                        c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
-                        with c1:
-                            st.markdown(f"<span class='{marker_class_t}'></span>{css_marker_t}", unsafe_allow_html=True)
-                            st.markdown(html_tot_wip_t, unsafe_allow_html=True)
-                            if st.button(nome, key=f"wip_trend_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
-                                mostra_diario_wip_trend(nome, storico, conto=conto_selezionato)
-                        
-                        if is_attivo and tipo_strat == "TREND":
-                            tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
-                            tf_display = tf_map.get(tf, tf)
-                            if dir_t in ("LONG", "SHORT") and core_count > 0:
-                                color = "#198754" if dir_t == "LONG" else "#dc3545"
-                                bg_c = "rgba(40,167,69,0.15)" if dir_t == "LONG" else "rgba(220,53,69,0.15)"
-                                dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
-                                core_sz_val = posizioni_core[0].get("size", sz) if core_count > 0 else sz
-                                str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}"
-                                str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
-                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
-                            elif dati.get("needs_manual_start", False):
-                                if is_rollover_active():
-                                    c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🌙 IN ATTESA ROLLOVER ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Attesa fine Rollover 00:15...</span></div>", unsafe_allow_html=True)
-                                elif is_weekend_active():
-                                    c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🏖️ IN ATTESA WEEKEND ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Mercati chiusi...</span></div>", unsafe_allow_html=True)
-                                else:
-                                    c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(13,110,253,0.15); color: #0d6efd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🚀 AVVIO ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Esecuzione a mercato...</span></div>", unsafe_allow_html=True)
-                            else:
-                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span></div>", unsafe_allow_html=True)
-                        elif is_attivo and tipo_strat == "RANGE":
-                            c2.markdown("<span style='background-color: rgba(23, 162, 184, 0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
-                        else:
-                            if nome in STRUMENTI_ESCLUSIVI_HYPER:
-                                c2.markdown("<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ RISERVATO HYPER</span>", unsafe_allow_html=True)
-                            else:
-                                c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
-                            
-                        c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
-                        
-                        ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
-                        ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
-                        c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
-                        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-
-            renderizza_sintesi_trend()
-
-    if tab_operativa is not None:
-        with tab_operativa:
-
-            @st.fragment(run_every=15)
-            def renderizza_dati_live():
-                memoria_attuale = carica_memoria(conto_selezionato) 
-                stato = leggi_stato_sistema(conto_selezionato)
-                distanze_minime = stato.get("distanze_minime", {})
-                prezzi_live = stato.get("prezzi_live", {})
-                prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
-            
-                col_titolo_main, col_btn_restart = st.columns([5, 1])
-                with col_titolo_main:
-                    st.markdown("<h1 style='color: #FFD700; margin-top: -15px; white-space: nowrap;'>⚙️ Dashboard Trading Range</h1>", unsafe_allow_html=True)
-                with col_btn_restart:
-                    st.write("") 
-                    if st.button("🔄 RESTART VM", help="Elimina il token attuale e forza il rinnovo della sessione IG", width="stretch", key=f"RESTART_{conto_selezionato}"):
-                        path_token = os.path.join(conto_selezionato, FILE_TOKEN)
-                        if os.path.exists(path_token): os.remove(path_token) 
-                        st.rerun()
-
-                motore_attivo = False
-                path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
-                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
-
-                col_head1, col_head2 = st.columns([1.6, 2])
-                with col_head1:
-                    with st.container(border=True):
-                        st.markdown(f"**Stato Sistema:** {'🟢 Connesso' if motore_attivo else '🔴 Motore Offline'}")
-                        st.markdown(f"📶 **IG API:** {'OK' if motore_attivo else 'SCONNESSO'} &nbsp;&nbsp; | &nbsp;&nbsp; 📈 **Stream:** {'Live' if motore_attivo else 'FERMO'}")
-                        st.markdown(f"<div style='white-space: nowrap;'>🕒 <b>LAST:</b> {stato['ultimo_aggiornamento']} &nbsp;|&nbsp; ⏱️ <b>Sessione:</b> {stato['durata_sessione']}</div>", unsafe_allow_html=True)
-                        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                        if st.button("🔄 Aggiorna dati Dashboard", width="stretch", key=f"REFRESH_{conto_selezionato}"): st.rerun()
-
-                with col_head2:
-                    with st.container(border=True):
-                        c_bal1, c_bal2 = st.columns(2)
-                        c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
-                        c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
-                    
-                        st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-                    
-                        c_bal3, c_bal4 = st.columns(2)
-                        c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
-                    
-                        try:
-                            dd_num_op = float(stato.get('drawdown', '0'))
-                            dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
-                        except:
-                            dd_col_op = "white"
-                        
-                        c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
-                        st.caption(stato.get('messaggio', ''))
-
-                st.markdown("---")
-
-                def crea_riquadro_strumento(nome, tipo, tp_default, opp_default, dts_default, size_default=4):
-                    with st.container(border=True):
-                        dati_salvati = memoria_attuale.get(nome, {})
-                        tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
-                        stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
-                        stato_attivo = dati_salvati.get("attivo", False)
-                        direzione = dati_salvati.get("direzione", "")
-                        modalita_manuale = dati_salvati.get("modalita_manuale", False)
-                        is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
-                        is_sosp_rollover = dati_salvati.get("sospeso_rollover", False) and stato_attivo
-                        msg_weekend = dati_salvati.get("msg_weekend", "")
-                        msg_manuale = dati_salvati.get("msg_manuale", "")
-                        errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
-                        stato_corrente_disp = stato_corrente.replace("OverGain", "OG").replace("OverLoss", "OL")
-                    
-                        if not stato_attivo:
-                            has_custom = dati_salvati.get("custom_override", False)
-                            if has_custom and dati_salvati.get("tp") and dati_salvati.get("tp") >= 80:
-                                tp_val = dati_salvati.get("tp")
-                                opp_val = dati_salvati.get("opp", int(round(tp_val / 4.0)))
-                                dts_val = dati_salvati.get("dts", int(round(tp_val / 8.0)))
-                            else:
-                                tp_val = tp_default
-                                opp_val = opp_default
-                                dts_val = dts_default
-                        else:
-                            tp_val = dati_salvati.get("tp", tp_default)
-                            opp_val = dati_salvati.get("opp", opp_default)
-                            dts_val = dati_salvati.get("dts", dts_default)
-
-                        min_impostato = min(opp_val, dts_val, tp_val / 4)
-                        min_richiesto_ig = distanze_minime.get(nome, 0)
-                        is_distanza_pericolosa = min_richiesto_ig > 0 and min_impostato <= min_richiesto_ig
-
-                        col_titolo, col_salva, col_pulisci = st.columns([2.7, 0.9, 1.2], vertical_alignment="center")
-                        with col_titolo:
-                            badge = "🟢 <b>[ Auto ]</b>" if not modalita_manuale else "🟠 <b>[ Manuale ]</b>"
-                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
-                            st.markdown(titolo_html, unsafe_allow_html=True)
-                            prezzi_ba = prezzi_bid_ask.get(nome, {})
-                            bid_ask_str = f"Bid: <span style='color:#ff4b4b;'>{prezzi_ba.get('bid', '-')}</span> | Ask: <span style='color:#09ab3b;'>{prezzi_ba.get('ask', '-')}</span>" if prezzi_ba else "<span style='color: #666;'>In aggiornamento...</span>"
-                            st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
-                        
-                        with col_salva:
-                            if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help="Conferma e salva TP, OPP, DTS e Size", width="stretch"):
-                                memoria_attuale[nome] = {
-                                    **dati_salvati, 
-                                    "tp": st.session_state.get(f"{conto_selezionato}_{nome}_tp", tp_val), 
-                                    "opp": st.session_state.get(f"{conto_selezionato}_{nome}_opp", opp_val), 
-                                    "dts": st.session_state.get(f"{conto_selezionato}_{nome}_dts", dts_val), 
-                                    "size": st.session_state.get(f"{conto_selezionato}_{nome}_size", dati_salvati.get("size", size_default)),
-                                    "custom_override": True,
-                                    "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""
-                                }
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun() 
-                            
-                        with col_pulisci:
-                            if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help="Forza pulizia su IG e resetta a zero", width="stretch"):
-                                memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "custom_override": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                    
-                        if errore_avvio: st.error("🛑 **AVVIO BLOCCATO:** IG ha rifiutato la griglia.")
-                        elif errore_ripristino: st.error("🛑 **RIPRISTINO BLOCCATO:** 4 tentativi falliti. Passaggio in **MANUALE**.")
-                        elif is_distanza_pericolosa: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 15px;'>⚠️ <b>ATTENZIONE:</b> Stop Minimo IG: <b>{min_richiesto_ig} pt</b>. Impostato: <b>{min_impostato} pt</b>.</div>", unsafe_allow_html=True)
-                        else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
-                    
-                        candele_d1 = carica_candele_locali_dash(conto_selezionato, nome, "DAY")
-                        atr_d1_val = calcola_atr_da_candele_dash(candele_d1, periods=21)
-                        if atr_d1_val is not None:
-                            mult_r = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
-                            atr_d1_pips = int(round(atr_d1_val / mult_r))
-                            unita_r = "pt" if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "pip"
-                            st.markdown(f"<div style='font-size: 0.82rem; color: #888; margin-top: 1px; margin-bottom: 3px;'>📊 <span style='color: #FFA500; font-weight: 600;'>ATR(21) Live: {atr_d1_pips} {unita_r}</span> ➡️ <span style='color: #FFA500; font-weight: 600;'>TP Live: {tp_default}</span> (OPP: {opp_default} | DTS: {dts_default})</div>", unsafe_allow_html=True)
-
-                        margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
-                        if margine_u != "N/D":
-                            st.caption(f"🛡️ Margine (Size=1): **{margine_u}€**")
-
-                        if msg_weekend: st.error(f"🛑 {msg_weekend}")
-                        if msg_manuale: st.error(msg_manuale)
-                    
-                        alert_falso = dati_salvati.get("alert_falso_allarme")
-                        if alert_falso:
-                            st.error(f"🛑 **{alert_falso}**")
-                            if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}"):
-                                memoria_attuale[nome] = {**dati_salvati, "alert_falso_allarme": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                    
-                        c_in1, c_in2 = st.columns(2)
-                        with c_in1: tp = st.number_input("TP", value=int(tp_val), min_value=80, step=20, format="%d", key=f"{conto_selezionato}_{nome}_tp")
-                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_opp")
-                        
-                        c_in3, c_in4 = st.columns(2)
-                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_dts")
-                        with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
-                    
-                        if is_sospeso_wk:
-                            st.warning("🌴 **MACCHINA IN SOSPENSIONE WEEKEND.** Le funzioni generali sono bloccate per proteggere la memoria. Clicca Riprendi per sbloccare la console e piazzare i Satelliti.")
-                            if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                salva_memoria(conto_selezionato, memoria_attuale)
-                                st.rerun()
-                        elif modalita_manuale:
-                            st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
-                            col_m1, col_m2 = st.columns(2, vertical_alignment="center")
-                            with col_m1:
-                                if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": "", "sospeso_weekend": False}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                            with col_m2:
-                                if st.button("🔄 Restart Fase 1", key=f"RES_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                        elif tipo_strategia == "TREND" and stato_attivo:
-                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**.")
-                        elif not stato_attivo:
-                            msg_err = dati_salvati.get("msg_manuale") or ("Errore avvio" if dati_salvati.get("errore_avvio") else ("Errore ripristino" if dati_salvati.get("errore_ripristino") else ""))
-                            if msg_err:
-                                st.error(f"🛑 **Allarme/Sospensione Rilevata:** {msg_err}")
-                                if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False, "errore_ripristino": False, "alert_falso_allarme": False}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                            is_roll_r = is_rollover_active()
-                            is_wkd_r = is_weekend_active()
-
-                            is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
-                            if is_hyper_exclusive:
-                                st.warning("⚡ **Operatività Range sospesa:** strumento riservato ad HYPER.")
-                            elif is_roll_r:
-                                st.warning("🌙 Avvio disabilitato fino alle 00:15.")
-                            elif is_wkd_r:
-                                st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
-
-                            dis_btn_range = is_hyper_exclusive or is_roll_r or is_wkd_r
-                            help_range = "Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None))
-
-                            col_l, col_s = st.columns(2)
-                            with col_l:
-                                if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
-                                    if is_roll_r:
-                                        st.error("🛑 Avvio disabilitato fino alle 00:15.")
-                                        st.rerun()
-                                    if is_wkd_r:
-                                        st.error("🛑 Avvio disabilitato durante il Weekend.")
-                                        st.rerun()
-                                    memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                            with col_s:
-                                if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
-                                    if is_roll_r:
-                                        st.error("🛑 Avvio disabilitato fino alle 00:15.")
-                                        st.rerun()
-                                    if is_wkd_r:
-                                        st.error("🛑 Avvio disabilitato durante il Weekend.")
-                                        st.rerun()
-                                    memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                            if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=dis_btn_range, help=help_range):
-                                st.session_state[f"sync_open_{nome}"] = True
-                                st.rerun()
-                            
-                            if st.session_state.get(f"sync_open_{nome}", False):
-                                dialog_sync_start(conto_selezionato, nome)
-                        else:
-                            c_stop, c_man, c_wk, c_sync = st.columns([1.7, 2.3, 2.3, 1.7], vertical_alignment="center")
-                            with c_stop:
-                                if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help="Chiude tutto e resetta a zero", width="stretch"):
-                                    pl = prezzi_live.get(nome, "")
-                                    vecchio_wip = dati_salvati.get("storico_wip", [])
-                                    vecchio_wip.append(f"[{now_it().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
-                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                            with c_man:
-                                if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch"):
-                                    memoria_attuale[nome] = {**dati_salvati, "comando_manuale": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.rerun()
-                            with c_wk:
-                                if "FASE_2" in stato_corrente:
-                                    if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
-                                        memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
-                                        salva_memoria(conto_selezionato, memoria_attuale)
-                                        st.rerun()
-                                elif is_sosp_rollover:
-                                    st.warning("🌙 ROLLOVER")
-                                else:
-                                    st.success("✔️ OK")
-                            with c_sync:
-                                if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch"):
-                                    dialog_sync(conto_selezionato, nome)
-
-                        if not modalita_manuale:
-                            if stato_attivo:
-                                if is_sospeso_wk: st.warning(f"🌴 IN PAUSA WEEKEND ({direzione}) | In attesa di ripresa")
-                                elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:15")
-                                elif stato_corrente == "FASE_2_STANDBY": st.markdown("<div style='background-color: #FFD700; color: #000000; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 1rem;'>⏳ IN ATTESA DI RIENTRO | Motore in Stand-By</div>", unsafe_allow_html=True)
-                                else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
-                            else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
-
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
-                for i in range(0, len(tutti_strumenti), 2):
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        def_r1 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i])
-                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r1, 4)
-                    with c2:
-                        if i + 1 < len(tutti_strumenti):
-                            def_r2 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i+1])
-                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r2, 4)
-
-            renderizza_dati_live()
-
     if tab_trend is not None:
         with tab_trend:
             @st.fragment(run_every=15)
@@ -3999,7 +3341,673 @@ else:
                         if i + 1 < len(tutti_strumenti):
                             crea_riquadro_trend(tutti_strumenti[i+1])
 
-            renderizza_dati_trend()
+
+        @st.fragment(run_every=15)
+        def renderizza_sintesi_trend():
+            memoria = carica_memoria(conto_selezionato)
+            stato_sys = leggi_stato_sistema(conto_selezionato)
+            prezzi_live = stato_sys.get("prezzi_live", {})
+            
+            tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+            strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
+            
+            st.html("""
+            <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
+                <div><h3 style='margin: 0; font-size: 1.6rem;'>📈 Sintesi Tnd</h3></div>
+            </div>
+            """)
+            
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
+                c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento</div>", unsafe_allow_html=True)
+                c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Stato Trend</div>", unsafe_allow_html=True)
+                c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>LIVE</div>", unsafe_allow_html=True)
+                c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
+                
+                for nome in strumenti_ordinati:
+                    dati = memoria.get(nome, {})
+                    stato = dati.get("stato", "FLAT")
+                    is_attivo = dati.get("attivo", False)
+                    dir_t = dati.get("direzione", "")
+                    tf = dati.get("timeframe", "HOUR")
+                    sz = dati.get("size", 1)
+                    storico = dati.get("storico_wip_trend", [])
+                    prezzo = prezzi_live.get(nome, "In aggiornamento...")
+                    
+                    posizioni_core = dati.get("posizioni_core", [])
+                    posizioni_incr = dati.get("posizioni_incr", [])
+                    
+                    core_count = len(posizioni_core)
+                    core_entry = posizioni_core[0].get("entry", 0) if core_count > 0 else 0
+                    
+                    incr_count = len(posizioni_incr)
+                    incr_avg = sum(p.get("entry", 0) for p in posizioni_incr) / incr_count if incr_count > 0 else 0
+                    
+                    tipo_strat = dati.get("tipo_strategia", "RANGE")
+                    
+                    # Colore e stile del pulsante Strumento WIP
+                    if is_attivo and tipo_strat == "TREND":
+                        if dir_t == "LONG":
+                            bg_color_t = "#198754" # Verde
+                        elif dir_t == "SHORT":
+                            bg_color_t = "#dc3545" # Rosso
+                        else:
+                            bg_color_t = "#00BFFF" # Azzurro
+                        text_color_t = "white"
+                    elif is_attivo and tipo_strat == "RANGE":
+                        bg_color_t = "#17a2b8"
+                        text_color_t = "white"
+                    else:
+                        bg_color_t = "#495057"
+                        text_color_t = "white"
+                        
+                    totale_wip_t = 0.0
+                    if storico:
+                        for riga in storico:
+                            match = re.search(r"\[PnL:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
+                            if match:
+                                totale_wip_t += float(match.group(1).replace(",", "."))
+                    
+                    segno_t = "+" if totale_wip_t > 0 else ""
+                    col_tot_t = "#4ade80" if totale_wip_t > 0 else ("#ff6b6b" if totale_wip_t < 0 else "#aaa")
+                    valore_tot_t_str = f"{segno_t}{totale_wip_t:.0f} €"
+                    
+                    # Calcolo PnL Live Core + Incrementi (derivante da Pfoglio)
+                    c_conf = CONFIG_STRUMENTI.get(nome, {})
+                    c_mult = c_conf.get("moltiplicatore", 1)
+                    c_valore_punto = c_conf.get("valore_punto", 1)
+                    c_valuta = c_conf.get("valuta", "USD")
+                    c_rate = get_eur_rate(c_valuta, prezzi_live)
+                    c_epic = c_conf.get("epic")
+                    
+                    pnl_live_trend = 0.0
+                    has_live_pos = False
+                    
+                    pos_live_all = st.session_state.get("live_pos_data", [])
+                    if pos_live_all and c_epic:
+                        for p in pos_live_all:
+                            if p.get('market', {}).get('epic') == c_epic:
+                                sz_p = float(p.get('position', {}).get('size', 0))
+                                lvl_p = float(p.get('position', {}).get('level', 0))
+                                dir_p = p.get('position', {}).get('direction')
+                                if isinstance(prezzo, (int, float)):
+                                    pts = (prezzo - lvl_p)/c_mult if dir_p == 'BUY' else (lvl_p - prezzo)/c_mult
+                                    pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
+                                    has_live_pos = True
+                                    
+                    if not has_live_pos and isinstance(prezzo, (int, float)):
+                        for cp in posizioni_core:
+                            sz_p = float(cp.get("size", 0))
+                            lvl_p = float(cp.get("entry", 0))
+                            dir_p = cp.get("direction", dir_t)
+                            pts = (prezzo - lvl_p)/c_mult if dir_p == 'LONG' else (lvl_p - prezzo)/c_mult
+                            pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
+                            has_live_pos = True
+                        for ip in posizioni_incr:
+                            sz_p = float(ip.get("size", 0))
+                            lvl_p = float(ip.get("entry", 0))
+                            dir_p = ip.get("direction", dir_t)
+                            pts = (prezzo - lvl_p)/c_mult if dir_p == 'LONG' else (lvl_p - prezzo)/c_mult
+                            pnl_live_trend += (pts * sz_p * c_valore_punto * c_rate)
+                            has_live_pos = True
+                            
+                    if has_live_pos:
+                        segno_live = "+" if pnl_live_trend > 0 else ""
+                        # Verde erba (#00E676) o Rosso salmone (#FA8072)
+                        col_live = "#00E676" if pnl_live_trend >= 0 else "#FA8072"
+                        valore_live_str = f"{segno_live}{pnl_live_trend:.0f} €"
+                    else:
+                        col_live = "#888888"
+                        valore_live_str = "0 €"
+                    
+                    html_tot_wip_t = f"""<div style='font-size: 0.70rem; color: #bbb; margin-top: 0px; margin-bottom: 3px; padding-left: 2px; line-height: 1.15; white-space: nowrap;'>
+<div>Live: <b style='color: {col_live};'>{valore_live_str}</b></div>
+<div>Totale: <b style='color: {col_tot_t};'>{valore_tot_t_str}</b></div>
+</div>"""
+
+                    marker_class_t = f"btn-trend-{nome.replace('/', '').replace(' ', '')}"
+                    css_marker_t = f"""<style>
+                    div[data-testid="stHorizontalBlock"]:has(.{marker_class_t}) {{
+                        margin-bottom: -15px !important;
+                    }}
+                    div[data-testid="stColumn"]:has(.{marker_class_t}) {{
+                        margin-top: -22px !important;
+                    }}
+                    div[data-testid="stColumn"]:has(.{marker_class_t}) div[data-testid="stButton"] > button {{
+                        background-color: {bg_color_t} !important; border-color: {bg_color_t} !important; color: {text_color_t} !important;
+                    }}
+                    </style>"""
+
+                    c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
+                    with c1:
+                        st.markdown(f"<span class='{marker_class_t}'></span>{css_marker_t}", unsafe_allow_html=True)
+                        st.markdown(html_tot_wip_t, unsafe_allow_html=True)
+                        if st.button(nome, key=f"wip_trend_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
+                            mostra_diario_wip_trend(nome, storico, conto=conto_selezionato)
+                    
+                    if is_attivo and tipo_strat == "TREND":
+                        tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                        tf_display = tf_map.get(tf, tf)
+                        if dir_t in ("LONG", "SHORT") and core_count > 0:
+                            color = "#198754" if dir_t == "LONG" else "#dc3545"
+                            bg_c = "rgba(40,167,69,0.15)" if dir_t == "LONG" else "rgba(220,53,69,0.15)"
+                            dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
+                            core_sz_val = posizioni_core[0].get("size", sz) if core_count > 0 else sz
+                            str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}"
+                            str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
+                            c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
+                        elif dati.get("needs_manual_start", False):
+                            if is_rollover_active():
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🌙 IN ATTESA ROLLOVER ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Attesa fine Rollover 00:15...</span></div>", unsafe_allow_html=True)
+                            elif is_weekend_active():
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🏖️ IN ATTESA WEEKEND ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Mercati chiusi...</span></div>", unsafe_allow_html=True)
+                            else:
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(13,110,253,0.15); color: #0d6efd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🚀 AVVIO ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Esecuzione a mercato...</span></div>", unsafe_allow_html=True)
+                        else:
+                            c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,193,7,0.15); color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⏳ FLAT ({tf_display})</span></div>", unsafe_allow_html=True)
+                    elif is_attivo and tipo_strat == "RANGE":
+                        c2.markdown("<span style='background-color: rgba(23, 162, 184, 0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
+                    else:
+                        if nome in STRUMENTI_ESCLUSIVI_HYPER:
+                            c2.markdown("<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ RISERVATO HYPER</span>", unsafe_allow_html=True)
+                        else:
+                            c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
+                        
+                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
+                    
+                    ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
+                    ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
+                    c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+
+
+            sub_tnd_op, sub_tnd_sin = st.tabs(["⚡ Operatività", "📋 Sintesi"])
+            with sub_tnd_op:
+                renderizza_dati_trend()
+            with sub_tnd_sin:
+                renderizza_sintesi_trend()
+
+    if tab_operativa is not None:
+        with tab_operativa:
+
+            @st.fragment(run_every=15)
+            def renderizza_dati_live():
+                memoria_attuale = carica_memoria(conto_selezionato) 
+                stato = leggi_stato_sistema(conto_selezionato)
+                distanze_minime = stato.get("distanze_minime", {})
+                prezzi_live = stato.get("prezzi_live", {})
+                prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
+            
+                col_titolo_main, col_btn_restart = st.columns([5, 1])
+                with col_titolo_main:
+                    st.markdown("<h1 style='color: #FFD700; margin-top: -15px; white-space: nowrap;'>⚙️ Dashboard Trading Range</h1>", unsafe_allow_html=True)
+                with col_btn_restart:
+                    st.write("") 
+                    if st.button("🔄 RESTART VM", help="Elimina il token attuale e forza il rinnovo della sessione IG", width="stretch", key=f"RESTART_{conto_selezionato}"):
+                        path_token = os.path.join(conto_selezionato, FILE_TOKEN)
+                        if os.path.exists(path_token): os.remove(path_token) 
+                        st.rerun()
+
+                motore_attivo = False
+                path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
+                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
+
+                col_head1, col_head2 = st.columns([1.6, 2])
+                with col_head1:
+                    with st.container(border=True):
+                        st.markdown(f"**Stato Sistema:** {'🟢 Connesso' if motore_attivo else '🔴 Motore Offline'}")
+                        st.markdown(f"📶 **IG API:** {'OK' if motore_attivo else 'SCONNESSO'} &nbsp;&nbsp; | &nbsp;&nbsp; 📈 **Stream:** {'Live' if motore_attivo else 'FERMO'}")
+                        st.markdown(f"<div style='white-space: nowrap;'>🕒 <b>LAST:</b> {stato['ultimo_aggiornamento']} &nbsp;|&nbsp; ⏱️ <b>Sessione:</b> {stato['durata_sessione']}</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+                        if st.button("🔄 Aggiorna dati Dashboard", width="stretch", key=f"REFRESH_{conto_selezionato}"): st.rerun()
+
+                with col_head2:
+                    with st.container(border=True):
+                        c_bal1, c_bal2 = st.columns(2)
+                        c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
+                        c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
+                    
+                        st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+                    
+                        c_bal3, c_bal4 = st.columns(2)
+                        c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
+                    
+                        try:
+                            dd_num_op = float(stato.get('drawdown', '0'))
+                            dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
+                        except:
+                            dd_col_op = "white"
+                        
+                        c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
+                        st.caption(stato.get('messaggio', ''))
+
+                st.markdown("---")
+
+                def crea_riquadro_strumento(nome, tipo, tp_default, opp_default, dts_default, size_default=4):
+                    with st.container(border=True):
+                        dati_salvati = memoria_attuale.get(nome, {})
+                        tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
+                        stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
+                        stato_attivo = dati_salvati.get("attivo", False)
+                        direzione = dati_salvati.get("direzione", "")
+                        modalita_manuale = dati_salvati.get("modalita_manuale", False)
+                        is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
+                        is_sosp_rollover = dati_salvati.get("sospeso_rollover", False) and stato_attivo
+                        msg_weekend = dati_salvati.get("msg_weekend", "")
+                        msg_manuale = dati_salvati.get("msg_manuale", "")
+                        errore_avvio, errore_ripristino = dati_salvati.get("errore_avvio", False), dati_salvati.get("errore_ripristino", False)
+                        stato_corrente_disp = stato_corrente.replace("OverGain", "OG").replace("OverLoss", "OL")
+                    
+                        if not stato_attivo:
+                            has_custom = dati_salvati.get("custom_override", False)
+                            if has_custom and dati_salvati.get("tp") and dati_salvati.get("tp") >= 80:
+                                tp_val = dati_salvati.get("tp")
+                                opp_val = dati_salvati.get("opp", int(round(tp_val / 4.0)))
+                                dts_val = dati_salvati.get("dts", int(round(tp_val / 8.0)))
+                            else:
+                                tp_val = tp_default
+                                opp_val = opp_default
+                                dts_val = dts_default
+                        else:
+                            tp_val = dati_salvati.get("tp", tp_default)
+                            opp_val = dati_salvati.get("opp", opp_default)
+                            dts_val = dati_salvati.get("dts", dts_default)
+
+                        min_impostato = min(opp_val, dts_val, tp_val / 4)
+                        min_richiesto_ig = distanze_minime.get(nome, 0)
+                        is_distanza_pericolosa = min_richiesto_ig > 0 and min_impostato <= min_richiesto_ig
+
+                        col_titolo, col_salva, col_pulisci = st.columns([2.7, 0.9, 1.2], vertical_alignment="center")
+                        with col_titolo:
+                            badge = "🟢 <b>[ Auto ]</b>" if not modalita_manuale else "🟠 <b>[ Manuale ]</b>"
+                            titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge)
+                            st.markdown(titolo_html, unsafe_allow_html=True)
+                            prezzi_ba = prezzi_bid_ask.get(nome, {})
+                            bid_ask_str = f"Bid: <span style='color:#ff4b4b;'>{prezzi_ba.get('bid', '-')}</span> | Ask: <span style='color:#09ab3b;'>{prezzi_ba.get('ask', '-')}</span>" if prezzi_ba else "<span style='color: #666;'>In aggiornamento...</span>"
+                            st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
+                        
+                        with col_salva:
+                            if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help="Conferma e salva TP, OPP, DTS e Size", width="stretch"):
+                                memoria_attuale[nome] = {
+                                    **dati_salvati, 
+                                    "tp": st.session_state.get(f"{conto_selezionato}_{nome}_tp", tp_val), 
+                                    "opp": st.session_state.get(f"{conto_selezionato}_{nome}_opp", opp_val), 
+                                    "dts": st.session_state.get(f"{conto_selezionato}_{nome}_dts", dts_val), 
+                                    "size": st.session_state.get(f"{conto_selezionato}_{nome}_size", dati_salvati.get("size", size_default)),
+                                    "custom_override": True,
+                                    "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""
+                                }
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun() 
+                            
+                        with col_pulisci:
+                            if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help="Forza pulizia su IG e resetta a zero", width="stretch"):
+                                memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "custom_override": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
+                    
+                        if errore_avvio: st.error("🛑 **AVVIO BLOCCATO:** IG ha rifiutato la griglia.")
+                        elif errore_ripristino: st.error("🛑 **RIPRISTINO BLOCCATO:** 4 tentativi falliti. Passaggio in **MANUALE**.")
+                        elif is_distanza_pericolosa: st.markdown(f"<div style='background-color: rgba(239, 68, 68, 0.15); border-left: 3px solid #ef4444; padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; color: #fca5a5; margin-bottom: 15px;'>⚠️ <b>ATTENZIONE:</b> Stop Minimo IG: <b>{min_richiesto_ig} pt</b>. Impostato: <b>{min_impostato} pt</b>.</div>", unsafe_allow_html=True)
+                        else: st.caption(f"📏 Distanza richiesta da IG: **{min_richiesto_ig} pt** | Minimo Griglia: **{min_impostato} pt**")
+                    
+                        candele_d1 = carica_candele_locali_dash(conto_selezionato, nome, "DAY")
+                        atr_d1_val = calcola_atr_da_candele_dash(candele_d1, periods=21)
+                        if atr_d1_val is not None:
+                            mult_r = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                            atr_d1_pips = int(round(atr_d1_val / mult_r))
+                            unita_r = "pt" if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "pip"
+                            st.markdown(f"<div style='font-size: 0.82rem; color: #888; margin-top: 1px; margin-bottom: 3px;'>📊 <span style='color: #FFA500; font-weight: 600;'>ATR(21) Live: {atr_d1_pips} {unita_r}</span> ➡️ <span style='color: #FFA500; font-weight: 600;'>TP Live: {tp_default}</span> (OPP: {opp_default} | DTS: {dts_default})</div>", unsafe_allow_html=True)
+
+                        margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
+                        if margine_u != "N/D":
+                            st.caption(f"🛡️ Margine (Size=1): **{margine_u}€**")
+
+                        if msg_weekend: st.error(f"🛑 {msg_weekend}")
+                        if msg_manuale: st.error(msg_manuale)
+                    
+                        alert_falso = dati_salvati.get("alert_falso_allarme")
+                        if alert_falso:
+                            st.error(f"🛑 **{alert_falso}**")
+                            if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}"):
+                                memoria_attuale[nome] = {**dati_salvati, "alert_falso_allarme": ""}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
+                    
+                        c_in1, c_in2 = st.columns(2)
+                        with c_in1: tp = st.number_input("TP", value=int(tp_val), min_value=80, step=20, format="%d", key=f"{conto_selezionato}_{nome}_tp")
+                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_opp")
+                        
+                        c_in3, c_in4 = st.columns(2)
+                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_dts")
+                        with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
+                    
+                        if is_sospeso_wk:
+                            st.warning("🌴 **MACCHINA IN SOSPENSIONE WEEKEND.** Le funzioni generali sono bloccate per proteggere la memoria. Clicca Riprendi per sbloccare la console e piazzare i Satelliti.")
+                            if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                                memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                salva_memoria(conto_selezionato, memoria_attuale)
+                                st.rerun()
+                        elif modalita_manuale:
+                            st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
+                            col_m1, col_m2 = st.columns(2, vertical_alignment="center")
+                            with col_m1:
+                                if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": "", "sospeso_weekend": False}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with col_m2:
+                                if st.button("🔄 Restart Fase 1", key=f"RES_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                        elif tipo_strategia == "TREND" and stato_attivo:
+                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**.")
+                        elif not stato_attivo:
+                            msg_err = dati_salvati.get("msg_manuale") or ("Errore avvio" if dati_salvati.get("errore_avvio") else ("Errore ripristino" if dati_salvati.get("errore_ripristino") else ""))
+                            if msg_err:
+                                st.error(f"🛑 **Allarme/Sospensione Rilevata:** {msg_err}")
+                                if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False, "errore_ripristino": False, "alert_falso_allarme": False}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            is_roll_r = is_rollover_active()
+                            is_wkd_r = is_weekend_active()
+
+                            is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
+                            if is_hyper_exclusive:
+                                st.warning("⚡ **Operatività Range sospesa:** strumento riservato ad HYPER.")
+                            elif is_roll_r:
+                                st.warning("🌙 Avvio disabilitato fino alle 00:15.")
+                            elif is_wkd_r:
+                                st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
+
+                            dis_btn_range = is_hyper_exclusive or is_roll_r or is_wkd_r
+                            help_range = "Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None))
+
+                            col_l, col_s = st.columns(2)
+                            with col_l:
+                                if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
+                                    if is_roll_r:
+                                        st.error("🛑 Avvio disabilitato fino alle 00:15.")
+                                        st.rerun()
+                                    if is_wkd_r:
+                                        st.error("🛑 Avvio disabilitato durante il Weekend.")
+                                        st.rerun()
+                                    memoria_attuale[nome] = {"attivo": True, "direzione": "LONG", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with col_s:
+                                if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
+                                    if is_roll_r:
+                                        st.error("🛑 Avvio disabilitato fino alle 00:15.")
+                                        st.rerun()
+                                    if is_wkd_r:
+                                        st.error("🛑 Avvio disabilitato durante il Weekend.")
+                                        st.rerun()
+                                    memoria_attuale[nome] = {"attivo": True, "direzione": "SHORT", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "storico_wip": [], "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=dis_btn_range, help=help_range):
+                                st.session_state[f"sync_open_{nome}"] = True
+                                st.rerun()
+                            
+                            if st.session_state.get(f"sync_open_{nome}", False):
+                                dialog_sync_start(conto_selezionato, nome)
+                        else:
+                            c_stop, c_man, c_wk, c_sync = st.columns([1.7, 2.3, 2.3, 1.7], vertical_alignment="center")
+                            with c_stop:
+                                if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help="Chiude tutto e resetta a zero", width="stretch"):
+                                    pl = prezzi_live.get(nome, "")
+                                    vecchio_wip = dati_salvati.get("storico_wip", [])
+                                    vecchio_wip.append(f"[{now_it().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
+                                    memoria_attuale[nome] = {**dati_salvati, "attivo": False, "direzione": "", "stato": "IN_ATTESA", "kill_switch": True, "sospeso_weekend": False, "tp": tp, "opp": opp, "dts": dts, "size": size, "storico_wip": vecchio_wip, "errore_avvio": False, "errore_ripristino": False, "comando_manuale": False, "msg_manuale": "", "tipo_strategia": "RANGE"}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with c_man:
+                                if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {**dati_salvati, "comando_manuale": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.rerun()
+                            with c_wk:
+                                if "FASE_2" in stato_corrente:
+                                    if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                                        memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
+                                        salva_memoria(conto_selezionato, memoria_attuale)
+                                        st.rerun()
+                                elif is_sosp_rollover:
+                                    st.warning("🌙 ROLLOVER")
+                                else:
+                                    st.success("✔️ OK")
+                            with c_sync:
+                                if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch"):
+                                    dialog_sync(conto_selezionato, nome)
+
+                        if not modalita_manuale:
+                            if stato_attivo:
+                                if is_sospeso_wk: st.warning(f"🌴 IN PAUSA WEEKEND ({direzione}) | In attesa di ripresa")
+                                elif is_sosp_rollover: st.warning(f"🌙 IN PAUSA ROLLOVER ({direzione}) | In attesa delle 00:15")
+                                elif stato_corrente == "FASE_2_STANDBY": st.markdown("<div style='background-color: #FFD700; color: #000000; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 1rem;'>⏳ IN ATTESA DI RIENTRO | Motore in Stand-By</div>", unsafe_allow_html=True)
+                                else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
+                            else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
+
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                for i in range(0, len(tutti_strumenti), 2):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        def_r1 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i])
+                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r1, 4)
+                    with c2:
+                        if i + 1 < len(tutti_strumenti):
+                            def_r2 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i+1])
+                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r2, 4)
+
+
+        @st.fragment(run_every=15)
+        def renderizza_sintesi():
+            memoria = carica_memoria(conto_selezionato)
+            stato_sys = leggi_stato_sistema(conto_selezionato)
+            prezzi_live = stato_sys.get("prezzi_live", {})
+            
+            motore_attivo = False
+            path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
+            if os.path.exists(path_stato):
+                if (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
+            
+            badge_motore = "🟢 Connesso" if motore_attivo else "🔴 Offline"
+            saldo_val = formatta_eur(stato_sys.get('saldo', '0'))
+            dd_val = formatta_eur(stato_sys.get('drawdown', '0'))
+            
+            try:
+                color_dd = "#ff4b4b" if float(stato_sys.get('drawdown', '0')) < 0 else ("#09ab3b" if float(stato_sys.get('drawdown', '0')) > 0 else "inherit")
+            except: color_dd = "inherit"
+
+            ultima_operazione_testo = ""
+            path_storico = os.path.join(conto_selezionato, "storico_operazioni.csv")
+            try:
+                if os.path.exists(path_storico):
+                    with open(path_storico, "r", encoding="utf-8") as f:
+                        last_line = None
+                        for riga in f:
+                            if riga.strip(): last_line = riga
+                        if last_line and not last_line.startswith("Data,"):
+                            parti = last_line.strip().split(",")
+                            if len(parti) >= 4:
+                                dt, strum, fase, pnl = parti[0], parti[1], parti[2], float(parti[3])
+                                try:
+                                    dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                                    dt_fmt = dt_obj.strftime("%d/%m %H:%M")
+                                except:
+                                    dt_fmt = dt
+                                segno = "+" if pnl > 0 else ""
+                                col_pnl = "#09ab3b" if pnl > 0 else "#ff4b4b"
+                                ultima_operazione_testo = f"<div style='font-size: 1rem; color: #FFD700; margin-top: 5px; font-weight: 500;'>⏱️ Ultima Op: <b>{strum}</b> - {fase} ({dt_fmt}) | <span style='color:{col_pnl}; font-weight:bold;'>{segno}{pnl:.0f} €</span></div>"
+            except Exception:
+                pass
+
+            st.html(f"""
+            <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
+                <div>
+                    <h3 style='margin: 0; font-size: 1.6rem;'>📋 Sintesi Trading Range</h3>
+                    {ultima_operazione_testo}
+                </div>
+                <div style='font-size: 1.05rem; font-weight: 500; display: flex; gap: 20px; align-items: center;'>
+                    <span><span style='color: #888;'>Saldo:</span> {saldo_val} €</span>
+                    <span><span style='color: #888;'>P/L:</span> <span style='color: {color_dd};'>{dd_val} €</span></span>
+                </div>
+            </div>
+            """)
+            
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2])
+                c1.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Strumento (WIP)</div>", unsafe_allow_html=True)
+                c2.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Fase Attuale</div>", unsafe_allow_html=True)
+                c3.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>LIVE</div>", unsafe_allow_html=True)
+                c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
+                
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
+                
+                for nome in strumenti_ordinati:
+                    dati = memoria.get(nome, {})
+                    stato = dati.get("stato", "IN_ATTESA")
+                    is_attivo = dati.get("attivo", False)
+                    tipo_strategia = dati.get("tipo_strategia", "RANGE")
+                    storico = dati.get("storico_wip", [])
+                    prezzo = prezzi_live.get(nome, "In aggiornamento...")
+                    spia = ""
+                    stato_display = stato.replace("OverGain", "OG").replace("OverLoss", "OL")
+                    
+                    if is_attivo and isinstance(prezzo, (int, float)):
+                        mult = 1 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude", "Ethereum"] else (0.01 if "JPY" in nome else 0.0001)
+                        if stato == "FASE_1 + Micro":
+                            dir_core = dati.get("direzione")
+                            base = dati.get("prezzo_base")
+                            tp = dati.get("tp", 50)
+                            if dir_core and base is not None:
+                                stato_display = f"FASE_1 + Micro ({'SHORT' if dir_core == 'LONG' else 'LONG'})"
+                                spia = " 🟢" if (prezzo < base + (tp/4)*mult if dir_core == 'LONG' else prezzo > base - (tp/4)*mult) else " 🔴"
+                        elif stato == "FASE_2_TICKET1":
+                            t_dir, t_entry = dati.get("ticket1_dir"), dati.get("ticket1_entry", dati.get("ticket1_base")) 
+                            if t_dir and t_entry is not None:
+                                spia = " 🟢" if (prezzo > t_entry if t_dir == "BUY" else prezzo < t_entry) else " 🔴"
+                        elif stato in ["FASE_2_SATELLITE_OG", "FASE_2_SATELLITE_OL"]:
+                            s_dir, s_base = dati.get("sat_dir"), dati.get("sat_price")
+                            if s_dir and s_base is not None:
+                                spia = " 🟢" if (prezzo > s_base if s_dir == "BUY" else prezzo < s_base) else " 🔴"
+                        elif stato == "FASE_3 + Ultima":
+                            f3_dir, f3_base = dati.get("fase3_dir"), dati.get("fase3_current_base")
+                            if f3_dir and f3_base is not None:
+                                spia = " 🟢" if (prezzo < f3_base + (dati.get("tp", 50)/4)*mult if f3_dir == "BUY" else prezzo > f3_base - (dati.get("tp", 50)/4)*mult) else " 🔴"
+                        elif stato == "FASE_2_SATELLITI":
+                            pos_live = st.session_state.get("live_pos_data", [])
+                            c = CONFIG_STRUMENTI.get(nome, {})
+                            if c and c.get("epic"):
+                                s_core = float(dati.get("size", 4))
+                                s_mezzo = max(1.0, s_core / 2)
+                                t_epic = c.get("epic")
+                                for p in pos_live:
+                                    if p['market']['epic'] == t_epic and float(p['position']['size']) == s_mezzo:
+                                        p_dir = p['position']['direction']
+                                        p_level = float(p['position']['level'])
+                                        spia = " 🟢" if (prezzo > p_level if p_dir == "BUY" else prezzo < p_level) else " 🔴"
+                                        break
+                    
+                    if dati.get("ticket2_active"):
+                        stato_display += " [+ Ticket2]"
+
+                    if is_attivo:
+                        if tipo_strategia == "TREND":
+                            stato_visivo = f"<span style='background-color: rgba(0, 191, 255, 0.15); color: #00BFFF; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>📈 IN TREND</span>"
+                        else:
+                            stato_visivo = f"<span style='background-color: rgba(40, 167, 69, 0.15); color: #09ab3b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ ATTIVA ({stato_display}{spia})</span>"
+                            if stato == "FASE_2_STANDBY":
+                                stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
+                    else:
+                        if nome in STRUMENTI_ESCLUSIVI_HYPER:
+                            stato_visivo = f"<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ RISERVATO HYPER</span>"
+                        elif stato == "MANUALE":
+                            stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚠️ MANUALE</span>"
+                        else:
+                            stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏸️ IN ATTESA</span>"
+                    
+                    has_anomalia = bool(dati.get("alert_falso_allarme") or dati.get("errore_avvio") or dati.get("errore_ripristino") or dati.get("msg_manuale"))
+                    
+                    if has_anomalia:
+                        bg_color = "#FFC107" # Giallo
+                        text_color = "black"
+                    elif is_attivo and tipo_strategia == "RANGE":
+                        bg_color = "#198754" # Verde
+                        text_color = "white"
+                    elif is_attivo and tipo_strategia == "TREND":
+                        bg_color = "#00BFFF" # Azzurro
+                        text_color = "white"
+                    else:
+                        bg_color = "#495057" # Grigio scuro
+                        text_color = "white"
+                        
+                    if not is_attivo or stato == "IN_ATTESA":
+                        html_tot_wip = "<div style='font-size: 0.71rem; color: #888; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: #888;'>WIP</b></div>"
+                    else:
+                        totale_wip = 0.0
+                        if storico:
+                            for riga in storico:
+                                match = re.search(r"\[Parziale:\s*([+-]?\d+(?:[\.,]\d+)?)\s*€\]", riga)
+                                if match:
+                                    totale_wip += float(match.group(1).replace(",", "."))
+                        
+                        segno_wip = "+" if totale_wip > 0 else ""
+                        col_tot_wip = "#4ade80" if totale_wip > 0 else ("#ff6b6b" if totale_wip < 0 else "#aaa")
+                        valore_tot_str = f"{segno_wip}{totale_wip:.2f} €".replace(".", ",")
+                        html_tot_wip = f"<div style='font-size: 0.71rem; color: #bbb; margin-top: 0px; margin-bottom: -10px; padding-left: 2px; line-height: 1.1; white-space: nowrap;'>Totale: <b style='color: {col_tot_wip};'>{valore_tot_str}</b></div>"
+
+                    marker_class = f"btn-marker-{nome.replace('/', '').replace(' ', '')}"
+                    css_marker = f"""<style>
+                    div[data-testid="stHorizontalBlock"]:has(.{marker_class}) {{
+                        margin-bottom: -15px !important;
+                    }}
+                    div[data-testid="stColumn"]:has(.{marker_class}) div[data-testid="stButton"] > button {{
+                        background-color: {bg_color} !important; border-color: {bg_color} !important; color: {text_color} !important;
+                    }}
+                    </style>"""
+                    
+                    c1, c2, c3, c4 = st.columns([1.5, 3.5, 1.8, 3.2], vertical_alignment="center")
+                    with c1:
+                        st.markdown(f"<span class='{marker_class}'></span>{css_marker}", unsafe_allow_html=True)
+                        st.markdown(html_tot_wip, unsafe_allow_html=True)
+                        if st.button(nome, key=f"wip_{conto_selezionato}_{nome}", type="primary", use_container_width=True):
+                            mostra_diario_wip(nome, storico, conto=conto_selezionato)
+                    
+                    c2.markdown(f"<div style='height: 32px; display: flex; align-items: center;'>{stato_visivo}</div>", unsafe_allow_html=True)
+                    
+                    if has_anomalia:
+                        btn_label = "🚨 Visto Emergenza" if (dati.get("errore_avvio") or dati.get("errore_ripristino") or (dati.get("msg_manuale") and ("Fallit" in str(dati.get("msg_manuale")) or "Emergenza" in str(dati.get("msg_manuale")) or "Rifiuto" in str(dati.get("msg_manuale"))))) else "👁️ Visto Anomalia"
+                        if c2.button(btn_label, key=f"ack_all_{conto_selezionato}_{nome}"):
+                            p = carica_memoria(conto_selezionato)
+                            if nome in p:
+                                p[nome].pop("alert_falso_allarme", None)
+                                p[nome]["errore_ripristino"] = False
+                                p[nome]["errore_avvio"] = False
+                                p[nome]["msg_manuale"] = ""
+                                salva_memoria(conto_selezionato, p)
+                                st.rerun()
+                            
+                    c3.markdown(f"<div style='height: 32px; display: flex; align-items: center;'><span style='display: inline-block; min-width: 80px; width: auto; white-space: nowrap; text-align: center; font-family: monospace; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; border: 1px solid rgba(255, 215, 0, 0.5); padding: 3px 8px; border-radius: 5px; background-color: rgba(255, 215, 0, 0.08);'>{prezzo}</span></div>", unsafe_allow_html=True)
+                    ultimo_evento_raw = storico[-1] if storico else "Nessun evento registrato in questo ciclo."
+                    ultimo_evento = formatta_ultimo_evento_sintesi(ultimo_evento_raw, dati, nome)
+                    c4.markdown(f"<div style='font-size: 0.85rem; color: white; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'>{ultimo_evento}</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+                    
+
+
+            sub_rng_op, sub_rng_sin = st.tabs(["⚡ Operatività", "📋 Sintesi"])
+            with sub_rng_op:
+                renderizza_dati_live()
+            with sub_rng_sin:
+                renderizza_sintesi()
 
     if tab_hyper is not None:
         with tab_hyper:
