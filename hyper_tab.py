@@ -349,7 +349,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 14px;'>
             <div class='kpi-title-hyper' style='display: flex; justify-content: space-between; align-items: center;'>
-                <span>Livelli Chiave (30s)</span>
+                <span style='color: #38bdf8; font-weight: 800;'>⚡ LIVELLI CHIAVE 30 SECONDI</span>
                 <span style='color: {col_reg}; font-weight: 700; font-size: 0.72rem;'>{regime}</span>
             </div>
             <div style='display: flex; justify-content: space-around; align-items: center; margin-top: 5px;'>
@@ -788,7 +788,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 14px;'>
             <div class='kpi-title-hyper' style='display: flex; justify-content: space-between; align-items: center;'>
-                <span>Livelli Chiave (M5)</span>
+                <span style='color: #f59e0b; font-weight: 800;'>📊 LIVELLI CHIAVE 5 MINUTI (M5)</span>
                 <span style='color: {col_reg}; font-weight: 700; font-size: 0.72rem;'>{regime}</span>
             </div>
             <div style='display: flex; justify-content: space-around; align-items: center; margin-top: 5px;'>

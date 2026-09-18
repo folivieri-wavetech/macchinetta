@@ -176,9 +176,40 @@ class HyperGoldM1Engine:
         return user, pwd, api_key
 
     def _fetch_historical_m5_bars_from_ig(self):
-        """Singola chiamata REST una tantum per scaricare 200 barre M5 storiche senza overflow"""
+        """Singola chiamata REST una tantum per scaricare le barre M5 storiche contigue con cache centralizzata condivisa"""
+        # 1. Verifica se esiste già una cache centralizzata recente (meno di 5 minuti)
+        central_file = "candele_Spot_Gold_M5.json"
+        if os.path.exists(central_file):
+            try:
+                mtime = os.path.getmtime(central_file)
+                if (time.time() - mtime) < 300: # Meno di 5 minuti
+                    with open(central_file, "r", encoding="utf-8") as f:
+                        cached = json.load(f)
+                    if isinstance(cached, list) and len(cached) >= WARMUP_BARS_KJ:
+                        with self.lock:
+                            self.candles = cached[-500:]
+                            self._recalculate_indicators()
+                            self.save_state()
+                        return
+            except Exception:
+                pass
+
         try:
-            user, pwd, api_key = self._get_ig_credentials()
+            # Preferisce credenziali DANY_DEMO per risparmiare quote o usa il conto corrente
+            user, pwd, api_key = None, None, None
+            for p in ["DANY_DEMO/.env", "/data/DANY_DEMO/.env"]:
+                if os.path.exists(p):
+                    try:
+                        with open(p, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
+                                elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
+                                elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
+                        if user and pwd and api_key: break
+                    except Exception: pass
+            if not user or not pwd or not api_key:
+                user, pwd, api_key = self._get_ig_credentials()
             if not user or not pwd or not api_key:
                 return
 
@@ -198,7 +229,7 @@ class HyperGoldM1Engine:
             cst = r_sess.headers.get("CST")
             xst = r_sess.headers.get("X-SECURITY-TOKEN")
 
-            # Recupera fino a 250 barre storiche M5 in UNA SOLA chiamata REST di fallback (se necessarie)
+            # Recupera fino a 250 barre storiche M5 in UNA SOLA chiamata REST condivisa
             url_px = f"https://demo-api.ig.com/gateway/deal/prices/{EPIC_GOLD}?resolution=MINUTE_5&max=250&pageSize=0"
             h_px = {
                 "X-IG-API-KEY": api_key,
@@ -239,6 +270,26 @@ class HyperGoldM1Engine:
                         self.candles = loaded_candles[-500:]
                         self._recalculate_indicators()
                         self.save_state()
+
+                        # Salva centralmente per condividere con tutti gli altri account
+                        try:
+                            with open(central_file, "w", encoding="utf-8") as f:
+                                json.dump(self.candles, f, indent=2)
+                        except Exception:
+                            pass
+
+                        # Sincronizza istantaneamente su FIORDOK_DEMO, DANY_DEMO, BONGIOLO_DEMO
+                        for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
+                            try:
+                                p_acc = os.path.join(acc, STATE_FILE)
+                                if os.path.exists(acc) and os.path.exists(p_acc):
+                                    with open(p_acc, "r", encoding="utf-8") as f_r:
+                                        d_acc = json.load(f_r)
+                                    d_acc["candles"] = self.candles
+                                    with open(p_acc, "w", encoding="utf-8") as f_w:
+                                        json.dump(d_acc, f_w, indent=2)
+                            except Exception:
+                                pass
         except Exception:
             pass
 
