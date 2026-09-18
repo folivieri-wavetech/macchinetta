@@ -665,20 +665,20 @@ class HyperGoldEngine:
                         close_price=close_px,
                         pnl_eur=profit,
                         deal_id=deal_id,
-                        reason=f"TP 70% Cassa (+{profit_pips:.1f}p)",
+                        reason=f"TP Scalino #1 (+{profit_pips:.1f}p)",
                         time_open=pos.get("open_time", time_str),
-                        label="TP 70% (7c)"
+                        label="Scalino #1 (7c)"
                     )
 
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"🎯 TP 70% ESEGUITO ({profit:+.2f} €) ➔ Runner 3c @ BE (+{CORE_TS_LOCK_PIPS:.1f}p)",
+                        "action": f"🎯 TP SCALINO #1 (7C) (+{profit:+.2f} €) ➔ Core Runner 3c @ BE (+{CORE_TS_LOCK_PIPS:.1f}p)",
                         "open_price": open_px,
                         "close_price": close_px,
                         "contracts": close_size,
                         "pnl": profit,
                         "balance": round(self.balance, 2),
-                        "reason": f"Incasso 7c @ +{profit_pips:.1f}p ➔ Stop Runner a BE @ {self.position['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f}p attivo"
+                        "reason": f"Incasso Scalino #1 (7c @ +{profit_pips:.1f}p) ➔ Stop Core Runner a BE @ {self.position['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f}p attivo"
                     })
                     self.save_state()
         except Exception as e:
@@ -744,44 +744,115 @@ class HyperGoldEngine:
                 self.increments = []
                 self.save_state()
 
-            # 1. Chiudi la Core se presente
-            # 1. Chiudi la Core se presente (10c all'inizio o 3c Runner residui)
+            # 1. Chiudi la posizione a mercato su IG
             if pos_to_close and pos_to_close.get("deal_id"):
                 deal_c = pos_to_close["deal_id"]
-                c_lbl = "Core Runner (3c)" if pos_to_close.get("partial_closed") else f"Hyper 30S ({pos_to_close.get('contracts', 10)}c)"
-                res_c = order_mgr.close_market_deal(
-                    deal_id=deal_c,
-                    direction_open=pos_to_close["direction"],
-                    size=pos_to_close["contracts"],
-                    label=c_lbl,
-                    reason_note=reason
-                )
-                prof_c = float(res_c.get("profit") or 0.0)
-                cl_c = float(res_c.get("close_level") or exec_price)
-                order_mgr.record_closed_trade(
-                    tf="30S",
-                    direction=pos_to_close["direction"],
-                    contracts=pos_to_close["contracts"],
-                    open_price=pos_to_close["open_price"],
-                    close_price=cl_c,
-                    pnl_eur=prof_c,
-                    deal_id=deal_c,
-                    reason=reason,
-                    time_open=pos_to_close.get("open_time", time_str),
-                    label=c_lbl
-                )
-                with self.lock:
-                    self.balance += prof_c
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": f"CLOSE {c_lbl.upper()} {pos_to_close['direction']} ({prof_c:+.2f} €)",
-                        "open_price": pos_to_close["open_price"],
-                        "close_price": cl_c,
-                        "contracts": pos_to_close["contracts"],
-                        "pnl": prof_c,
-                        "balance": round(self.balance, 2),
-                        "reason": reason
-                    })
+                is_partial = pos_to_close.get("partial_closed", False)
+
+                if is_partial:
+                    # Chiusura dei 3 contratti residui (Core Runner)
+                    c_lbl = "Core Runner (3c)"
+                    res_c = order_mgr.close_market_deal(
+                        deal_id=deal_c,
+                        direction_open=pos_to_close["direction"],
+                        size=pos_to_close["contracts"],
+                        label=c_lbl,
+                        reason_note=reason
+                    )
+                    prof_c = float(res_c.get("profit") or 0.0)
+                    cl_c = float(res_c.get("close_level") or exec_price)
+                    order_mgr.record_closed_trade(
+                        tf="30S",
+                        direction=pos_to_close["direction"],
+                        contracts=pos_to_close["contracts"],
+                        open_price=pos_to_close["open_price"],
+                        close_price=cl_c,
+                        pnl_eur=prof_c,
+                        deal_id=deal_c,
+                        reason=reason,
+                        time_open=pos_to_close.get("open_time", time_str),
+                        label=c_lbl
+                    )
+                    with self.lock:
+                        self.balance += prof_c
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"CLOSE {c_lbl.upper()} {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                            "open_price": pos_to_close["open_price"],
+                            "close_price": cl_c,
+                            "contracts": pos_to_close["contracts"],
+                            "pnl": prof_c,
+                            "balance": round(self.balance, 2),
+                            "reason": reason
+                        })
+                else:
+                    # Posizione iniziale integra da 10 contratti (7c Scalino #1 + 3c Core)
+                    # Chiusura a mercato unico ordine IG da 10c
+                    c_lbl = f"Hyper 30S ({pos_to_close.get('contracts', 10)}c)"
+                    res_c = order_mgr.close_market_deal(
+                        deal_id=deal_c,
+                        direction_open=pos_to_close["direction"],
+                        size=pos_to_close["contracts"],
+                        label=c_lbl,
+                        reason_note=reason
+                    )
+                    prof_c = float(res_c.get("profit") or 0.0)
+                    cl_c = float(res_c.get("close_level") or exec_price)
+
+                    # Split matematico esatto: 30% Core (3c) e 70% Scalino #1 (7c)
+                    prof_core = round(prof_c * 0.3, 2)
+                    prof_scalino = round(prof_c - prof_core, 2)
+
+                    # Registra Scalino #1 (7 contratti, 70% della perdita/guadagno)
+                    order_mgr.record_closed_trade(
+                        tf="30S",
+                        direction=pos_to_close["direction"],
+                        contracts=7.0,
+                        open_price=pos_to_close["open_price"],
+                        close_price=cl_c,
+                        pnl_eur=prof_scalino,
+                        deal_id=deal_c,
+                        reason=reason,
+                        time_open=pos_to_close.get("open_time", time_str),
+                        label="Scalino #1 (7c)"
+                    )
+
+                    # Registra Core (3 contratti, 30% della perdita/guadagno)
+                    order_mgr.record_closed_trade(
+                        tf="30S",
+                        direction=pos_to_close["direction"],
+                        contracts=3.0,
+                        open_price=pos_to_close["open_price"],
+                        close_price=cl_c,
+                        pnl_eur=prof_core,
+                        deal_id=deal_c,
+                        reason=reason,
+                        time_open=pos_to_close.get("open_time", time_str),
+                        label="Core (3c)"
+                    )
+
+                    with self.lock:
+                        self.balance += prof_c
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"CLOSE SCALINO #1 (7C) {pos_to_close['direction']} ({prof_scalino:+.2f} €)",
+                            "open_price": pos_to_close["open_price"],
+                            "close_price": cl_c,
+                            "contracts": 7,
+                            "pnl": prof_scalino,
+                            "balance": round(self.balance - prof_core, 2),
+                            "reason": reason
+                        })
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"CLOSE CORE (3C) {pos_to_close['direction']} ({prof_core:+.2f} €)",
+                            "open_price": pos_to_close["open_price"],
+                            "close_price": cl_c,
+                            "contracts": 3,
+                            "pnl": prof_core,
+                            "balance": round(self.balance, 2),
+                            "reason": reason
+                        })
                 # Pausa prima di procedere agli scalini residui
                 time.sleep(1.5)
 
