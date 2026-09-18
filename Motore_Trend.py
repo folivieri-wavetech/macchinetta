@@ -139,17 +139,17 @@ config = dotenv_values(".env")
 
 # Vocabolario base
 CONFIG_STRUMENTI = {
-    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1},
-    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "EUR/JPY": {"epic": "CS.D.EURJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1},
-    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1},
-    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1},
-    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100},
-    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1},
-    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1}
+    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "tp_kj_distance_h1": 100},
+    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100},
+    "EUR/JPY": {"epic": "CS.D.EURJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100},
+    "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100},
+    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "tp_kj_distance_h1": 100},
+    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "tp_kj_distance_h1": 100},
+    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1, "tp_kj_distance_h1": 100},
+    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100},
+    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "tp_kj_distance_h1": 200},
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "tp_kj_distance_h1": 100},
+    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "tp_kj_distance_h1": 250}
 }
 
 # Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
@@ -2127,7 +2127,8 @@ def esegui_ciclo_trend():
                 "pip_value": CONFIG_STRUMENTI[nome]["moltiplicatore"],
                 "max_kj_distance": 30.0,
                 "max_entry_delay": 5,
-                "auto_restart": auto_restart
+                "auto_restart": auto_restart,
+                "tp_kj_distance_h1": CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 250 if "Oil" in nome else 100)
             }
             stato_motore.motori[nome] = CoreEngine(cfg)
         else:
@@ -2140,6 +2141,7 @@ def esegui_ciclo_trend():
             stato_motore.motori[nome].config["pip_value"] = CONFIG_STRUMENTI[nome]["moltiplicatore"]
             stato_motore.motori[nome].config["max_kj_distance"] = 30.0
             stato_motore.motori[nome].config["auto_restart"] = auto_restart
+            stato_motore.motori[nome].config["tp_kj_distance_h1"] = CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 250 if "Oil" in nome else 100)
         
         engine = stato_motore.motori[nome]
         

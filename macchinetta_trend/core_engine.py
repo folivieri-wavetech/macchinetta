@@ -179,11 +179,12 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            # 0. Take Profit Estensione Trend H1: Distanza Prezzo - Kijun >= 100 pip a chiusura candela
+            # 0. Take Profit Estensione Trend H1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
             dist_kj_pips = (c_close - kj) / pip_val
-            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1", 100) or 100)
+            default_tp_h1 = 250 if "Oil" in str(self.config.get("nome", "")) else 100
+            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
             if is_h1 and dist_kj_pips >= tp_kj_threshold:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
@@ -196,7 +197,7 @@ class CoreEngine:
                 if ev: events.append(ev)
                 events.append({
                     "type": "reversal",
-                    "reason": "tp_kj_extension_100p",
+                    "reason": f"tp_kj_extension_{int(tp_kj_threshold)}p",
                     "new_direction": "FLAT",
                     "price": exec_price,
                     "dist_kj_pips": round(dist_kj_pips, 1)
@@ -340,11 +341,12 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            # 0. Take Profit Estensione Trend H1: Distanza Kijun - Prezzo >= 100 pip a chiusura candela
+            # 0. Take Profit Estensione Trend H1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
             dist_kj_pips = (kj - c_close) / pip_val
-            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1", 100) or 100)
+            default_tp_h1 = 250 if "Oil" in str(self.config.get("nome", "")) else 100
+            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
             if is_h1 and dist_kj_pips >= tp_kj_threshold:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
@@ -357,7 +359,7 @@ class CoreEngine:
                 if ev: events.append(ev)
                 events.append({
                     "type": "reversal",
-                    "reason": "tp_kj_extension_100p",
+                    "reason": f"tp_kj_extension_{int(tp_kj_threshold)}p",
                     "new_direction": "FLAT",
                     "price": exec_price,
                     "dist_kj_pips": round(dist_kj_pips, 1)

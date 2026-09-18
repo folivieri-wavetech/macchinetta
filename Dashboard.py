@@ -72,17 +72,17 @@ import Sistema.auth_manager as auth_manager
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {
-    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "margine_unitario": 310},
-    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 210},
-    "EUR/JPY": {"epic": "CS.D.EURJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350},
-    "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350},
-    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 400},
-    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 300},
-    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1, "margine_unitario": 290},
-    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290},
-    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220},
-    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400},
-    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 900}
+    "AUD/NZD": {"epic": "CS.D.AUDNZD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "NZD", "valore_punto": 1, "margine_unitario": 310, "tp_kj_distance_h1": 100},
+    "CAD/JPY": {"epic": "CS.D.CADJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 210, "tp_kj_distance_h1": 100},
+    "EUR/JPY": {"epic": "CS.D.EURJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350, "tp_kj_distance_h1": 100},
+    "GBP/JPY": {"epic": "CS.D.GBPJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 350, "tp_kj_distance_h1": 100},
+    "GBP/USD": {"epic": "CS.D.GBPUSD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "USD", "valore_punto": 1, "margine_unitario": 400, "tp_kj_distance_h1": 100},
+    "USD/CAD": {"epic": "CS.D.USDCAD.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CAD", "valore_punto": 1, "margine_unitario": 300, "tp_kj_distance_h1": 100},
+    "USD/CHF": {"epic": "CS.D.USDCHF.MINI.IP", "moltiplicatore": 0.0001, "decimali": 5, "valuta": "CHF", "valore_punto": 1, "margine_unitario": 290, "tp_kj_distance_h1": 100},
+    "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290, "tp_kj_distance_h1": 100},
+    "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220, "tp_kj_distance_h1": 200},
+    "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400, "tp_kj_distance_h1": 100},
+    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 900, "tp_kj_distance_h1": 250}
 }
 
 # Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
@@ -3717,7 +3717,8 @@ else:
                                 dir_comp = "LONG" if px_live > current_kj else ("SHORT" if px_live < current_kj else "NEUTRO")
                                 st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 4px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
                             if tf_val == "HOUR":
-                                st.markdown("<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🎯 <b>TP Estensione H1:</b> Distanza Prezzo-KJ &ge; 100 pip ➔ FLAT</div>", unsafe_allow_html=True)
+                                tp_kj_h1_val = int(CONFIG_STRUMENTI.get(nome, {}).get("tp_kj_distance_h1", 250 if "Oil" in nome else 100))
+                                st.markdown(f"<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🎯 <b>TP Estensione H1:</b> Distanza Prezzo-KJ &ge; {tp_kj_h1_val} pip ➔ FLAT</div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
