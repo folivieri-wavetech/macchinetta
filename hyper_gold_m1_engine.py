@@ -36,8 +36,10 @@ MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <
 MIN_DIST_INCR_PIPS = 5.0       # Distanza minima tra incrementi consecutivi su M5: >= 5 pip
 PARACADUTE_KJ_PIPS = 6.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 6 pip
 CANDELA_SEGNALE_OFFSET_PIPS = 3.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 3 pip
-TK_FILTER_PIPS = 3.0              # Filtro Macro TK 233: Conferma cambio direzione a TK +- 3 pip
-CORE_REENTRY_KJ_DIST_PIPS = 5.0   # Max distanza da KJ per ingresso/rientro Core M5: <= 5 pip
+KJ_TK_MIN_FORBICE_PIPS = 3.0   # Forbice minima tra KJ55 e TK233 per consentire operatività: >= 3 pip
+CORE_MIN_KJ_DIST_PIPS = 2.0    # Minima distanza Prezzo - KJ per ingresso Core M5: >= 2 pip (stacco da KJ)
+TK_FILTER_PIPS = 3.0           # Alias per retrocompatibilità
+CORE_REENTRY_KJ_DIST_PIPS = 2.0 # Alias per retrocompatibilità
 
 # Orari Sospensione Gold:
 # 1. Chiusura Feed IG Spot Gold (Nessun tick disponibile dalle 22:45 alle 00:00)
@@ -957,29 +959,27 @@ class HyperGoldM1Engine:
         prev_close = closed_candle["close"]
         prev_open = closed_candle["open"]
 
-        tk_bullish_threshold = round(tk + TK_FILTER_PIPS, 2)
-        tk_bearish_threshold = round(tk - TK_FILTER_PIPS, 2)
+        forbice_kj_tk = round(kj - tk, 2)  # Positiva se KJ > TK (Bullish), Negativa se KJ < TK (Bearish)
 
         # =============================================================
-        # 1. CONTROLLO INVERSIONE MACRO SU POSIZIONI ESISTENTI (FILTRO 3 PIP)
+        # 1. CONTROLLO INVERSIONE MACRO SU POSIZIONI ESISTENTI (INCROCIO KJ / TK)
         # =============================================================
-        if self.position and self.position["direction"] == "SHORT" and prev_close > tk_bullish_threshold:
-            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > (TK233 {tk:.2f} + {TK_FILTER_PIPS:.0f}p = {tk_bullish_threshold:.2f})")
+        if self.position and self.position["direction"] == "LONG" and kj < tk:
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: KJ55 ({kj:.2f}) < TK233 ({tk:.2f}) ➔ Chiusura Core LONG")
 
-        elif self.position and self.position["direction"] == "LONG" and prev_close < tk_bearish_threshold:
-            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < (TK233 {tk:.2f} - {TK_FILTER_PIPS:.0f}p = {tk_bearish_threshold:.2f})")
+        elif self.position and self.position["direction"] == "SHORT" and kj > tk:
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: KJ55 ({kj:.2f}) > TK233 ({tk:.2f}) ➔ Chiusura Core SHORT")
 
         # =============================================================
-        # 2. GESTIONE OPERATIVA SECONDO IL REGIME
+        # 2. GESTIONE OPERATIVA SECONDO IL REGIME KJ vs TK
         # =============================================================
-        # A) REGIME BULLISH (Close > TK233 + 3 pip) o POSIZIONE LONG RESIDUA (non ancora invertita)
-        if prev_close > tk_bullish_threshold or (self.position and self.position["direction"] == "LONG"):
+        # A) REGIME BULLISH: KJ > TK con forbice >= 3 pip (oppure posizione LONG aperta)
+        if (kj > tk and forbice_kj_tk >= KJ_TK_MIN_FORBICE_PIPS) or (self.position and self.position["direction"] == "LONG"):
             if prev_close > kj:
-                if self.position is None and prev_close > tk_bullish_threshold:
-                    # Verifica condizione rientro Core LONG:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 5 pip su M5)
-                    dist_kj = abs(exec_price - kj)
-                    if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
+                if self.position is None and (kj > tk and forbice_kj_tk >= KJ_TK_MIN_FORBICE_PIPS):
+                    # Ingresso Core LONG: solo se il prezzo attuale stacca sopra KJ di almeno 2 pip
+                    dist_kj = round(exec_price - kj, 2)
+                    if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                             self.entry_in_progress = True
                             self.signal_candle_active = False
@@ -1008,7 +1008,9 @@ class HyperGoldM1Engine:
                                 ).start()
 
             else:
-                # prev_close <= kj in Regime Bullish: Candela Segnale se siamo LONG!
+                # prev_close <= kj in Regime Bullish:
+                # Regola: NON SI VA SHORT! Se siamo FLAT si rimane FLAT.
+                # Se avevamo già una Core LONG aperta: Candela Segnale!
                 # Non chiude subito all'Open: imposta stop confermato su Minimo - 3 pip
                 if self.position and self.position["direction"] == "LONG":
                     stop_livello = round(closed_candle["low"] - CANDELA_SEGNALE_OFFSET_PIPS, 2)
@@ -1022,14 +1024,13 @@ class HyperGoldM1Engine:
                         self.signal_ref_price = closed_candle["low"]
                     self.save_state()
 
-        # B) REGIME BEARISH (Close < TK233 - 3 pip) o POSIZIONE SHORT RESIDUA (non ancora invertita)
-        elif prev_close < tk_bearish_threshold or (self.position and self.position["direction"] == "SHORT"):
+        # B) REGIME BEARISH: KJ < TK con forbice >= 3 pip (oppure posizione SHORT aperta)
+        elif (kj < tk and abs(forbice_kj_tk) >= KJ_TK_MIN_FORBICE_PIPS) or (self.position and self.position["direction"] == "SHORT"):
             if prev_close < kj:
-                if self.position is None and prev_close < tk_bearish_threshold:
-                    # Verifica condizione rientro Core SHORT:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 5 pip su M5)
-                    dist_kj = abs(exec_price - kj)
-                    if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
+                if self.position is None and (kj < tk and abs(forbice_kj_tk) >= KJ_TK_MIN_FORBICE_PIPS):
+                    # Ingresso Core SHORT: solo se il prezzo attuale stacca sotto KJ di almeno 2 pip
+                    dist_kj = round(kj - exec_price, 2)
+                    if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                             self.entry_in_progress = True
                             self.signal_candle_active = False
@@ -1058,7 +1059,9 @@ class HyperGoldM1Engine:
                                 ).start()
 
             else:
-                # prev_close >= kj in Regime Bearish: Candela Segnale se siamo SHORT!
+                # prev_close >= kj in Regime Bearish:
+                # Regola: NON SI VA LONG! Se siamo FLAT si rimane FLAT.
+                # Se avevamo già una Core SHORT aperta: Candela Segnale!
                 # Non chiude subito all'Open: imposta stop confermato su Massimo + 3 pip
                 if self.position and self.position["direction"] == "SHORT":
                     stop_livello = round(closed_candle["high"] + CANDELA_SEGNALE_OFFSET_PIPS, 2)

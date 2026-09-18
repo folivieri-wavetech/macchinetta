@@ -770,15 +770,16 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     with m2:
         tk_str = f"{tk:.2f}" if tk else "--"
         kj_str = f"{kj:.2f}" if kj else "--"
-        if live_mid and tk:
-            if live_mid > (tk + TK_FILTER_PIPS_5M):
-                regime = "🟢 BULLISH (SOLO LONG)"
+        if kj and tk:
+            forbice_pips = round(kj - tk, 2)
+            if forbice_pips >= 3.0:
+                regime = f"🟢 BULLISH (KJ > TK +{forbice_pips:.1f}p ➔ LONG)"
                 col_reg = "#22c55e"
-            elif live_mid < (tk - TK_FILTER_PIPS_5M):
-                regime = "🔴 BEARISH (SOLO SHORT)"
+            elif forbice_pips <= -3.0:
+                regime = f"🔴 BEARISH (KJ < TK {forbice_pips:.1f}p ➔ SHORT)"
                 col_reg = "#ef4444"
             else:
-                regime = "⚪ ZONA NEUTRA TK (±3p)"
+                regime = f"⚪ ZONA NEUTRA (Forbice {forbice_pips:+.1f}p < 3p ➔ FLAT)"
                 col_reg = "#f59e0b"
         else:
             regime = "Inizializzazione..."
@@ -806,7 +807,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Filtro Macro TK233 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±6p</div>
+            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Regime Forbice KJ-TK (±3p) • Stacco Core KJ: 2p • 🪂 Paracadute KJ: ±6p</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -824,25 +825,27 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         sec_elapsed = 0
         if curr_bar_t:
             sec_elapsed = min(300, int(time.time() - curr_bar_t))
+        sec_left = max(0, 300 - sec_elapsed)
+        sec_left_str = f"{sec_left // 60:02d}:{sec_left % 60:02d}"
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px;'>
+        <div class='kpi-card-hyper' style='padding: 10px 14px; text-align: center;'>
             <div class='kpi-title-hyper'>Tempo Barra (M5)</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #cbd5e1;'>{sec_elapsed}s / 300s</div>
-            <div style='font-size: 0.70rem; color: #94a3b8;'>Prossima chiusura: {300 - sec_elapsed}s</div>
+            <div style='font-size: 1.30rem; font-weight: 800; font-family: monospace; color: #38bdf8; margin-top: 2px;'>{sec_left_str}</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # 3. SEZIONE CONTROLLI E OPERAZIONI
-    col_left, col_right = st.columns([1.60, 1.60])
+    col_left, col_right = st.columns([1.15, 1.85])
 
     with col_left:
         with st.expander("⚙️ Assetto Contratti M5 (Core 5c + Incr 3c)", expanded=False):
             st.markdown(f"""
             <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; font-size: 0.80rem; line-height: 1.6;'>
                 <div style='color: #f59e0b; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi M5 Trend Scalping:</div>
-                <div>• <b>Core Runner</b>: <span style='color: #4ade80; font-weight: 600;'>{CORE_CONTRACTS_5M} contratti</span> (TS a <b>+{CORE_TS_TRIGGER_PIPS_5M:.0f} pip</b>)</div>
+                <div>• <b>Regime</b>: LONG se KJ55 > TK233 (+3p) | SHORT se KJ55 < TK233 (-3p)</div>
+                <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{CORE_CONTRACTS_5M} contratti</span> su stacco Prezzo - KJ >= 2 pip</div>
                 <div>• <b>Incrementi</b>: fino a <b>{MAX_INCREMENTS_5M}</b> da <span style='color: #f59e0b; font-weight: 600;'>{INC_CONTRACTS_5M} contratti</span> (TP +{INC_TP_PIPS_5M:.0f} pip)</div>
                 <div style='border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px;'>
                     <span style='color: #94a3b8;'>Paracadute KJ55: <b>±6 pip</b> • Candela Segnale: <b>±3 pip</b></span>
