@@ -37,7 +37,10 @@ CANDELA_SEGNALE_OFFSET_PIPS = 2.0 # Candela Segnale: Stop confermato su rottura 
 TK_FILTER_PIPS = 3.0        # Filtro Macro TK: Conferma cambio direzione a TK +- 3 pip
 CORE_REENTRY_KJ_DIST_PIPS = 3.0 # Max distanza da KJ per consentire ingresso (pullback): <= 3.0 pip
 
-# Compatibilità struttura plan
+# Compatibilità struttura plan e import legacy
+INC_CONTRACTS = 0
+MAX_INCREMENTS = 0
+INC_TP_PIPS = 5.0
 DEFAULT_SCALINI_PLAN_30S = [
     {"step": 1, "contracts": 7, "tp_pips": 5.0},
 ]
