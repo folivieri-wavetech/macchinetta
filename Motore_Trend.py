@@ -1695,7 +1695,11 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 reversal_ev = next((e for e in events if e.get('type') == 'reversal'), None)
                 if tipo == 'core_closed' and reversal_ev:
                     r_reason = reversal_ev.get("reason", "")
-                    if "trailing" in r_reason:
+                    if "tp_kj_extension" in r_reason:
+                        dist_p = reversal_ev.get("dist_kj_pips", 100)
+                        tag_motivo = f"TP Estensione KJ (+{dist_p}p)"
+                        tag_title = "TP ESTENSIONE KJ"
+                    elif "trailing" in r_reason:
                         tag_motivo = "Trailing Core"
                         tag_title = "TRAILING CORE"
                     elif "live_stop_kj_break_min" in r_reason:
@@ -1811,7 +1815,10 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             
             # Se la Core è già stata registrata con il relativo motivo e passaggio a FLAT, evitiamo il doppio messaggio
             if not has_core_in_events and not has_auto_start:
-                if "break_min" in reason_str:
+                if "tp_kj_extension" in reason_str:
+                    dist_p = ev.get("dist_kj_pips", 100)
+                    tag_motivo = f"TP Estensione KJ (+{dist_p}p)"
+                elif "break_min" in reason_str:
                     tag_motivo = "Stop KJ (Break Min -5p)"
                 elif "break_max" in reason_str:
                     tag_motivo = "Stop KJ (Break Max +5p)"

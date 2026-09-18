@@ -179,8 +179,32 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
+            # 0. Take Profit Estensione Trend H1: Distanza Prezzo - Kijun >= 100 pip a chiusura candela
+            tf_val = str(self.config.get("timeframe", "HOUR")).upper()
+            is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+            dist_kj_pips = (c_close - kj) / pip_val
+            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1", 100) or 100)
+            if is_h1 and dist_kj_pips >= tp_kj_threshold:
+                self.trailing_sl_core = None
+                self.trailing_sl_incr = None
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+                self.signal_candle_tk_active = False
+                self.signal_stop_price_tk = None
+                events.extend(self.pm.close_all_increments(exec_price))
+                ev = self.pm.close_core(exec_price)
+                if ev: events.append(ev)
+                events.append({
+                    "type": "reversal",
+                    "reason": "tp_kj_extension_100p",
+                    "new_direction": "FLAT",
+                    "price": exec_price,
+                    "dist_kj_pips": round(dist_kj_pips, 1)
+                })
+                self.current_direction = "FLAT"
+                self.retracement_start_price = None
             # 1. Chiusura Trailing SL Core a fine candela se attivo
-            if self.trailing_sl_core is not None and c_close < self.trailing_sl_core:
+            elif self.trailing_sl_core is not None and c_close < self.trailing_sl_core:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
@@ -316,8 +340,32 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
+            # 0. Take Profit Estensione Trend H1: Distanza Kijun - Prezzo >= 100 pip a chiusura candela
+            tf_val = str(self.config.get("timeframe", "HOUR")).upper()
+            is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+            dist_kj_pips = (kj - c_close) / pip_val
+            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1", 100) or 100)
+            if is_h1 and dist_kj_pips >= tp_kj_threshold:
+                self.trailing_sl_core = None
+                self.trailing_sl_incr = None
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+                self.signal_candle_tk_active = False
+                self.signal_stop_price_tk = None
+                events.extend(self.pm.close_all_increments(exec_price))
+                ev = self.pm.close_core(exec_price)
+                if ev: events.append(ev)
+                events.append({
+                    "type": "reversal",
+                    "reason": "tp_kj_extension_100p",
+                    "new_direction": "FLAT",
+                    "price": exec_price,
+                    "dist_kj_pips": round(dist_kj_pips, 1)
+                })
+                self.current_direction = "FLAT"
+                self.retracement_start_price = None
             # 1. Chiusura Trailing SL Core a fine candela se attivo
-            if self.trailing_sl_core is not None and c_close > self.trailing_sl_core:
+            elif self.trailing_sl_core is not None and c_close > self.trailing_sl_core:
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False

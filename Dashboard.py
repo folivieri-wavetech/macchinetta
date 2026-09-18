@@ -3715,7 +3715,9 @@ else:
                             if current_kj is not None and px_live is not None:
                                 symb_comp = "&gt;" if px_live > current_kj else ("&lt;" if px_live < current_kj else "=")
                                 dir_comp = "LONG" if px_live > current_kj else ("SHORT" if px_live < current_kj else "NEUTRO")
-                                st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 4px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
+                            if tf_val == "HOUR":
+                                st.markdown("<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🎯 <b>TP Estensione H1:</b> Distanza Prezzo-KJ &ge; 100 pip ➔ FLAT</div>", unsafe_allow_html=True)
                             
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
