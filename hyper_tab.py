@@ -221,7 +221,7 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
         st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_attivo})</span></h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (±2p) • Scalini Fast: 4c @ 2p + 4c @ 3p • Core Runner 2c (TS +10p din.)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (≤3p da KJ) • Modello 70/30: 7c @ +5p TP • Core Runner 3c (BE + TS 4p)</div>", unsafe_allow_html=True)
 
     with c_badges:
         is_feed_closed = is_gold_feed_suspended()
@@ -405,16 +405,16 @@ def render_hyper_30s(conto_selezionato="DANY_DEMO", is_other_active=False, **kwa
         tot_plan_c = sum(it["contracts"] for it in cur_plan)
         tot_all_c = cur_core + tot_plan_c
 
-        with st.expander("⚙️ Assetto Scalini 30S: Fast Scalping (10 Contratti)", expanded=False):
+        with st.expander("⚙️ Assetto 30S: Modello 70/30 (10 Contratti in Ordine Unico)", expanded=False):
             st.markdown(f"""
             <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; font-size: 0.80rem; line-height: 1.6;'>
-                <div style='color: #38bdf8; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi Fast Scalping (De-leveraging Fulmineo):</div>
-                <div>• <b>Scalino #1</b>: <span style='color: #f59e0b; font-weight: 600;'>4 contratti</span> @ <b>TP 2 pip</b> (+8.00 €)</div>
-                <div>• <b>Scalino #2</b>: <span style='color: #f59e0b; font-weight: 600;'>4 contratti</span> @ <b>TP 3 pip</b> (+12.00 €)</div>
-                <div style='margin-top: 4px;'>• <b>Core Runner</b>: <span style='color: #4ade80; font-weight: 600;'>{cur_core} contratti</span> (Trailing Stop attivo a <b>+10 pip</b>, Lock +6 pip, Trail dinamico base 4 pip [+1p ogni 10p])</div>
+                <div style='color: #38bdf8; font-weight: 700; margin-bottom: 4px;'>🎯 Piano Ingressi Chirurgico 70/30 (10 Contratti in Ordine Unico):</div>
+                <div>• <b>Ingresso</b>: Ordine unico da 10 contratti su pullback entro <b>≤ 3.0 pip da KJ 55</b></div>
+                <div>• <b>Cassa Sicura (70%)</b>: <span style='color: #f59e0b; font-weight: 600;'>7 contratti</span> @ <b>TP +5.0 pip</b> (+35.00 € netti)</div>
+                <div style='margin-top: 4px;'>• <b>Core Runner (30%)</b>: <span style='color: #4ade80; font-weight: 600;'>3 contratti</span> (Al tocco di +5p: <b>Break-Even protetto a +1.0p</b> + Trailing dinamico 4.0p dal picco)</div>
                 <div style='border-top: 1px solid #334155; margin-top: 6px; padding-top: 4px; display: flex; justify-content: space-between;'>
-                    <span style='color: #94a3b8;'>Esposizione iniziale: <b style='color: #f8fafc;'>{tot_all_c} contratti</b> (Margine: {tot_all_c*220:,.0f} €)</span>
-                    <span style='color: #4ade80; font-weight: 700;'>Incasso Scalini (2p + 3p): +20.00 €</span>
+                    <span style='color: #94a3b8;'>Esposizione iniziale: <b style='color: #f8fafc;'>10 contratti</b> (Margine: 2.200 €)</span>
+                    <span style='color: #4ade80; font-weight: 700;'>Incasso Target 70%: +35.00 €</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)

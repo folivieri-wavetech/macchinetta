@@ -23,26 +23,23 @@ WARMUP_BARS_KJ = 55     # Kijun 55 periodi
 WARMUP_BARS_TK = 144    # Tenkan/Macro 144 periodi
 STATE_FILE = "hyper_gold_state.json"
 
-# Parametri Strategia: Core + Incrementi + Trailing Stop
-CORE_CONTRACTS = 2          # Size Core Runner: 2 contratti (Trailing Stop a +10 pip)
-CORE_TS_TRIGGER_PIPS = 10.0 # Attivazione Trailing Stop: a +10 pip di guadagno
-CORE_TS_LOCK_PIPS = 6.0     # Lock profit iniziale: +6 pip garantiti subito (+12.00 €)
-CORE_TS_DISTANCE_PIPS = 4.0 # Distanza trailing: 4 pip continui dal picco massimo/minimo
-INC_CONTRACTS = 1           # Incrementi: 1 contratto ciascuno
-MAX_INCREMENTS = 8          # 8 scalini x 1c = 8 contratti (Totale 10 con core)
-INC_TP_PIPS = 2.0           # TP incrementi su 30S: a partire da 2 pip
+# Parametri Strategia: Modello 70/30 (Ingresso 10 contratti in ordine unico)
+CORE_CONTRACTS = 10         # Size ingresso a mercato unico: 10 contratti
+PARTIAL_CLOSE_CONTRACTS = 7 # Chiusura parziale 70% al primo target: 7 contratti
+RUNNER_CONTRACTS = 3        # Quota 30% che corre in Trailing: 3 contratti
+PARTIAL_TP_PIPS = 5.0       # TP primo blocco (70%): +5.0 pip (+35.00 €)
+CORE_TS_TRIGGER_PIPS = 5.0  # Attivazione Trailing / Break-Even: a +5.0 pip di guadagno
+CORE_TS_LOCK_PIPS = 1.0     # Lock profit Break-Even garantito: +1.0 pip (+3.00 € sui 3c)
+CORE_TS_DISTANCE_PIPS = 4.0 # Distanza trailing continua dal picco: 4.0 pip
 KJ_TOLERANCE_PIPS = 2.0     # Tolleranza di 2 pip su rottura Kijun 55
-MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <= 5 pip
-MIN_DIST_INCR_PIPS = 1.0       # Distanza minima tra incrementi: 1 pip
-PARACADUTE_KJ_PIPS = 2.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 2 pip
+PARACADUTE_KJ_PIPS = 2.0    # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 2 pip
 CANDELA_SEGNALE_OFFSET_PIPS = 2.0 # Candela Segnale: Stop confermato su rottura Massimo/Minimo +- 2 pip
-TK_FILTER_PIPS = 3.0              # Filtro Macro TK 144: Conferma cambio direzione a TK +- 3 pip
-CORE_REENTRY_KJ_DIST_PIPS = 4.0   # Max distanza da KJ per ingresso/rientro Core 30S: <= 4 pip
+TK_FILTER_PIPS = 3.0        # Filtro Macro TK: Conferma cambio direzione a TK +- 3 pip
+CORE_REENTRY_KJ_DIST_PIPS = 3.0 # Max distanza da KJ per consentire ingresso (pullback): <= 3.0 pip
 
-# Modello Fast Scalping 30S (Totale 10 Contratti: 4c @ 2p + 4c @ 3p + Core Runner 2c [TS a +10p])
+# Compatibilità struttura plan
 DEFAULT_SCALINI_PLAN_30S = [
-    {"step": 1, "contracts": 4, "tp_pips": 2.0},
-    {"step": 2, "contracts": 4, "tp_pips": 3.0},
+    {"step": 1, "contracts": 7, "tp_pips": 5.0},
 ]
 
 # Orari Sospensione Gold:
@@ -150,6 +147,7 @@ class HyperGoldEngine:
         # Flag controllo esecuzione ordini reali IG (evita collisioni e ordini multipli)
         self.entry_in_progress = False
         self.closing_in_progress = False
+        self.partial_closing_in_progress = False
 
         # 1. Carica stato persistito
         self.load_state()
@@ -480,25 +478,23 @@ class HyperGoldEngine:
                 time.sleep(5)
 
     def _check_core_trailing_stop(self, current_price: float, time_str: str):
-        """Gestisce il Trailing Stop sulla posizione Core:
-        1. A +10 pip attiva il TS e piazza il lock a +7 pip garantiti.
-        2. Segue il prezzo a 3 pip dal picco massimo (Long) o minimo (Short).
-        3. Quando il prezzo tocca il TS: chiude Core + tutti gli incrementi a FLAT,
-           imposta automaticamente trading_enabled = False (STOP TRADING) e salva il ciclo."""
-        if not self.position:
+        """Gestisce il Trailing Stop sulla posizione Runner (3 contratti o posizione attiva):
+        1. Se ts_active è True (attivato al TP del 70% o se profit_pips >= 5.0):
+           protegge a Break-Even (+1.0 pip lock) e aggiorna il trailing a 4 pip di distanza dal picco.
+        2. Quando il prezzo tocca il TS: chiude la posizione residua a FLAT."""
+        if not self.position or not getattr(self, "use_core_trailing", True):
             return
 
         pos = self.position
         direction = pos["direction"]
         open_px = pos["open_price"]
 
-        # Calcolo pips attuali
         if direction == "LONG":
             profit_pips = round(current_price - open_px, 2)
         else:
             profit_pips = round(open_px - current_price, 2)
 
-        # 1. Attivazione Trailing Stop al raggiungimento di +10 pip
+        # Attivazione TS di sicurezza se non già attivo e siamo a >= +5 pip
         if not pos.get("ts_active", False):
             if profit_pips >= CORE_TS_TRIGGER_PIPS:
                 pos["ts_active"] = True
@@ -517,132 +513,81 @@ class HyperGoldEngine:
                     "contracts": pos["contracts"],
                     "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
                     "balance": round(self.balance, 2),
-                    "reason": f"Raggiunti +{profit_pips:.1f} pip @ {current_price:.2f} ➔ Lock +{CORE_TS_LOCK_PIPS:.1f} pip @ {pos['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f} pip (dinamico +1p ogni 10p)"
+                    "reason": f"Raggiunti +{profit_pips:.1f} pip @ {current_price:.2f} ➔ Lock Break-Even +{CORE_TS_LOCK_PIPS:.1f} pip @ {pos['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f} pip"
                 })
                 self.save_state()
 
-        # 2. Aggiornamento dinamico del Trailing e verifica tocco
+        # Aggiornamento dinamico del Trailing e verifica tocco
         if pos.get("ts_active", False):
             peak_px = pos.get("peak_price", current_price)
 
             if direction == "LONG":
-                # Nuovo picco massimo
                 if current_price > peak_px:
                     pos["peak_price"] = current_price
                     peak_px = current_price
 
-                # Calcolo distanza dinamica: +1 pip ogni 10 pip oltre il trigger (+10 pip)
-                # Es. 10-19.9p: 4p | 20-29.9p: 5p | 30-39.9p: 6p ...
-                peak_gain = max(0.0, peak_px - open_px)
-                extra_dist = max(0, int((peak_gain - CORE_TS_TRIGGER_PIPS) // 10.0))
-                current_ts_dist = CORE_TS_DISTANCE_PIPS + float(extra_dist)
-                pos["ts_distance"] = current_ts_dist
-
+                current_ts_dist = pos.get("ts_distance", CORE_TS_DISTANCE_PIPS)
                 new_ts = round(peak_px - current_ts_dist, 2)
                 if new_ts > pos.get("ts_price", 0.0):
                     pos["ts_price"] = new_ts
 
-                # Verifica tocco Trailing Stop
                 if current_price <= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
 
             else: # SHORT
-                # Nuovo picco minimo
                 if current_price < peak_px:
                     pos["peak_price"] = current_price
                     peak_px = current_price
 
-                # Calcolo distanza dinamica: +1 pip ogni 10 pip oltre il trigger (+10 pip)
-                # Es. 10-19.9p: 4p | 20-29.9p: 5p | 30-39.9p: 6p ...
-                peak_gain = max(0.0, open_px - peak_px)
-                extra_dist = max(0, int((peak_gain - CORE_TS_TRIGGER_PIPS) // 10.0))
-                current_ts_dist = CORE_TS_DISTANCE_PIPS + float(extra_dist)
-                pos["ts_distance"] = current_ts_dist
-
+                current_ts_dist = pos.get("ts_distance", CORE_TS_DISTANCE_PIPS)
                 new_ts = round(peak_px + current_ts_dist, 2)
                 if new_ts < pos.get("ts_price", 999999.0):
                     pos["ts_price"] = new_ts
 
-                # Verifica tocco Trailing Stop
                 if current_price >= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
 
     def _execute_entry_sequence(self, direction: str, exec_price: float, time_str: str):
-        """Esegue l'apertura a mercato reale su IG dei 3 blocchi (Scalino 1, Scalino 2, Core Runner)
-        in un thread separato senza bloccare il flusso Lightstreamer, rispettando il pacing di sicurezza."""
+        """Esegue l'apertura a mercato reale su IG di UN UNICO ordine da 10 contratti (Modello 70/30: 7c Cassa + 3c Runner)
+        senza pause sequenziali e con prezzo di esecuzione uniforme."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            plan = getattr(self, "scalini_plan", DEFAULT_SCALINI_PLAN_30S)
-            c_sz = getattr(self, "core_size", CORE_CONTRACTS)
+            total_sz = CORE_CONTRACTS  # 10 contratti
 
-            # 1. Apertura blocchi scalini a mercato
-            for it in plan:
-                st_idx = it["step"]
-                st_sz = it["contracts"]
-                st_tp_dist = it["tp_pips"]
-                tp_px = round(exec_price + st_tp_dist if direction == "LONG" else exec_price - st_tp_dist, 2)
-
-                res = order_mgr.open_market_deal(
-                    direction=direction,
-                    size=st_sz,
-                    limit_level=tp_px,
-                    label=f"Scalino #{st_idx} (30S)"
-                )
-                if res.get("success"):
-                    deal_id = res.get("deal_id")
-                    real_open = float(res.get("level") or exec_price)
-                    with self.lock:
-                        self.increments.append({
-                            "id": int(time.time() * 1000) + st_idx,
-                            "deal_id": deal_id,
-                            "deal_reference": res.get("deal_reference"),
-                            "direction": direction,
-                            "open_price": real_open,
-                            "contracts": st_sz,
-                            "tp_price": tp_px,
-                            "tp_dist_pips": st_tp_dist,
-                            "step_idx": st_idx,
-                            "open_time": res.get("time") or time_str
-                        })
-                        self.save_state()
-
-                # Pausa prudenziale tra scalini per non ingolfare IG
-                time.sleep(1.5)
-
-            # Pausa prima del Core Runner
-            time.sleep(1.0)
-
-            # 2. Apertura blocco Core Runner
-            res_core = order_mgr.open_market_deal(
+            res = order_mgr.open_market_deal(
                 direction=direction,
-                size=c_sz,
+                size=total_sz,
                 limit_level=None,
-                label="Core Runner (30S)"
+                label="Hyper 30S (10c: 70/30)"
             )
-            if res_core.get("success"):
-                deal_id_c = res_core.get("deal_id")
-                real_open_c = float(res_core.get("level") or exec_price)
+            if res.get("success"):
+                deal_id = res.get("deal_id")
+                real_open = float(res.get("level") or exec_price)
                 with self.lock:
                     self.position = {
-                        "deal_id": deal_id_c,
-                        "deal_reference": res_core.get("deal_reference"),
+                        "deal_id": deal_id,
+                        "deal_reference": res.get("deal_reference"),
                         "direction": direction,
-                        "open_price": real_open_c,
-                        "contracts": c_sz,
-                        "open_time": res_core.get("time") or time_str,
+                        "open_price": real_open,
+                        "contracts": total_sz,        # 10 contratti iniziali
+                        "initial_contracts": total_sz,
+                        "partial_closed": False,      # Diventa True dopo la presa del 70%
+                        "open_time": res.get("time") or time_str,
                         "ts_active": False,
                         "ts_price": None,
-                        "peak_price": real_open_c
+                        "peak_price": real_open,
+                        "ts_distance": CORE_TS_DISTANCE_PIPS
                     }
+                    self.increments = []
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"🚀 OPEN REAL IG {direction} ({c_sz}c Core + Scalini)",
-                        "open_price": real_open_c,
+                        "action": f"🚀 OPEN REAL IG {direction} (10c: 7c Cassa + 3c Runner)",
+                        "open_price": real_open,
                         "close_price": None,
-                        "contracts": c_sz,
+                        "contracts": total_sz,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Ingresso IG Reale {direction} @ {real_open_c:.2f} € (Deal ID Core: {deal_id_c})"
+                        "reason": f"Ingresso IG Reale {direction} @ {real_open:.2f} € (Deal ID: {deal_id})"
                     })
                     self.save_state()
         except Exception as e:
@@ -651,8 +596,96 @@ class HyperGoldEngine:
             with self.lock:
                 self.entry_in_progress = False
 
+    def _check_partial_tp(self, current_price: float, time_str: str):
+        """Controlla se la posizione (10c) ha raggiunto +5 pip per effettuare la chiusura parziale del 70% (7 contratti)"""
+        if not self.position or self.position.get("partial_closed", False):
+            return
+        if getattr(self, "closing_in_progress", False) or getattr(self, "partial_closing_in_progress", False):
+            return
+
+        direction = self.position["direction"]
+        open_px = self.position["open_price"]
+        profit_pips = round(current_price - open_px, 2) if direction == "LONG" else round(open_px - current_price, 2)
+
+        if profit_pips >= PARTIAL_TP_PIPS:
+            self.partial_closing_in_progress = True
+            threading.Thread(
+                target=self._execute_partial_close,
+                args=(current_price, time_str, profit_pips),
+                daemon=True
+            ).start()
+
+    def _execute_partial_close(self, current_price: float, time_str: str, profit_pips: float):
+        """Chiude parzialmente 7 contratti su IG e imposta i restanti 3 a Break-Even (+1 pip) con Trailing Stop"""
+        try:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            with self.lock:
+                if not self.position or self.position.get("partial_closed", False):
+                    return
+                pos = dict(self.position)
+
+            deal_id = pos.get("deal_id")
+            close_size = PARTIAL_CLOSE_CONTRACTS  # 7 contratti
+
+            res = order_mgr.close_market_deal(
+                deal_id=deal_id,
+                direction_open=pos["direction"],
+                size=close_size,
+                label="TP 70% Cassa (7c @ +5p)",
+                reason_note=f"Raggiunto TP 70% a +{profit_pips:.1f}p @ {current_price:.2f}"
+            )
+            profit = float(res.get("profit") or (profit_pips * close_size * self.point_value))
+            close_px = float(res.get("close_level") or current_price)
+
+            with self.lock:
+                if self.position:
+                    self.balance += profit
+                    self.position["contracts"] = RUNNER_CONTRACTS  # Rimangono 3 contratti
+                    self.position["partial_closed"] = True
+                    self.position["ts_active"] = True
+                    self.position["peak_price"] = close_px
+                    self.position["ts_distance"] = CORE_TS_DISTANCE_PIPS
+
+                    # Lock profit a Break-Even (+1.0 pip) sui 3 contratti
+                    open_px = self.position["open_price"]
+                    direction = self.position["direction"]
+                    if direction == "LONG":
+                        self.position["ts_price"] = round(open_px + CORE_TS_LOCK_PIPS, 2)
+                    else:
+                        self.position["ts_price"] = round(open_px - CORE_TS_LOCK_PIPS, 2)
+
+                    order_mgr.record_closed_trade(
+                        tf="30S",
+                        direction=pos["direction"],
+                        contracts=close_size,
+                        open_price=open_px,
+                        close_price=close_px,
+                        pnl_eur=profit,
+                        deal_id=deal_id,
+                        reason=f"TP 70% Cassa (+{profit_pips:.1f}p)",
+                        time_open=pos.get("open_time", time_str),
+                        label="TP 70% (7c)"
+                    )
+
+                    self.trades.insert(0, {
+                        "time": time_str,
+                        "action": f"🎯 TP 70% ESEGUITO ({profit:+.2f} €) ➔ Runner 3c @ BE (+{CORE_TS_LOCK_PIPS:.1f}p)",
+                        "open_price": open_px,
+                        "close_price": close_px,
+                        "contracts": close_size,
+                        "pnl": profit,
+                        "balance": round(self.balance, 2),
+                        "reason": f"Incasso 7c @ +{profit_pips:.1f}p ➔ Stop Runner a BE @ {self.position['ts_price']:.2f}, Trail {CORE_TS_DISTANCE_PIPS:.1f}p attivo"
+                    })
+                    self.save_state()
+        except Exception as e:
+            logger.error(f"Errore durante chiusura parziale 70% IG: {e}")
+        finally:
+            with self.lock:
+                self.partial_closing_in_progress = False
+
     def _execute_close_scalino(self, inc: dict, current_price: float, time_str: str):
-        """Chiude a mercato reale un singolo scalino quando tocca il Take Profit."""
+        """Chiude a mercato reale un singolo scalino quando tocca il Take Profit (per eventuale retrocompatibilità)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             deal_id = inc.get("deal_id")
@@ -667,11 +700,9 @@ class HyperGoldEngine:
             close_px = float(res.get("close_level") or current_price)
 
             with self.lock:
-                # Rimuovi l'incremento chiuso
                 self.increments = [i for i in self.increments if i.get("deal_id") != deal_id and i.get("id") != inc.get("id")]
                 self.balance += profit
 
-                # Registra trade nello storico di Sintesi
                 order_mgr.record_closed_trade(
                     tf="30S",
                     direction=inc["direction"],
@@ -711,13 +742,15 @@ class HyperGoldEngine:
                 self.save_state()
 
             # 1. Chiudi la Core se presente
+            # 1. Chiudi la Core se presente (10c all'inizio o 3c Runner residui)
             if pos_to_close and pos_to_close.get("deal_id"):
                 deal_c = pos_to_close["deal_id"]
+                c_lbl = "Core Runner (3c)" if pos_to_close.get("partial_closed") else f"Hyper 30S ({pos_to_close.get('contracts', 10)}c)"
                 res_c = order_mgr.close_market_deal(
                     deal_id=deal_c,
                     direction_open=pos_to_close["direction"],
                     size=pos_to_close["contracts"],
-                    label="Chiusura Core Flat",
+                    label=c_lbl,
                     reason_note=reason
                 )
                 prof_c = float(res_c.get("profit") or 0.0)
@@ -732,13 +765,13 @@ class HyperGoldEngine:
                     deal_id=deal_c,
                     reason=reason,
                     time_open=pos_to_close.get("open_time", time_str),
-                    label="Core Runner"
+                    label=c_lbl
                 )
                 with self.lock:
                     self.balance += prof_c
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"CLOSE CORE {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                        "action": f"CLOSE {c_lbl.upper()} {pos_to_close['direction']} ({prof_c:+.2f} €)",
                         "open_price": pos_to_close["open_price"],
                         "close_price": cl_c,
                         "contracts": pos_to_close["contracts"],
@@ -905,19 +938,23 @@ class HyperGoldEngine:
                 if self.position or self.increments:
                     self._close_all_to_flat(mid, time_str, reason="Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT")
             else:
-                # 1. Verifica Trailing Stop per la Core (Attivo di default: Trigger +10p, Lock +6p, Trail 4p)
+                # 1. Verifica Take Profit 70% (7 contratti a +5 pip)
+                if self.trading_enabled and self.position and not self.position.get("partial_closed", False):
+                    self._check_partial_tp(mid, time_str)
+
+                # 2. Verifica Trailing Stop per la Core Runner (Trigger +5p, Lock +1p Break-Even, Trail 4p)
                 if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
                     self._check_core_trailing_stop(mid, time_str)
 
-                # 2. Verifica Take Profit (2 pip) per gli incrementi aperti (Bancomat continuo)
+                # 3. Verifica Take Profit per eventuali incrementi residui
                 if self.trading_enabled and self.increments:
                     self._check_increments_tp(mid, time_str)
 
-                # 3. Paracadute KJ Intracandela (3 pip): Chiusura istantanea di sicurezza a FLAT
+                # 4. Paracadute KJ Intracandela (2 pip): Chiusura istantanea di sicurezza a FLAT
                 if self.trading_enabled and self.position and self.kj55 is not None:
                     self._check_paracadute_kj(mid, time_str)
 
-                # 4. Stop Conferma Candela Segnale KJ (2 pip): Chiusura a rottura confermata
+                # 5. Stop Conferma Candela Segnale KJ (2 pip): Chiusura a rottura confermata
                 if self.trading_enabled and self.position and self.signal_candle_active:
                     self._check_candela_segnale_stop(mid, time_str)
 
@@ -992,7 +1029,7 @@ class HyperGoldEngine:
             if prev_close > kj:
                 if self.position is None and prev_close > tk_bullish_threshold:
                     # Verifica condizione rientro Core LONG:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 4 pip su 30S)
+                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
                     dist_kj = abs(exec_price - kj)
                     if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
@@ -1031,7 +1068,7 @@ class HyperGoldEngine:
             if prev_close < kj:
                 if self.position is None and prev_close < tk_bearish_threshold:
                     # Verifica condizione rientro Core SHORT:
-                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 4 pip su 30S)
+                    # Solo se il prezzo è riavvicinato a KJ (pullback entro CORE_REENTRY_KJ_DIST_PIPS, 3 pip su 30S)
                     dist_kj = abs(exec_price - kj)
                     if dist_kj <= CORE_REENTRY_KJ_DIST_PIPS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
