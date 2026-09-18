@@ -20,7 +20,7 @@ except Exception:
 EPIC_GOLD = "CS.D.CFEGOLD.CBE.IP"
 CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
 WARMUP_BARS_KJ = 55     # Kijun 55 periodi
-WARMUP_BARS_TK = 144    # Tenkan/Macro 144 periodi
+WARMUP_BARS_TK = 233    # Tenkan/Macro 233 periodi
 STATE_FILE = "hyper_gold_m1_state.json"
 
 # Parametri Strategia: Core + Incrementi + Trailing Stop (M5)
@@ -36,7 +36,7 @@ MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <
 MIN_DIST_INCR_PIPS = 5.0       # Distanza minima tra incrementi consecutivi su M5: >= 5 pip
 PARACADUTE_KJ_PIPS = 6.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 6 pip
 CANDELA_SEGNALE_OFFSET_PIPS = 3.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 3 pip
-TK_FILTER_PIPS = 3.0              # Filtro Macro TK 144: Conferma cambio direzione a TK +- 3 pip
+TK_FILTER_PIPS = 3.0              # Filtro Macro TK 233: Conferma cambio direzione a TK +- 3 pip
 CORE_REENTRY_KJ_DIST_PIPS = 5.0   # Max distanza da KJ per ingresso/rientro Core M5: <= 5 pip
 
 # Orari Sospensione Gold:
@@ -111,7 +111,8 @@ class HyperGoldM1Engine:
         # Storico barre concluse M5 (ultime 500)
         self.candles = []
         self.kj55 = None
-        self.tk144 = None
+        self.tk233 = None
+        self.tk144 = None  # Retrocompatibilità (punta a tk233)
 
         # Portafoglio e Trading
         self.initial_balance = 10000.0
@@ -196,8 +197,8 @@ class HyperGoldM1Engine:
             cst = r_sess.headers.get("CST")
             xst = r_sess.headers.get("X-SECURITY-TOKEN")
 
-            # Recupera 200 barre storiche M5 in UNA SOLA chiamata REST
-            url_px = f"https://demo-api.ig.com/gateway/deal/prices/{EPIC_GOLD}?resolution=MINUTE_5&max=200&pageSize=0"
+            # Recupera fino a 250 barre storiche M5 in UNA SOLA chiamata REST di fallback (se necessarie)
+            url_px = f"https://demo-api.ig.com/gateway/deal/prices/{EPIC_GOLD}?resolution=MINUTE_5&max=250&pageSize=0"
             h_px = {
                 "X-IG-API-KEY": api_key,
                 "CST": cst,
@@ -241,7 +242,7 @@ class HyperGoldM1Engine:
             pass
 
     def _recalculate_indicators(self):
-        """Calcola KJ55 e TK144 in base allo storico candele M5 disponibile"""
+        """Calcola KJ55 e TK233 in base allo storico candele M5 disponibile (in memoria, senza chiamate IG)"""
         n = len(self.candles)
         if n >= WARMUP_BARS_KJ:
             sub_kj = self.candles[-WARMUP_BARS_KJ:]
@@ -257,10 +258,13 @@ class HyperGoldM1Engine:
             sub_tk = self.candles[-WARMUP_BARS_TK:]
             max_h_tk = max(c["high"] for c in sub_tk)
             min_l_tk = min(c["low"] for c in sub_tk)
-            self.tk144 = round((max_h_tk + min_l_tk) / 2.0, 2)
+            self.tk233 = round((max_h_tk + min_l_tk) / 2.0, 2)
+            self.tk144 = self.tk233  # retrocompatibilità
             if self.candles:
-                self.candles[-1]["tk144"] = self.tk144
+                self.candles[-1]["tk233"] = self.tk233
+                self.candles[-1]["tk144"] = self.tk233
         else:
+            self.tk233 = None
             self.tk144 = None
 
     def _get_state_file(self):
@@ -944,9 +948,10 @@ class HyperGoldM1Engine:
 
                 self.save_state()
 
-                # Strategia Unidirezionale TK144 + Trigger KJ55: solo se il mercato NON è sospeso
-                if self.trading_enabled and not market_suspended and self.kj55 is not None and self.tk144 is not None:
-                    self._evaluate_unidirectional_strategy(closed_candle, self.kj55, self.tk144, new_open, time_str)
+                # Strategia Unidirezionale TK233 + Trigger KJ55: solo se il mercato NON è sospeso
+                if self.trading_enabled and not market_suspended and self.kj55 is not None and (self.tk233 is not None or self.tk144 is not None):
+                    tk_val = self.tk233 if self.tk233 is not None else self.tk144
+                    self._evaluate_unidirectional_strategy(closed_candle, self.kj55, tk_val, new_open, time_str)
 
     def _evaluate_unidirectional_strategy(self, closed_candle: dict, kj: float, tk: float, exec_price: float, time_str: str):
         prev_close = closed_candle["close"]
@@ -959,15 +964,15 @@ class HyperGoldM1Engine:
         # 1. CONTROLLO INVERSIONE MACRO SU POSIZIONI ESISTENTI (FILTRO 3 PIP)
         # =============================================================
         if self.position and self.position["direction"] == "SHORT" and prev_close > tk_bullish_threshold:
-            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > (TK144 {tk:.2f} + {TK_FILTER_PIPS:.0f}p = {tk_bullish_threshold:.2f})")
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} > (TK233 {tk:.2f} + {TK_FILTER_PIPS:.0f}p = {tk_bullish_threshold:.2f})")
 
         elif self.position and self.position["direction"] == "LONG" and prev_close < tk_bearish_threshold:
-            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < (TK144 {tk:.2f} - {TK_FILTER_PIPS:.0f}p = {tk_bearish_threshold:.2f})")
+            self._close_all_to_flat(exec_price, time_str, reason=f"Inversione Macro: Close {prev_close:.2f} < (TK233 {tk:.2f} - {TK_FILTER_PIPS:.0f}p = {tk_bearish_threshold:.2f})")
 
         # =============================================================
         # 2. GESTIONE OPERATIVA SECONDO IL REGIME
         # =============================================================
-        # A) REGIME BULLISH (Close > TK144 + 3 pip) o POSIZIONE LONG RESIDUA (non ancora invertita)
+        # A) REGIME BULLISH (Close > TK233 + 3 pip) o POSIZIONE LONG RESIDUA (non ancora invertita)
         if prev_close > tk_bullish_threshold or (self.position and self.position["direction"] == "LONG"):
             if prev_close > kj:
                 if self.position is None and prev_close > tk_bullish_threshold:
@@ -1017,7 +1022,7 @@ class HyperGoldM1Engine:
                         self.signal_ref_price = closed_candle["low"]
                     self.save_state()
 
-        # B) REGIME BEARISH (Close < TK144 - 3 pip) o POSIZIONE SHORT RESIDUA (non ancora invertita)
+        # B) REGIME BEARISH (Close < TK233 - 3 pip) o POSIZIONE SHORT RESIDUA (non ancora invertita)
         elif prev_close < tk_bearish_threshold or (self.position and self.position["direction"] == "SHORT"):
             if prev_close < kj:
                 if self.position is None and prev_close < tk_bearish_threshold:

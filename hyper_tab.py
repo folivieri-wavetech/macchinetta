@@ -635,7 +635,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
         total_ticks = engine.total_ticks
         candles_count = len(engine.candles)
         kj = engine.kj55
-        tk = engine.tk144
+        tk = getattr(engine, "tk233", None) or engine.tk144
         pos = engine.position
         increments = list(engine.increments)
         total_contracts = (pos.get("contracts", CORE_CONTRACTS_5M) + sum(i.get("contracts", INC_CONTRACTS_5M) for i in increments)) if pos else 0
@@ -665,7 +665,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
         st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper Spot Gold 1€ <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>📊 TF 5 MIN</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_attivo})</span></h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (Paracadute 6p, Candela Segnale 3p) • Core 5c • Incr 3c (TP +5p)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 233 • Trigger KJ 55 (Paracadute 6p, Candela Segnale 3p) • Core 5c • Incr 3c (TP +5p)</div>", unsafe_allow_html=True)
 
     with c_badges:
         is_feed_closed = is_gold_feed_suspended()
@@ -802,11 +802,11 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, **kwar
                 </div>
                 <div style='border-left: 1px solid #334155; height: 26px;'></div>
                 <div style='text-align: center;'>
-                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>TK 144</div>
+                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>TK 233</div>
                     <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±6p</div>
+            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>Filtro Macro TK233 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±6p</div>
         </div>
         """, unsafe_allow_html=True)
 
