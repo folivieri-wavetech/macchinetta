@@ -3550,37 +3550,19 @@ else:
                         if os.path.exists(path_token): os.remove(path_token) 
                         st.rerun()
 
-                motore_attivo = False
-                path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
-                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
+                try:
+                    dd_num_op = float(stato.get('drawdown', '0'))
+                    dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
+                except:
+                    dd_col_op = "white"
 
-                col_head1, col_head2 = st.columns([1.6, 2])
-                with col_head1:
-                    with st.container(border=True):
-                        st.markdown(f"**Stato Sistema:** {'🟢 Connesso' if motore_attivo else '🔴 Motore Offline'}")
-                        st.markdown(f"📶 **IG API:** {'OK' if motore_attivo else 'SCONNESSO'} &nbsp;&nbsp; | &nbsp;&nbsp; 📈 **Stream:** {'Live' if motore_attivo else 'FERMO'}")
-                        st.markdown(f"<div style='white-space: nowrap;'>🕒 <b>LAST:</b> {stato['ultimo_aggiornamento']} &nbsp;|&nbsp; ⏱️ <b>Sessione:</b> {stato['durata_sessione']}</div>", unsafe_allow_html=True)
-                        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                        if st.button("🔄 Aggiorna dati Dashboard", width="stretch", key=f"REFRESH_{conto_selezionato}"): st.rerun()
-
-                with col_head2:
-                    with st.container(border=True):
-                        c_bal1, c_bal2 = st.columns(2)
-                        c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
-                        c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
-                    
-                        st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-                    
-                        c_bal3, c_bal4 = st.columns(2)
-                        c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
-                    
-                        try:
-                            dd_num_op = float(stato.get('drawdown', '0'))
-                            dd_col_op = "#09ab3b" if dd_num_op > 0 else ("#ef4444" if dd_num_op < 0 else "white")
-                        except:
-                            dd_col_op = "white"
-                        
-                        c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
+                with st.container(border=True):
+                    c_bal1, c_bal2, c_bal3, c_bal4 = st.columns(4)
+                    c_bal1.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE TOTALE</div><div style='font-size: 1.4rem; font-weight: bold; color: #FFD700;'>{formatta_eur(stato.get('saldo', '0'))} EUR</div>", unsafe_allow_html=True)
+                    c_bal2.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>CAPITALE DISPONIBILE</div><div style='font-size: 1.4rem; font-weight: bold; color: #4ade80;'>{formatta_eur(stato.get('disponibile', '0'))} EUR</div>", unsafe_allow_html=True)
+                    c_bal3.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>MARGINE UTILIZZATO</div><div style='font-size: 1.4rem; font-weight: bold; color: #ef4444;'>{formatta_eur(stato.get('margine', '0'))} EUR</div>", unsafe_allow_html=True)
+                    c_bal4.markdown(f"<div style='font-size: 0.9rem; color: #aaa; font-weight: 600; margin-bottom: -5px;'>DRAWDOWN (P/L)</div><div style='font-size: 1.4rem; font-weight: bold; color: {dd_col_op};'>{formatta_eur(stato.get('drawdown', '0'))} EUR</div>", unsafe_allow_html=True)
+                    if stato.get('messaggio'):
                         st.caption(stato.get('messaggio', ''))
 
                 st.markdown("---")
@@ -4459,7 +4441,21 @@ else:
                 if st.session_state.get("vista_sidebar", "CONTO") == "RADAR":
                     return
                 st.markdown("### 💻 Terminale di Bordo (Live)")
-                st.markdown("Monitoraggio in tempo reale del Motore. Auto-aggiornamento ogni 4 secondi.")
+
+                motore_attivo = False
+                path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
+                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60:
+                    motore_attivo = True
+                stato = leggi_stato_sistema(conto_selezionato)
+
+                with st.container(border=True):
+                    col_info, col_btn = st.columns([3.5, 1.5], vertical_alignment="center")
+                    with col_info:
+                        st.markdown(f"**Stato Sistema:** {'🟢 Connesso' if motore_attivo else '🔴 Motore Offline'} &nbsp;&nbsp; | &nbsp;&nbsp; 📶 **IG API:** {'OK' if motore_attivo else 'SCONNESSO'} &nbsp;&nbsp; | &nbsp;&nbsp; 📈 **Stream:** {'Live' if motore_attivo else 'FERMO'}")
+                        st.markdown(f"<div style='white-space: nowrap;'>🕒 <b>LAST:</b> {stato.get('ultimo_aggiornamento', '-')} &nbsp;|&nbsp; ⏱️ <b>Sessione:</b> {stato.get('durata_sessione', '-')}</div>", unsafe_allow_html=True)
+                    with col_btn:
+                        if st.button("🔄 Aggiorna dati Dashboard", width="stretch", key=f"REFRESH_{conto_selezionato}"):
+                            st.rerun()
             
                 try:
                     path_log = os.path.join(conto_selezionato, CONSOLE_LOG_FILE)
@@ -4944,7 +4940,7 @@ else:
                     st.rerun()
             with btn_c2:
                 if st.button("🗑️ Elimina Record", type="primary", key="confirm_reset_rep", use_container_width=True, disabled=(num_del == 0)):
-                    df_rimasti = df_rep.loc[~m_del].drop(columns=['Data_dt'], errors='ignore')
+                    df_rimasti = df_rep.loc[~m_del].drop(columns=['Data_dt', 'Capitale_Num', 'Diff_Giorno'], errors='ignore')
                     df_rimasti.to_csv(f_rep, index=False)
                     st.success(f"✅ {num_del} record eliminati con successo!")
                     time.sleep(1)
@@ -4957,6 +4953,9 @@ else:
                 df_report = df_report.drop_duplicates(subset=['Data'], keep='last')
                 df_report['Data_dt'] = pd.to_datetime(df_report['Data'], format="%Y-%m-%d", errors='coerce')
                 df_report = df_report.dropna(subset=['Data_dt'])
+                df_report = df_report.sort_values(by='Data_dt', ascending=True)
+                df_report['Capitale_Num'] = pd.to_numeric(df_report['Capitale Totale'], errors='coerce').fillna(0.0)
+                df_report['Diff_Giorno'] = df_report['Capitale_Num'].diff()
                 min_date = df_report['Data_dt'].min().date() if not df_report.empty else datetime.today().date()
                 max_date = df_report['Data_dt'].max().date() if not df_report.empty else datetime.today().date()
                 
@@ -5016,6 +5015,17 @@ else:
                             rend_html = f"<span style='color: #ff6b6b; font-weight: 600;'>-{formatta_eur(abs(diff_abs))} € (-{pct_str}%)</span>"
                         else:
                             rend_html = "<span style='color: #bbb;'>0,00 € (0,00%)</span>"
+
+                        # Calcolo Differenza giornaliera (DIFF.)
+                        diff_g = riga.get('Diff_Giorno')
+                        if pd.isna(diff_g):
+                            diff_html = "<span style='color: #888;'>--</span>"
+                        elif diff_g > 0:
+                            diff_html = f"<span style='color: #4ade80; font-weight: 600;'>+{formatta_eur(diff_g)} €</span>"
+                        elif diff_g < 0:
+                            diff_html = f"<span style='color: #ff6b6b; font-weight: 600;'>-{formatta_eur(abs(diff_g))} €</span>"
+                        else:
+                            diff_html = "<span style='color: #bbb;'>0,00 €</span>"
                             
                         # Drawdown styling
                         if dd_val < 0:
@@ -5032,6 +5042,7 @@ else:
                         <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
                             <td style='padding: 8px 12px; text-align: center; color: #fff; font-weight: 500;'>{d_str}</td>
                             <td style='padding: 8px 12px; text-align: center;'>{cap_html}</td>
+                            <td style='padding: 8px 12px; text-align: center;'>{diff_html}</td>
                             <td style='padding: 8px 12px; text-align: center;'>{rend_html}</td>
                             <td style='padding: 8px 12px; text-align: center;'>{marg_html}</td>
                             <td style='padding: 8px 12px; text-align: center;'>{dd_html}</td>
@@ -5040,11 +5051,12 @@ else:
                         
                     tabella_report_html = f"""
                     <div class='table-responsive'>
-                    <table style='width: 90%; max-width: 900px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 0.86rem; background-color: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.25);'>
+                    <table style='width: 90%; max-width: 950px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 0.86rem; background-color: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.25);'>
                         <thead>
                             <tr style='background-color: rgba(0,255,204,0.08); border-bottom: 1px solid rgba(0,255,204,0.25); color: #00FFCC; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.5px;'>
                                 <th style='padding: 10px 12px; text-align: center;'>📅 Data</th>
                                 <th style='padding: 10px 12px; text-align: center;'>💰 Capitale Totale</th>
+                                <th style='padding: 10px 12px; text-align: center;'>📊 DIFF.</th>
                                 <th style='padding: 10px 12px; text-align: center;'>📈 Rendimento (%)</th>
                                 <th style='padding: 10px 12px; text-align: center;'>🔒 Margine Utilizzato</th>
                                 <th style='padding: 10px 12px; text-align: center;'>📉 Drawdown</th>
