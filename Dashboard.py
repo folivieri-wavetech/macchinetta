@@ -708,7 +708,7 @@ def carica_stati_hyper(conto):
             except Exception: pass
     return hyper_30s_state, hyper_5m_state
 
-def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state=None, hyper_5m_state=None, pos_data=None):
+def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state=None, hyper_5m_state=None, pos_data=None):
     if hyper_30s_state is None: hyper_30s_state = {}
     if hyper_5m_state is None: hyper_5m_state = {}
     if pos_data is None: pos_data = []
@@ -821,6 +821,8 @@ def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s
     elif abs(sz_pos - s_c * 0.35) < 0.001: return f"Core ({dir_label}) (Taglio 1)"
     elif abs(sz_pos - s_c * 0.50) < 0.001: return f"Core ({dir_label}) (Taglio 2)"
     return "Posizione Orfana"
+
+get_role_pos = calcola_ruolo_posizione
 
 def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, size, ruolo_label=""):
     """
@@ -2787,9 +2789,8 @@ else:
             hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
             
             # --- HELPER: Riconoscimento Ruolo Chirurgico ---
-            def get_role_pos_inner(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
-                return get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state, hyper_5m_state, pos_data)
-            get_role_pos = get_role_pos_inner
+            def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
+                return calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state, hyper_5m_state, pos_data)
 
             def get_role_ord(nome_strum, dir_pos, sz_pos, param_memoria, ord_dict):
                 is_gold = (
@@ -4322,7 +4323,7 @@ else:
                         pnl_eur = 0.0
                         
                     param_inst = memoria_attuale.get(nome, {})
-                    role_html = get_role_pos(nome, dir_pos, sz, param_inst, pos, hyper_30s_state, hyper_5m_state, pos_data)
+                    role_html = calcola_ruolo_posizione(nome, dir_pos, sz, param_inst, pos, hyper_30s_state, hyper_5m_state, pos_data)
                     role_clean = re.sub(r"<[^>]+>", "", role_html).strip()
 
                     with st.container(border=True):
