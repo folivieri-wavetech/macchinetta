@@ -26,31 +26,28 @@ def test_forex_be_and_trailing():
     assert engine.pm.total_active_size() == 6
     assert inc.be_active == False
     
-    # 1. Prezzo a +10 pip (1.0820): nessun BE (soglia 15)
-    evs = engine.check_live_stops(1.0820)
-    assert len(evs) == 0, f"Attesi 0 eventi a +10p, ottenuti: {evs}"
+    # 1. Prezzo a +20 pip (1.0830): nessun BE (nuova soglia 25)
+    evs = engine.check_live_stops(1.0830)
+    assert len(evs) == 0, f"Attesi 0 eventi a +20p, ottenuti: {evs}"
     assert inc.be_active == False
     
-    # 2. Prezzo a +15 pip (1.0825): ATTIVAZIONE BREAK-EVEN (+1 pip = 1.0811, trailing 12p dal picco = 1.0813)
-    evs = engine.check_live_stops(1.0825)
+    # 2. Prezzo a +25 pip (1.0835): ATTIVAZIONE BREAK-EVEN (+1 pip = 1.0811, trailing 12p dal picco = 1.0823)
+    evs = engine.check_live_stops(1.0835)
     assert len(evs) == 1, f"Atteso 1 evento (BE), ottenuti: {evs}"
     assert evs[0]["type"] == "increment_be_activated"
     assert round(evs[0]["sl_price"], 5) == 1.0811
     assert inc.be_active == True
-    assert round(inc.sl_price, 5) == 1.0813
+    assert round(inc.sl_price, 5) == 1.0823
     
-    # 3. Prezzo sale a 1.0824 (gain +14p): BE rimane attivo
-    evs = engine.check_live_stops(1.0824)
+    # 3. Prezzo sale a 1.0837 (gain +27p): BE rimane attivo
+    evs = engine.check_live_stops(1.0837)
     assert len(evs) == 0
     assert inc.be_active == True
+    # Trailing dist = 12 pip -> trail_level = 1.0837 - 0.0012 = 1.0825
+    assert round(inc.sl_price, 5) == 1.0825
     
-    # 4. Prezzo sale a 1.0824 -> sale a 1.0824, poi sale a +24 pip (1.0834):
-    # Trailing dist = 12 pip -> trail_level = 1.0834 - 0.0012 = 1.0822
-    evs = engine.check_live_stops(1.0834)
-    assert round(inc.sl_price, 5) == 1.0822
-    
-    # 5. Prezzo ritraccia a 1.0821: scatta Trailing Stop!
-    evs = engine.check_live_stops(1.0821)
+    # 4. Prezzo ritraccia a 1.0824: scatta Trailing Stop!
+    evs = engine.check_live_stops(1.0824)
     assert len(evs) == 1
     assert evs[0]["type"] == "increment_closed"
     assert evs[0]["reason"] == "trailing_increment"
@@ -61,7 +58,7 @@ def test_forex_be_and_trailing():
     print("-> Test Forex BE & Trailing superato con successo!")
 
 def test_forex_tp_bancomat():
-    print("=== TEST FOREX TAKE PROFIT BANCOMAT (+25 PIP) ===")
+    print("=== TEST FOREX TAKE PROFIT BANCOMAT (+40 PIP) ===")
     config = {
         "nome": "GBP/USD",
         "size_i": 4,
@@ -76,18 +73,18 @@ def test_forex_tp_bancomat():
     
     inc = engine.pm.open_increment(1.2520, 2, "LONG")
     
-    # Prezzo a +25 pip dall'entry incremento (1.2545)
-    evs = engine.check_live_stops(1.2545)
+    # Prezzo a +40 pip dall'entry incremento (1.2560)
+    evs = engine.check_live_stops(1.2560)
     assert len(evs) >= 1
     tp_ev = next(e for e in evs if e["type"] == "tp_increment")
     assert tp_ev["size"] == 2
-    assert tp_ev["tp_pips"] == 25
+    assert tp_ev["tp_pips"] == 40
     assert len(engine.pm.increments) == 0
     assert engine.pm.total_active_size() == 4
     print("-> Test Forex TP Bancomat superato con successo!")
 
-def test_gold_30_50_logic():
-    print("=== TEST SPOT GOLD BE 30 PUNTI & TP 50 PUNTI ===")
+def test_gold_40_50_logic():
+    print("=== TEST SPOT GOLD BE 40 PUNTI & TP 50 PUNTI ===")
     config = {
         "nome": "Spot Gold",
         "size_i": 4,
@@ -102,19 +99,19 @@ def test_gold_30_50_logic():
     
     inc = engine.pm.open_increment(4300.0, 2, "LONG")
     
-    # 1. Prezzo a +20 punti (4320.0): niente BE (soglia per Gold è 30)
-    evs = engine.check_live_stops(4320.0)
+    # 1. Prezzo a +30 punti (4330.0): niente BE (soglia per Gold ora è 40)
+    evs = engine.check_live_stops(4330.0)
     assert len(evs) == 0
     assert inc.be_active == False
     
-    # 2. Prezzo a +30 punti (4330.0): scatta BE (+2 punti = 4302.0, trailing 15p dal picco = 4315.0)
-    evs = engine.check_live_stops(4330.0)
+    # 2. Prezzo a +40 punti (4340.0): scatta BE (+2 punti = 4302.0, trailing 15p dal picco = 4325.0)
+    evs = engine.check_live_stops(4340.0)
     assert len(evs) == 1
     assert evs[0]["type"] == "increment_be_activated"
     assert evs[0]["sl_price"] == 4302.0
-    assert evs[0]["be_pips"] == 30
+    assert evs[0]["be_pips"] == 40
     assert inc.be_active == True
-    assert inc.sl_price == 4315.0
+    assert inc.sl_price == 4325.0
     
     # 3. Prezzo a +50 punti (4350.0): scatta TP Bancomat (+50 punti)
     evs = engine.check_live_stops(4350.0)
@@ -123,7 +120,7 @@ def test_gold_30_50_logic():
     assert tp_ev["tp_pips"] == 50
     assert len(engine.pm.increments) == 0
     assert engine.pm.total_active_size() == 4
-    print("-> Test Spot Gold 30/50 superato con successo!")
+    print("-> Test Spot Gold 40/50 superato con successo!")
 
 def test_short_forex():
     print("=== TEST FOREX SHORT BE & TP ===")
@@ -141,18 +138,18 @@ def test_short_forex():
     
     inc = engine.pm.open_increment(154.50, 2, "SHORT")
     
-    # Prezzo scende a +15 pip (154.35): gain = 154.50 - 154.35 = 0.15 (+15 pip)
-    evs = engine.check_live_stops(154.35)
+    # Prezzo scende a +25 pip (154.25): gain = 154.50 - 154.25 = 0.25 (+25 pip)
+    evs = engine.check_live_stops(154.25)
     assert len(evs) == 1
     assert evs[0]["type"] == "increment_be_activated"
     # BE offset = 1 pip = 0.01 -> sl_price = 154.50 - 0.01 = 154.49
     assert round(evs[0]["sl_price"], 2) == 154.49
     assert inc.be_active == True
     
-    # Prezzo scende a +25 pip (154.25): scatta TP Bancomat
-    evs = engine.check_live_stops(154.25)
+    # Prezzo scende a +40 pip (154.10): scatta TP Bancomat
+    evs = engine.check_live_stops(154.10)
     tp_ev = next(e for e in evs if e["type"] == "tp_increment")
-    assert tp_ev["tp_pips"] == 25
+    assert tp_ev["tp_pips"] == 40
     assert len(engine.pm.increments) == 0
     assert engine.pm.total_active_size() == 4
     print("-> Test Forex SHORT superato con successo!")
@@ -250,7 +247,7 @@ def test_oil_90_100_logic():
 if __name__ == "__main__":
     test_forex_be_and_trailing()
     test_forex_tp_bancomat()
-    test_gold_30_50_logic()
+    test_gold_40_50_logic()
     test_oil_90_100_logic()
     test_short_forex()
     test_serialization_persistence()

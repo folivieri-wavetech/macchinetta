@@ -106,9 +106,9 @@ class CoreEngine:
         - Crude Oil (Oil - US Crude):
             be_pips = 90, be_offset = 5, tp_pips = 100, trail_dist = 30
         - Commodities e Indici (Spot Gold, US 500 Cash):
-            be_pips = 30, be_offset = 2, tp_pips = 50, trail_dist = 15
+            be_pips = 40, be_offset = 2, tp_pips = 50, trail_dist = 15
         - Cross Forex:
-            be_pips = 15, be_offset = 1, tp_pips = 25, trail_dist = 12
+            be_pips = 25, be_offset = 1, tp_pips = 40, trail_dist = 12
         """
         nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
         if "oil" in nome or "crude" in nome:
@@ -117,14 +117,14 @@ class CoreEngine:
             tp_pips = self.config.get("increment_tp_pips", 100)
             trail_dist = self.config.get("increment_trail_pips", 30)
         elif any(c in nome for c in ["gold", "us 500", "us500", "sp500"]):
-            be_pips = self.config.get("increment_be_pips", 30)
+            be_pips = self.config.get("increment_be_pips", 40)
             be_offset = self.config.get("increment_be_offset", 2)
             tp_pips = self.config.get("increment_tp_pips", 50)
             trail_dist = self.config.get("increment_trail_pips", 15)
         else:
-            be_pips = self.config.get("increment_be_pips", 15)
+            be_pips = self.config.get("increment_be_pips", 25)
             be_offset = self.config.get("increment_be_offset", 1)
-            tp_pips = self.config.get("increment_tp_pips", 25)
+            tp_pips = self.config.get("increment_tp_pips", 40)
             trail_dist = self.config.get("increment_trail_pips", 12)
         return be_pips, be_offset, tp_pips, trail_dist
 
