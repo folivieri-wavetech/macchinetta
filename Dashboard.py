@@ -1050,7 +1050,7 @@ def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, 
             topic = cfg_env.get("NTFY_TOPIC")
             if topic:
                 t_str = ora_dt.strftime("%H:%M:%S")
-                body_notif = f"[{t_str}] [{nome_strumento}] Chiusa manualmente posizione {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.2f} €]"
+                body_notif = f"[{t_str}] [{nome_strumento}] {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.2f} €]"
                 headers_ntfy = {
                     "Title": f"[{conto}] 🛑 CHIUSURA MANUALE: {nome_strumento}".encode('utf-8'),
                     "Tags": "octagonal_sign"

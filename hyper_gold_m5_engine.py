@@ -37,6 +37,7 @@ MIN_DIST_INCR_PIPS = 5.0       # Distanza minima tra incrementi consecutivi su M
 PARACADUTE_KJ_PIPS = 6.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 6 pip
 CANDELA_SEGNALE_OFFSET_PIPS = 3.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 3 pip
 CORE_MIN_KJ_DIST_PIPS = 2.0    # Minima distanza Prezzo - KJ per ingresso Core M5: >= 2 pip (stacco da KJ)
+CORE_MAX_KJ_DIST_PIPS = 6.0    # Massima distanza Prezzo - KJ per ingresso Core M5: <= 6 pip (coerente con Paracadute)
 
 # Parametri legacy per retrocompatibilità
 KJ_TK_MIN_FORBICE_PIPS = 0.0
@@ -1009,9 +1010,9 @@ class HyperGoldM5Engine:
         # =============================================================
         if prev_close > kj:
             if self.position is None:
-                # Ingresso Core LONG: solo se il prezzo attuale stacca sopra KJ di almeno 2 pip
+                # Ingresso Core LONG: solo se il prezzo attuale stacca sopra KJ tra 2.0 e 6.0 pip
                 dist_kj = round(exec_price - kj, 2)
-                if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
+                if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
                     if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                         self.entry_in_progress = True
                         self.signal_candle_active = False
@@ -1022,6 +1023,8 @@ class HyperGoldM5Engine:
                             args=("LONG", exec_price, time_str),
                             daemon=True
                         ).start()
+                elif dist_kj > CORE_MAX_KJ_DIST_PIPS:
+                    print(f"[{time_str}] ⏸️ [CORE SKIP LONG] Prezzo {exec_price:.2f} troppo distante da KJ {kj:.2f} ({dist_kj:.2f}p > max {CORE_MAX_KJ_DIST_PIPS:.1f}p). Attendo rientro/pullback.")
             elif self.position and self.position["direction"] == "LONG":
                 # Core già LONG: azzera eventuale Candela Segnale e valuta incremento su pullback
                 self.signal_candle_active = False
@@ -1056,9 +1059,9 @@ class HyperGoldM5Engine:
         # =============================================================
         elif prev_close < kj:
             if self.position is None:
-                # Ingresso Core SHORT: solo se il prezzo attuale stacca sotto KJ di almeno 2 pip
+                # Ingresso Core SHORT: solo se il prezzo attuale stacca sotto KJ tra 2.0 e 6.0 pip
                 dist_kj = round(kj - exec_price, 2)
-                if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
+                if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
                     if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                         self.entry_in_progress = True
                         self.signal_candle_active = False
@@ -1069,6 +1072,8 @@ class HyperGoldM5Engine:
                             args=("SHORT", exec_price, time_str),
                             daemon=True
                         ).start()
+                elif dist_kj > CORE_MAX_KJ_DIST_PIPS:
+                    print(f"[{time_str}] ⏸️ [CORE SKIP SHORT] Prezzo {exec_price:.2f} troppo distante da KJ {kj:.2f} ({dist_kj:.2f}p > max {CORE_MAX_KJ_DIST_PIPS:.1f}p). Attendo rientro/pullback.")
             elif self.position and self.position["direction"] == "SHORT":
                 # Core già SHORT: azzera eventuale Candela Segnale e valuta incremento su pullback
                 self.signal_candle_active = False

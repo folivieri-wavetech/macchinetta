@@ -1646,13 +1646,15 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     engine.pm.core_position.ticket = deal_id
                 
                 if core_close_summary:
-                    msg = f"{core_close_summary} 🔄 Reverse {dir_auto} a {entry_px}"
+                    msg = f"{core_close_summary} 🔄 Reverse {dir_auto} a {entry_px:.{dec}f}"
                     print_log(nome, msg)
-                    invia_notifica(f"🔄 STP&REV {tf_label}", f"[{nome}] {msg}", "arrows_counterclockwise")
+                    body_rev = f"[{nome}] Reverse {dir_auto} a {entry_px:.{dec}f} (Chiusura prec.{pnl_str})"
+                    invia_notifica(f"🔄 STP&REV {tf_label}", body_rev, "arrows_counterclockwise")
                 else:
-                    msg = f"🚀 Restart {dir_auto} a {entry_px}"
+                    msg = f"🚀 Restart {dir_auto} a {entry_px:.{dec}f}"
                     print_log(nome, msg)
-                    invia_notifica(f"🚀 RESTART {tf_label}", f"[{nome}] {msg}", "rocket")
+                    body_restart = f"[{nome}] {dir_auto} a {entry_px:.{dec}f}"
+                    invia_notifica(f"🚀 RESTART {tf_label}", body_restart, "rocket")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 aggiorna_memoria(nome, {"stato": dir_auto, "direzione": dir_auto})
@@ -1661,7 +1663,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 print_log(nome, "⚠️ Fallito Restart Core.")
                 if core_close_summary:
                     print_log(nome, f"{core_close_summary} ➡️ FLAT")
-                    invia_notifica(f"🛑 STOP KJ {tf_label}", f"[{nome}] {core_close_summary} ➡️ FLAT", "warning")
+                    body_fail = f"[{nome}] Core ({sz}){pnl_str} ➡️ FLAT"
+                    invia_notifica(f"🛑 STOP KJ {tf_label}", body_fail, "warning")
         
         elif tipo == 'increment_opened':
             dir_incr = ev['direction']
@@ -1670,9 +1673,10 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             if ok:
                 pos.entry_price = real_lvl if real_lvl else ev['price']
                 pos.ticket = deal_id
-                msg = f"➕ Open Incr {dir_incr} a {pos.entry_price}"
+                msg = f"➕ Open Incr {dir_incr} a {pos.entry_price:.{dec}f}"
                 print_log(nome, msg)
-                invia_notifica(f"➕ OPEN INCR {tf_label}", f"[{nome}] {msg}", "heavy_plus_sign")
+                body_incr = f"[{nome}] {dir_incr} a {pos.entry_price:.{dec}f} (size {pos.size})"
+                invia_notifica(f"➕ OPEN INCR {tf_label}", body_incr, "heavy_plus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
             else:
@@ -1735,20 +1739,24 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     if not has_auto_start:
                         print_log(nome, msg)
-                        invia_notifica(f"🛑 {tag_title} {tf_label}", f"[{nome}] {msg}", "warning")
+                        body_close_core = f"[{nome}] Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
+                        invia_notifica(f"🛑 {tag_title} {tf_label}", body_close_core, "warning")
                 elif tipo == 'tp_increment':
                     tp_p = ev.get('tp_pips', 20)
                     msg = f"🎯 TP Incr (+{tp_p}p) ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"🎯 TP INCR {tf_label}", f"[{nome}] {msg}", "dart")
+                    body_tp = f"[{nome}] Target (+{tp_p}p){px_str} (size {sz}){pnl_str}"
+                    invia_notifica(f"🎯 TP INCR {tf_label}", body_tp, "dart")
                 elif is_bancomat:
                     msg = f"💰 Bancomat ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"💰 BANCOMAT {tf_label}", f"[{nome}] {msg}", "moneybag")
+                    body_banc = f"[{nome}] Incasso{px_str} (size {sz}){pnl_str}"
+                    invia_notifica(f"💰 BANCOMAT {tf_label}", body_banc, "moneybag")
                 elif tipo == 'fifo_close':
                     msg = f"➖ FIFO Incr ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"➖ FIFO INCR {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    body_fifo = f"[{nome}] Uscita FIFO{px_str} (size {sz}){pnl_str}"
+                    invia_notifica(f"➖ FIFO INCR {tf_label}", body_fifo, "heavy_minus_sign")
                 elif tipo == 'increment_closed':
                     r_inc = ev.get("reason", "")
                     if r_inc == "be_increment":
@@ -1765,7 +1773,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                         ico = "heavy_minus_sign"
                     msg = f"➖ {tag_inc} ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"➖ {tag_title} {tf_label}", f"[{nome}] {msg}", ico)
+                    body_inc = f"[{nome}] Uscita{px_str} (size {sz}){pnl_str}"
+                    invia_notifica(f"➖ {tag_title} {tf_label}", body_inc, ico)
                 elif tipo == 'increments_cleared':
                     r_incr = ev.get("reason", "")
                     if not r_incr:
@@ -1774,21 +1783,28 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                             r_incr = inc_ev.get('reason', '')
                     if "break_min" in r_incr:
                         tag_tk = "Stop TK (Break Min -5p)"
+                        title_tk = "STOP TK (BREAK MIN)"
                     elif "break_max" in r_incr:
                         tag_tk = "Stop TK (Break Max +5p)"
+                        title_tk = "STOP TK (BREAK MAX)"
                     elif "live_stop_tk" in r_incr:
                         tag_tk = "Paracadute TK"
+                        title_tk = "PARACADUTE TK"
                     elif "trailing" in r_incr:
                         tag_tk = "Trailing TK"
+                        title_tk = "TRAILING TK"
                     else:
                         tag_tk = "Stop TK"
+                        title_tk = "STOP TK"
                     msg = f"🛑 {tag_tk}: Close Incr ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"🛑 {tag_tk.upper()} {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    body_tk = f"[{nome}] Close Incr ({sz}){px_str}{pnl_str}"
+                    invia_notifica(f"🛑 {title_tk} {tf_label}", body_tk, "heavy_minus_sign")
                 else:
                     msg = f"➖ Close Core ({sz}){px_str}{pnl_str}"
                     print_log(nome, msg)
-                    invia_notifica(f"➖ CLOSE CORE {tf_label}", f"[{nome}] {msg}", "heavy_minus_sign")
+                    body_core_def = f"[{nome}] Uscita{px_str} (size {sz}){pnl_str}"
+                    invia_notifica(f"➖ CLOSE CORE {tf_label}", body_core_def, "heavy_minus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
         
@@ -1821,7 +1837,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             px_str = f" a {be_px:.{dec}f}" if (be_px is not None and isinstance(be_px, (int, float))) else ""
             msg = f"🛡️ BE Incr (+{be_p}p) ({sz}) protetto{px_str}"
             print_log(nome, msg)
-            invia_notifica(f"🛡️ BE INCR {tf_label}", f"[{nome}] {msg}", "shield")
+            body_be = f"[{nome}] Protetto{px_str} (+{be_p}p, size {sz})"
+            invia_notifica(f"🛡️ BE INCR {tf_label}", body_be, "shield")
             storico.append(f"[{ora_str}] {msg}")
             ha_fatto_eventi = True
 
@@ -1832,7 +1849,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             px_str = f" a {stop_lvl:.{dec}f}" if (stop_lvl is not None and isinstance(stop_lvl, (int, float))) else ""
             msg_ts = f"🎯 Trailing Core H1 ({trail_p}p) impostato{px_str} (Distanza KJ: {dist_p:.1f}p)"
             print_log(nome, msg_ts)
-            invia_notifica(f"🎯 TRAILING CORE {tf_label}", f"[{nome}] {msg_ts}", "dart")
+            body_trail = f"[{nome}] Stop{px_str} (+{trail_p}p | Dist. KJ: {dist_p:.1f}p)"
+            invia_notifica(f"🎯 TRAILING CORE {tf_label}", body_trail, "dart")
             storico.append(f"[{ora_str}] {msg_ts}")
             ha_fatto_eventi = True
             aggiorna_memoria(nome, {"trailing_sl_core": stop_lvl})
@@ -1864,7 +1882,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     tag_motivo = "Stop KJ"
                 msg = f"🛑 {tag_motivo} ➡️ {new_d}"
                 print_log(nome, msg)
-                invia_notifica(f"🛑 REVERSAL {tf_label}", f"[{nome}] {msg}", "warning")
+                body_rev_direct = f"[{nome}] Stop KJ ➡️ {new_d}"
+                invia_notifica(f"🛑 REVERSAL {tf_label}", body_rev_direct, "warning")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
                 
@@ -2359,8 +2378,8 @@ def esegui_ciclo_trend():
                             pnl_str = f" [PnL: {pnl_eur:+.0f} €]" if pnl_eur != 0 else ""
                             msg = f"➖ FIFO SizeMax Incr ({best.size}) a {px_cur:.{dec}f}{pnl_str}"
                             storico.append(f"[{ora_str}] {msg}")
-                            print_log(nome, f"🛡️ Salvaguardia SizeMax: {msg}")
-                            invia_notifica(f"➖ FIFO SIZEMAX {nome}", msg, "heavy_minus_sign")
+                            body_sizemax = f"[{nome}] Chiusura incremento ({best.size}) a {px_cur:.{dec}f}{pnl_str}"
+                            invia_notifica(f"➖ FIFO SIZEMAX {nome}", body_sizemax, "heavy_minus_sign")
                             storico_aggiornato = True
                         else:
                             break
@@ -2608,7 +2627,13 @@ def esegui_ciclo_trend():
                 pos.entry_price = real_lvl if real_lvl else px_start
                 pos.ticket = deal_id
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                msg = f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}"
+                
+                # Calcola distanza da KJ in pip per arricchire il log e differenziare la notifica
+                mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                dist_kj_pip = abs(pos.entry_price - kj_val) / mult if (kj_val is not None and mult) else 0.0
+                dist_str = f" (Distanza KJ: {dist_kj_pip:.1f} pip)" if kj_val is not None else ""
+                
+                msg = f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}{dist_str}"
                 aggiorna_memoria(nome, {
                     "stato": direzione, 
                     "direzione": direzione, 
@@ -2618,8 +2643,9 @@ def esegui_ciclo_trend():
                     "msg_manuale": "",
                     "storico_wip_trend": [f"[{ora_str}] {msg}"]
                 })
-                print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}.")
-                invia_notifica(f"🚀 OPEN CORE {format_tf_label(tf)}", f"[{nome}] {msg}", "rocket")
+                print_log(nome, f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}{dist_str}.")
+                body_core_ntfy = f"[{nome}] {direzione} a {pos.entry_price:.{dec}f}{dist_str}"
+                invia_notifica(f"🚀 OPEN CORE {format_tf_label(tf)}", body_core_ntfy, "rocket")
             else:
                 engine.reset()
                 aggiorna_memoria(nome, {"attivo": False, "stato": "FLAT", "errore_avvio": True, "needs_manual_start": False})

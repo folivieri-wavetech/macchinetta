@@ -37,6 +37,7 @@ MIN_DIST_INCR_PIPS = 10.0       # Distanza minima tra incrementi consecutivi: >=
 PARACADUTE_KJ_PIPS = 10.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 10 punti
 CANDELA_SEGNALE_OFFSET_PIPS = 5.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 5 punti
 CORE_MIN_KJ_DIST_PIPS = 3.0     # Minima distanza Prezzo - KJ per ingresso Core M5: >= 3 punti (stacco da KJ)
+CORE_MAX_KJ_DIST_PIPS = 10.0    # Massima distanza Prezzo - KJ per ingresso Core M5: <= 10 punti (coerente con Paracadute)
 
 # Parametri legacy per retrocompatibilità
 KJ_TK_MIN_FORBICE_PIPS = 0.0
@@ -879,7 +880,7 @@ class HyperUS500M5Engine:
         if prev_close > kj:
             if self.position is None:
                 dist_kj = round(exec_price - kj, 2)
-                if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
+                if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
                     if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                         self.entry_in_progress = True
                         self.signal_candle_active = False
@@ -890,6 +891,8 @@ class HyperUS500M5Engine:
                             args=("LONG", exec_price, time_str),
                             daemon=True
                         ).start()
+                elif dist_kj > CORE_MAX_KJ_DIST_PIPS:
+                    print(f"[{time_str}] ⏸️ [CORE SKIP US500 LONG] Prezzo {exec_price:.2f} troppo distante da KJ {kj:.2f} ({dist_kj:.2f}p > max {CORE_MAX_KJ_DIST_PIPS:.1f}p). Attendo rientro/pullback.")
             elif self.position and self.position["direction"] == "LONG":
                 self.signal_candle_active = False
                 self.signal_stop_price = None
@@ -920,7 +923,7 @@ class HyperUS500M5Engine:
         elif prev_close < kj:
             if self.position is None:
                 dist_kj = round(kj - exec_price, 2)
-                if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
+                if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
                     if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                         self.entry_in_progress = True
                         self.signal_candle_active = False
@@ -931,6 +934,8 @@ class HyperUS500M5Engine:
                             args=("SHORT", exec_price, time_str),
                             daemon=True
                         ).start()
+                elif dist_kj > CORE_MAX_KJ_DIST_PIPS:
+                    print(f"[{time_str}] ⏸️ [CORE SKIP US500 SHORT] Prezzo {exec_price:.2f} troppo distante da KJ {kj:.2f} ({dist_kj:.2f}p > max {CORE_MAX_KJ_DIST_PIPS:.1f}p). Attendo rientro/pullback.")
             elif self.position and self.position["direction"] == "SHORT":
                 self.signal_candle_active = False
                 self.signal_stop_price = None
