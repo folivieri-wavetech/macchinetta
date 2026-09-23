@@ -120,7 +120,7 @@ CONFIG_STRUMENTI = {
 }
 
 # Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
-STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold"]
+STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold", "US 500 Cash"]
 
 # --- STATO GLOBALE ---
 falsi_allarmi_tracker = {}

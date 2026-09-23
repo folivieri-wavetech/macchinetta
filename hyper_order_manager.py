@@ -201,19 +201,21 @@ class HyperOrderManager:
                 logger.warning(f"Verifica conferma deal {deal_ref} tentativo {attempt}: {e}")
         return False, {"reason": "TIMEOUT_CONFERMA"}
 
-    def open_market_deal(self, direction: str, size: float, limit_level: float = None, stop_level: float = None, label: str = "Core") -> dict:
-        """Apre un ordine a mercato su Spot Gold 1€ con rispetto delle tempistiche IG e ritorno dei dati effettivi."""
+    def open_market_deal(self, direction: str, size: float, limit_level: float = None, stop_level: float = None, label: str = "Core", epic: str = None, currency: str = None) -> dict:
+        """Apre un ordine a mercato su IG (Gold, US500, ecc.) con rispetto delle tempistiche IG e ritorno dei dati effettivi."""
         with self.lock:
             self._throttle()
             if not self._ensure_session():
                 return {"success": False, "reason": "ERRORE_SESSIONE_IG"}
 
+            target_epic = epic or EPIC_GOLD
+            target_curr = currency or GOLD_CURRENCY
             dir_str = "BUY" if direction.upper() in ("BUY", "LONG") else "SELL"
             size_val = int(size) if float(size).is_integer() else float(size)
             size_str = str(size_val)
 
             payload = {
-                "epic": EPIC_GOLD,
+                "epic": target_epic,
                 "expiry": "-",
                 "direction": dir_str,
                 "size": size_str,
@@ -221,7 +223,7 @@ class HyperOrderManager:
                 "timeInForce": "EXECUTE_AND_ELIMINATE",
                 "guaranteedStop": False,
                 "forceOpen": True,
-                "currencyCode": GOLD_CURRENCY
+                "currencyCode": target_curr
             }
 
             if limit_level is not None:
@@ -229,7 +231,7 @@ class HyperOrderManager:
             if stop_level is not None:
                 payload["stopLevel"] = f"{float(stop_level):.2f}"
 
-            logger.info(f"📤 Invio ordine a mercato IG ({label}): {dir_str} {size_str} contratti su {EPIC_GOLD} (TP: {limit_level}, SL: {stop_level})")
+            logger.info(f"📤 Invio ordine a mercato IG ({label}): {dir_str} {size_str} contratti su {target_epic} (TP: {limit_level}, SL: {stop_level})")
 
             try:
                 h = self._get_headers(version="2")
@@ -366,15 +368,17 @@ class HyperOrderManager:
                 logger.error(f"❌ Eccezione chiusura IG {deal_id}: {e}")
                 return {"success": False, "reason": str(e)}
 
-    def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = ""):
+    def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = "", epic: str = ""):
         """Salva in modo persistente l'operazione conclusa in hyper_trades_history.json."""
         with self.lock:
             now_str = now_it().strftime("%Y-%m-%d %H:%M:%S")
+            target_epic = epic or ("IX.D.SPTRD.IBE.IP" if "US500" in (label or "").upper() else EPIC_GOLD)
             trade_item = {
                 "id": str(int(time.time() * 1000)),
                 "time_open": time_open or now_str,
                 "time_close": now_str,
                 "tf": tf,
+                "epic": target_epic,
                 "direction": direction,
                 "contracts": contracts,
                 "open_price": round(open_price, 2) if open_price else 0.0,
@@ -397,8 +401,8 @@ class HyperOrderManager:
             except Exception as e:
                 logger.error(f"Errore salvataggio trade history in {self.history_file}: {e}")
 
-    def get_trades_history(self, tf: str = None) -> list:
-        """Restituisce la lista dei trade conclusi registrati."""
+    def get_trades_history(self, tf: str = None, epic: str = None) -> list:
+        """Restituisce la lista dei trade conclusi registrati, opzionalmente filtrati per TF ed Epic."""
         if not os.path.exists(self.history_file):
             return []
         try:
@@ -406,18 +410,33 @@ class HyperOrderManager:
                 data = json.load(f)
                 if not isinstance(data, list):
                     return []
+                res = data
                 if tf:
-                    return [t for t in data if t.get("tf") == tf]
-                return data
+                    res = [t for t in res if t.get("tf") == tf]
+                if epic:
+                    if "SPTRD" in epic.upper() or "US500" in epic.upper():
+                        res = [t for t in res if ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())]
+                    else:
+                        res = [t for t in res if not ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())]
+                return res
         except Exception:
             return []
 
-    def clear_trades_history(self, tf: str = None):
-        """Azzera lo storico eseguiti (per un singolo TF o globale)."""
+    def clear_trades_history(self, tf: str = None, epic: str = None):
+        """Azzera lo storico eseguiti (per un singolo TF o globale, con filtro per strumento opzionale)."""
         with self.lock:
-            if tf:
-                all_t = self.get_trades_history()
-                kept = [t for t in all_t if t.get("tf") != tf]
+            all_t = self.get_trades_history()
+            if tf or epic:
+                def _should_keep(t):
+                    if tf and t.get("tf") != tf:
+                        return True
+                    if epic:
+                        is_us500_t = ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())
+                        target_is_us = ("SPTRD" in epic.upper() or "US500" in epic.upper())
+                        if is_us500_t != target_is_us:
+                            return True
+                    return False
+                kept = [t for t in all_t if _should_keep(t)]
                 try:
                     with open(self.history_file, "w", encoding="utf-8") as f:
                         json.dump(kept, f, indent=2)

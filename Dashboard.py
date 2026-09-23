@@ -86,7 +86,7 @@ CONFIG_STRUMENTI = {
 }
 
 # Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
-STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold"]
+STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold", "US 500 Cash"]
 
 
 config = dotenv_values(".env")
@@ -699,13 +699,36 @@ def carica_stati_hyper(conto):
                     if hyper_30s_state: break
             except Exception: pass
 
-    for p_5m in [os.path.join(conto, "hyper_gold_m1_state.json"), "hyper_gold_m1_state.json"]:
+    for p_5m in [os.path.join(conto, "hyper_gold_m5_state.json"), "hyper_gold_m5_state.json", os.path.join(conto, "hyper_gold_m1_state.json"), "hyper_gold_m1_state.json"]:
         if os.path.exists(p_5m):
             try:
                 with open(p_5m, "r", encoding="utf-8") as f:
                     hyper_5m_state = json.load(f)
                     if hyper_5m_state: break
             except Exception: pass
+
+    # US 500
+    hyper_us500_30s = {}
+    for p_u30 in [os.path.join(conto, "hyper_us500_state.json"), "hyper_us500_state.json"]:
+        if os.path.exists(p_u30):
+            try:
+                with open(p_u30, "r", encoding="utf-8") as f:
+                    hyper_us500_30s = json.load(f)
+                    if hyper_us500_30s: break
+            except Exception: pass
+
+    hyper_us500_5m = {}
+    for p_u5 in [os.path.join(conto, "hyper_us500_m5_state.json"), "hyper_us500_m5_state.json"]:
+        if os.path.exists(p_u5):
+            try:
+                with open(p_u5, "r", encoding="utf-8") as f:
+                    hyper_us500_5m = json.load(f)
+                    if hyper_us500_5m: break
+            except Exception: pass
+
+    hyper_30s_state["us500"] = hyper_us500_30s
+    hyper_5m_state["us500"] = hyper_us500_5m
+
     return hyper_30s_state, hyper_5m_state
 
 def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state=None, hyper_5m_state=None, pos_data=None):
@@ -719,11 +742,15 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
         or "CFEGOLD" in str(pos_dict.get("epic", ""))
     )
 
-    # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold 1€) ---
+    # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold e US 500) ---
     pos_30s = hyper_30s_state.get("position") or {}
     incs_30s = hyper_30s_state.get("increments") or []
     pos_5m = hyper_5m_state.get("position") or {}
     incs_5m = hyper_5m_state.get("increments") or []
+
+    u_pos_30s = (hyper_30s_state.get("us500") or {}).get("position") or {}
+    u_pos_5m = (hyper_5m_state.get("us500") or {}).get("position") or {}
+    u_incs_5m = (hyper_5m_state.get("us500") or {}).get("increments") or []
 
     if deal_id:
         if deal_id == pos_30s.get("deal_id"):
@@ -738,6 +765,15 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
         for idx_5, inc in enumerate(incs_5m):
             if inc.get("deal_id") == deal_id:
                 return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {idx_5 + 1}</span>"
+
+        # US500 Hyper
+        if deal_id == u_pos_30s.get("deal_id"):
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S (US500)</span>"
+        if deal_id == u_pos_5m.get("deal_id"):
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m (US500)</span>"
+        for idx_u5, inc in enumerate(u_incs_5m):
+            if inc.get("deal_id") == deal_id:
+                return f"<span style='color: #38bdf8; font-weight: bold;'>incremento US500 n. {idx_u5 + 1}</span>"
 
     if is_gold:
         if abs(sz_pos - 2.0) < 0.001:
@@ -961,8 +997,14 @@ def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, 
 
             salva_memoria(conto, memoria)
 
-        # 2. Riconciliazione Hyper Gold (30S e 5M)
-        for f_hyp, is_m1 in [("hyper_gold_state.json", False), ("hyper_gold_m1_state.json", True)]:
+        # 2. Riconciliazione Hyper Gold & US500 (30S e 5M)
+        for f_hyp, is_m1 in [
+            ("hyper_gold_state.json", False),
+            ("hyper_gold_m5_state.json", True),
+            ("hyper_gold_m1_state.json", True),
+            ("hyper_us500_state.json", False),
+            ("hyper_us500_m5_state.json", True)
+        ]:
             for p_hyp in [os.path.join(conto, f_hyp), f_hyp]:
                 if os.path.exists(p_hyp):
                     try:

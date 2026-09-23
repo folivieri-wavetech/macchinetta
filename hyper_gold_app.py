@@ -131,8 +131,8 @@ def render_live_desk():
     # HEADER SUPERIORE
     c_title, c_badges = st.columns([2.3, 1.7])
     with c_title:
-        st.markdown("<h3 style='margin: 0; font-size: 1.08rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8; font-weight: 500;'>(TK144 / KJ55)</span></h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Filtro Macro TK 144 • Trigger KJ 55 (Paracadute 2p, Candela Segnale 2p) • Scalini Fast: 4c @ 2p + 4c @ 3p • Core Runner 2c (TS a +10p) • Totale 10c • Porta 8501</div>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin: 0; font-size: 1.08rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper-Trading Spot Gold 1€ <span style='background: rgba(56, 189, 248, 0.20); color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>⏱️ TF 30 SEC</span> <span style='font-size: 0.80rem; color: #94a3b8; font-weight: 500;'>(S&R Puro KJ55)</span></h3>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Supporto & Resistenza Puro KJ 55 • Posizione Unica 10c • TS 3p a Gradini • 1 Primario + 1 Pullback (≤3p) • 🪂 ±3p</div>", unsafe_allow_html=True)
 
     with c_badges:
         is_feed_closed = is_gold_feed_suspended()
@@ -279,17 +279,17 @@ def render_live_desk():
         """, unsafe_allow_html=True)
 
     with m2:
-        tk_str = f"{tk:.2f}" if tk else "--"
         kj_str = f"{kj:.2f}" if kj else "--"
-        if live_mid and tk:
-            if live_mid > (tk + TK_FILTER_PIPS):
-                regime = "🟢 BULLISH (SOLO LONG)"
+        dist_str = f"{abs(live_mid - kj):.2f} p" if (live_mid and kj) else "--"
+        if live_mid and kj:
+            if live_mid > kj:
+                regime = "🟢 BULLISH (SOPRA KJ55)"
                 col_reg = "#22c55e"
-            elif live_mid < (tk - TK_FILTER_PIPS):
-                regime = "🔴 BEARISH (SOLO SHORT)"
+            elif live_mid < kj:
+                regime = "🔴 BEARISH (SOTTO KJ55)"
                 col_reg = "#ef4444"
             else:
-                regime = "⚪ ZONA NEUTRA TK (±3p)"
+                regime = "⚪ A CONTATTO CON KJ55"
                 col_reg = "#f59e0b"
         else:
             regime = "Inizializzazione..."
@@ -298,7 +298,7 @@ def render_live_desk():
         st.markdown(f"""
         <div class='kpi-card' style='padding: 8px 14px;'>
             <div class='kpi-title' style='display: flex; justify-content: space-between; align-items: center;'>
-                <span>Livelli Chiave (30s)</span>
+                <span>Livelli S&R Puro (30s)</span>
                 <span style='color: {col_reg}; font-weight: 700; font-size: 0.72rem;'>{regime}</span>
             </div>
             <div style='display: flex; justify-content: space-around; align-items: center; margin-top: 5px;'>
@@ -308,16 +308,16 @@ def render_live_desk():
                 </div>
                 <div style='border-left: 1px solid #334155; height: 26px;'></div>
                 <div style='text-align: center;'>
-                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>KJ 55</div>
+                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>KJ 55 (S&R)</div>
                     <div style='font-size: 1.05rem; font-weight: 800; color: #FFD700;'>{kj_str}</div>
                 </div>
                 <div style='border-left: 1px solid #334155; height: 26px;'></div>
                 <div style='text-align: center;'>
-                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>TK 144</div>
-                    <div style='font-size: 1.05rem; font-weight: 800; color: #f97316;'>{tk_str}</div>
+                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>DISTANZA KJ</div>
+                    <div style='font-size: 1.05rem; font-weight: 800; color: #38bdf8;'>{dist_str}</div>
                 </div>
             </div>
-            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>Filtro Macro TK144 (±3p) • Trigger KJ55 • 🪂 Paracadute KJ: ±2p (Live)</div>
+            <div style='font-size: 0.68rem; color: #94a3b8; margin-top: 5px; text-align: center;'>S&R Puro KJ55 • Trailing Stop 3p • 🪂 Paracadute KJ: ±3p (Live) • Pullback ≤3p</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -346,12 +346,12 @@ def render_live_desk():
     st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
 
     # 3. STATO ACCUMULO BARRE (SE INIZIALE)
-    if candles_count < WARMUP_BARS_TK:
-        pct_warmup = min(1.0, candles_count / WARMUP_BARS_TK)
-        st.info(f"⏳ **Accumulo Barre 30s In Corso:** {candles_count} / {WARMUP_BARS_TK} barre raccolte. Mancano {max(0, WARMUP_BARS_TK - candles_count)} barre ({max(0, (WARMUP_BARS_TK - candles_count) * 30 // 60)} min) per il calcolo completo di KJ55 e TK144.")
+    if candles_count < WARMUP_BARS_KJ:
+        pct_warmup = min(1.0, candles_count / WARMUP_BARS_KJ)
+        st.info(f"⏳ **Accumulo Barre 30s In Corso:** {candles_count} / {WARMUP_BARS_KJ} barre raccolte. Mancano {max(0, WARMUP_BARS_KJ - candles_count)} barre ({max(0, (WARMUP_BARS_KJ - candles_count) * 30 // 60)} min) per il calcolo completo di KJ55.")
         st.progress(pct_warmup)
     else:
-        st.success(f"✅ **Indicatori 30s Pienamente Operativi:** {candles_count} barre storiche disponibili. KJ55 e TK144 calcolate in tempo reale.")
+        st.success(f"✅ **Indicatori 30s Pienamente Operativi:** {candles_count} barre storiche disponibili. KJ55 calcolata in tempo reale.")
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 

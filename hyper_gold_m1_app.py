@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import time
-from hyper_gold_m1_engine import HyperGoldM1Engine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CORE_TS_TRIGGER_PIPS, CANDELA_SEGNALE_OFFSET_PIPS, TK_FILTER_PIPS, is_gold_trading_suspended, is_gold_feed_suspended
+from hyper_gold_m5_engine import HyperGoldM1Engine, CANDLE_SECONDS, WARMUP_BARS_KJ, WARMUP_BARS_TK, CORE_CONTRACTS, INC_CONTRACTS, MAX_INCREMENTS, INC_TP_PIPS, CORE_TS_TRIGGER_PIPS, CANDELA_SEGNALE_OFFSET_PIPS, TK_FILTER_PIPS, is_gold_trading_suspended, is_gold_feed_suspended
 
 # Configurazione Pagina Streamlit
 st.set_page_config(
