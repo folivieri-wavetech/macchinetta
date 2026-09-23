@@ -1,9 +1,8 @@
 # Regole Operative Progetto Macchinetta IG
 
 ## 🔄 1. Sincronizzazione e Deploy Server Kubernetes (Produzione)
-- **Autorizzazione Implicita al Deploy:** Quando l'utente dice "sincronizza server", a meno di comunicazioni esplicite dell'utente, significa che si PUÒ sincronizzare sempre (il server è attivo e operativo). Non mettere mai in dubbio lo stato o la disponibilità del server.
-- **Non usare Docker e non fare build di immagini/VM:** Su questa macchina Windows non è installato Docker e l'infrastruttura di produzione non usa VM dirette.
-- **Architettura di produzione:** Il cluster è Kubernetes K3s (Rancher `rancher.wavetech.it`), namespace `macchinetta`. I pod eseguono il codice direttamente dal volume condiviso Longhorn (`/data`).
+- **Autorizzazione Implicita al Deploy:** Quando l'utente dice "sincronizza server" (o simile), si procede sempre all'istante: il server è attivo, operativo e i permessi sul namespace `macchinetta` sono abilitati al 100%.
+- **Metodo Ufficiale di Deploy:** Non si usa Docker (la virtualizzazione non è attiva sul PC ed è stata concordata e confermata la modalità diretta PVC/Kubernetes). I pod eseguono il codice direttamente dal volume condiviso Longhorn (`/data`).
 - **Comando Unico di Sincronizzazione:**
   Per aggiornare il server, eseguire sempre:
   ```powershell
@@ -11,9 +10,9 @@
   ```
   Questo script si occupa in automatico di:
   1. Verificare la sintassi Python (`py_compile`).
-  2. Eseguire il commit e push su GitHub (`master`).
-  3. Copiare i file modificati (`Dashboard.py`, `Motore.py`, `Motore_Trend.py`, `macchinetta_trend/`, ecc.) nella PVC `/data/` tramite `kubectl cp`.
-  4. Riavviare selettivamente i pod (`kubectl rollout restart`).
+  2. Eseguire commit e push su GitHub (`master`).
+  3. Copiare i file modificati (`Dashboard.py`, `Motore.py`, `Motore_Trend.py`, `hyper_tab.py`, `macchinetta_trend/`, `Sistema/`, ecc.) nella PVC `/data/` tramite `kubectl cp`.
+  4. Riavviare i deployment (`kubectl rollout restart`).
   5. Eseguire l'health check HTTP su `https://macchinetta.wavetech.it`.
 
 ---
@@ -22,19 +21,16 @@
 - Il kubeconfig si trova in `local.yaml` e usa il token associato all'utente **`marco`** (`u-659xm`).
 - **Scadenza o Invalidazione del Token (Unauthorized / 401):**  
   Se un comando `kubectl` fallisce per token scaduto (`Unauthorized`, `401`):
-  - Chiedi direttamente ed esclusivamente all'utente di inviarti la nuova configurazione / nuovo token per `local.yaml`.
-  - L'utente te lo rimanda immediatamente senza scomodare nessun altro.
-  - Una volta fornito dall'utente, sovrascrivi `local.yaml` con il nuovo contenuto e procedi subito.
+  - Chiedi **direttamente ed esclusivamente all'utente** di inviarti la nuova configurazione / nuovo token per `local.yaml`.
+  - L'utente accede a Rancher, fa "Copy KubeConfig" e te lo manda immediatamente senza scomodare nessun altro.
+  - Una volta fornito dall'utente, sovrascrivi `local.yaml` con il nuovo contenuto e procedi subito con la sincronizzazione.
 
 ---
 
-## 🛑 3. Gestione Errore FORBIDDEN (REGOLA FONDAMENTALE)
-- **DIVIETO ASSOLUTO DI INVENTARE PROBLEMI DI PROGETTO O AMMINISTRATORE:**
-  Se durante il comando `kubectl` compare l'errore `Forbidden` (es. `User "u-659xm" cannot list resource "pods"`):
-  - **NON dire MAI** che l'utente non è riconosciuto nel progetto, che mancano ruoli, permessi RBAC o che serve contattare l'amministratore del server.
-  - L'amministratore **NON deve fare nulla**, l'utente **NON ha cambiato nulla**, il progetto e le autorizzazioni sono corretti al 100%.
-  - Si tratta unicamente di una **latenza temporanea di allineamento/cache interna di Rancher**.
-  - **Cosa fare:** Attendere qualche istante (lo script `sincronizza.ps1` include retry automatici) e riprovare. Se devi comunicare qualcosa, di' semplicemente: *"Il server è momentaneamente occupato nell'allineamento della sessione, attendo qualche secondo e riprovo la sincronizzazione"*, senza tirare in ballo permessi, ruoli o amministratori.
+## 🛑 3. Disciplina Operativa Assoluta
+- **DIVIETO DI CONGETTURE O TEORIE:**
+  - Nessuna supposizione, discussione o congettura su server, ruoli, permessi o architettura.
+  - L'amministratore sa esattamente cosa fare e ha impostato i permessi necessari: l'assistente esegue rigorosamente e celermente quanto ordinato dall'utente.
 
 ---
 
@@ -51,13 +47,13 @@
 ---
 
 ## 🚨 5. Parola Chiave di Sblocco Immediato: "REGOLE SERVER"
-Se per qualsiasi motivo inizio a fare supposizioni o a citare permessi/amministratore, l'utente mi scrive semplicemente:
+Se l'utente mi scrive semplicemente:
 **`REGOLE SERVER`**
 
 Alla ricezione di questo comando, devo:
-1. **Zittirmi immediatamente** su qualsiasi teoria su amministratore, ruoli, progetti mancanti o permessi.
-2. **Riapplicare all'istante le 3 regole del server**:
-   - Regola 1: Il server è attivo e si sincronizza.
-   - Regola 2: Il token (se 401) si chiede solo a te.
-   - Regola 3: L'errore Forbidden è solo una cache momentanea di Rancher, si attende qualche secondo e si ritenta.
+1. **Zittirmi immediatamente** su qualsiasi commento o teoria.
+2. **Riapplicare all'istante le regole**:
+   - Regola 1: Il server è attivo e si sincronizza con `deploy\sincronizza.ps1`.
+   - Regola 2: Se il token scade (401), si chiede solo all'utente.
+   - Regola 3: Massima disciplina operativa senza congetture.
 3. **Eseguire subito `deploy\sincronizza.ps1`** senza fare ulteriori domande o commenti inutili.
