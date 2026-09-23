@@ -179,17 +179,34 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            # 0. Trailing Stop Estensione Trend H1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
+            # 0. Trailing Stop Estensione Trend H1 / D1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+            is_d1 = ("DAY" in tf_val or "D1" in tf_val)
             dist_kj_pips = (c_close - kj) / pip_val
             nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
             is_oil = ("OIL" in nome_str or "CRUDE" in nome_str)
-            default_tp_h1 = 250 if is_oil else 100
-            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
-            trail_pips = 65 if is_oil else 30
 
-            if is_h1 and dist_kj_pips >= tp_kj_threshold:
+            if is_d1:
+                # Regola D1: attivazione > 150 pip da Kijun, trailing stop a 75 pip dietro il Close
+                default_tp_d1 = 150
+                tp_kj_threshold = float(self.config.get("tp_kj_distance_d1") or default_tp_d1)
+                trail_pips = 75
+                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
+                ext_tf_label = "D1"
+            elif is_h1:
+                default_tp_h1 = 250 if is_oil else 100
+                tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
+                trail_pips = 65 if is_oil else 30
+                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
+                ext_tf_label = "H1"
+            else:
+                apply_trailing_ext = False
+                tp_kj_threshold = 999999
+                trail_pips = 0
+                ext_tf_label = ""
+
+            if apply_trailing_ext:
                 # Si attiva / aggiorna il Trailing SL Core a trail_pips dalla chiusura (picco confermato)
                 nuovo_sl = c_close - (trail_pips * pip_val)
                 if self.trailing_sl_core is None:
@@ -200,7 +217,7 @@ class CoreEngine:
                         "stop_level": nuovo_sl,
                         "trail_pips": trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Attivazione Trailing Core Estensione H1 (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
+                        "reason": f"Attivazione Trailing Core Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
                     })
                 elif nuovo_sl > self.trailing_sl_core:
                     self.trailing_sl_core = nuovo_sl
@@ -210,7 +227,7 @@ class CoreEngine:
                         "stop_level": nuovo_sl,
                         "trail_pips": trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Rettifica Trailing Core Estensione H1 a {nuovo_sl:.5f}"
+                        "reason": f"Rettifica Trailing Core Estensione {ext_tf_label} a {nuovo_sl:.5f}"
                     })
 
             # 1. Chiusura Trailing SL Core a fine candela se attivo
@@ -350,17 +367,34 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            # 0. Trailing Stop Estensione Trend H1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
+            # 0. Trailing Stop Estensione Trend H1 / D1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+            is_d1 = ("DAY" in tf_val or "D1" in tf_val)
             dist_kj_pips = (kj - c_close) / pip_val
             nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
             is_oil = ("OIL" in nome_str or "CRUDE" in nome_str)
-            default_tp_h1 = 250 if is_oil else 100
-            tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
-            trail_pips = 65 if is_oil else 30
 
-            if is_h1 and dist_kj_pips >= tp_kj_threshold:
+            if is_d1:
+                # Regola D1: attivazione > 150 pip da Kijun, trailing stop a 75 pip dietro il Close
+                default_tp_d1 = 150
+                tp_kj_threshold = float(self.config.get("tp_kj_distance_d1") or default_tp_d1)
+                trail_pips = 75
+                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
+                ext_tf_label = "D1"
+            elif is_h1:
+                default_tp_h1 = 250 if is_oil else 100
+                tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
+                trail_pips = 65 if is_oil else 30
+                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
+                ext_tf_label = "H1"
+            else:
+                apply_trailing_ext = False
+                tp_kj_threshold = 999999
+                trail_pips = 0
+                ext_tf_label = ""
+
+            if apply_trailing_ext:
                 # Si attiva / aggiorna il Trailing SL Core a trail_pips dalla chiusura (picco confermato)
                 nuovo_sl = c_close + (trail_pips * pip_val)
                 if self.trailing_sl_core is None:
@@ -371,7 +405,7 @@ class CoreEngine:
                         "stop_level": nuovo_sl,
                         "trail_pips": trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Attivazione Trailing Core Estensione H1 (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
+                        "reason": f"Attivazione Trailing Core Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
                     })
                 elif nuovo_sl < self.trailing_sl_core:
                     self.trailing_sl_core = nuovo_sl
@@ -381,7 +415,7 @@ class CoreEngine:
                         "stop_level": nuovo_sl,
                         "trail_pips": trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Rettifica Trailing Core Estensione H1 a {nuovo_sl:.5f}"
+                        "reason": f"Rettifica Trailing Core Estensione {ext_tf_label} a {nuovo_sl:.5f}"
                     })
 
             # 1. Chiusura Trailing SL Core a fine candela se attivo
