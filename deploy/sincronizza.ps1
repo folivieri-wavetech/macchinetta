@@ -33,7 +33,7 @@ $ROOT = Resolve-Path "$PSScriptRoot\.."
 $KUBECTL = "$ROOT\kubectl.exe"
 $KUBECONFIG = "$ROOT\local.yaml"
 
-$maxTentativi = 15
+$maxTentativi = 30
 $attesaSecondi = 10
 $POD_DASH = ""
 
