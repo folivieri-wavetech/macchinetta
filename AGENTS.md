@@ -50,13 +50,13 @@
 
 ---
 
-## 🚨 5. Parola Chiave di Sblocco Immediato: "REGOLE D'ORO" (o "REGOLE SERVER")
-Se per qualsiasi motivo inizio a fare supposizioni o a citare permessi/amministratore, l'utente può scrivermi semplicemente:
-**`REGOLE D'ORO`** (oppure **`REGOLE SERVER`**)
+## 🚨 5. Parola Chiave di Sblocco Immediato: "REGOLE SERVER"
+Se per qualsiasi motivo inizio a fare supposizioni o a citare permessi/amministratore, l'utente mi scrive semplicemente:
+**`REGOLE SERVER`**
 
 Alla ricezione di questo comando, devo:
 1. **Zittirmi immediatamente** su qualsiasi teoria su amministratore, ruoli, progetti mancanti o permessi.
-2. **Riapplicare all'istante le 3 regole d'oro**:
+2. **Riapplicare all'istante le 3 regole del server**:
    - Regola 1: Il server è attivo e si sincronizza.
    - Regola 2: Il token (se 401) si chiede solo a te.
    - Regola 3: L'errore Forbidden è solo una cache momentanea di Rancher, si attende qualche secondo e si ritenta.
