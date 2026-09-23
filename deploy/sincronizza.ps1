@@ -33,13 +33,34 @@ $ROOT = Resolve-Path "$PSScriptRoot\.."
 $KUBECTL = "$ROOT\kubectl.exe"
 $KUBECONFIG = "$ROOT\local.yaml"
 
-$POD_DASH = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}")
-if (-not $POD_DASH) {
+$maxTentativi = 6
+$attesaSecondi = 10
+$POD_DASH = ""
+
+for ($i = 1; $i -le $maxTentativi; $i++) {
+    $out = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>&1)
+    if ($LASTEXITCODE -eq 0 -and $out -and -not ($out -match "Forbidden|Error|error")) {
+        $POD_DASH = $out.Trim()
+        break
+    }
+    
     # Fallback se in fase di rollout
-    $POD_DASH = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard -o jsonpath="{.items[0].metadata.name}")
+    $outFallback = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard -o jsonpath="{.items[0].metadata.name}" 2>&1)
+    if ($LASTEXITCODE -eq 0 -and $outFallback -and -not ($outFallback -match "Forbidden|Error|error")) {
+        $POD_DASH = $outFallback.Trim()
+        break
+    }
+
+    if ($out -match "Forbidden" -or $outFallback -match "Forbidden") {
+        Write-Host "Server in fase di allineamento sessione/cache (tentativo $i di $maxTentativi). Attendo $attesaSecondi secondi..." -ForegroundColor Yellow
+    } else {
+        Write-Host "In attesa disponibilità pod Dashboard (tentativo $i di $maxTentativi)..." -ForegroundColor Yellow
+    }
+    Start-Sleep -Seconds $attesaSecondi
 }
+
 if (-not $POD_DASH) {
-    Write-Host "Nessun pod Dashboard trovato nel namespace macchinetta." -ForegroundColor Red
+    Write-Host "Nessun pod Dashboard trovato nel namespace macchinetta dopo $maxTentativi tentativi." -ForegroundColor Red
     exit 1
 }
 Write-Host "Trovato pod Dashboard: $POD_DASH" -ForegroundColor Yellow
