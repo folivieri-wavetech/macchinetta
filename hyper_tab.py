@@ -813,10 +813,9 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
         else:
             st.markdown("<div style='padding-top: 6px; font-size: 0.76rem; color: #facc15; font-weight: 600;'>🪙 Spot Gold (1€/p) • S&R Puro KJ55 (5M: Core 5c + Incr 3c, TP 5p)</div>", unsafe_allow_html=True)
 
-    if is_us500:
-        engine_5m = HyperUS500M5Engine.get_instance(account_dir=conto_attivo)
-    else:
-        engine_5m = HyperGoldM5Engine.get_instance(account_dir=conto_attivo)
+    engine_gold_5m = HyperGoldM5Engine.get_instance(account_dir=conto_attivo)
+    engine_us500_5m = HyperUS500M5Engine.get_instance(account_dir=conto_attivo)
+    engine_5m = engine_us500_5m if is_us500 else engine_gold_5m
 
     is_5m_on = engine_5m.trading_enabled
 

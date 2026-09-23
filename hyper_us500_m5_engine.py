@@ -169,11 +169,12 @@ class HyperUS500M5Engine:
                     with open(central_file, "r", encoding="utf-8") as f:
                         cached = json.load(f)
                     if isinstance(cached, list) and len(cached) >= WARMUP_BARS_KJ:
-                        with self.lock:
-                            self.candles = cached[-500:]
-                            self._recalculate_indicators()
-                            self.save_state()
-                        return
+                        if cached[-1].get("boundary", 0) <= (time.time() + 600):
+                            with self.lock:
+                                self.candles = cached[-500:]
+                                self._recalculate_indicators()
+                                self.save_state()
+                            return
             except Exception:
                 pass
 
@@ -225,14 +226,20 @@ class HyperUS500M5Engine:
                     loaded_candles = []
                     for p in raw_prices:
                         try:
+                            st_time_utc = p.get("snapshotTimeUTC")
                             st_time = p.get("snapshotTime", "")
-                            try:
-                                dt_u = datetime.datetime.strptime(st_time, "%Y/%m/%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
-                                t_str = dt_u.astimezone(TZ_ITALIA).strftime("%H:%M:%S")
+                            if st_time_utc:
+                                try:
+                                    dt_u = datetime.datetime.fromisoformat(st_time_utc).replace(tzinfo=datetime.timezone.utc)
+                                except Exception:
+                                    dt_u = datetime.datetime.strptime(st_time_utc, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+                                dt_it = dt_u.astimezone(TZ_ITALIA)
+                                t_str = dt_it.strftime("%H:%M:%S")
                                 boundary = int(dt_u.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
-                            except Exception:
-                                t_str = st_time.split(" ")[1] if " " in st_time else st_time
-                                boundary = int(time.time() // CANDLE_SECONDS) * CANDLE_SECONDS
+                            else:
+                                dt_it = datetime.datetime.strptime(st_time, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+                                t_str = dt_it.strftime("%H:%M:%S")
+                                boundary = int(dt_it.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
 
                             op = round((p["openPrice"]["bid"] + p["openPrice"]["ask"]) / 2.0, 2)
                             hi = round((p["highPrice"]["bid"] + p["highPrice"]["ask"]) / 2.0, 2)
@@ -314,6 +321,8 @@ class HyperUS500M5Engine:
             self.increments = d.get("increments", [])
             self.trades = d.get("trades", [])
             self.candles = d.get("candles", [])
+            if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 600):
+                self.candles = []
             self.last_ts_cycle = d.get("last_ts_cycle")
             self.signal_candle_active = bool(d.get("signal_candle_active", False))
             self.signal_stop_price = d.get("signal_stop_price")
