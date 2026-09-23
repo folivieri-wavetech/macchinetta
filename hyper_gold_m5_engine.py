@@ -409,7 +409,11 @@ class HyperGoldM5Engine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
-            if not enabled:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            if enabled:
+                order_mgr.send_notification("🚀 AVVIO HYPER 5M: Spot Gold", "[Spot Gold] Scalping Hyper 5M attivato.", "rocket")
+            else:
+                order_mgr.send_notification("⏹️ STOP HYPER 5M: Spot Gold", "[Spot Gold] Scalping Hyper 5M disattivato dall'utente.", "stop_button")
                 # Quando l'utente preme STOP TRADING, chiude immediatamente tutte le posizioni aperte a FLAT
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
@@ -570,6 +574,12 @@ class HyperGoldM5Engine:
                             "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS sale a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
                         })
                         self.save_state()
+                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                        order_mgr.send_notification(
+                            "🎯 TRAILING STOP 5M: Spot Gold",
+                            f"[Spot Gold] Core Trailing Stop LONG aggiornato a {new_ts:.2f} € (Lock +{locked_pips:.1f}p, Prezzo: {current_price:.2f} €)",
+                            "dart"
+                        )
 
                 # Verifica tocco Trailing Stop
                 if current_price <= pos["ts_price"]:
@@ -595,6 +605,12 @@ class HyperGoldM5Engine:
                             "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS scende a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
                         })
                         self.save_state()
+                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                        order_mgr.send_notification(
+                            "🎯 TRAILING STOP 5M: Spot Gold",
+                            f"[Spot Gold] Core Trailing Stop SHORT aggiornato a {new_ts:.2f} € (Lock +{locked_pips:.1f}p, Prezzo: {current_price:.2f} €)",
+                            "dart"
+                        )
 
                 # Verifica tocco Trailing Stop
                 if current_price >= pos["ts_price"]:
@@ -636,6 +652,11 @@ class HyperGoldM5Engine:
                         "reason": f"Ingresso IG Reale {direction} @ {real_open:.2f} € (Deal ID Core: {deal_id})"
                     })
                     self.save_state()
+                    order_mgr.send_notification(
+                        "🚀 OPEN CORE 5M: Spot Gold",
+                        f"[Spot Gold] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} € (Deal ID: {deal_id})",
+                        "rocket"
+                    )
         except Exception as e:
             logger.error(f"Errore apertura Core M5 IG: {e}")
         finally:
@@ -680,6 +701,11 @@ class HyperGoldM5Engine:
                         "reason": f"Incremento M5 IG @ {real_open:.2f} € (TP: {tp_px:.2f}, Deal ID: {deal_id})"
                     })
                     self.save_state()
+                    order_mgr.send_notification(
+                        "➕ INCREMENTO 5M: Spot Gold",
+                        f"[Spot Gold] Incremento #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} € (TP: {tp_px:.2f} €, Tot: {tot_c}c)",
+                        "heavy_plus_sign"
+                    )
         except Exception as e:
             logger.error(f"Errore apertura incremento M5 IG: {e}")
         finally:
@@ -729,6 +755,11 @@ class HyperGoldM5Engine:
                     "reason": f"Chiusura IG Deal {deal_id}: TP raggiunto @ {close_px:.2f}"
                 })
                 self.save_state()
+                order_mgr.send_notification(
+                    "🎯 TP INCREMENTO 5M: Spot Gold",
+                    f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) a target a {close_px:.2f} € [PnL: {profit:+.2f} €]",
+                    "dart"
+                )
         except Exception as e:
             logger.error(f"Errore chiusura incremento M5 IG: {e}")
 
@@ -779,6 +810,19 @@ class HyperGoldM5Engine:
                         "balance": round(self.balance, 2),
                         "reason": reason
                     })
+                is_ts = "Trailing" in reason or "TS" in reason
+                is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                if is_ts:
+                    tag_cl = "dart"
+                    tit_cl = "🎯 TS HIT 5M: Spot Gold"
+                elif is_rev:
+                    tag_cl = "warning"
+                    tit_cl = "🛑 REVERSAL 5M: Spot Gold"
+                else:
+                    tag_cl = "octagonal_sign"
+                    tit_cl = "🛑 CHIUSURA FLAT 5M: Spot Gold"
+                msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
+                order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
                 # Pausa prima degli incrementi
                 time.sleep(1.5)
 
@@ -819,6 +863,11 @@ class HyperGoldM5Engine:
                             "balance": round(self.balance, 2),
                             "reason": reason
                         })
+                    order_mgr.send_notification(
+                        "🛑 CHIUSURA FLAT INC 5M: Spot Gold",
+                        f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {cl_i:.2f} € [PnL: {prof_i:+.2f} €]",
+                        "octagonal_sign"
+                    )
                     # Pausa prudenziale tra incrementi
                     time.sleep(1.5)
 

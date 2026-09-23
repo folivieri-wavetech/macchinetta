@@ -87,6 +87,53 @@ class HyperOrderManager:
                     pass
         return user, pwd, api_key
 
+    def _get_ntfy_topic(self) -> str:
+        """Recupera il topic NTFY dalle variabili d'ambiente (Kubernetes Secret) o dai file .env."""
+        topic = os.environ.get("NTFY_TOPIC")
+        if topic:
+            return topic.strip()
+        candidates = [
+            os.path.join(self.account_dir, ".env"),
+            os.path.join("DANY_DEMO", ".env"),
+            os.path.join("FIORDOK_DEMO", ".env"),
+            os.path.join("BONGIOLO_DEMO", ".env"),
+            ".env"
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("NTFY_TOPIC="):
+                                t = line.split("=", 1)[1].strip().strip('"').strip("'")
+                                if t:
+                                    return t
+                except Exception:
+                    pass
+        return None
+
+    def send_notification(self, titolo: str, messaggio: str, tags: str = "rotating_light"):
+        """Invia notifica push su ntfy.sh usando il topic configurato per questo conto."""
+        topic = self._get_ntfy_topic()
+        if not topic:
+            return
+        try:
+            orario = now_it().strftime("%H:%M:%S")
+            messaggio_con_orario = f"[{orario}] {messaggio}"
+            headers = {
+                "Title": f"[{self.account_dir}] {titolo}".encode('utf-8'),
+                "Tags": tags
+            }
+            requests.post(
+                f"https://ntfy.sh/{topic}",
+                data=messaggio_con_orario.encode('utf-8'),
+                headers=headers,
+                timeout=5
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ Errore invio notifica Push NTFY: {e}")
+
     def _ensure_session(self) -> bool:
         """Verifica o rinnova la sessione REST IG (CST e X-SECURITY-TOKEN)."""
         now = time.time()
@@ -285,15 +332,19 @@ class HyperOrderManager:
                                             "label": label,
                                             "time": now_it().strftime("%Y-%m-%d %H:%M:%S")
                                         }
+                            self.send_notification(f"⚠️ RIFIUTO ORDINE: {label}", f"Ordine {dir_str} {size_str}c su {target_epic} rifiutato da IG: {reason}", "warning")
                             return {"success": False, "reason": reason}
                     else:
+                        self.send_notification(f"⚠️ ERRORE ORDINE: {label}", f"Nessun Deal Reference da IG per {label}", "warning")
                         return {"success": False, "reason": "NO_DEAL_REFERENCE"}
                 else:
                     err_msg = r.text
                     logger.error(f"❌ Errore apertura posizione IG ({label}): HTTP {r.status_code} - {err_msg}")
+                    self.send_notification(f"⚠️ ERRORE IG: {label}", f"HTTP {r.status_code}: {err_msg[:100]}", "warning")
                     return {"success": False, "reason": f"HTTP_{r.status_code}: {err_msg}"}
             except Exception as e:
                 logger.error(f"❌ Eccezione apertura posizione IG ({label}): {e}")
+                self.send_notification(f"⚠️ ECCEZIONE IG: {label}", f"Errore apertura: {str(e)[:100]}", "warning")
                 return {"success": False, "reason": str(e)}
 
     def close_market_deal(self, deal_id: str, direction_open: str, size: float, label: str = "Chiusura", reason_note: str = "") -> dict:
@@ -304,6 +355,7 @@ class HyperOrderManager:
         with self.lock:
             self._throttle()
             if not self._ensure_session():
+                self.send_notification(f"⚠️ ERRORE SESSIONE: {label}", "Sessione IG non valida durante chiusura", "warning")
                 return {"success": False, "reason": "ERRORE_SESSIONE_IG"}
 
             # Direzione opposta a quella di apertura
@@ -354,6 +406,7 @@ class HyperOrderManager:
                             if "POSITION_NOT_FOUND" in str(rej_reason).upper() or "ALREADY_CLOSED" in str(rej_reason).upper():
                                 logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa su IG (TP/SL o manuale).")
                                 return {"success": True, "deal_id": deal_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
+                            self.send_notification(f"⚠️ RIFIUTO CHIUSURA: {label}", f"Deal {deal_id} ({dir_close} {size_str}c) rifiutato: {rej_reason}", "warning")
                             return {"success": False, "reason": rej_reason}
                     else:
                         return {"success": False, "reason": "NO_DEAL_REFERENCE"}
@@ -363,9 +416,11 @@ class HyperOrderManager:
                         logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa precedentemente.")
                         return {"success": True, "deal_id": deal_id, "already_closed": True}
                     logger.error(f"❌ Errore chiusura IG {deal_id}: HTTP {r.status_code} - {err_txt}")
+                    self.send_notification(f"⚠️ ERRORE CHIUSURA: {label}", f"Deal {deal_id} HTTP {r.status_code}: {err_txt[:100]}", "warning")
                     return {"success": False, "reason": f"HTTP_{r.status_code}: {err_txt}"}
             except Exception as e:
                 logger.error(f"❌ Eccezione chiusura IG {deal_id}: {e}")
+                self.send_notification(f"⚠️ ECCEZIONE CHIUSURA: {label}", f"Errore chiusura Deal {deal_id}: {str(e)[:100]}", "warning")
                 return {"success": False, "reason": str(e)}
 
     def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = "", epic: str = ""):
@@ -448,3 +503,12 @@ class HyperOrderManager:
                         json.dump([], f)
                 except Exception:
                     pass
+
+def invia_notifica_hyper(account_dir: str, titolo: str, messaggio: str, tags: str = "rotating_light"):
+    """Helper globale per invio notifiche push Hyper."""
+    try:
+        mgr = HyperOrderManager.get_instance(account_dir)
+        mgr.send_notification(titolo, messaggio, tags=tags)
+    except Exception as e:
+        logger.warning(f"Errore helper invia_notifica_hyper: {e}")
+

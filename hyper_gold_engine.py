@@ -364,7 +364,11 @@ class HyperGoldEngine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
-            if not enabled:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            if enabled:
+                order_mgr.send_notification("🚀 AVVIO HYPER 30S: Spot Gold", "[Spot Gold] Scalping Hyper 30S attivato.", "rocket")
+            else:
+                order_mgr.send_notification("⏹️ STOP HYPER 30S: Spot Gold", "[Spot Gold] Scalping Hyper 30S disattivato dall'utente.", "stop_button")
                 # Quando l'utente preme STOP TRADING, chiude immediatamente tutte le posizioni aperte a FLAT
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
@@ -523,6 +527,12 @@ class HyperGoldEngine:
                         "reason": f"Picco +{peak_gain:.1f}p @ {current_price:.2f} ➔ Stop aggiornato a {target_ts_px:.2f} (Lock +{profit_locked:.0f}p)"
                     })
                     self.save_state()
+                    order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                    order_mgr.send_notification(
+                        "🎯 TRAILING STOP 30S: Spot Gold",
+                        f"[Spot Gold] Trailing Stop LONG aggiornato a {target_ts_px:.2f} € (Lock +{profit_locked:.0f}p, Prezzo: {current_price:.2f} €)",
+                        "dart"
+                    )
             else:  # SHORT
                 target_ts_px = round(open_px - profit_locked, 2)
                 curr_ts_px = pos.get("ts_price")
@@ -540,6 +550,12 @@ class HyperGoldEngine:
                         "reason": f"Picco +{peak_gain:.1f}p @ {current_price:.2f} ➔ Stop aggiornato a {target_ts_px:.2f} (Lock +{profit_locked:.0f}p)"
                     })
                     self.save_state()
+                    order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                    order_mgr.send_notification(
+                        "🎯 TRAILING STOP 30S: Spot Gold",
+                        f"[Spot Gold] Trailing Stop SHORT aggiornato a {target_ts_px:.2f} € (Lock +{profit_locked:.0f}p, Prezzo: {current_price:.2f} €)",
+                        "dart"
+                    )
 
         # Verifica tocco dello stop
         if pos.get("ts_active", False) and pos.get("ts_price") is not None:
@@ -596,6 +612,11 @@ class HyperGoldEngine:
                         "reason": f"{lbl} {direction} @ {real_open:.2f} € (Deal ID: {deal_id})"
                     })
                     self.save_state()
+                    is_pullback = "Pullback" in lbl
+                    tag_ico = "arrows_counterclockwise" if is_pullback else "rocket"
+                    titolo_ntfy = f"🔄 OPEN PULLBACK 30S: Spot Gold" if is_pullback else f"🚀 OPEN HYPER 30S: Spot Gold"
+                    msg_ntfy = f"[Spot Gold] {lbl} {direction} a {real_open:.2f} € (Deal ID: {deal_id})"
+                    order_mgr.send_notification(titolo_ntfy, msg_ntfy, tag_ico)
         except Exception as e:
             logger.error(f"Eccezione durante esecuzione ordine IG: {e}")
         finally:
@@ -650,6 +671,19 @@ class HyperGoldEngine:
                         "balance": round(self.balance, 2),
                         "reason": reason
                     })
+                is_ts = "Trailing" in reason or "TS" in reason
+                is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                if is_ts:
+                    tag_cl = "dart"
+                    tit_cl = "🎯 TS HIT 30S: Spot Gold"
+                elif is_rev:
+                    tag_cl = "warning"
+                    tit_cl = "🛑 REVERSAL 30S: Spot Gold"
+                else:
+                    tag_cl = "octagonal_sign"
+                    tit_cl = "🛑 CHIUSURA FLAT 30S: Spot Gold"
+                msg_cl = f"[Spot Gold] {c_lbl} {pos_to_close['direction']} chiuso a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
+                order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
 
             # 2. Chiudi gli scalini residui (se presenti da sessioni precedenti)
             for inc in incs_to_close:

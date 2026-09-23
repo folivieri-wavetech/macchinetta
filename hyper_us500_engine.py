@@ -306,7 +306,11 @@ class HyperUS500Engine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
-            if not enabled:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            if enabled:
+                order_mgr.send_notification("🚀 AVVIO HYPER 30S: US 500 Cash", "[US 500] Scalping Hyper 30S attivato.", "rocket")
+            else:
+                order_mgr.send_notification("⏹️ STOP HYPER 30S: US 500 Cash", "[US 500] Scalping Hyper 30S disattivato dall'utente.", "stop_button")
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
                     t_str = now_it().strftime("%H:%M:%S")
@@ -453,6 +457,12 @@ class HyperUS500Engine:
                         "reason": f"Peak +{peak_gain:.1f}p (k={k}) ➔ Stop Lock a {target_stop:.2f} (+{profit_locked:.1f}p)"
                     })
                     self.save_state()
+                    order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                    order_mgr.send_notification(
+                        "🎯 TRAILING STOP 30S: US 500 Cash",
+                        f"[US 500] Trailing Stop LONG aggiornato a {target_stop:.2f} pt (Lock +{profit_locked:.1f}pt, Prezzo: {current_price:.2f} pt)",
+                        "dart"
+                    )
 
                 if current_price <= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
@@ -475,6 +485,12 @@ class HyperUS500Engine:
                         "reason": f"Peak +{peak_gain:.1f}p (k={k}) ➔ Stop Lock a {target_stop:.2f} (+{profit_locked:.1f}p)"
                     })
                     self.save_state()
+                    order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                    order_mgr.send_notification(
+                        "🎯 TRAILING STOP 30S: US 500 Cash",
+                        f"[US 500] Trailing Stop SHORT aggiornato a {target_stop:.2f} pt (Lock +{profit_locked:.1f}pt, Prezzo: {current_price:.2f} pt)",
+                        "dart"
+                    )
 
                 if current_price >= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
@@ -519,6 +535,11 @@ class HyperUS500Engine:
                         "reason": f"Ingresso IG Reale {direction} @ {real_open:.2f} (Fase: {self.cycle_phase}, Deal ID: {deal_id})"
                     })
                     self.save_state()
+                    is_pullback = (self.cycle_phase == "PULLBACK_OPEN")
+                    tag_ico = "arrows_counterclockwise" if is_pullback else "rocket"
+                    titolo_ntfy = "🔄 OPEN PULLBACK 30S: US 500 Cash" if is_pullback else "🚀 OPEN HYPER 30S: US 500 Cash"
+                    msg_ntfy = f"[US 500] {direction} {contracts}c a {real_open:.2f} pt (Deal ID: {deal_id}, Fase: {self.cycle_phase})"
+                    order_mgr.send_notification(titolo_ntfy, msg_ntfy, tag_ico)
         except Exception as e:
             logger.error(f"Errore apertura Core US500 IG: {e}")
         finally:
@@ -570,6 +591,19 @@ class HyperUS500Engine:
                         "balance": round(self.balance, 2),
                         "reason": reason
                     })
+                is_ts = "Trailing" in reason or "TS" in reason
+                is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                if is_ts:
+                    tag_cl = "dart"
+                    tit_cl = "🎯 TS HIT 30S: US 500 Cash"
+                elif is_rev:
+                    tag_cl = "warning"
+                    tit_cl = "🛑 REVERSAL 30S: US 500 Cash"
+                else:
+                    tag_cl = "octagonal_sign"
+                    tit_cl = "🛑 CHIUSURA FLAT 30S: US 500 Cash"
+                msg_cl = f"[US 500] Posizione {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
+                order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
 
             for inc in incs_to_close:
                 if inc.get("deal_id"):

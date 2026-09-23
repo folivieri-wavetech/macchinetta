@@ -355,7 +355,11 @@ class HyperUS500M5Engine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
-            if not enabled:
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            if enabled:
+                order_mgr.send_notification("🚀 AVVIO HYPER 5M: US 500 Cash", "[US 500] Scalping Hyper 5M attivato.", "rocket")
+            else:
+                order_mgr.send_notification("⏹️ STOP HYPER 5M: US 500 Cash", "[US 500] Scalping Hyper 5M disattivato dall'utente.", "stop_button")
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
                     t_str = now_it().strftime("%H:%M:%S")
@@ -485,6 +489,12 @@ class HyperUS500M5Engine:
                         pos["peak_price"] = round(peak_px + steps * CORE_TS_STEP_PIPS, 2)
                         pos["ts_price"] = round(pos["ts_price"] + steps * CORE_TS_STEP_PIPS, 2)
                         self.save_state()
+                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                        order_mgr.send_notification(
+                            "🎯 TRAILING STOP 5M: US 500 Cash",
+                            f"[US 500] Core TS LONG aggiornato a {pos['ts_price']:.2f} pt (Prezzo: {current_price:.2f} pt)",
+                            "dart"
+                        )
 
                 if current_price <= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
@@ -497,6 +507,12 @@ class HyperUS500M5Engine:
                         pos["peak_price"] = round(peak_px - steps * CORE_TS_STEP_PIPS, 2)
                         pos["ts_price"] = round(pos["ts_price"] - steps * CORE_TS_STEP_PIPS, 2)
                         self.save_state()
+                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                        order_mgr.send_notification(
+                            "🎯 TRAILING STOP 5M: US 500 Cash",
+                            f"[US 500] Core TS SHORT aggiornato a {pos['ts_price']:.2f} pt (Prezzo: {current_price:.2f} pt)",
+                            "dart"
+                        )
 
                 if current_price >= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
@@ -537,6 +553,11 @@ class HyperUS500M5Engine:
                         "reason": f"Ingresso IG Reale US500 {direction} @ {real_open:.2f} (Deal ID Core: {deal_id})"
                     })
                     self.save_state()
+                    order_mgr.send_notification(
+                        "🚀 OPEN CORE 5M: US 500 Cash",
+                        f"[US 500] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} pt (Deal ID: {deal_id})",
+                        "rocket"
+                    )
         except Exception as e:
             logger.error(f"Errore apertura Core US500 M5 IG: {e}")
         finally:
@@ -581,6 +602,11 @@ class HyperUS500M5Engine:
                         "reason": f"Incremento US500 M5 @ {real_open:.2f} (TP: {tp_px:.2f}, Deal ID: {deal_id})"
                     })
                     self.save_state()
+                    order_mgr.send_notification(
+                        "➕ INCREMENTO 5M: US 500 Cash",
+                        f"[US 500] Incremento #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} pt (TP: {tp_px:.2f} pt, Tot: {tot_c}c)",
+                        "heavy_plus_sign"
+                    )
         except Exception as e:
             logger.error(f"Errore apertura incremento US500 M5 IG: {e}")
         finally:
@@ -629,6 +655,11 @@ class HyperUS500M5Engine:
                     "reason": f"Chiusura Deal US500 {deal_id}: TP raggiunto @ {close_px:.2f}"
                 })
                 self.save_state()
+                order_mgr.send_notification(
+                    "🎯 TP INCREMENTO 5M: US 500 Cash",
+                    f"[US 500] Incremento {inc['direction']} ({inc['contracts']}c) a target a {close_px:.2f} pt [PnL: {profit:+.2f} €]",
+                    "dart"
+                )
         except Exception as e:
             logger.error(f"Errore chiusura incremento US500 M5 IG: {e}")
 
@@ -677,6 +708,19 @@ class HyperUS500M5Engine:
                         "balance": round(self.balance, 2),
                         "reason": reason
                     })
+                is_ts = "Trailing" in reason or "TS" in reason
+                is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                if is_ts:
+                    tag_cl = "dart"
+                    tit_cl = "🎯 TS HIT 5M: US 500 Cash"
+                elif is_rev:
+                    tag_cl = "warning"
+                    tit_cl = "🛑 REVERSAL 5M: US 500 Cash"
+                else:
+                    tag_cl = "octagonal_sign"
+                    tit_cl = "🛑 CHIUSURA FLAT 5M: US 500 Cash"
+                msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
+                order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
 
             for inc in incs_to_close:
                 if inc.get("deal_id"):
@@ -713,6 +757,11 @@ class HyperUS500M5Engine:
                             "balance": round(self.balance, 2),
                             "reason": reason
                         })
+                    order_mgr.send_notification(
+                        "🛑 CHIUSURA FLAT INC 5M: US 500 Cash",
+                        f"[US 500] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
+                        "octagonal_sign"
+                    )
                     time.sleep(1.5)
 
             with self.lock:
