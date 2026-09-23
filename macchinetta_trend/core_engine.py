@@ -179,9 +179,10 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            # 0. Trailing Stop Estensione Trend H1 / D1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
+            # 0. Trailing Stop Estensione Trend H1 / H4 / D1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+            is_h4 = ("HOUR_4" in tf_val or "H4" in tf_val)
             is_d1 = ("DAY" in tf_val or "D1" in tf_val)
             dist_kj_pips = (c_close - kj) / pip_val
             nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
@@ -194,6 +195,13 @@ class CoreEngine:
                 trail_pips = 75
                 apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
                 ext_tf_label = "D1"
+            elif is_h4:
+                # Regola H4: attivazione > 120 pip da Kijun, trailing stop a 60 pip dietro il Close
+                default_tp_h4 = 120
+                tp_kj_threshold = float(self.config.get("tp_kj_distance_h4") or default_tp_h4)
+                trail_pips = 60
+                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
+                ext_tf_label = "H4"
             elif is_h1:
                 default_tp_h1 = 250 if is_oil else 100
                 tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
@@ -367,9 +375,10 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            # 0. Trailing Stop Estensione Trend H1 / D1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
+            # 0. Trailing Stop Estensione Trend H1 / H4 / D1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
             tf_val = str(self.config.get("timeframe", "HOUR")).upper()
             is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+            is_h4 = ("HOUR_4" in tf_val or "H4" in tf_val)
             is_d1 = ("DAY" in tf_val or "D1" in tf_val)
             dist_kj_pips = (kj - c_close) / pip_val
             nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
@@ -382,6 +391,13 @@ class CoreEngine:
                 trail_pips = 75
                 apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
                 ext_tf_label = "D1"
+            elif is_h4:
+                # Regola H4: attivazione > 120 pip da Kijun, trailing stop a 60 pip dietro il Close
+                default_tp_h4 = 120
+                tp_kj_threshold = float(self.config.get("tp_kj_distance_h4") or default_tp_h4)
+                trail_pips = 60
+                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
+                ext_tf_label = "H4"
             elif is_h1:
                 default_tp_h1 = 250 if is_oil else 100
                 tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)

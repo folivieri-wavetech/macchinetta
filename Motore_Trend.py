@@ -2242,22 +2242,27 @@ def esegui_ciclo_trend():
                         c_close = (last_c['closePrice']['bid'] + last_c['closePrice']['ask']) / 2
                         pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
                         
-                        # Inizializzazione rapida al boot per D1 se dist_kj >= 150 pip (regola: > 150p dist KJ -> 75p TS)
-                        if tf in ("DAY", "D1") and engine.trailing_sl_core is None and engine.current_kj is not None:
+                        # Inizializzazione rapida al boot per H4 e D1 se dist_kj >= soglia (D1: >= 150p -> 75p TS, H4: >= 120p -> 60p TS)
+                        is_d1 = tf in ("DAY", "D1")
+                        is_h4 = tf in ("HOUR_4", "H4")
+                        if (is_d1 or is_h4) and engine.trailing_sl_core is None and engine.current_kj is not None:
+                            th_dist = 150 if is_d1 else 120
+                            ts_dist = 75 if is_d1 else 60
+                            tf_lbl = "D1" if is_d1 else "H4"
                             if stato_corrente == "SHORT":
                                 dist_kj = engine.current_kj - c_close
-                                if dist_kj >= (150 * pip_val):
-                                    engine.trailing_sl_core = round(c_close + (75 * pip_val), dec)
+                                if dist_kj >= (th_dist * pip_val):
+                                    engine.trailing_sl_core = round(c_close + (ts_dist * pip_val), dec)
                                     aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
-                                    print_log(nome, f"🎯 Trailing SL Core (D1) attivato a {engine.trailing_sl_core:.{dec}f} (distanza KJ: {dist_kj/pip_val:.1f} pip >= 150p)")
+                                    print_log(nome, f"🎯 Trailing SL Core ({tf_lbl}) attivato a {engine.trailing_sl_core:.{dec}f} (distanza KJ: {dist_kj/pip_val:.1f} pip >= {th_dist}p)")
                                     if engine.pm.core_position and engine.pm.core_position.ticket:
                                         aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
                             elif stato_corrente == "LONG":
                                 dist_kj = c_close - engine.current_kj
-                                if dist_kj >= (150 * pip_val):
-                                    engine.trailing_sl_core = round(c_close - (75 * pip_val), dec)
+                                if dist_kj >= (th_dist * pip_val):
+                                    engine.trailing_sl_core = round(c_close - (ts_dist * pip_val), dec)
                                     aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
-                                    print_log(nome, f"🎯 Trailing SL Core (D1) attivato a {engine.trailing_sl_core:.{dec}f} (distanza KJ: {dist_kj/pip_val:.1f} pip >= 150p)")
+                                    print_log(nome, f"🎯 Trailing SL Core ({tf_lbl}) attivato a {engine.trailing_sl_core:.{dec}f} (distanza KJ: {dist_kj/pip_val:.1f} pip >= {th_dist}p)")
                                     if engine.pm.core_position and engine.pm.core_position.ticket:
                                         aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
 
