@@ -167,6 +167,71 @@ def inject_hyper_css():
             visibility: hidden !important;
         }
 
+        /* Nuovi stili compatti per visualizzazione affiancata Hyper 5M */
+        .inst-container-hyper {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        .micro-card-hyper {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
+            border: 1px solid #334155;
+            border-radius: 7px;
+            padding: 5px 6px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+        .micro-label-hyper {
+            font-size: 0.60rem;
+            color: #94a3b8;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 2px;
+            white-space: nowrap;
+        }
+        .micro-val-hyper {
+            font-size: 1.05rem;
+            font-weight: 800;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+        .micro-sub-hyper {
+            font-size: 0.62rem;
+            color: #cbd5e1;
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+        .table-compact-hyper {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.71rem;
+        }
+        .table-compact-hyper th {
+            background-color: #1e293b;
+            color: #94a3b8;
+            padding: 4px 6px;
+            text-align: left;
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border-bottom: 1px solid #475569;
+        }
+        .table-compact-hyper td {
+            padding: 4px 6px;
+            border-bottom: 1px solid #334155;
+        }
+        .btn-compact-hyper div.stButton > button {
+            height: 30px !important;
+            font-size: 0.74rem !important;
+            font-weight: 700 !important;
+            padding: 2px 6px !important;
+            border-radius: 5px !important;
+            white-space: nowrap !important;
+        }
         /* Expander compatto e proporzionato in Hyper */
         div[data-testid="stTabsContent"] details[data-testid="stExpander"] {
             border: 1px solid #334155 !important;
@@ -195,15 +260,9 @@ def inject_hyper_css():
     """, unsafe_allow_html=True)
 
 
-@st.fragment(run_every=2)
-def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, is_us500=False, **kwargs):
-    conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
-    nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
-
-    if is_us500:
-        engine = HyperUS500M5Engine.get_instance(account_dir=conto_attivo)
-        is_feed_closed = is_us500_feed_suspended()
-        is_trade_frozen = is_us500_trading_suspended()
+def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
+    """Renderizza una colonna compatta ed elegante per un singolo strumento Hyper 5M."""
+    if instr_type == "US500":
         instr_name = "US 500 Cash 1€"
         unit_lbl = "pt"
         core_c = 4
@@ -218,10 +277,9 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, is_us5
         sig_offset = 5.0
         epic_filter = "IX.D.SPTRD.IBE.IP"
         btn_sfx = f"us500_{conto_attivo}"
+        is_feed_closed = is_us500_feed_suspended()
+        is_trade_frozen = is_us500_trading_suspended()
     else:
-        engine = HyperGoldM5Engine.get_instance(account_dir=conto_attivo)
-        is_feed_closed = is_gold_feed_suspended()
-        is_trade_frozen = is_gold_trading_suspended()
         instr_name = "Spot Gold 1€"
         unit_lbl = "p"
         core_c = CORE_CONTRACTS_5M
@@ -236,416 +294,397 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", is_other_active=False, is_us5
         sig_offset = CANDELA_SEGNALE_OFFSET_PIPS_5M
         epic_filter = "CS.D.CFDGOLD.CFD.IP"
         btn_sfx = f"gold_{conto_attivo}"
+        is_feed_closed = is_gold_feed_suspended()
+        is_trade_frozen = is_gold_trading_suspended()
 
     with engine.lock:
         is_conn = engine.ls_connected
         live_mid = engine.live_mid
-        live_bid = engine.live_bid
-        live_ask = engine.live_ask
         total_ticks = engine.total_ticks
-        candles_count = len(engine.candles)
         kj = engine.kj55
         pos = engine.position
         increments = list(engine.increments)
         total_contracts = (pos.get("contracts", core_c) + sum(i.get("contracts", inc_c) for i in increments)) if pos else 0
         trading_on = engine.trading_enabled
-        trades = list(engine.trades)
         curr_bar_t = engine.curr_bar_start_t
-
-    # Dati patrimoniali sincronizzati con la Sidebar ogni 15s
-    acc_data = get_sidebar_account_data(conto_attivo)
-    float_pnl = engine.get_floating_pnl()
-
-    saldo_fl = acc_data["saldo_float"]
-    equity_fl = saldo_fl + float_pnl
-
-    val_capitale = acc_data["saldo_str"]
-    val_disp = acc_data["disp_str"]
-    val_margine = acc_data["marg_str"]
-    val_equity = f"{equity_fl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-    # P&L e Storico Eseguiti Reali IG per 5M (Fonte di verità assoluta)
-    order_mgr = HyperOrderManager.get_instance(conto_attivo)
-    history_5m = order_mgr.get_trades_history(tf="5M", epic=epic_filter)
-    session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_5m)
-    num_closed = len(history_5m)
-
-    # Intestazione e Badge di Stato
-    c_title, c_badges = st.columns([2.3, 1.7])
-    with c_title:
-        st.markdown(f"<h3 style='margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap;'>⚡ Hyper {instr_name} <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 7px; border-radius: 5px; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.04em; margin: 0 4px;'>📊 TF 5 MIN</span> <span style='font-size: 0.80rem; color: #94a3b8;'>({conto_attivo})</span></h3>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size: 0.70rem; color: #94a3b8; white-space: nowrap; margin-top: 2px;'>Supporto & Resistenza Puro KJ 55 • Core {core_c}c • Max {max_inc} Incrementi Pullback (TP +{inc_tp:.0f}{unit_lbl}) • Trailing Stop Core • 🪂 ±{parachute_p:.0f}{unit_lbl}</div>", unsafe_allow_html=True)
-
-    with c_badges:
-        if is_conn:
-            badge_ls = f"<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>🟢 Lightstreamer LIVE ({total_ticks} tick)</span>"
-        elif is_feed_closed:
-            badge_ls = "<span class='badge-live-hyper' style='background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #64748b;'>💤 Feed Chiuso</span>"
-        else:
-            badge_ls = "<span class='badge-live-hyper' style='background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444;'>🔴 In Connessione...</span>"
-
-        if is_trade_frozen:
-            badge_st = "<span class='badge-live-hyper' style='background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #facc15;'>🌙 ORDINI CONGELATI</span>"
-        elif trading_on:
-            badge_st = "<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>⚡ TRADING ATTIVO</span>"
-        else:
-            badge_st = "<span class='badge-live-hyper' style='background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid #64748b;'>⏸️ IN PAUSA</span>"
-
-        st.markdown(f"<div style='display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 4px; white-space: nowrap;'>{badge_ls}{badge_st}</div>", unsafe_allow_html=True)
-
-    st.markdown("<hr style='margin: 8px 0 12px 0; border-color: #334155;' />", unsafe_allow_html=True)
-
-    # 1. KPI PORTAFOGLIO PRINCIPALI
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        st.markdown(f"""
-        <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
-            <div class='kpi-val-hyper' style='color: #FFD700;'>{val_capitale} €</div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disponibile: <b style='color: #4ade80;'>{val_disp} €</b></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with k2:
-        col_real = "#22c55e" if session_realized_pnl >= 0 else ("#ef4444" if session_realized_pnl < 0 else "#94a3b8")
-        sign_real = "+" if session_realized_pnl > 0 else ""
-        pnl_str = f"{session_realized_pnl:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        st.markdown(f"""
-        <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>P&L Sessione Hyper (5m)</div>
-            <div class='kpi-val-hyper' style='color: {col_real};'>{sign_real}{pnl_str} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{num_closed} operazioni concluse</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with k3:
-        if pos or increments:
-            col_float = "#22c55e" if float_pnl >= 0 else "#ef4444"
-            sign_fl = "+" if float_pnl >= 0 else ""
-            st.markdown(f"""
-            <div class='kpi-card-hyper'>
-                <div class='kpi-title-hyper'>P&L Flottante (Live)</div>
-                <div class='kpi-val-hyper' style='color: {col_float};'>{sign_fl}{float_pnl:,.2f} €</div>
-                <div class='kpi-sub-hyper' style='color: #94a3b8;'>Core + {len(increments)} Incrementi</div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div class='kpi-card-hyper'>
-                <div class='kpi-title-hyper'>P&L Flottante (Live)</div>
-                <div class='kpi-val-hyper' style='color: #94a3b8;'>0.00 €</div>
-                <div class='kpi-sub-hyper' style='color: #64748b;'>Nessuna posizione aperta</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    with k4:
-        if pos:
-            dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
-            dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
-            num_inc = len(increments)
-            sub_text = f"Core: {core_c}c @ {pos['open_price']:.2f} | Incr: {num_inc}/{max_inc}"
-            st.markdown(f"""
-            <div class='kpi-card-hyper'>
-                <div class='kpi-title-hyper'>Esposizione a Mercato</div>
-                <div class='kpi-val-hyper' style='color: {dir_col}; font-size: 1.12rem; white-space: nowrap;'>{dir_icon} {pos['direction']} <span style='font-size: 0.92rem; font-weight: 600; opacity: 0.88;'>({total_contracts} Contr.)</span></div>
-                <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{sub_text}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div class='kpi-card-hyper'>
-                <div class='kpi-title-hyper'>Esposizione a Mercato</div>
-                <div class='kpi-val-hyper' style='color: #94a3b8; font-size: 1.12rem;'>⚪ FLAT (0)</div>
-                <div class='kpi-sub-hyper' style='color: #64748b;'>In attesa automatica nuovo segnale</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-
-    # 2. INDICATORI DI MERCATO (5M: S&R PURO KJ55)
-    m1, m2, m3 = st.columns([2.0, 1.0, 1.0])
-    with m1:
-        px_str = f"{live_mid:.2f}" if live_mid else "--"
-        kj_str = f"{kj:.2f}" if kj else "--"
-        dist_str = f"{abs(live_mid - kj):.2f} {unit_lbl}" if (live_mid and kj) else "--"
-        if live_mid and kj:
-            if live_mid > kj:
-                regime = "🟢 SOPRA KJ55 (BULLISH)"
-                col_reg = "#22c55e"
-            elif live_mid < kj:
-                regime = "🔴 SOTTO KJ55 (BEARISH)"
-                col_reg = "#ef4444"
-            else:
-                regime = "⚪ A CONTATTO CON KJ55"
-                col_reg = "#f59e0b"
-        else:
-            regime = "Inizializzazione..."
-            col_reg = "#94a3b8"
-
-        st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 8px 14px;'>
-            <div class='kpi-title-hyper' style='display: flex; justify-content: space-between; align-items: center;'>
-                <span style='color: #f59e0b; font-weight: 800;'>📊 SUPPORTO & RESISTENZA PURO (5M)</span>
-                <span style='color: {col_reg}; font-weight: 700; font-size: 0.72rem;'>{regime}</span>
-            </div>
-            <div style='display: flex; justify-content: space-around; align-items: center; margin-top: 5px;'>
-                <div style='text-align: center;'>
-                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>MID LIVE</div>
-                    <div style='font-size: 1.05rem; font-weight: 800; color: #22c55e;'>{px_str} €</div>
-                </div>
-                <div style='border-left: 1px solid #334155; height: 26px;'></div>
-                <div style='text-align: center;'>
-                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>KJ 55 (S&R)</div>
-                    <div style='font-size: 1.05rem; font-weight: 800; color: #FFD700;'>{kj_str}</div>
-                </div>
-                <div style='border-left: 1px solid #334155; height: 26px;'></div>
-                <div style='text-align: center;'>
-                    <div style='font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;'>DISTANZA KJ</div>
-                    <div style='font-size: 1.05rem; font-weight: 800; color: #38bdf8;'>{dist_str}</div>
-                </div>
-            </div>
-            <div style='font-size: 0.66rem; color: #94a3b8; margin-top: 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>S&R Puro KJ55 • Trailing Stop Core • 🪂 Paracadute KJ: ±{parachute_p:.0f}{unit_lbl} • Incr Pullback ≤5{unit_lbl} (TP +{inc_tp:.0f}{unit_lbl})</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with m2:
-        hyper_margine = total_contracts * margin_per_c
-        st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px;'>
-            <div class='kpi-title-hyper'>Margine ({nome_clean})</div>
-            <div style='font-size: 1.18rem; font-weight: 700; color: #f59e0b;'>{val_margine} €</div>
-            <div style='font-size: 0.70rem; color: #cbd5e1;'>Hyper: {hyper_margine:,.0f} €</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with m3:
-        sec_elapsed = 0
-        if curr_bar_t:
-            sec_elapsed = min(300, int(time.time() - curr_bar_t))
-        sec_left = max(0, 300 - sec_elapsed)
-        sec_left_str = f"{sec_left // 60:02d}:{sec_left % 60:02d}"
-        st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 10px 14px; text-align: center;'>
-            <div class='kpi-title-hyper'>Tempo Barra (M5)</div>
-            <div style='font-size: 1.30rem; font-weight: 800; font-family: monospace; color: #38bdf8; margin-top: 2px;'>{sec_left_str}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-
-    # 3. SEZIONE CONTROLLI E OPERAZIONI
-    col_left, col_right = st.columns([1.15, 1.85])
-
-    with col_left:
-        with st.expander(f"⚙️ Assetto M5: S&R Puro KJ55 (Core {core_c}c + Incr {inc_c}c)", expanded=False):
-            st.markdown(f"""
-            <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.73rem; line-height: 1.45;'>
-                <div style='color: #f59e0b; font-weight: 700; margin-bottom: 3px; font-size: 0.75rem;'>🎯 Piano Ingressi M5 S&R Puro KJ55:</div>
-                <div>• <b>Regime</b>: LONG se Chiusura > KJ55 | SHORT se Chiusura < KJ55</div>
-                <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su stacco Prezzo - KJ >= 2 {unit_lbl}</div>
-                <div>• <b>Incrementi Pullback</b>: fino a <b>{max_inc}</b> da <span style='color: #f59e0b; font-weight: 600;'>{inc_c}c</span> (distanza <= 5{unit_lbl} da KJ, TP +{inc_tp:.0f}{unit_lbl})</div>
-                <div>• <b>Trailing Stop Core</b>: Trigger +{ts_trig:.0f}{unit_lbl}, Lock +{ts_lock:.0f}{unit_lbl}, Step {ts_stp:.0f}{unit_lbl}</div>
-                <div style='border-top: 1px solid #334155; margin-top: 4px; padding-top: 3px;'>
-                    <span style='color: #94a3b8;'>Paracadute KJ55: <b>±{parachute_p:.0f} {unit_lbl}</b> • Candela Segnale: <b>±{sig_offset:.0f} {unit_lbl}</b></span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
-
-        c_btn1, c_btn2 = st.columns([1, 1])
-        dis_start = trading_on
-        with c_btn1:
-            st.markdown("<div class='btn-start-hyper'>", unsafe_allow_html=True)
-            if st.button("🟢 AVVIA 5M", key=f"btn_start_m5_{btn_sfx}", disabled=dis_start, use_container_width=True):
-                st.session_state["hyper_target_subtab"] = "5m"
-                engine.set_trading(True)
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("<div class='btn-azzera-hyper' style='margin-top: 6px;'>", unsafe_allow_html=True)
-            if st.button("🔄 Azzera Sessione", key=f"btn_clr_trades_m5_{btn_sfx}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione", use_container_width=True):
-                st.session_state["hyper_target_subtab"] = "5m"
-                order_mgr.clear_trades_history(tf="5M", epic=epic_filter)
-                engine.clear_session_trades()
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with c_btn2:
-            st.markdown("<div class='btn-stop-hyper'>", unsafe_allow_html=True)
-            if st.button("🔴 STOP 5M", key=f"btn_stop_m5_{btn_sfx}", disabled=(not trading_on), use_container_width=True):
-                st.session_state["hyper_target_subtab"] = "5m"
-                engine.set_trading(False)
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("<h4 style='margin: 12px 0 8px 0; font-size: 0.90rem; font-weight: 700;'>📋 Storico Operazioni (M5)</h4>", unsafe_allow_html=True)
-        closed_trades = history_5m
-        if closed_trades:
-            num_core_closed = 0
-            pnl_core_closed = 0.0
-            num_inc_closed = 0
-            pnl_inc_closed = 0.0
-
-            for t in closed_trades:
-                lbl = t.get("label", "").upper()
-                p = float(t.get("pnl_eur", 0.0) or 0.0)
-                if "CORE" in lbl or "M5" in lbl or "5M" in lbl:
-                    num_core_closed += 1
-                    pnl_core_closed += p
-                else:
-                    num_inc_closed += 1
-                    pnl_inc_closed += p
-
-            tot_pnl_closed = round(pnl_core_closed + pnl_inc_closed, 2)
-            col_core_pnl = "#22c55e" if pnl_core_closed >= 0 else "#ef4444"
-            sign_core = "+" if pnl_core_closed >= 0 else ""
-            col_inc_pnl = "#22c55e" if pnl_inc_closed >= 0 else "#ef4444"
-            sign_inc = "+" if pnl_inc_closed >= 0 else ""
-            col_tot_pnl = "#22c55e" if tot_pnl_closed >= 0 else "#ef4444"
-            sign_tot = "+" if tot_pnl_closed >= 0 else ""
-
-            rows_html = []
-            for t in closed_trades[:12]:
-                pnl_val = float(t.get("pnl_eur", 0.0) or 0.0)
-                col_pnl = "#22c55e" if pnl_val > 0 else ("#ef4444" if pnl_val < 0 else "#94a3b8")
-                sign_p = f"+{pnl_val:.2f}" if pnl_val > 0 else f"{pnl_val:.2f}"
-                lbl = t.get("label", "Trade")
-                rsn = t.get("reason", "")
-
-                if "PARACADUTE" in rsn.upper():
-                    action_badge = f"<span style='color: #f87171; font-weight: bold;'>🪂 {lbl}</span>"
-                elif "TP" in rsn.upper() or "TP" in lbl.upper():
-                    action_badge = f"<span style='color: #38bdf8; font-weight: bold;'>🎯 {lbl}</span>"
-                elif "TRAILING" in rsn.upper() or "TS" in rsn.upper():
-                    action_badge = f"<span style='color: #4ade80; font-weight: bold;'>🏆 TS {lbl}</span>"
-                else:
-                    action_badge = f"<span style='color: #cbd5e1; font-weight: bold;'>⏹️ {lbl}</span>"
-
-                t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
-                rows_html.append(
-                    f"<tr><td style='white-space: nowrap;'>{t_str}</td><td style='white-space: nowrap;'>{action_badge}</td><td style='white-space: nowrap;'>{t['open_price']:.2f}</td><td style='white-space: nowrap;'>{t['close_price']:.2f}</td><td style='color: {col_pnl}; font-weight: bold; white-space: nowrap;'>{sign_p}&nbsp;€</td><td style='font-family: monospace; font-size: 0.74rem; color: #94a3b8; white-space: nowrap;'>{t.get('deal_id', '--')}</td><td style='color: #cbd5e1; font-size: 0.78rem;'>{rsn}</td></tr>"
-                )
-
-            summary_html = (
-                f"<tr style='background-color: #1e293b; border-top: 2px solid #475569; font-weight: 700; font-size: 0.75rem;'>"
-                f"<td colspan='2' style='color: #f8fafc; text-transform: uppercase;'>📊 TOTALI CHIUSI (5M)</td>"
-                f"<td colspan='2' style='color: #cbd5e1;'>Core: <span style='color: #38bdf8;'>{num_core_closed}</span> (<span style='color: {col_core_pnl};'>{sign_core}{pnl_core_closed:,.2f} €</span>) | Incr: <span style='color: #38bdf8;'>{num_inc_closed}</span> (<span style='color: {col_inc_pnl};'>{sign_inc}{pnl_inc_closed:,.2f} €</span>)</td>"
-                f"<td style='color: {col_tot_pnl}; font-size: 0.84rem; white-space: nowrap;'>{sign_tot}{tot_pnl_closed:,.2f}&nbsp;€</td>"
-                f"<td colspan='2' style='color: #94a3b8; font-size: 0.70rem;'>P&L complessivo eseguiti reali IG</td>"
-                f"</tr>"
-            )
-            rows_html.append(summary_html)
-
-            st.markdown(f"""
-            <table class='table-dark-hyper' style='width: 100%;'>
-                <thead>
-                    <tr><th style='width: 9%; white-space: nowrap;'>Orario</th><th style='width: 14%; white-space: nowrap;'>Posizione</th><th style='width: 9%; white-space: nowrap;'>Prezzo In</th><th style='width: 9%; white-space: nowrap;'>Prezzo Out</th><th style='width: 9%; white-space: nowrap;'>P&L</th><th style='width: 11%; white-space: nowrap;'>Deal ID</th><th style='width: 39%;'>Trigger Chiusura</th></tr>
-                </thead>
-                <tbody>{''.join(rows_html)}</tbody>
-            </table>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Nessuna operazione ancora chiusa in sessione 5m.")
-
-    with col_right:
         sig_act = getattr(engine, "signal_candle_active", False)
         sig_px = getattr(engine, "signal_stop_price", None)
         sig_ref = getattr(engine, "signal_ref_price", None)
 
-        if sig_act and sig_px is not None:
-            if sig_ref is None:
-                if pos and pos.get("direction") == "LONG":
-                    sig_ref = round(sig_px + sig_offset, 2)
-                elif pos and pos.get("direction") == "SHORT":
-                    sig_ref = round(sig_px - sig_offset, 2)
-                else:
-                    sig_ref = sig_px
-            sign_op = "-" if (pos and pos.get("direction") == "LONG") else "+"
-            sig_badge = f"<span style='font-size: 0.90rem; font-weight: 700; color: #f97316; white-space: nowrap;'>Candela Segnale: <span style='font-weight: 800; color: #fb923c;'>{sig_px:.2f}</span> <span style='font-size: 0.82rem; color: #fed7aa;'>({sig_ref:.2f} {sign_op} {sig_offset:.0f}{unit_lbl})</span></span>"
-        else:
-            sig_badge = "<span style='font-size: 0.90rem; font-weight: 700; color: #64748b; white-space: nowrap;'>---</span>"
+    float_pnl = engine.get_floating_pnl()
+    history_inst = order_mgr.get_trades_history(tf="5M", epic=epic_filter)
+    session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_inst)
+    num_closed = len(history_inst)
 
-        st.markdown(f"""
-        <div style='display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8px 0;'>
-            <h4 style='margin: 0; font-size: 0.95rem; font-weight: 700;'>💼 Posizioni in Portafoglio (M5)</h4>
-            {sig_badge}
+    # Badges Stato Connessione e Trading
+    if is_conn:
+        badge_ls = f"<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>🟢 LIVE ({total_ticks} t)</span>"
+    elif is_feed_closed:
+        badge_ls = "<span class='badge-live-hyper' style='background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #64748b;'>💤 Feed Chiuso</span>"
+    else:
+        badge_ls = "<span class='badge-live-hyper' style='background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444;'>🔴 Offline</span>"
+
+    if is_trade_frozen:
+        badge_st = "<span class='badge-live-hyper' style='background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #facc15;'>🌙 CONGELATO</span>"
+    elif trading_on:
+        badge_st = "<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>⚡ ATTIVO</span>"
+    else:
+        badge_st = "<span class='badge-live-hyper' style='background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid #64748b;'>⏸️ PAUSA</span>"
+
+    # Intestazione compatta dell'Asset
+    st.markdown(f"""
+    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155;'>
+        <div style='display: flex; align-items: center; gap: 6px;'>
+            <span style='font-size: 0.95rem; font-weight: 800; color: #f8fafc;'>{instr_name}</span>
+            <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 800;'>5M</span>
         </div>
-        """, unsafe_allow_html=True)
+        <div style='display: flex; gap: 4px; align-items: center;'>
+            {badge_ls}{badge_st}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-        if pos:
-            dir_pos = pos["direction"]
-            dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
-            dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core {dir_pos}</span> <span style='font-size: 0.82rem; color: #cbd5e1;'>({pos['open_price']:.2f})</span>"
+    # 4 Micro cards: Prezzo, KJ, Distanza e Countdown Barra
+    px_str = f"{live_mid:.2f}" if live_mid else "--"
+    kj_str = f"{kj:.2f}" if kj else "--"
+    dist_str = f"{abs(live_mid - kj):.2f}{unit_lbl}" if (live_mid and kj) else "--"
 
-            ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
-            ts_sign = "+" if dir_pos == "LONG" else "-"
-            ts_cell = f"<span style='color: #38bdf8; font-weight: 600; white-space: nowrap;'>{ts_target:.2f}</span> <span style='font-size: 0.70rem; color: #94a3b8;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
+    if live_mid and kj:
+        if live_mid > kj:
+            regime_badge = "<span style='color: #22c55e; font-weight: 700; font-size: 0.62rem;'>🟢 SOPRA</span>"
+        elif live_mid < kj:
+            regime_badge = "<span style='color: #ef4444; font-weight: 700; font-size: 0.62rem;'>🔴 SOTTO</span>"
+        else:
+            regime_badge = "<span style='color: #f59e0b; font-weight: 700; font-size: 0.62rem;'>⚪ CONTATTO</span>"
+    else:
+        regime_badge = "<span style='color: #94a3b8; font-size: 0.62rem;'>--</span>"
 
-            if live_mid is not None:
-                core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                core_pnl_val = round(core_diff * pos.get("contracts", core_c) * 1.0, 2)
+    sec_elapsed = min(300, int(time.time() - curr_bar_t)) if curr_bar_t else 0
+    sec_left = max(0, 300 - sec_elapsed)
+    sec_left_str = f"{sec_left // 60:02d}:{sec_left % 60:02d}"
+
+    st.markdown(f"""
+    <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 7px;'>
+        <div class='micro-card-hyper'>
+            <div class='micro-label-hyper'>MID LIVE</div>
+            <div class='micro-val-hyper' style='color: #22c55e;'>{px_str}</div>
+            <div class='micro-sub-hyper'>{unit_lbl}</div>
+        </div>
+        <div class='micro-card-hyper'>
+            <div class='micro-label-hyper'>KJ 55 (S&R)</div>
+            <div class='micro-val-hyper' style='color: #FFD700;'>{kj_str}</div>
+            <div class='micro-sub-hyper'>Livello</div>
+        </div>
+        <div class='micro-card-hyper'>
+            <div class='micro-label-hyper'>DISTANZA</div>
+            <div class='micro-val-hyper' style='color: #38bdf8;'>{dist_str}</div>
+            <div class='micro-sub-hyper'>{regime_badge}</div>
+        </div>
+        <div class='micro-card-hyper'>
+            <div class='micro-label-hyper'>BARRA M5</div>
+            <div class='micro-val-hyper' style='color: #cbd5e1; font-family: monospace;'>{sec_left_str}</div>
+            <div class='micro-sub-hyper'>Countdown</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Mini Barra Stato: Esposizione, Flottante, Sessione e Candela Segnale
+    if pos:
+        dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
+        dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
+        pos_str = f"<span style='color: {dir_col}; font-weight: 700;'>{dir_icon} {pos['direction']} {total_contracts}c</span> <span style='font-size: 0.68rem; color: #94a3b8;'>@{pos['open_price']:.2f}</span>"
+    else:
+        pos_str = "<span style='color: #94a3b8; font-weight: 600;'>⚪ FLAT (0c)</span>"
+
+    col_fl = "#22c55e" if float_pnl > 0 else ("#ef4444" if float_pnl < 0 else "#94a3b8")
+    sign_fl = "+" if float_pnl > 0 else ""
+    fl_str = f"<span style='color: {col_fl}; font-weight: 700;'>{sign_fl}{float_pnl:,.2f} €</span>"
+
+    col_sess = "#22c55e" if session_realized_pnl > 0 else ("#ef4444" if session_realized_pnl < 0 else "#94a3b8")
+    sign_sess = "+" if session_realized_pnl > 0 else ""
+    sess_str = f"<span style='color: {col_sess}; font-weight: 700;'>{sign_sess}{session_realized_pnl:,.2f} €</span> <span style='font-size: 0.65rem; color: #64748b;'>({num_closed} op)</span>"
+
+    sig_html = ""
+    if sig_act and sig_px is not None:
+        if sig_ref is None:
+            if pos and pos.get("direction") == "LONG":
+                sig_ref = round(sig_px + sig_offset, 2)
+            elif pos and pos.get("direction") == "SHORT":
+                sig_ref = round(sig_px - sig_offset, 2)
             else:
-                core_pnl_val = 0.0
+                sig_ref = sig_px
+        sign_op = "-" if (pos and pos.get("direction") == "LONG") else "+"
+        sig_html = f"<div style='font-size: 0.68rem; color: #f97316; font-weight: 700; margin-top: 3px;'>⚠️ Candela Segnale: <span style='color: #fb923c; font-weight: 800;'>{sig_px:.2f}</span> ({sig_ref:.2f} {sign_op} {sig_offset:.0f}{unit_lbl})</div>"
 
-            col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
-            sign_core = "+" if core_pnl_val >= 0 else ""
+    st.markdown(f"""
+    <div style='background: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 6px; padding: 5px 8px; margin-bottom: 7px;'>
+        <div style='display: flex; justify-content: space-between; align-items: center; font-size: 0.73rem;'>
+            <div>Pos: {pos_str}</div>
+            <div>Flott: {fl_str}</div>
+            <div>Sess: {sess_str}</div>
+        </div>
+        {sig_html}
+    </div>
+    """, unsafe_allow_html=True)
 
-            p_rows = [
-                f"<tr>"
-                f"<td>{dir_badge}</td>"
-                f"<td style='text-align: center; font-weight: 700;'>{pos.get('contracts', core_c)}c</td>"
-                f"<td style='text-align: right; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                f"<td style='text-align: right;'>{ts_cell}</td>"
-                f"<td style='text-align: right; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f}&nbsp;€</td>"
-                f"</tr>"
-            ]
+    # Pulsanti di Controllo compatti
+    c_b1, c_b2, c_b3 = st.columns([1.1, 1.1, 1.0])
+    with c_b1:
+        st.markdown("<div class='btn-start-hyper btn-compact-hyper'>", unsafe_allow_html=True)
+        if st.button("🟢 AVVIA 5M", key=f"btn_start_m5_{btn_sfx}", disabled=trading_on, use_container_width=True):
+            st.session_state["hyper_target_subtab"] = "5m"
+            engine.set_trading(True)
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-            for idx, inc in enumerate(increments, 1):
-                if live_mid is not None:
-                    inc_diff = (live_mid - inc["open_price"]) if inc["direction"] == "LONG" else (inc["open_price"] - live_mid)
-                    inc_pnl_val = round(inc_diff * inc.get("contracts", inc_c) * 1.0, 2)
-                else:
-                    inc_pnl_val = 0.0
+    with c_b2:
+        st.markdown("<div class='btn-stop-hyper btn-compact-hyper'>", unsafe_allow_html=True)
+        if st.button("🔴 STOP 5M", key=f"btn_stop_m5_{btn_sfx}", disabled=(not trading_on), use_container_width=True):
+            st.session_state["hyper_target_subtab"] = "5m"
+            engine.set_trading(False)
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-                col_inc_pnl = "#22c55e" if inc_pnl_val >= 0 else "#ef4444"
-                sign_inc = "+" if inc_pnl_val >= 0 else ""
-                tp_val = inc.get("tp_price", 0.0)
-                tp_cell = f"<span style='color: #38bdf8; font-weight: 700; white-space: nowrap;'>{tp_val:.2f}</span>"
+    with c_b3:
+        st.markdown("<div class='btn-azzera-hyper btn-compact-hyper'>", unsafe_allow_html=True)
+        if st.button("🔄 Azzera", key=f"btn_clr_trades_m5_{btn_sfx}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione per questo strumento", use_container_width=True):
+            st.session_state["hyper_target_subtab"] = "5m"
+            order_mgr.clear_trades_history(tf="5M", epic=epic_filter)
+            engine.clear_session_trades()
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-                p_rows.append(
-                    f"<tr>"
-                    f"<td><span style='color: #f59e0b; font-weight: 600;'>➕ Incr #{idx}</span></td>"
-                    f"<td style='text-align: center; font-weight: 700;'>{inc.get('contracts', inc_c)}c</td>"
-                    f"<td style='text-align: right; font-weight: 600;'>{inc['open_price']:.2f}</td>"
-                    f"<td style='text-align: right;'>{tp_cell}</td>"
-                    f"<td style='text-align: right; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f}&nbsp;€</td>"
-                    f"</tr>"
-                )
+    # Posizioni in Portafoglio
+    st.markdown("<div style='margin-top: 8px; margin-bottom: 3px; font-size: 0.77rem; font-weight: 700; color: #e2e8f0;'>💼 Posizioni in Portafoglio</div>", unsafe_allow_html=True)
+    if pos:
+        dir_pos = pos["direction"]
+        dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
+        dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
+        ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
+        ts_sign = "+" if dir_pos == "LONG" else "-"
+        ts_cell = f"<span style='color: #38bdf8; font-weight: 600;'>{ts_target:.2f}</span> <span style='font-size: 0.63rem; color: #94a3b8;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
 
-            # Riga Totale
-            col_tot_pnl = "#22c55e" if float_pnl >= 0 else "#ef4444"
-            sign_tot = "+" if float_pnl >= 0 else ""
-            px_live_str = f"{live_mid:.2f}" if live_mid is not None else "--"
+        if live_mid is not None:
+            core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
+            core_pnl_val = round(core_diff * pos.get("contracts", core_c) * 1.0, 2)
+        else:
+            core_pnl_val = 0.0
+
+        col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
+        sign_core = "+" if core_pnl_val >= 0 else ""
+
+        p_rows = [
+            f"<tr>"
+            f"<td>{dir_badge}</td>"
+            f"<td style='text-align: center; font-weight: 700;'>{pos.get('contracts', core_c)}c</td>"
+            f"<td style='text-align: right; font-weight: 600;'>{pos['open_price']:.2f}</td>"
+            f"<td style='text-align: right;'>{ts_cell}</td>"
+            f"<td style='text-align: right; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
+            f"</tr>"
+        ]
+
+        for idx, inc in enumerate(increments, 1):
+            if live_mid is not None:
+                inc_diff = (live_mid - inc["open_price"]) if inc["direction"] == "LONG" else (inc["open_price"] - live_mid)
+                inc_pnl_val = round(inc_diff * inc.get("contracts", inc_c) * 1.0, 2)
+            else:
+                inc_pnl_val = 0.0
+
+            col_inc_pnl = "#22c55e" if inc_pnl_val >= 0 else "#ef4444"
+            sign_inc = "+" if inc_pnl_val >= 0 else ""
+            tp_val = inc.get("tp_price", 0.0)
+            tp_cell = f"<span style='color: #38bdf8; font-weight: 700;'>{tp_val:.2f}</span>"
+
             p_rows.append(
-                f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 2px solid #475569; font-weight: 800;'>"
-                f"<td style='color: #f8fafc;'>TOTALE</td>"
-                f"<td style='text-align: center; color: #38bdf8; white-space: nowrap;'>{total_contracts}c</td>"
-                f"<td style='text-align: right; color: #94a3b8; white-space: nowrap;'>Live: {px_live_str}</td>"
-                f"<td style='text-align: right; color: #64748b; white-space: nowrap;'>--</td>"
-                f"<td style='text-align: right; color: {col_tot_pnl}; white-space: nowrap;'>{sign_tot}{float_pnl:,.2f}&nbsp;€</td>"
+                f"<tr>"
+                f"<td><span style='color: #f59e0b; font-weight: 600;'>➕ Inc #{idx}</span></td>"
+                f"<td style='text-align: center; font-weight: 700;'>{inc.get('contracts', inc_c)}c</td>"
+                f"<td style='text-align: right; font-weight: 600;'>{inc['open_price']:.2f}</td>"
+                f"<td style='text-align: right;'>{tp_cell}</td>"
+                f"<td style='text-align: right; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
                 f"</tr>"
             )
 
-            st.markdown(f"""
-            <table class='table-dark-hyper'>
-                <thead>
-                    <tr><th>Posizione</th><th style='text-align: center;'>Size</th><th style='text-align: right;'>Open</th><th style='text-align: right;'>TP / TS</th><th style='text-align: right;'>P&L</th></tr>
-                </thead>
-                <tbody>{''.join(p_rows)}</tbody>
-            </table>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Portafoglio Flat. Nessun contratto a mercato.")
+        col_tot_pnl = "#22c55e" if float_pnl >= 0 else "#ef4444"
+        sign_tot = "+" if float_pnl >= 0 else ""
+        p_rows.append(
+            f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.71rem;'>"
+            f"<td style='color: #f8fafc;'>TOT</td>"
+            f"<td style='text-align: center; color: #38bdf8;'>{total_contracts}c</td>"
+            f"<td style='text-align: right; color: #94a3b8;'>Live: {px_str}</td>"
+            f"<td style='text-align: right; color: #64748b;'>--</td>"
+            f"<td style='text-align: right; color: {col_tot_pnl};'>{sign_tot}{float_pnl:,.2f} €</td>"
+            f"</tr>"
+        )
+
+        st.markdown(f"""
+        <table class='table-compact-hyper'>
+            <thead>
+                <tr><th>Pos</th><th style='text-align: center;'>Size</th><th style='text-align: right;'>Open</th><th style='text-align: right;'>TP/TS</th><th style='text-align: right;'>P&L</th></tr>
+            </thead>
+            <tbody>{''.join(p_rows)}</tbody>
+        </table>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.69rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat)</div>", unsafe_allow_html=True)
+
+    # Storico Operazioni Recenti
+    st.markdown("<div style='margin-top: 8px; margin-bottom: 3px; font-size: 0.77rem; font-weight: 700; color: #e2e8f0;'>📋 Storico Operazioni Recenti (5M)</div>", unsafe_allow_html=True)
+    if history_inst:
+        rows_h = []
+        for t in history_inst[:6]:
+            pnl_val = float(t.get("pnl_eur", 0.0) or 0.0)
+            col_p = "#22c55e" if pnl_val > 0 else ("#ef4444" if pnl_val < 0 else "#94a3b8")
+            sign_p = f"+{pnl_val:.2f}" if pnl_val > 0 else f"{pnl_val:.2f}"
+            lbl = t.get("label", "Trade")
+            rsn = t.get("reason", "")
+            if "PARACADUTE" in rsn.upper():
+                badge_act = f"<span style='color: #f87171; font-weight: bold;'>🪂 {lbl}</span>"
+            elif "TP" in rsn.upper() or "TP" in lbl.upper():
+                badge_act = f"<span style='color: #38bdf8; font-weight: bold;'>🎯 {lbl}</span>"
+            elif "TRAILING" in rsn.upper() or "TS" in rsn.upper():
+                badge_act = f"<span style='color: #4ade80; font-weight: bold;'>🏆 TS</span>"
+            else:
+                badge_act = f"<span style='color: #cbd5e1; font-weight: bold;'>⏹️ {lbl}</span>"
+
+            t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
+            rsn_short = rsn.replace("Chiusura Paracadute", "🪂 Paracadute").replace("Take Profit", "🎯 TP").replace("Trailing Stop", "🏆 TS")
+            if len(rsn_short) > 26:
+                rsn_short = rsn_short[:24] + ".."
+
+            rows_h.append(
+                f"<tr>"
+                f"<td style='white-space: nowrap;'>{t_str}</td>"
+                f"<td style='white-space: nowrap;'>{badge_act}</td>"
+                f"<td style='text-align: right; white-space: nowrap;'>{t['open_price']:.2f}</td>"
+                f"<td style='text-align: right; white-space: nowrap;'>{t['close_price']:.2f}</td>"
+                f"<td style='text-align: right; color: {col_p}; font-weight: 700; white-space: nowrap;'>{sign_p}&nbsp;€</td>"
+                f"<td style='color: #94a3b8; font-size: 0.67rem;'>{rsn_short}</td>"
+                f"</tr>"
+            )
+        st.markdown(f"""
+        <table class='table-compact-hyper'>
+            <thead>
+                <tr><th>Ora</th><th>Pos</th><th style='text-align: right;'>In</th><th style='text-align: right;'>Out</th><th style='text-align: right;'>P&L</th><th>Trigger</th></tr>
+            </thead>
+            <tbody>{''.join(rows_h)}</tbody>
+        </table>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.69rem; color: #64748b; text-align: center;'>Nessuna operazione ancora chiusa in sessione.</div>", unsafe_allow_html=True)
+
+    # Expander Regole M5
+    with st.expander(f"⚙️ Assetto & Regole M5 {instr_name}", expanded=False):
+        st.markdown(f"""
+        <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.70rem; line-height: 1.4;'>
+            <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name}:</div>
+            <div>• <b>Regime</b>: LONG se Chiusura > KJ55 | SHORT se Chiusura < KJ55</div>
+            <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su stacco Prezzo - KJ >= 2{unit_lbl}</div>
+            <div>• <b>Incrementi Pullback</b>: fino a <b>{max_inc}</b> da <span style='color: #f59e0b; font-weight: 600;'>{inc_c}c</span> (distanza <= 5{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl})</div>
+            <div>• <b>Trailing Stop Core</b>: Trigger +{ts_trig:.0f}{unit_lbl}, Lock +{ts_lock:.0f}{unit_lbl}, Step {ts_stp:.0f}{unit_lbl}</div>
+            <div>• <b>Protezioni</b>: Paracadute ±{parachute_p:.0f}{unit_lbl} • Candela Segnale ±{sig_offset:.0f}{unit_lbl}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+@st.fragment(run_every=2)
+def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
+    """Visualizzazione unificata e affiancata di Spot Gold 1€ e US 500 Cash 1€ su timeframe 5M."""
+    conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
+    nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
+
+    # Motori dei due strumenti 5M
+    engine_gold = HyperGoldM5Engine.get_instance(account_dir=conto_attivo)
+    engine_us500 = HyperUS500M5Engine.get_instance(account_dir=conto_attivo)
+
+    # Dati patrimoniali sincronizzati
+    acc_data = get_sidebar_account_data(conto_attivo)
+
+    # Flottanti live
+    float_gold = engine_gold.get_floating_pnl()
+    float_us500 = engine_us500.get_floating_pnl()
+    tot_float = float_gold + float_us500
+
+    # Order manager & Storico 5M Reale IG
+    order_mgr = HyperOrderManager.get_instance(conto_attivo)
+    hist_gold = order_mgr.get_trades_history(tf="5M", epic="CS.D.CFDGOLD.CFD.IP")
+    hist_us500 = order_mgr.get_trades_history(tf="5M", epic="IX.D.SPTRD.IBE.IP")
+    real_gold = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_gold)
+    real_us500 = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_us500)
+    tot_real = real_gold + real_us500
+    tot_closed = len(hist_gold) + len(hist_us500)
+
+    # Contratti ed esposizione aggregata
+    with engine_gold.lock:
+        pos_g = engine_gold.position
+        inc_g = list(engine_gold.increments)
+        c_gold = (pos_g.get("contracts", CORE_CONTRACTS_5M) + sum(i.get("contracts", INC_CONTRACTS_5M) for i in inc_g)) if pos_g else 0
+        dir_gold = pos_g["direction"] if pos_g else "FLAT"
+
+    with engine_us500.lock:
+        pos_u = engine_us500.position
+        inc_u = list(engine_us500.increments)
+        c_us500 = (pos_u.get("contracts", 4) + sum(i.get("contracts", 2) for i in inc_u)) if pos_u else 0
+        dir_us500 = pos_u["direction"] if pos_u else "FLAT"
+
+    tot_hyper_margin = (c_gold * 220.0) + (c_us500 * 400.0)
+
+    # Banner KPI di Sintesi Account (4 colonne proporzionate ed eleganti)
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(f"""
+        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
+            <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
+            <div class='kpi-val-hyper' style='color: #FFD700; font-size: 1.25rem;'>{acc_data['saldo_str']} €</div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disp: <b style='color: #4ade80;'>{acc_data['disp_str']} €</b> | Marg: <b style='color: #f59e0b;'>{acc_data['marg_str']} €</b></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k2:
+        col_real = "#22c55e" if tot_real >= 0 else "#ef4444"
+        sign_real = "+" if tot_real > 0 else ""
+        pnl_real_str = f"{tot_real:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        st.markdown(f"""
+        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
+            <div class='kpi-title-hyper'>P&L Sessione Hyper 5M</div>
+            <div class='kpi-val-hyper' style='color: {col_real}; font-size: 1.25rem;'>{sign_real}{pnl_real_str} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} € <span style='color: #64748b;'>({tot_closed} op)</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k3:
+        col_float = "#22c55e" if tot_float > 0 else ("#ef4444" if tot_float < 0 else "#94a3b8")
+        sign_fl = "+" if tot_float > 0 else ""
+        st.markdown(f"""
+        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
+            <div class='kpi-title-hyper'>P&L Flottante Hyper (Live)</div>
+            <div class='kpi-val-hyper' style='color: {col_float}; font-size: 1.25rem;'>{sign_fl}{tot_float:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {float_gold:+.2f} € • US500 {float_us500:+.2f} €</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k4:
+        col_g = "#22c55e" if dir_gold == "LONG" else ("#ef4444" if dir_gold == "SHORT" else "#94a3b8")
+        col_u = "#22c55e" if dir_us500 == "LONG" else ("#ef4444" if dir_us500 == "SHORT" else "#94a3b8")
+        st.markdown(f"""
+        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
+            <div class='kpi-title-hyper'>Esposizione Hyper 5M</div>
+            <div class='kpi-val-hyper' style='font-size: 1.02rem; white-space: nowrap;'>
+                <span style='color: {col_g};'>Gold: {dir_gold} ({c_gold}c)</span> | <span style='color: {col_u};'>US500: {dir_us500} ({c_us500}c)</span>
+            </div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Margine Hyper impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+
+    # Due Colonne Affiancate: Sinistra Spot Gold 1€, Destra US 500 Cash 1€
+    col_gold, col_us500 = st.columns(2, gap="medium")
+    with col_gold:
+        _render_instrument_column(engine_gold, "GOLD", conto_attivo, order_mgr)
+
+    with col_us500:
+        _render_instrument_column(engine_us500, "US500", conto_attivo, order_mgr)
 
 
 def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
@@ -794,30 +833,9 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
 
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
 
-    # Selettore Strumento Operativo Hyper in evidenza
-    c_sel, c_info = st.columns([1.8, 3.2])
-    with c_sel:
-        scelta_inst = st.radio(
-            "Strumento Hyper:",
-            ["🪙 Spot Gold 1€", "🇺🇸 US 500 Cash 1€"],
-            index=0,
-            horizontal=True,
-            label_visibility="collapsed",
-            key=f"radio_inst_hyper_{conto_attivo}"
-        )
-    is_us500 = ("US 500" in scelta_inst)
-
-    with c_info:
-        if is_us500:
-            st.markdown("<div style='padding-top: 6px; font-size: 0.76rem; color: #38bdf8; font-weight: 600;'>🇺🇸 US 500 Cash (1€/pt) • S&R Puro KJ55 (5M: Core 4c + 2 Incr 2c, TP 10pt)</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='padding-top: 6px; font-size: 0.76rem; color: #facc15; font-weight: 600;'>🪙 Spot Gold (1€/p) • S&R Puro KJ55 (5M: Core 5c + Incr 3c, TP 5p)</div>", unsafe_allow_html=True)
-
     engine_gold_5m = HyperGoldM5Engine.get_instance(account_dir=conto_attivo)
     engine_us500_5m = HyperUS500M5Engine.get_instance(account_dir=conto_attivo)
-    engine_5m = engine_us500_5m if is_us500 else engine_gold_5m
-
-    is_5m_on = engine_5m.trading_enabled
+    is_5m_on = engine_gold_5m.trading_enabled or engine_us500_5m.trading_enabled
 
     tab_h5m, tab_sintesi = st.tabs([
         "📊 Hyper 5M (Trend Scalping)" + (" 🟢 ATTIVO" if is_5m_on else ""),
@@ -825,10 +843,10 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
     ])
 
     with tab_h5m:
-        render_hyper_5m(conto_selezionato=conto_attivo, is_us500=is_us500)
+        render_hyper_5m(conto_selezionato=conto_attivo)
 
     with tab_sintesi:
-        render_sintesi_hyp(conto_selezionato=conto_attivo, is_us500=is_us500)
+        render_sintesi_hyp(conto_selezionato=conto_attivo)
 
     target_subtab = st.session_state.pop("hyper_target_subtab", None)
     target_js = target_subtab if target_subtab else ""
