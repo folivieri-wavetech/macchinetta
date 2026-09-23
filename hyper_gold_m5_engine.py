@@ -460,7 +460,7 @@ class HyperGoldM5Engine:
                 def on_tick(item_update):
                     vals = item_update.get("values", {})
                     bid_s = vals.get("BID")
-                    ask_s = vals.get("OFFER")
+                    ask_s = vals.get("OFR") or vals.get("OFFER")
                     # Orario locale italiano (Roma UTC+2/UTC+1) per storico ed eseguiti
                     t_str = now_it().strftime("%H:%M:%S")
                     if bid_s and ask_s:
@@ -472,9 +472,9 @@ class HyperGoldM5Engine:
                             pass
 
                 sub = LightstreamerSubscription(
-                    mode="MERGE",
-                    items=[f"MARKET:{EPIC_GOLD}"],
-                    fields=["BID", "OFFER", "HIGH", "LOW", "UPDATE_TIME"]
+                    mode="DISTINCT",
+                    items=[f"CHART:{EPIC_GOLD}:TICK"],
+                    fields=["BID", "OFR", "UTM"]
                 )
                 sub.addlistener(on_tick)
                 ls_client.subscribe(sub)

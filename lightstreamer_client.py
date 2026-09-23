@@ -236,7 +236,7 @@ class LightstreamerClient(object):
         if server_response == OK_CMD:
             log.info("Successfully subscribed ")
         else:
-            log.warning("Subscription error")
+            log.warning(f"Subscription error: {server_response}")
         return self._current_subscription_key
 
     def unsubscribe(self, subcription_key):
