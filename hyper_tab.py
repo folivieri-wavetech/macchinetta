@@ -537,10 +537,16 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
         sign_core = "+" if core_pnl_val >= 0 else ""
 
+        # Formattazione Size Core (+size verde per LONG, -size salmone per SHORT)
+        core_c_val = pos.get('contracts', core_c)
+        sign_c_size = "+" if dir_pos == "LONG" else "-"
+        col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
+        size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}c</span>"
+
         p_rows = [
             f"<tr>"
             f"<td style='text-align: center;'>{dir_badge}</td>"
-            f"<td style='text-align: center; font-weight: 700;'>{pos.get('contracts', core_c)}c</td>"
+            f"<td style='text-align: center;'>{size_core_cell}</td>"
             f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
             f"<td style='text-align: center;'>{ts_core_cell}</td>"
             f"<td style='text-align: center;'></td>"
@@ -561,10 +567,17 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             # Verde Erba per TP Incremento (inserito a mercato all'apertura)
             tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>"
 
+            # Formattazione Size Incremento
+            inc_dir = inc.get("direction", dir_pos)
+            inc_c_val = inc.get('contracts', inc_c)
+            sign_i_size = "+" if inc_dir == "LONG" else "-"
+            col_i_size = "#22c55e" if inc_dir == "LONG" else "#fa8072"
+            size_inc_cell = f"<span style='color: {col_i_size}; font-weight: 700;'>{sign_i_size}{inc_c_val}c</span>"
+
             p_rows.append(
                 f"<tr>"
                 f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>➕ Inc #{idx}</span></td>"
-                f"<td style='text-align: center; font-weight: 700;'>{inc.get('contracts', inc_c)}c</td>"
+                f"<td style='text-align: center;'>{size_inc_cell}</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
                 f"<td style='text-align: center;'></td>"
                 f"<td style='text-align: center;'>{tp_cell}</td>"
@@ -574,10 +587,14 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
         col_tot_pnl = "#22c55e" if float_pnl >= 0 else "#ef4444"
         sign_tot = "+" if float_pnl >= 0 else ""
+        sign_tot_size = "+" if dir_pos == "LONG" else "-"
+        col_tot_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
+        size_tot_cell = f"<span style='color: {col_tot_size}; font-weight: 800;'>{sign_tot_size}{total_contracts}c</span>"
+
         p_rows.append(
             f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.78rem;'>"
             f"<td style='text-align: center; color: #f8fafc;'>TOT</td>"
-            f"<td style='text-align: center; color: #38bdf8;'>{total_contracts}c</td>"
+            f"<td style='text-align: center;'>{size_tot_cell}</td>"
             f"<td></td>"
             f"<td colspan='2' style='text-align: center; color: #38bdf8;'>Live: {px_str}</td>"
             f"<td style='text-align: center; color: {col_tot_pnl};'>{sign_tot}{float_pnl:,.2f} €</td>"
@@ -702,16 +719,12 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     with k4:
         col_g = "#22c55e" if dir_gold == "LONG" else ("#ef4444" if dir_gold == "SHORT" else "#94a3b8")
         col_u = "#22c55e" if dir_us500 == "LONG" else ("#ef4444" if dir_us500 == "SHORT" else "#94a3b8")
-        col_fl_g = "#22c55e" if float_gold > 0 else ("#ef4444" if float_gold < 0 else "#94a3b8")
-        sign_fl_g = "+" if float_gold > 0 else ""
-        col_fl_u = "#22c55e" if float_us500 > 0 else ("#ef4444" if float_us500 < 0 else "#94a3b8")
-        sign_fl_u = "+" if float_us500 > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
             <div class='kpi-title-hyper' style='text-align: center;'>Esposizione</div>
             <div class='kpi-val-hyper' style='font-size: 0.88rem; line-height: 1.25; text-align: center;'>
-                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g}; font-weight: 700;'>{dir_gold} (size={c_gold})</span> <span style='color: {col_fl_g}; font-weight: 700; margin-left: 6px;'>{sign_fl_g}{round(float_gold):,.0f} €</span></div>
-                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u}; font-weight: 700;'>{dir_us500} (size={c_us500})</span> <span style='color: {col_fl_u}; font-weight: 700; margin-left: 6px;'>{sign_fl_u}{round(float_us500):,.0f} €</span></div>
+                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g}; font-weight: 700;'>{dir_gold} (size={c_gold})</span></div>
+                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u}; font-weight: 700;'>{dir_us500} (size={c_us500})</span></div>
             </div>
             <div class='kpi-sub-hyper' style='color: #94a3b8; text-align: center;'>Margine impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
         </div>
