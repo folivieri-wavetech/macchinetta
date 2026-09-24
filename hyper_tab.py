@@ -467,7 +467,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Posizioni in Portafoglio
-    st.markdown("<div style='margin-top: 8px; margin-bottom: 3px; font-size: 0.82rem; font-weight: 700; color: #e2e8f0;'>💼 Posizioni in Portafoglio</div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 8px; margin-bottom: 4px; font-size: 0.95rem; font-weight: 700; color: #FFD700;'>💼 Posizioni in Portafoglio</div>", unsafe_allow_html=True)
     if pos:
         dir_pos = pos["direction"]
         dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
