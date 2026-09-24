@@ -589,7 +589,7 @@ class HyperGoldM5Engine:
                         order_mgr = HyperOrderManager.get_instance(self.account_dir)
                         order_mgr.send_notification(
                             "🎯 TRAILING STOP 5M: Spot Gold",
-                            f"[Spot Gold] Core Trailing Stop LONG aggiornato a {new_ts:.2f} € (Lock +{locked_pips:.1f}p, Prezzo: {current_price:.2f} €)",
+                            f"[Spot Gold] TS Core LONG aggiornato a {new_ts:.2f}",
                             "dart"
                         )
 
@@ -620,7 +620,7 @@ class HyperGoldM5Engine:
                         order_mgr = HyperOrderManager.get_instance(self.account_dir)
                         order_mgr.send_notification(
                             "🎯 TRAILING STOP 5M: Spot Gold",
-                            f"[Spot Gold] Core Trailing Stop SHORT aggiornato a {new_ts:.2f} € (Lock +{locked_pips:.1f}p, Prezzo: {current_price:.2f} €)",
+                            f"[Spot Gold] TS Core SHORT aggiornato a {new_ts:.2f}",
                             "dart"
                         )
 

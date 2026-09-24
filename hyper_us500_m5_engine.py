@@ -501,7 +501,7 @@ class HyperUS500M5Engine:
                         order_mgr = HyperOrderManager.get_instance(self.account_dir)
                         order_mgr.send_notification(
                             "🎯 TRAILING STOP 5M: US 500 Cash",
-                            f"[US 500] Core TS LONG aggiornato a {pos['ts_price']:.2f} pt (Prezzo: {current_price:.2f} pt)",
+                            f"[US 500] TS Core LONG aggiornato a {pos['ts_price']:.2f}",
                             "dart"
                         )
 
@@ -519,7 +519,7 @@ class HyperUS500M5Engine:
                         order_mgr = HyperOrderManager.get_instance(self.account_dir)
                         order_mgr.send_notification(
                             "🎯 TRAILING STOP 5M: US 500 Cash",
-                            f"[US 500] Core TS SHORT aggiornato a {pos['ts_price']:.2f} pt (Prezzo: {current_price:.2f} pt)",
+                            f"[US 500] TS Core SHORT aggiornato a {pos['ts_price']:.2f}",
                             "dart"
                         )
 

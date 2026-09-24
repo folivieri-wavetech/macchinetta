@@ -19,31 +19,47 @@ from hyper_us500_m5_engine import (
 import json
 from hyper_order_manager import HyperOrderManager, TZ_ITALIA, now_it
 
-def is_trade_today(trade: dict, today_dt=None) -> bool:
-    """Verifica se il trade appartiene alla giornata odierna (fuso orario italiano)."""
-    if today_dt is None:
-        today_dt = now_it()
-    iso_date = today_dt.strftime("%Y-%m-%d")
-    it_date = today_dt.strftime("%d/%m/%Y")
-    
-    tc = str(trade.get("time_close") or "")
-    if iso_date in tc or it_date in tc:
-        return True
-        
-    to = str(trade.get("time_open") or "")
-    if iso_date in to or it_date in to:
-        return True
-        
+def get_trading_day(dt: datetime.datetime) -> datetime.date:
+    """Restituisce la data della giornata operativa con reset alle 01:00 (finestra 01:00 - 00:59 del giorno dopo)."""
+    return (dt - datetime.timedelta(hours=1)).date()
+
+def is_trade_today(trade: dict, now_dt=None) -> bool:
+    """Verifica se il trade è stato chiuso nella giornata operativa corrente (scatto alle 01:00).
+    Se un'operazione aperta alle 00:30 si chiude alle 01:15, entra a pieno titolo nella nuova giornata."""
+    if now_dt is None:
+        now_dt = now_it()
+    curr_trading_day = get_trading_day(now_dt)
+
+    # 1. Priorità a time_close (orario di effettivo incasso del profitto)
+    tc_str = str(trade.get("time_close") or "")
+    if tc_str:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"):
+            try:
+                tc_dt = datetime.datetime.strptime(tc_str[:19], fmt)
+                return get_trading_day(tc_dt) == curr_trading_day
+            except Exception:
+                pass
+
+    # 2. Controllo su id univoco timestamp in millisecondi
     tid = trade.get("id")
     if tid:
         try:
             ts_sec = float(tid) / 1000.0 if float(tid) > 1e11 else float(tid)
-            trade_dt = datetime.datetime.fromtimestamp(ts_sec, TZ_ITALIA)
-            if trade_dt.date() == today_dt.date():
-                return True
+            tid_dt = datetime.datetime.fromtimestamp(ts_sec, TZ_ITALIA)
+            return get_trading_day(tid_dt) == curr_trading_day
         except Exception:
             pass
-            
+
+    # 3. Fallback su time_open
+    to_str = str(trade.get("time_open") or "")
+    if to_str:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"):
+            try:
+                to_dt = datetime.datetime.strptime(to_str[:19], fmt)
+                return get_trading_day(to_dt) == curr_trading_day
+            except Exception:
+                pass
+
     return False
 
 _sidebar_cache = {"time": 0.0, "conto": None, "data": {}}
@@ -660,22 +676,26 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         col_real = "#22c55e" if tot_real >= 0 else "#ef4444"
         sign_real = "+" if tot_real > 0 else ""
         pnl_real_str = f"{tot_real:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        col_rg = "#22c55e" if real_gold >= 0 else "#fa8072"
+        col_ru = "#22c55e" if real_us500 >= 0 else "#fa8072"
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
             <div class='kpi-title-hyper' style='text-align: center;'>P&L Giornaliero</div>
             <div class='kpi-val-hyper' style='color: {col_real}; font-size: 1.25rem; text-align: center;'>{sign_real}{pnl_real_str} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'><span style='color: #FFD700; font-weight: 600;'>Gold</span> <span style='color: {col_rg}; font-weight: 600;'>{real_gold:+.2f} €</span> • <span style='color: #FFD700; font-weight: 600;'>US500</span> <span style='color: {col_ru}; font-weight: 600;'>{real_us500:+.2f} €</span></div>
         </div>
         """, unsafe_allow_html=True)
 
     with k3:
         col_float = "#22c55e" if tot_float > 0 else ("#ef4444" if tot_float < 0 else "#94a3b8")
         sign_fl = "+" if tot_float > 0 else ""
+        col_fg = "#22c55e" if float_gold >= 0 else "#fa8072"
+        col_fu = "#22c55e" if float_us500 >= 0 else "#fa8072"
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
             <div class='kpi-title-hyper' style='text-align: center;'>P&L Latente (Live)</div>
             <div class='kpi-val-hyper' style='color: {col_float}; font-size: 1.25rem; text-align: center;'>{sign_fl}{tot_float:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Gold {float_gold:+.2f} € • US500 {float_us500:+.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'><span style='color: #FFD700; font-weight: 600;'>Gold</span> <span style='color: {col_fg}; font-weight: 600;'>{float_gold:+.2f} €</span> • <span style='color: #FFD700; font-weight: 600;'>US500</span> <span style='color: {col_fu}; font-weight: 600;'>{float_us500:+.2f} €</span></div>
         </div>
         """, unsafe_allow_html=True)
 
