@@ -618,12 +618,16 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     with k4:
         col_g = "#22c55e" if dir_gold == "LONG" else ("#ef4444" if dir_gold == "SHORT" else "#94a3b8")
         col_u = "#22c55e" if dir_us500 == "LONG" else ("#ef4444" if dir_us500 == "SHORT" else "#94a3b8")
+        col_fl_g = "#22c55e" if float_gold > 0 else ("#ef4444" if float_gold < 0 else "#94a3b8")
+        sign_fl_g = "+" if float_gold > 0 else ""
+        col_fl_u = "#22c55e" if float_us500 > 0 else ("#ef4444" if float_us500 < 0 else "#94a3b8")
+        sign_fl_u = "+" if float_us500 > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
             <div class='kpi-title-hyper' style='text-align: center;'>Esposizione</div>
             <div class='kpi-val-hyper' style='font-size: 0.88rem; line-height: 1.25; text-align: center;'>
-                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g};'>{dir_gold} ({c_gold}c)</span></div>
-                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u};'>{dir_us500} ({c_us500}c)</span></div>
+                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g}; font-weight: 700;'>{dir_gold} (size={c_gold})</span> <span style='color: {col_fl_g}; font-weight: 700; margin-left: 6px;'>{sign_fl_g}{float_gold:,.2f} €</span></div>
+                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u}; font-weight: 700;'>{dir_us500} (size={c_us500})</span> <span style='color: {col_fl_u}; font-weight: 700; margin-left: 6px;'>{sign_fl_u}{float_us500:,.2f} €</span></div>
             </div>
             <div class='kpi-sub-hyper' style='color: #94a3b8; text-align: center;'>Margine impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
         </div>
