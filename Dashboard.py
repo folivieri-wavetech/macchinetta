@@ -3536,6 +3536,24 @@ else:
                                                 msg_stop = f"[{ora_str}] 🛑 STOP MANUALE {label_tipo}{px_str} [PnL: {sign_p}{pnl_it:.0f} €]"
                                                 storico.append(msg_stop)
                                                 try:
+                                                    from trend_trades_manager import salva_trade_chiuso_trend
+                                                    salva_trade_chiuso_trend(
+                                                        conto=conto_selezionato,
+                                                        trade_dict={
+                                                            "time_close": now_it().strftime("%Y-%m-%d %H:%M:%S"),
+                                                            "instrument": nome,
+                                                            "direction": it.get("direction", "BUY" if "LONG" in label_tipo else "SELL"),
+                                                            "contracts": float(sz_it),
+                                                            "open_price": float(it.get("open_level", 0.0) or 0.0),
+                                                            "close_price": float(px_c or 0.0),
+                                                            "pnl_eur": round(float(pnl_it or 0.0), 2),
+                                                            "deal_id": it.get("deal_id", "--"),
+                                                            "reason": f"STOP MANUALE {label_tipo}".strip()
+                                                        }
+                                                    )
+                                                except Exception:
+                                                    pass
+                                                try:
                                                     scrivi_log(f"[{nome}] 🛑 STOP MANUALE: Chiusa posizione {label_tipo}{px_str} [PnL: {sign_p}{pnl_it:.0f} €]", conto=conto_selezionato)
                                                 except Exception:
                                                     pass
@@ -3786,11 +3804,200 @@ else:
 
 
 
-            sub_tnd_op, sub_tnd_sin = st.tabs(["⚡ Operatività", "📋 Sintesi"])
+            @st.fragment(run_every=15)
+            def renderizza_sintesi_operazioni_trend():
+                from trend_trades_manager import carica_trades_trend, azzera_trades_trend, TUTTI_STRUMENTI_TREND
+                trades = carica_trades_trend(conto_selezionato)
+
+                st.html("""
+                <div style='display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: -15px; margin-bottom: 20px;'>
+                    <div><h3 style='margin: 0; font-size: 1.6rem;'>📜 Sintesi Operazioni Trend</h3></div>
+                </div>
+                """)
+
+                # Stili CSS per KPI e tabella
+                st.html("""
+                <style>
+                .kpi-card-trend {
+                    background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px; text-align: center;
+                }
+                .kpi-title-trend { font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+                .kpi-val-trend { font-size: 1.45rem; font-weight: 700; }
+                .kpi-sub-trend { font-size: 0.70rem; margin-top: 3px; }
+                .table-dark-trend {
+                    width: 100%; border-collapse: collapse; font-size: 0.78rem;
+                }
+                .table-dark-trend th { background-color: #1e293b; color: #94a3b8; padding: 6px 8px; text-align: left; font-size: 0.72rem; }
+                .table-dark-trend td { padding: 6px 8px; border-bottom: 1px solid #334155; }
+                </style>
+                """)
+
+                tot_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades)
+                tot_trades = len(trades)
+                n_win = len([t for t in trades if float(t.get("pnl_eur", 0.0) or 0.0) > 0])
+                n_loss = len([t for t in trades if float(t.get("pnl_eur", 0.0) or 0.0) < 0])
+                wr = (n_win / tot_trades * 100.0) if tot_trades > 0 else 0.0
+                pnl_medio = (tot_pnl / tot_trades) if tot_trades > 0 else 0.0
+
+                col_tot = "#22c55e" if tot_pnl > 0 else ("#ef4444" if tot_pnl < 0 else "#94a3b8")
+                sign_tot = "+" if tot_pnl > 0 else ""
+                col_avg = "#22c55e" if pnl_medio > 0 else ("#ef4444" if pnl_medio < 0 else "#94a3b8")
+                sign_avg = "+" if pnl_medio > 0 else ""
+
+                k1, k2, k3, k4 = st.columns(4)
+                with k1:
+                    st.markdown(f"""
+                    <div class='kpi-card-trend'>
+                        <div class='kpi-title-trend'>P&L Totale Chiuso Trend</div>
+                        <div class='kpi-val-trend' style='color: {col_tot};'>{sign_tot}{tot_pnl:,.2f} €</div>
+                        <div class='kpi-sub-trend' style='color: #cbd5e1;'>Somma operazioni chiuse</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with k2:
+                    st.markdown(f"""
+                    <div class='kpi-card-trend'>
+                        <div class='kpi-title-trend'>Operazioni Chiuse</div>
+                        <div class='kpi-val-trend' style='color: #f8fafc;'>{tot_trades}</div>
+                        <div class='kpi-sub-trend' style='color: #94a3b8;'>Storico totale registrato</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with k3:
+                    st.markdown(f"""
+                    <div class='kpi-card-trend'>
+                        <div class='kpi-title-trend'>Win Rate</div>
+                        <div class='kpi-val-trend' style='color: {'#22c55e' if wr >= 50 else '#ef4444'};'>{wr:.1f}%</div>
+                        <div class='kpi-sub-trend' style='color: #94a3b8;'>🟢 {n_win} W | 🔴 {n_loss} L</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with k4:
+                    st.markdown(f"""
+                    <div class='kpi-card-trend'>
+                        <div class='kpi-title-trend'>P&L Medio per Trade</div>
+                        <div class='kpi-val-trend' style='color: {col_avg};'>{sign_avg}{pnl_medio:,.2f} €</div>
+                        <div class='kpi-sub-trend' style='color: #94a3b8;'>Media per operazione</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+
+                def _badge_strumento(strum):
+                    s = str(strum).upper()
+                    if "GOLD" in s:
+                        return f"<span style='color: #FFD700; font-weight: 700;'>🪙 {strum}</span>"
+                    elif "US 500" in s or "SPTRD" in s or "US500" in s:
+                        return f"<span style='color: #38bdf8; font-weight: 700;'>🇺🇸 {strum}</span>"
+                    elif "OIL" in s or "CRUDE" in s:
+                        return f"<span style='color: #fb923c; font-weight: 700;'>🛢️ {strum}</span>"
+                    elif any(k in s for k in ("GBP/JPY", "EUR/JPY", "CAD/JPY", "USD/JPY")):
+                        return f"<span style='color: #c084fc; font-weight: 700;'>🇯🇵 {strum}</span>"
+                    elif "GBP/USD" in s:
+                        return f"<span style='color: #60a5fa; font-weight: 700;'>🇬🇧 {strum}</span>"
+                    elif "AUD/NZD" in s:
+                        return f"<span style='color: #34d399; font-weight: 700;'>🇦🇺 {strum}</span>"
+                    else:
+                        return f"<span style='color: #94a3b8; font-weight: 700;'>📈 {strum}</span>"
+
+                def _render_trades_table_trend(trade_list, empty_msg):
+                    if not trade_list:
+                        st.info(empty_msg)
+                        return
+
+                    # Raggruppa i giorni per alternare arancione e bianco a giorni alterni
+                    unique_days = []
+                    for t in trade_list:
+                        tc = str(t.get("time_close", "")).strip()
+                        day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
+                        if day and day != "--" and day not in unique_days:
+                            unique_days.append(day)
+                    day_color_map = {day: ("#fb923c" if idx % 2 == 0 else "#f8fafc") for idx, day in enumerate(unique_days)}
+
+                    rows = []
+                    for t in trade_list:
+                        tc = str(t.get("time_close", "--")).strip()
+                        day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
+                        date_color = day_color_map.get(day, "#f8fafc")
+
+                        pnl = float(t.get("pnl_eur", 0.0) or 0.0)
+                        col_p = "#22c55e" if pnl > 0 else ("#ef4444" if pnl < 0 else "#94a3b8")
+                        sign = "+" if pnl > 0 else ""
+                        direction = str(t.get("direction", "--")).upper()
+                        d_col = "#22c55e" if direction in ("LONG", "BUY") else ("#ef4444" if direction in ("SHORT", "SELL") else "#94a3b8")
+                        inst_name = t.get("instrument", "--")
+                        inst_badge = _badge_strumento(inst_name)
+                        dec = CONFIG_STRUMENTI.get(inst_name, {}).get("decimali", 2)
+
+                        op_px = float(t.get("open_price", 0.0) or 0.0)
+                        cl_px = float(t.get("close_price", 0.0) or 0.0)
+                        op_str = f"{op_px:.{dec}f}" if op_px > 0 else "--"
+                        cl_str = f"{cl_px:.{dec}f}" if cl_px > 0 else "--"
+
+                        c_val = float(t.get("contracts", 1.0))
+                        c_str = f"{int(c_val)}c" if c_val.is_integer() else f"{c_val:g}c"
+
+                        rows.append(
+                            f"<tr>"
+                            f"<td style='white-space: nowrap; color: {date_color}; font-weight: 600;'>{tc}</td>"
+                            f"<td style='white-space: nowrap;'>{inst_badge}</td>"
+                            f"<td style='text-align: center; color: {d_col}; font-weight: 700;'>{direction}</td>"
+                            f"<td style='text-align: center;'>{c_str}</td>"
+                            f"<td style='text-align: right;'>{op_str}</td>"
+                            f"<td style='text-align: right;'>{cl_str}</td>"
+                            f"<td style='text-align: right; color: {col_p}; font-weight: 700;'>{sign}{pnl:,.2f} €</td>"
+                            f"<td style='color: #cbd5e1; font-size: 0.72rem;'>{t.get('reason', '--')}</td>"
+                            f"</tr>"
+                        )
+
+                    st.markdown(f"""
+                    <table class='table-dark-trend'>
+                        <thead>
+                            <tr>
+                                <th>Data/Ora Chiusura</th>
+                                <th>Strumento</th>
+                                <th style='text-align: center;'>Direzione</th>
+                                <th style='text-align: center;'>Contratti</th>
+                                <th style='text-align: right;'>Open</th>
+                                <th style='text-align: right;'>Close</th>
+                                <th style='text-align: right;'>P&L Netto</th>
+                                <th>Motivo Uscita</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(rows)}</tbody>
+                    </table>
+                    """, unsafe_allow_html=True)
+
+                strum_con_trade = []
+                for s in TUTTI_STRUMENTI_TREND:
+                    n_strum = len([t for t in trades if t.get("instrument") == s])
+                    if n_strum > 0:
+                        strum_con_trade.append(s)
+
+                tab_titles = [f"📜 Tutti i Trade ({len(trades)})"]
+                for s in strum_con_trade:
+                    n_s = len([t for t in trades if t.get("instrument") == s])
+                    tab_titles.append(f"{s} ({n_s})")
+
+                if tab_titles:
+                    sub_tabs = st.tabs(tab_titles)
+                    with sub_tabs[0]:
+                        _render_trades_table_trend(trades, "Nessuna operazione registrata in Trend.")
+                    for idx, s in enumerate(strum_con_trade):
+                        with sub_tabs[idx + 1]:
+                            t_filtered = [t for t in trades if t.get("instrument") == s]
+                            _render_trades_table_trend(t_filtered, f"Nessuna operazione registrata per {s}.")
+
+                with st.expander("⚙️ Gestione Archivio Operazioni Trend"):
+                    if st.button("🗑️ Azzera Archivio Operazioni Trend", key=f"btn_clear_trend_trades_{conto_selezionato}"):
+                        azzera_trades_trend(conto_selezionato)
+                        st.success("Archivio operazioni Trend azzerato!")
+                        st.rerun()
+
+            sub_tnd_op, sub_tnd_sin_strum, sub_tnd_sin_op = st.tabs(["⚡ Operatività", "📋 Sintesi Strumenti", "📜 Sintesi Operazioni"])
             with sub_tnd_op:
                 renderizza_dati_trend()
-            with sub_tnd_sin:
+            with sub_tnd_sin_strum:
                 renderizza_sintesi_trend()
+            with sub_tnd_sin_op:
+                renderizza_sintesi_operazioni_trend()
 
     if tab_operativa is not None:
         with tab_operativa:

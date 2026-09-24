@@ -682,8 +682,8 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
     trades_5m = [t for t in trades_all if t.get("tf") == "5M"]
     trades_active = trades_5m if trades_5m else [t for t in trades_all if t.get("tf") != "30S"]
 
-    trades_gold = [t for t in trades_active if "CFDGOLD" in t.get("epic", "").upper() or "GOLD" in t.get("label", "").upper()]
-    trades_us500 = [t for t in trades_active if "SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper()]
+    trades_us500 = [t for t in trades_active if ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())]
+    trades_gold = [t for t in trades_active if ("GOLD" in t.get("epic", "").upper() or "GOLD" in t.get("label", "").upper() or not ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper()))]
 
     tot_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_active)
     tot_gold = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_gold)
@@ -752,22 +752,33 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         if not trade_list:
             st.info(empty_msg)
             return
+
+        # Raggruppa i giorni in ordine di apparizione per alternare i colori a giorni alterni
+        unique_days = []
+        for t in trade_list:
+            tc = str(t.get("time_close", "")).strip()
+            day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
+            if day and day != "--" and day not in unique_days:
+                unique_days.append(day)
+        day_color_map = {day: ("#fb923c" if idx % 2 == 0 else "#f8fafc") for idx, day in enumerate(unique_days)}
+
         rows = []
         for t in trade_list:
+            tc = str(t.get("time_close", "--")).strip()
+            day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
+            date_color = day_color_map.get(day, "#f8fafc")
+
             pnl = float(t.get("pnl_eur", 0.0) or 0.0)
             col_p = "#22c55e" if pnl > 0 else ("#ef4444" if pnl < 0 else "#94a3b8")
             sign = "+" if pnl > 0 else ""
             d_col = "#22c55e" if t.get("direction") == "LONG" else "#ef4444"
-            deal = t.get("deal_id", "--")
-            deal_short = deal[:10] + "..." if len(deal) > 12 else deal
             is_us = ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())
             inst_badge = "<span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US500</span>" if is_us else "<span style='color: #FFD700; font-weight: 700;'>🪙 Gold</span>"
             rows.append(
                 f"<tr>"
-                f"<td style='white-space: nowrap;'>{t.get('time_close', '--')}</td>"
+                f"<td style='white-space: nowrap; color: {date_color}; font-weight: 600;'>{t.get('time_close', '--')}</td>"
                 f"<td style='white-space: nowrap;'>{inst_badge}</td>"
-                f"<td style='font-family: monospace; color: #94a3b8;'>{deal_short}</td>"
-                f"<td style='color: {d_col}; font-weight: 700;'>{t.get('direction', '--')}</td>"
+                f"<td style='text-align: center; color: {d_col}; font-weight: 700;'>{t.get('direction', '--')}</td>"
                 f"<td style='text-align: center;'>{t.get('contracts', 0)}c</td>"
                 f"<td style='text-align: right;'>{float(t.get('open_price', 0.0)):.2f}</td>"
                 f"<td style='text-align: right;'>{float(t.get('close_price', 0.0)):.2f}</td>"
@@ -781,8 +792,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                 <tr>
                     <th>Data/Ora Chiusura</th>
                     <th>Strumento</th>
-                    <th>Deal ID IG</th>
-                    <th>Direzione</th>
+                    <th style='text-align: center;'>Direzione</th>
                     <th style='text-align: center;'>Contratti</th>
                     <th style='text-align: right;'>Open</th>
                     <th style='text-align: right;'>Close</th>
@@ -823,7 +833,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
 
     tab_h5m, tab_sintesi = st.tabs([
         "📊 Hyper 5M (Trend Scalping)" + (" 🟢 ATTIVO" if is_5m_on else ""),
-        "📋 Sintesi Hyp (Eseguiti)"
+        "📋 Sintesi"
     ])
 
     with tab_h5m:
@@ -855,7 +865,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
                             t.addEventListener("click", function() {{
                                 sessionStorage.setItem("hyper_active_subtab", "5m");
                             }});
-                        }} else if (txt.includes("Sintesi Hyp") && !t._hyper_listener) {{
+                        }} else if (txt.includes("Sintesi") && !t._hyper_listener) {{
                             t._hyper_listener = true;
                             t.addEventListener("click", function() {{
                                 sessionStorage.setItem("hyper_active_subtab", "sintesi");
@@ -876,7 +886,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
                     }} else if (target === "sintesi") {{
                         for (let t of tabs) {{
                             const txt = (t.innerText || t.textContent || "").trim();
-                            if (txt.includes("Sintesi Hyp")) {{
+                            if (txt.includes("Sintesi")) {{
                                 if (t.getAttribute("aria-selected") !== "true") {{
                                     t.click();
                                 }}

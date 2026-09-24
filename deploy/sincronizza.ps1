@@ -5,7 +5,7 @@ param (
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "1. VERIFICA SINTASSI PYTHON" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
-python -m py_compile Dashboard.py Motore.py Motore_Trend.py hyper_tab.py hyper_gold_engine.py hyper_gold_m5_engine.py hyper_gold_m1_engine.py hyper_us500_engine.py hyper_us500_m5_engine.py lightstreamer_client.py
+python -m py_compile Dashboard.py Motore.py Motore_Trend.py trend_trades_manager.py hyper_tab.py hyper_gold_engine.py hyper_gold_m5_engine.py hyper_gold_m1_engine.py hyper_us500_engine.py hyper_us500_m5_engine.py lightstreamer_client.py
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Errore di sintassi Python. Sincronizzazione interrotta." -ForegroundColor Red
     exit 1
@@ -70,6 +70,7 @@ try {
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Dashboard.py "macchinetta/${POD_DASH}:/data/Dashboard.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore.py "macchinetta/${POD_DASH}:/data/Motore.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp Motore_Trend.py "macchinetta/${POD_DASH}:/data/Motore_Trend.py"
+    & $KUBECTL --kubeconfig=$KUBECONFIG cp trend_trades_manager.py "macchinetta/${POD_DASH}:/data/trend_trades_manager.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp ig_request_manager.py "macchinetta/${POD_DASH}:/data/ig_request_manager.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_tab.py "macchinetta/${POD_DASH}:/data/hyper_tab.py"
     & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_order_manager.py "macchinetta/${POD_DASH}:/data/hyper_order_manager.py"

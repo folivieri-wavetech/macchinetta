@@ -1807,6 +1807,25 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     invia_notifica(f"➖ CLOSE CORE {tf_label}", body_core_def, "heavy_minus_sign")
                 storico.append(f"[{ora_str}] {msg}")
                 ha_fatto_eventi = True
+                try:
+                    from trend_trades_manager import salva_trade_chiuso_trend
+                    clean_reason = re.sub(r"\[PnL:.*?\]", "", msg).strip().replace("➡️ FLAT", "").strip()
+                    salva_trade_chiuso_trend(
+                        conto=NOME_CONTO,
+                        trade_dict={
+                            "time_close": now_it().strftime("%Y-%m-%d %H:%M:%S"),
+                            "instrument": nome,
+                            "direction": ev.get("direction", dir_t),
+                            "contracts": float(sz),
+                            "open_price": float(ev.get("entry_price", 0.0) or 0.0),
+                            "close_price": float(close_px) if (close_px is not None and isinstance(close_px, (int, float))) else 0.0,
+                            "pnl_eur": round(float(pnl_eur), 2),
+                            "deal_id": deal_id or "--",
+                            "reason": clean_reason
+                        }
+                    )
+                except Exception as e_save_trend:
+                    print_log(nome, f"⚠️ Errore salvataggio storico trend: {e_save_trend}")
         
         elif tipo == 'signal_candle_kj':
             dir_s = ev.get('direction')
