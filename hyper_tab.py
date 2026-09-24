@@ -333,7 +333,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         instr_name = "US 500 Cash 1€"
         unit_lbl = "pt"
         core_c = 4
-        inc_c = 2
+        inc_c = 4
         max_inc = 2
         inc_tp = 10.0
         parachute_p = 10.0

@@ -28,9 +28,9 @@ CORE_CONTRACTS = 5          # Size iniziale Core: 5 contratti
 CORE_TS_TRIGGER_PIPS = 10.0 # Attivazione Trailing Stop: a +10 pip di guadagno
 CORE_TS_LOCK_PIPS = 6.0     # Lock profit iniziale: +6 pip garantiti (+30.00 €)
 CORE_TS_STEP_PIPS = 2.0     # Avanzamento a scatti: di 2 in 2 pip
-INC_CONTRACTS = 3           # Incrementi: 3 contratti ciascuno
-MAX_INCREMENTS = 5          # Max 5 incrementi x 3c = 15 contratti (Totale max 20 con core)
-INC_TP_PIPS = 5.0           # TP incrementi su M5: 5 pip (+15.00 € a incremento)
+INC_CONTRACTS = 5           # Incrementi: 5 contratti ciascuno (pari alla size Core)
+MAX_INCREMENTS = 5          # Max 5 incrementi
+INC_TP_PIPS = 5.0           # TP incrementi su M5: 5 pip (+25.00 € a incremento)
 KJ_TOLERANCE_PIPS = 5.0     # Tolleranza di 5 pip su Kijun 55
 MAX_INC_KJ_DISTANCE_PIPS = 5.0 # Max distanza da KJ per consentire incrementi: <= 5 pip
 MIN_DIST_INCR_PIPS = 5.0       # Distanza minima tra incrementi consecutivi su M5: >= 5 pip
