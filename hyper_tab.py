@@ -472,9 +472,17 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         dir_pos = pos["direction"]
         dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
         dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
-        ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
-        ts_sign = "+" if dir_pos == "LONG" else "-"
-        ts_cell = f"<span style='color: #38bdf8; font-weight: 600;'>{ts_target:.2f}</span> <span style='font-size: 0.68rem; color: #94a3b8;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
+        
+        # Gestione TS Core: Verde Erba se già attivo, Rosso Salmone se target futuro (non ancora entrato)
+        ts_is_active = pos.get("ts_active", False) and pos.get("ts_price") is not None
+        if ts_is_active:
+            ts_val = pos["ts_price"]
+            ts_core_cell = f"<span style='color: #22c55e; font-weight: 700;'>{ts_val:.2f}</span>"
+        else:
+            ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
+            ts_sign = "+" if dir_pos == "LONG" else "-"
+            # Rosso Salmone per TS non ancora entrato
+            ts_core_cell = f"<span style='color: #fa8072; font-weight: 600;'>{ts_target:.2f}</span> <span style='font-size: 0.65rem; color: #fca5a5;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
 
         if live_mid is not None:
             core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
@@ -490,7 +498,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             f"<td style='text-align: center;'>{dir_badge}</td>"
             f"<td style='text-align: center; font-weight: 700;'>{pos.get('contracts', core_c)}c</td>"
             f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-            f"<td style='text-align: center;'>{ts_cell}</td>"
+            f"<td style='text-align: center;'>{ts_core_cell}</td>"
+            f"<td style='text-align: center;'></td>"
             f"<td style='text-align: center; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
             f"</tr>"
         ]
@@ -505,13 +514,15 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             col_inc_pnl = "#22c55e" if inc_pnl_val >= 0 else "#ef4444"
             sign_inc = "+" if inc_pnl_val >= 0 else ""
             tp_val = inc.get("tp_price", 0.0)
-            tp_cell = f"<span style='color: #38bdf8; font-weight: 700;'>{tp_val:.2f}</span>"
+            # Verde Erba per TP Incremento (inserito a mercato all'apertura)
+            tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>"
 
             p_rows.append(
                 f"<tr>"
                 f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>➕ Inc #{idx}</span></td>"
                 f"<td style='text-align: center; font-weight: 700;'>{inc.get('contracts', inc_c)}c</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
+                f"<td style='text-align: center;'></td>"
                 f"<td style='text-align: center;'>{tp_cell}</td>"
                 f"<td style='text-align: center; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
                 f"</tr>"
@@ -524,7 +535,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             f"<td style='text-align: center; color: #f8fafc;'>TOT</td>"
             f"<td style='text-align: center; color: #38bdf8;'>{total_contracts}c</td>"
             f"<td></td>"
-            f"<td style='text-align: center; color: #38bdf8;'>Live: {px_str}</td>"
+            f"<td colspan='2' style='text-align: center; color: #38bdf8;'>Live: {px_str}</td>"
             f"<td style='text-align: center; color: {col_tot_pnl};'>{sign_tot}{float_pnl:,.2f} €</td>"
             f"</tr>"
         )
@@ -536,7 +547,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                     <th style='text-align: center;'>Pos</th>
                     <th style='text-align: center;'>Size</th>
                     <th style='text-align: center;'>Open</th>
-                    <th style='text-align: center;'>TP/TS</th>
+                    <th style='text-align: center;'>TS</th>
+                    <th style='text-align: center;'>TP</th>
                     <th style='text-align: center;'>P&L</th>
                 </tr>
             </thead>
