@@ -712,7 +712,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         col_wr = "#22c55e" if wr >= 50 else ("#f59e0b" if wr > 0 else "#94a3b8")
         st.markdown(f"""
         <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Operazioni Chiuse / Win Rate</div>
+            <div class='kpi-title-hyper'>Win Rate</div>
             <div class='kpi-val-hyper' style='color: {col_wr};'>{wr:.1f}%</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{n_win} vincenti su {n_tot} concluse</div>
         </div>
@@ -740,7 +740,93 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+
+    # 2. RIEPILOGO GIORNALIERO (Gold, US500, Totale)
+    daily_stats = {}
+    for t in trades_active:
+        tc = str(t.get("time_close", "")).strip()
+        day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
+        if not day or day == "--":
+            continue
+        if day not in daily_stats:
+            daily_stats[day] = {"gold": 0.0, "us500": 0.0, "n_gold": 0, "n_us500": 0}
+        pnl = float(t.get("pnl_eur", 0.0) or 0.0)
+        is_us = ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())
+        if is_us:
+            daily_stats[day]["us500"] += pnl
+            daily_stats[day]["n_us500"] += 1
+        else:
+            daily_stats[day]["gold"] += pnl
+            daily_stats[day]["n_gold"] += 1
+
+    sorted_days = sorted(daily_stats.keys(), reverse=True)
+    if sorted_days:
+        day_color_map_daily = {day: ("#fb923c" if idx % 2 == 0 else "#f8fafc") for idx, day in enumerate(sorted_days)}
+        d_rows = []
+        for day in sorted_days:
+            col_date = day_color_map_daily.get(day, "#f8fafc")
+            data_day = daily_stats[day]
+            pnl_g = data_day["gold"]
+            pnl_u = data_day["us500"]
+            pnl_tot = pnl_g + pnl_u
+            ng = data_day["n_gold"]
+            nu = data_day["n_us500"]
+            ntot = ng + nu
+
+            col_p_g = "#22c55e" if pnl_g > 0 else ("#ef4444" if pnl_g < 0 else "#94a3b8")
+            sign_g = "+" if pnl_g > 0 else ""
+            col_p_u = "#22c55e" if pnl_u > 0 else ("#ef4444" if pnl_u < 0 else "#94a3b8")
+            sign_u = "+" if pnl_u > 0 else ""
+            col_p_tot = "#22c55e" if pnl_tot > 0 else ("#ef4444" if pnl_tot < 0 else "#94a3b8")
+            sign_tot = "+" if pnl_tot > 0 else ""
+
+            # Riga 1: Gold
+            d_rows.append(
+                f"<tr>"
+                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 600;'>{day}</td>"
+                f"<td style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>🪙 Spot Gold 5M</span></td>"
+                f"<td style='text-align: center; color: #94a3b8;'>{ng} op</td>"
+                f"<td style='text-align: right; color: {col_p_g}; font-weight: 700;'>{sign_g}{pnl_g:,.2f} €</td>"
+                f"</tr>"
+            )
+            # Riga 2: US500
+            d_rows.append(
+                f"<tr>"
+                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 600;'>{day}</td>"
+                f"<td style='white-space: nowrap;'><span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US 500 Cash 5M</span></td>"
+                f"<td style='text-align: center; color: #94a3b8;'>{nu} op</td>"
+                f"<td style='text-align: right; color: {col_p_u}; font-weight: 700;'>{sign_u}{pnl_u:,.2f} €</td>"
+                f"</tr>"
+            )
+            # Riga 3: Totale Giornata (Gold + US500)
+            d_rows.append(
+                f"<tr style='background-color: rgba(255, 255, 255, 0.04); border-bottom: 2px solid #475569;'>"
+                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 700;'>{day}</td>"
+                f"<td style='white-space: nowrap;'><span style='color: #f8fafc; font-weight: 700;'>📊 Totale Giornata (Gold+US500)</span></td>"
+                f"<td style='text-align: center; color: #f8fafc; font-weight: 700;'>{ntot} op</td>"
+                f"<td style='text-align: right; color: {col_p_tot}; font-weight: 800; font-size: 0.85rem;'>{sign_tot}{pnl_tot:,.2f} €</td>"
+                f"</tr>"
+            )
+
+        st.markdown(f"""
+        <div style='margin-top: 10px; margin-bottom: 16px; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px;'>
+            <div style='font-size: 0.80rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;'>
+                📅 P&L Giornaliero per Strumento (Eseguiti Hyper 5M)
+            </div>
+            <table class='table-dark-hyper' style='margin: 0;'>
+                <thead>
+                    <tr>
+                        <th style='width: 18%;'>Giorno</th>
+                        <th style='width: 38%;'>Strumento</th>
+                        <th style='width: 18%; text-align: center;'>Operazioni</th>
+                        <th style='width: 26%; text-align: right;'>Totale P/L Giornata</th>
+                    </tr>
+                </thead>
+                <tbody>{''.join(d_rows)}</tbody>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
 
     tab_s_gold, tab_s_us500, tab_s_all = st.tabs([
         f"🪙 Spot Gold 5M ({len(trades_gold)})",
