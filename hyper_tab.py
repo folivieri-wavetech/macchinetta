@@ -448,9 +448,10 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     if pos:
         dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
         dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
-        pos_str = f"<span style='color: {dir_col}; font-weight: 700;'>{dir_icon} {pos['direction']} {total_contracts}c</span> <span style='font-size: 0.68rem; color: #94a3b8;'>@{pos['open_price']:.2f}</span>"
+        sign_pos_c = "+" if pos["direction"] == "LONG" else "-"
+        pos_str = f"<span style='color: {dir_col}; font-weight: 700;'>{dir_icon} {pos['direction']} {sign_pos_c}{total_contracts}</span> <span style='font-size: 0.68rem; color: #94a3b8;'>@{pos['open_price']:.2f}</span>"
     else:
-        pos_str = "<span style='color: #94a3b8; font-weight: 600;'>⚪ FLAT (0c)</span>"
+        pos_str = "<span style='color: #94a3b8; font-weight: 600;'>⚪ FLAT</span>"
 
     col_fl = "#22c55e" if float_pnl > 0 else ("#ef4444" if float_pnl < 0 else "#94a3b8")
     sign_fl = "+" if float_pnl > 0 else ""
@@ -537,11 +538,11 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
         sign_core = "+" if core_pnl_val >= 0 else ""
 
-        # Formattazione Size Core (+size verde per LONG, -size salmone per SHORT)
+        # Formattazione Size Core (+size verde per LONG, -size salmone per SHORT, senza 'c')
         core_c_val = pos.get('contracts', core_c)
         sign_c_size = "+" if dir_pos == "LONG" else "-"
         col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
-        size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}c</span>"
+        size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}</span>"
 
         p_rows = [
             f"<tr>"
@@ -567,12 +568,12 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             # Verde Erba per TP Incremento (inserito a mercato all'apertura)
             tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>"
 
-            # Formattazione Size Incremento
+            # Formattazione Size Incremento (senza 'c')
             inc_dir = inc.get("direction", dir_pos)
             inc_c_val = inc.get('contracts', inc_c)
             sign_i_size = "+" if inc_dir == "LONG" else "-"
             col_i_size = "#22c55e" if inc_dir == "LONG" else "#fa8072"
-            size_inc_cell = f"<span style='color: {col_i_size}; font-weight: 700;'>{sign_i_size}{inc_c_val}c</span>"
+            size_inc_cell = f"<span style='color: {col_i_size}; font-weight: 700;'>{sign_i_size}{inc_c_val}</span>"
 
             p_rows.append(
                 f"<tr>"
@@ -589,7 +590,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         sign_tot = "+" if float_pnl >= 0 else ""
         sign_tot_size = "+" if dir_pos == "LONG" else "-"
         col_tot_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
-        size_tot_cell = f"<span style='color: {col_tot_size}; font-weight: 800;'>{sign_tot_size}{total_contracts}c</span>"
+        size_tot_cell = f"<span style='color: {col_tot_size}; font-weight: 800;'>{sign_tot_size}{total_contracts}</span>"
 
         p_rows.append(
             f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.78rem;'>"
