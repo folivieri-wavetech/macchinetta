@@ -684,7 +684,7 @@ class HyperGoldM5Engine:
                 direction=direction,
                 size=INC_CONTRACTS,
                 limit_level=tp_px,
-                label=f"Incremento M5 #{len(self.increments)+1}"
+                label=f"Incremento Spot Gold M5 #{len(self.increments)+1}"
             )
             if res.get("success"):
                 deal_id = res.get("deal_id")
@@ -733,11 +733,14 @@ class HyperGoldM5Engine:
                 deal_id=deal_id,
                 direction_open=inc["direction"],
                 size=inc["contracts"],
-                label="TP Incremento M5",
+                label="TP Incremento Spot Gold M5",
                 reason_note=f"Raggiunto TP a +{self.inc_tp_pips:.1f}p @ {current_price:.2f}"
             )
             profit = float(res.get("profit") or 0.0)
             close_px = float(res.get("close_level") or current_price)
+            if profit == 0.0 and res.get("already_closed"):
+                profit = round(abs(inc["open_price"] - inc["tp_price"]) * inc["contracts"] * self.point_value, 2)
+                close_px = inc["tp_price"]
 
             with self.lock:
                 self.increments = [i for i in self.increments if i.get("deal_id") != deal_id and i.get("id") != inc.get("id")]
@@ -793,7 +796,7 @@ class HyperGoldM5Engine:
                     deal_id=deal_c,
                     direction_open=pos_to_close["direction"],
                     size=pos_to_close["contracts"],
-                    label="Chiusura Core M5 Flat",
+                    label="Chiusura Core Spot Gold M5 Flat",
                     reason_note=reason
                 )
                 prof_c = float(res_c.get("profit") or 0.0)
@@ -846,7 +849,7 @@ class HyperGoldM5Engine:
                         deal_id=deal_i,
                         direction_open=inc["direction"],
                         size=inc["contracts"],
-                        label="Chiusura Inc M5 Flat",
+                        label="Chiusura Inc Spot Gold M5 Flat",
                         reason_note=reason
                     )
                     prof_i = float(res_i.get("profit") or 0.0)

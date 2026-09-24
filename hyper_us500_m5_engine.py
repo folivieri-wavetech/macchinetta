@@ -635,6 +635,9 @@ class HyperUS500M5Engine:
             )
             profit = float(res.get("profit") or 0.0)
             close_px = float(res.get("close_level") or current_price)
+            if profit == 0.0 and res.get("already_closed"):
+                profit = round(abs(inc["open_price"] - inc["tp_price"]) * inc["contracts"] * self.point_value, 2)
+                close_px = inc["tp_price"]
 
             with self.lock:
                 self.increments = [i for i in self.increments if i.get("deal_id") != deal_id and i.get("id") != inc.get("id")]

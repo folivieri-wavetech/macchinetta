@@ -347,6 +347,20 @@ class HyperOrderManager:
                 self.send_notification(f"⚠️ ECCEZIONE IG: {label}", f"Errore apertura: {str(e)[:100]}", "warning")
                 return {"success": False, "reason": str(e)}
 
+    def is_deal_open(self, deal_id: str) -> bool:
+        """Verifica se un dealId è effettivamente ancora aperto su IG."""
+        if not deal_id:
+            return False
+        try:
+            h = self._get_headers(version="2")
+            r = requests.get(f"{self.base_url}/positions", headers=h, timeout=6)
+            if r.status_code == 200:
+                positions = r.json().get("positions", [])
+                return any(p.get("position", {}).get("dealId") == deal_id for p in positions)
+        except Exception:
+            pass
+        return False
+
     def close_market_deal(self, deal_id: str, direction_open: str, size: float, label: str = "Chiusura", reason_note: str = "") -> dict:
         """Chiude a mercato una posizione aperta su IG tramite DELETE /positions/otc con verifica conferma."""
         if not deal_id:
@@ -402,24 +416,38 @@ class HyperOrderManager:
                             }
                         else:
                             rej_reason = conf_data.get("reason", "UNKNOWN_REJECT")
+                            rej_upper = str(rej_reason).upper()
                             # Se la posizione non esiste più, è già stata chiusa (es. per TP già toccato)
-                            if "POSITION_NOT_FOUND" in str(rej_reason).upper() or "ALREADY_CLOSED" in str(rej_reason).upper():
-                                logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa su IG (TP/SL o manuale).")
+                            if any(k in rej_upper for k in ("POSITION_NOT_FOUND", "ALREADY_CLOSED", "NOT_AVAILABLE", "ORDER_NOT_FOUND")):
+                                logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa su IG ({rej_reason}).")
                                 return {"success": True, "deal_id": deal_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
+
+                            # Verifica immediata su IG: se non è più tra le posizioni aperte, è già stata chiusa dal TP nativo
+                            if not self.is_deal_open(deal_id):
+                                logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta su IG (già eseguita da TP/SL nativo IG). Nessun allarme.")
+                                return {"success": True, "deal_id": deal_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
+
                             self.send_notification(f"⚠️ RIFIUTO CHIUSURA: {label}", f"Posizione ({dir_close} {size_str}c) rifiutata: {rej_reason}", "warning")
                             return {"success": False, "reason": rej_reason}
                     else:
                         return {"success": False, "reason": "NO_DEAL_REFERENCE"}
                 else:
                     err_txt = r.text
-                    if "POSITION_NOT_FOUND" in err_txt or "deal-not-found" in err_txt:
+                    err_upper = err_txt.upper()
+                    if any(k in err_upper for k in ("POSITION_NOT_FOUND", "DEAL-NOT-FOUND", "ALREADY_CLOSED", "NOT_AVAILABLE")):
                         logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa precedentemente.")
+                        return {"success": True, "deal_id": deal_id, "already_closed": True}
+                    if not self.is_deal_open(deal_id):
+                        logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta su IG (già chiusa da TP/SL).")
                         return {"success": True, "deal_id": deal_id, "already_closed": True}
                     logger.error(f"❌ Errore chiusura IG {deal_id}: HTTP {r.status_code} - {err_txt}")
                     self.send_notification(f"⚠️ ERRORE CHIUSURA: {label}", f"HTTP {r.status_code}: {err_txt[:100]}", "warning")
                     return {"success": False, "reason": f"HTTP_{r.status_code}: {err_txt}"}
             except Exception as e:
                 logger.error(f"❌ Eccezione chiusura IG {deal_id}: {e}")
+                if not self.is_deal_open(deal_id):
+                    logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta dopo eccezione (già chiusa).")
+                    return {"success": True, "deal_id": deal_id, "already_closed": True}
                 self.send_notification(f"⚠️ ECCEZIONE CHIUSURA: {label}", f"Errore chiusura: {str(e)[:100]}", "warning")
                 return {"success": False, "reason": str(e)}
 
