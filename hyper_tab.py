@@ -523,8 +523,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.78rem;'>"
             f"<td style='text-align: center; color: #f8fafc;'>TOT</td>"
             f"<td style='text-align: center; color: #38bdf8;'>{total_contracts}c</td>"
-            f"<td style='text-align: center; color: #94a3b8;'>Live: {px_str}</td>"
-            f"<td style='text-align: center; color: #64748b;'>--</td>"
+            f"<td></td>"
+            f"<td style='text-align: center; color: #38bdf8;'>Live: {px_str}</td>"
             f"<td style='text-align: center; color: {col_tot_pnl};'>{sign_tot}{float_pnl:,.2f} €</td>"
             f"</tr>"
         )
