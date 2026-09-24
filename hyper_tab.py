@@ -662,20 +662,20 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         col_pnl = "#22c55e" if tot_pnl > 0 else ("#ef4444" if tot_pnl < 0 else "#94a3b8")
         sign_p = "+" if tot_pnl > 0 else ""
         st.markdown(f"""
-        <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>P&L Totale Reale Hyper 5M</div>
-            <div class='kpi-val-hyper' style='color: {col_pnl};'>{sign_p}{tot_pnl:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Somma Gold + US500 su IG</div>
+        <div class='kpi-card-hyper' style='text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Totale Reale Hyper 5M</div>
+            <div class='kpi-val-hyper' style='color: {col_pnl}; text-align: center;'>{sign_p}{tot_pnl:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Somma Gold + US500 su IG</div>
         </div>
         """, unsafe_allow_html=True)
 
     with s2:
         col_wr = "#22c55e" if wr >= 50 else ("#f59e0b" if wr > 0 else "#94a3b8")
         st.markdown(f"""
-        <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>Win Rate</div>
-            <div class='kpi-val-hyper' style='color: {col_wr};'>{wr:.1f}%</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{n_win} vincenti su {n_tot} concluse</div>
+        <div class='kpi-card-hyper' style='text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>Win Rate</div>
+            <div class='kpi-val-hyper' style='color: {col_wr}; text-align: center;'>{wr:.1f}%</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>{n_win} vincenti su {n_tot} concluse</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -683,10 +683,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         col_g = "#22c55e" if tot_gold > 0 else ("#ef4444" if tot_gold < 0 else "#94a3b8")
         sign_g = "+" if tot_gold > 0 else ""
         st.markdown(f"""
-        <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>P&L Spot Gold 1€ (5M)</div>
-            <div class='kpi-val-hyper' style='color: {col_g};'>{sign_g}{tot_gold:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{len(trades_gold)} operazioni concluse</div>
+        <div class='kpi-card-hyper' style='text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Spot Gold 1€ (5M)</div>
+            <div class='kpi-val-hyper' style='color: {col_g}; text-align: center;'>{sign_g}{tot_gold:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>{len(trades_gold)} operazioni concluse</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -694,10 +694,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         col_u = "#22c55e" if tot_us500 > 0 else ("#ef4444" if tot_us500 < 0 else "#94a3b8")
         sign_u = "+" if tot_us500 > 0 else ""
         st.markdown(f"""
-        <div class='kpi-card-hyper'>
-            <div class='kpi-title-hyper'>P&L US 500 Cash 1€ (5M)</div>
-            <div class='kpi-val-hyper' style='color: {col_u};'>{sign_u}{tot_us500:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>{len(trades_us500)} operazioni concluse</div>
+        <div class='kpi-card-hyper' style='text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L US 500 Cash 1€ (5M)</div>
+            <div class='kpi-val-hyper' style='color: {col_u}; text-align: center;'>{sign_u}{tot_us500:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>{len(trades_us500)} operazioni concluse</div>
         </div>
         """, unsafe_allow_html=True)
 
