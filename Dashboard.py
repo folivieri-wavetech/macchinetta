@@ -2722,6 +2722,43 @@ else:
             display: block !important;
             visibility: visible !important;
         }
+
+        /* Tab selezionate in Giallo Oro anziché rosso scuro Streamlit */
+        div[data-testid="stTabs"] button[aria-selected="true"],
+        div[role="tablist"] button[aria-selected="true"] {
+            color: #FFD700 !important;
+            border-bottom: 2px solid #FFD700 !important;
+            border-bottom-color: #FFD700 !important;
+            border-color: #FFD700 !important;
+        }
+        div[data-testid="stTabs"] button[aria-selected="true"] p,
+        div[data-testid="stTabs"] button[aria-selected="true"] span,
+        div[data-testid="stTabs"] button[aria-selected="true"] div,
+        div[role="tablist"] button[aria-selected="true"] p,
+        div[role="tablist"] button[aria-selected="true"] span,
+        div[role="tablist"] button[aria-selected="true"] div {
+            color: #FFD700 !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="stTabs"] button[aria-selected="true"]::after,
+        div[role="tablist"] button[aria-selected="true"]::after {
+            background-color: #FFD700 !important;
+            border-color: #FFD700 !important;
+        }
+        div[data-testid="stTabs"] button:hover,
+        div[role="tablist"] button:hover {
+            color: #fef08a !important;
+            border-bottom-color: #facc15 !important;
+        }
+        div[data-testid="stTabs"] button:hover p,
+        div[data-testid="stTabs"] button:hover span,
+        div[data-testid="stTabs"] button:hover div,
+        div[role="tablist"] button:hover p,
+        div[role="tablist"] button:hover span,
+        div[role="tablist"] button:hover div {
+            color: #fef08a !important;
+        }
+
         /* Nasconde la linguetta della tab Radar solo dalla barra orizzontale principale:
            il Radar rimane accessibile unicamente tramite il pulsante dorato in Sidebar */
         .block-container > div[data-testid="stTabs"] > div[role="tablist"] > button:nth-child(2),
