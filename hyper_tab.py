@@ -742,8 +742,9 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-    # 2. RIEPILOGO GIORNALIERO (Gold, US500, Totale)
+    # 2. RIEPILOGO GIORNALIERO (Gold, US500, Totale) CON SELETTORE SETTIMANA (LUNEDÌ)
     daily_stats = {}
+    weeks_map = {}
     for t in trades_active:
         tc = str(t.get("time_close", "")).strip()
         day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
@@ -760,12 +761,55 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             daily_stats[day]["gold"] += pnl
             daily_stats[day]["n_gold"] += 1
 
-    sorted_days = sorted(daily_stats.keys(), reverse=True)
-    if sorted_days:
-        day_color_map_daily = {day: ("#fb923c" if idx % 2 == 0 else "#f8fafc") for idx, day in enumerate(sorted_days)}
+    # Raggruppamento per il Lunedì di inizio settimana
+    for day in daily_stats.keys():
+        try:
+            dt_obj = datetime.datetime.strptime(day, "%Y-%m-%d").date()
+            lun = dt_obj - datetime.timedelta(days=dt_obj.weekday())
+            if lun not in weeks_map:
+                weeks_map[lun] = []
+            if day not in weeks_map[lun]:
+                weeks_map[lun].append(day)
+        except Exception:
+            pass
+
+    sorted_mondays = sorted(weeks_map.keys(), reverse=True)
+    if sorted_mondays:
+        week_options = []
+        monday_by_label = {}
+        for idx, lun in enumerate(sorted_mondays):
+            ven = lun + datetime.timedelta(days=4)
+            tag_corr = " (Settimana Corrente)" if idx == 0 else ""
+            label = f"Lunedì {lun.strftime('%d/%m/%Y')} (Sett. {lun.strftime('%d/%m')} - {ven.strftime('%d/%m')}){tag_corr}"
+            week_options.append(label)
+            monday_by_label[label] = lun
+
+        col_w_title, col_w_sel = st.columns([1.6, 1.4], vertical_alignment="center")
+        with col_w_title:
+            st.markdown("<div style='font-size: 0.88rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;'>📅 P&L Giornaliero per Strumento (Eseguiti Hyper 5M)</div>", unsafe_allow_html=True)
+        with col_w_sel:
+            selected_week_label = st.selectbox("Seleziona Settimana", week_options, index=0, key="sel_hyper_week", label_visibility="collapsed")
+
+        sel_lun = monday_by_label.get(selected_week_label, sorted_mondays[0])
+        days_in_week = sorted(weeks_map.get(sel_lun, []), reverse=True)[:5]
+
+        giorni_settimana = {0: "LUN", 1: "MAR", 2: "MER", 3: "GIO", 4: "VEN", 5: "SAB", 6: "DOM"}
+        day_color_map_daily = {day: ("#fb923c" if idx % 2 == 0 else "#f8fafc") for idx, day in enumerate(days_in_week)}
         d_rows = []
-        for day in sorted_days:
+        tot_ng_week = 0
+        tot_nu_week = 0
+        tot_pnl_gw = 0.0
+        tot_pnl_uw = 0.0
+
+        for day in days_in_week:
             col_date = day_color_map_daily.get(day, "#f8fafc")
+            try:
+                dt_obj = datetime.datetime.strptime(day, "%Y-%m-%d")
+                suff = giorni_settimana.get(dt_obj.weekday(), "")
+                day_label = f"{day} ({suff})" if suff else day
+            except Exception:
+                day_label = day
+
             data_day = daily_stats[day]
             pnl_g = data_day["gold"]
             pnl_u = data_day["us500"]
@@ -774,6 +818,11 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             nu = data_day["n_us500"]
             ntot = ng + nu
 
+            tot_ng_week += ng
+            tot_nu_week += nu
+            tot_pnl_gw += pnl_g
+            tot_pnl_uw += pnl_u
+
             col_p_g = "#22c55e" if pnl_g > 0 else ("#ef4444" if pnl_g < 0 else "#94a3b8")
             sign_g = "+" if pnl_g > 0 else ""
             col_p_u = "#22c55e" if pnl_u > 0 else ("#ef4444" if pnl_u < 0 else "#94a3b8")
@@ -781,46 +830,55 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             col_p_tot = "#22c55e" if pnl_tot > 0 else ("#ef4444" if pnl_tot < 0 else "#94a3b8")
             sign_tot = "+" if pnl_tot > 0 else ""
 
-            # Riga 1: Gold
+            # Una riga singola per giornata (max 5 giorni con suffisso del giorno)
             d_rows.append(
                 f"<tr>"
-                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 600;'>{day}</td>"
-                f"<td style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>🪙 Spot Gold 5M</span></td>"
-                f"<td style='text-align: center; color: #94a3b8;'>{ng} op</td>"
+                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 600;'>{day_label}</td>"
+                f"<td style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>🪙 Spot Gold</span></td>"
+                f"<td style='text-align: center; color: #cbd5e1;'>{ng} op</td>"
                 f"<td style='text-align: right; color: {col_p_g}; font-weight: 700;'>{sign_g}{pnl_g:,.2f} €</td>"
-                f"</tr>"
-            )
-            # Riga 2: US500
-            d_rows.append(
-                f"<tr>"
-                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 600;'>{day}</td>"
-                f"<td style='white-space: nowrap;'><span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US 500 Cash 5M</span></td>"
-                f"<td style='text-align: center; color: #94a3b8;'>{nu} op</td>"
+                f"<td style='white-space: nowrap;'><span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US 500</span></td>"
+                f"<td style='text-align: center; color: #cbd5e1;'>{nu} op</td>"
                 f"<td style='text-align: right; color: {col_p_u}; font-weight: 700;'>{sign_u}{pnl_u:,.2f} €</td>"
-                f"</tr>"
-            )
-            # Riga 3: Totale Giornata (Gold + US500)
-            d_rows.append(
-                f"<tr style='background-color: rgba(255, 255, 255, 0.04); border-bottom: 2px solid #475569;'>"
-                f"<td style='white-space: nowrap; color: {col_date}; font-weight: 700;'>{day}</td>"
-                f"<td style='white-space: nowrap;'><span style='color: #f8fafc; font-weight: 700;'>📊 Totale Giornata (Gold+US500)</span></td>"
-                f"<td style='text-align: center; color: #f8fafc; font-weight: 700;'>{ntot} op</td>"
-                f"<td style='text-align: right; color: {col_p_tot}; font-weight: 800; font-size: 0.85rem;'>{sign_tot}{pnl_tot:,.2f} €</td>"
+                f"<td style='text-align: right; color: {col_p_tot}; font-weight: 800; font-size: 0.85rem; background-color: rgba(255, 255, 255, 0.03);'>{sign_tot}{pnl_tot:,.2f} €</td>"
                 f"</tr>"
             )
 
+        # Riga riassuntiva Totale Settimana
+        tot_pnl_totw = tot_pnl_gw + tot_pnl_uw
+        col_p_gw = "#22c55e" if tot_pnl_gw > 0 else ("#ef4444" if tot_pnl_gw < 0 else "#94a3b8")
+        sign_gw = "+" if tot_pnl_gw > 0 else ""
+        col_p_uw = "#22c55e" if tot_pnl_uw > 0 else ("#ef4444" if tot_pnl_uw < 0 else "#94a3b8")
+        sign_uw = "+" if tot_pnl_uw > 0 else ""
+        col_p_totw = "#22c55e" if tot_pnl_totw > 0 else ("#ef4444" if tot_pnl_totw < 0 else "#94a3b8")
+        sign_totw = "+" if tot_pnl_totw > 0 else ""
+
+        d_rows.append(
+            f"<tr style='background-color: rgba(255, 255, 255, 0.05); border-top: 2px solid #475569; font-weight: 700;'>"
+            f"<td style='white-space: nowrap; color: #f8fafc; font-weight: 800;'>TOTALE SETTIMANA</td>"
+            f"<td style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 800;'>🪙 Spot Gold</span></td>"
+            f"<td style='text-align: center; color: #f8fafc;'>{tot_ng_week} op</td>"
+            f"<td style='text-align: right; color: {col_p_gw}; font-weight: 800;'>{sign_gw}{tot_pnl_gw:,.2f} €</td>"
+            f"<td style='white-space: nowrap;'><span style='color: #38bdf8; font-weight: 800;'>🇺🇸 US 500</span></td>"
+            f"<td style='text-align: center; color: #f8fafc;'>{tot_nu_week} op</td>"
+            f"<td style='text-align: right; color: {col_p_uw}; font-weight: 800;'>{sign_uw}{tot_pnl_uw:,.2f} €</td>"
+            f"<td style='text-align: right; color: {col_p_totw}; font-weight: 800; font-size: 0.88rem; background-color: rgba(255, 255, 255, 0.05);'>{sign_totw}{tot_pnl_totw:,.2f} €</td>"
+            f"</tr>"
+        )
+
         st.markdown(f"""
-        <div style='margin-top: 10px; margin-bottom: 16px; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px;'>
-            <div style='font-size: 0.80rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;'>
-                📅 P&L Giornaliero per Strumento (Eseguiti Hyper 5M)
-            </div>
+        <div style='margin-top: 8px; margin-bottom: 16px; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px;'>
             <table class='table-dark-hyper' style='margin: 0;'>
                 <thead>
                     <tr>
-                        <th style='width: 18%;'>Giorno</th>
-                        <th style='width: 38%;'>Strumento</th>
-                        <th style='width: 18%; text-align: center;'>Operazioni</th>
-                        <th style='width: 26%; text-align: right;'>Totale P/L Giornata</th>
+                        <th>Giorno</th>
+                        <th>Strumento 1</th>
+                        <th style='text-align: center;'>Operazioni 1</th>
+                        <th style='text-align: right;'>P&L 1</th>
+                        <th>Strumento 2</th>
+                        <th style='text-align: center;'>Operazioni 2</th>
+                        <th style='text-align: right;'>P&L 2</th>
+                        <th style='text-align: right;'>Totale P&L</th>
                     </tr>
                 </thead>
                 <tbody>{''.join(d_rows)}</tbody>
