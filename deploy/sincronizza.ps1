@@ -5,7 +5,7 @@ param (
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "1. VERIFICA SINTASSI PYTHON" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
-python -m py_compile Dashboard.py Motore.py Motore_Trend.py trend_trades_manager.py hyper_tab.py hyper_gold_engine.py hyper_gold_m5_engine.py hyper_gold_m1_engine.py hyper_us500_engine.py hyper_us500_m5_engine.py lightstreamer_client.py
+python -m py_compile Dashboard.py Motore.py Motore_Trend.py trend_trades_manager.py hyper_tab.py hyper_order_manager.py hyper_gold_engine.py hyper_gold_m5_engine.py hyper_gold_m1_engine.py hyper_us500_engine.py hyper_us500_m5_engine.py lightstreamer_client.py
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Errore di sintassi Python. Sincronizzazione interrotta." -ForegroundColor Red
     exit 1

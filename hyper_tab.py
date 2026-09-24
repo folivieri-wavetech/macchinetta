@@ -515,46 +515,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     else:
         st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.69rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat)</div>", unsafe_allow_html=True)
 
-    # Storico Operazioni Recenti
-    st.markdown("<div style='margin-top: 8px; margin-bottom: 3px; font-size: 0.77rem; font-weight: 700; color: #e2e8f0;'>📋 Storico Operazioni Recenti (5M)</div>", unsafe_allow_html=True)
-    if history_inst:
-        rows_h = []
-        for t in history_inst[:6]:
-            pnl_val = float(t.get("pnl_eur", 0.0) or 0.0)
-            col_p = "#22c55e" if pnl_val > 0 else ("#ef4444" if pnl_val < 0 else "#94a3b8")
-            sign_p = f"+{pnl_val:.2f}" if pnl_val > 0 else f"{pnl_val:.2f}"
-            lbl = t.get("label", "Trade")
-            rsn = t.get("reason", "")
-            if "PARACADUTE" in rsn.upper():
-                badge_act = f"<span style='color: #f87171; font-weight: bold;'>🪂 {lbl}</span>"
-            elif "TP" in rsn.upper() or "TP" in lbl.upper():
-                badge_act = f"<span style='color: #38bdf8; font-weight: bold;'>🎯 {lbl}</span>"
-            elif "TRAILING" in rsn.upper() or "TS" in rsn.upper():
-                badge_act = f"<span style='color: #4ade80; font-weight: bold;'>🏆 TS</span>"
-            else:
-                badge_act = f"<span style='color: #cbd5e1; font-weight: bold;'>⏹️ {lbl}</span>"
 
-            t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
-
-            rows_h.append(
-                f"<tr>"
-                f"<td style='white-space: nowrap;'>{t_str}</td>"
-                f"<td style='white-space: nowrap;'>{badge_act}</td>"
-                f"<td style='text-align: right; white-space: nowrap;'>{t['open_price']:.2f}</td>"
-                f"<td style='text-align: right; white-space: nowrap;'>{t['close_price']:.2f}</td>"
-                f"<td style='text-align: right; color: {col_p}; font-weight: 700; white-space: nowrap;'>{sign_p}&nbsp;€</td>"
-                f"</tr>"
-            )
-        st.markdown(f"""
-        <table class='table-compact-hyper'>
-            <thead>
-                <tr><th>Ora</th><th>Pos</th><th style='text-align: right;'>In</th><th style='text-align: right;'>Out</th><th style='text-align: right;'>P&L</th></tr>
-            </thead>
-            <tbody>{''.join(rows_h)}</tbody>
-        </table>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.69rem; color: #64748b; text-align: center;'>Nessuna operazione ancora chiusa in sessione.</div>", unsafe_allow_html=True)
 
     # Expander Regole M5
     with st.expander(f"⚙️ Assetto & Regole M5 {instr_name}", expanded=False):
@@ -929,6 +890,16 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             d_col = "#22c55e" if t.get("direction") == "LONG" else "#ef4444"
             is_us = ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())
             inst_badge = "<span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US500</span>" if is_us else "<span style='color: #FFD700; font-weight: 700;'>🪙 Gold</span>"
+            reason_txt = str(t.get("reason", "--") or "--")
+            reason_txt = reason_txt.replace("Paracadute KJ Intracandela", "Paracadute KJ")
+            reason_txt = reason_txt.replace(
+                "Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT",
+                "Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT."
+            )
+            reason_txt = reason_txt.replace("Candela Segnale KJ Confermata:", "Candela Segnale KJ :")
+            import re
+            reason_txt = re.sub(r"\s*\((?:Minimo|Massimo)\s*[-+]\s*\d+p\)", "", reason_txt)
+
             rows.append(
                 f"<tr>"
                 f"<td style='white-space: nowrap; color: {date_color}; font-weight: 600;'>{t.get('time_close', '--')}</td>"
@@ -938,7 +909,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                 f"<td style='text-align: right;'>{float(t.get('open_price', 0.0)):.2f}</td>"
                 f"<td style='text-align: right;'>{float(t.get('close_price', 0.0)):.2f}</td>"
                 f"<td style='text-align: right; color: {col_p}; font-weight: 700;'>{sign}{pnl:,.2f} €</td>"
-                f"<td style='color: #cbd5e1; font-size: 0.72rem;'>{t.get('reason', '--')}</td>"
+                f"<td style='color: #cbd5e1; font-size: 0.72rem;'>{reason_txt}</td>"
                 f"</tr>"
             )
         st.markdown(f"""
@@ -987,7 +958,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
     is_5m_on = engine_gold_5m.trading_enabled or engine_us500_5m.trading_enabled
 
     tab_h5m, tab_sintesi = st.tabs([
-        "📊 Hyper 5M (Trend Scalping)" + (" 🟢 ATTIVO" if is_5m_on else ""),
+        "📊 Hyper 5M" + (" 🟢 ATTIVO" if is_5m_on else ""),
         "📋 Sintesi"
     ])
 

@@ -493,7 +493,21 @@ class HyperOrderManager:
                 data = json.load(f)
                 if not isinstance(data, list):
                     return []
-                res = data
+                res = []
+                import re
+                for t in data:
+                    if isinstance(t, dict):
+                        rsn = str(t.get("reason", "") or "")
+                        if rsn:
+                            rsn = rsn.replace("Paracadute KJ Intracandela", "Paracadute KJ")
+                            rsn = rsn.replace(
+                                "Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT",
+                                "Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT."
+                            )
+                            rsn = rsn.replace("Candela Segnale KJ Confermata:", "Candela Segnale KJ :")
+                            rsn = re.sub(r"\s*\((?:Minimo|Massimo)\s*[-+]\s*\d+p\)", "", rsn)
+                            t["reason"] = rsn
+                        res.append(t)
                 if tf:
                     res = [t for t in res if t.get("tf") == tf]
                 if epic:
