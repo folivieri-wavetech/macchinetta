@@ -3902,20 +3902,20 @@ else:
                         st.info(empty_msg)
                         return
 
-                    # Raggruppa i giorni per alternare arancione e bianco a giorni alterni
+                    # Raggruppa i giorni per alternare arancione e azzurro a giorni alterni
                     unique_days = []
                     for t in trade_list:
                         tc = str(t.get("time_close", "")).strip()
                         day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
                         if day and day != "--" and day not in unique_days:
                             unique_days.append(day)
-                    day_color_map = {day: ("#fb923c" if idx % 2 == 0 else "#f8fafc") for idx, day in enumerate(unique_days)}
+                    day_color_map = {day: ("#fb923c" if idx % 2 == 0 else "#38bdf8") for idx, day in enumerate(unique_days)}
 
                     rows = []
                     for t in trade_list:
                         tc = str(t.get("time_close", "--")).strip()
                         day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
-                        date_color = day_color_map.get(day, "#f8fafc")
+                        date_color = day_color_map.get(day, "#38bdf8")
 
                         pnl = float(t.get("pnl_eur", 0.0) or 0.0)
                         col_p = "#22c55e" if pnl > 0 else ("#ef4444" if pnl < 0 else "#94a3b8")

@@ -505,7 +505,7 @@ class HyperGoldM5Engine:
                             mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
                         if has_pos:
                             t_str = now_it().strftime("%H:%M:%S")
-                            self._close_all_to_flat(mid_px, t_str, reason="Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT")
+                            self._close_all_to_flat(mid_px, t_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
                     if self.last_tick_time and (time.time() - self.last_tick_time) > 40:
                         break
 
@@ -938,7 +938,7 @@ class HyperGoldM5Engine:
                 self._close_all_to_flat(
                     mid,
                     time_str,
-                    reason=f"Paracadute KJ Intracandela: Mid live {mid:.2f} <= (KJ {self.kj55:.2f} - {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
+                    reason=f"Paracadute KJ: Mid live {mid:.2f} <= (KJ {self.kj55:.2f} - {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
                 )
         elif pos_dir == "SHORT":
             threshold = round(self.kj55 + PARACADUTE_KJ_PIPS, 2)
@@ -946,7 +946,7 @@ class HyperGoldM5Engine:
                 self._close_all_to_flat(
                     mid,
                     time_str,
-                    reason=f"Paracadute KJ Intracandela: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
+                    reason=f"Paracadute KJ: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
                 )
 
     def _check_candela_segnale_stop(self, mid: float, time_str: str):
@@ -967,7 +967,7 @@ class HyperGoldM5Engine:
                 self._close_all_to_flat(
                     mid,
                     time_str,
-                    reason=f"Candela Segnale KJ Confermata: Mid live {mid:.2f} <= Stop {stop_val:.2f} (Minimo - {CANDELA_SEGNALE_OFFSET_PIPS:.0f}p) ➔ FLAT"
+                    reason=f"Candela Segnale KJ : Mid live {mid:.2f} <= Stop {stop_val:.2f} ➔ FLAT"
                 )
         elif pos_dir == "SHORT":
             if mid >= self.signal_stop_price:
@@ -978,7 +978,7 @@ class HyperGoldM5Engine:
                 self._close_all_to_flat(
                     mid,
                     time_str,
-                    reason=f"Candela Segnale KJ Confermata: Mid live {mid:.2f} >= Stop {stop_val:.2f} (Massimo + {CANDELA_SEGNALE_OFFSET_PIPS:.0f}p) ➔ FLAT"
+                    reason=f"Candela Segnale KJ : Mid live {mid:.2f} >= Stop {stop_val:.2f} ➔ FLAT"
                 )
 
     def _process_tick(self, bid: float, ask: float, time_str: str):
@@ -1000,7 +1000,7 @@ class HyperGoldM5Engine:
             if market_suspended:
                 # Se è scattata l'ora di sospensione (22:44) con posizioni ancora aperte, le chiudiamo a FLAT di sicurezza
                 if self.position or self.increments:
-                    self._close_all_to_flat(mid, time_str, reason="Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT")
+                    self._close_all_to_flat(mid, time_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
             else:
                 # 1. Verifica Trailing Stop per la Core (Attivo di default: Trigger +10p, Lock +6p, Step 2p)
                 if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
