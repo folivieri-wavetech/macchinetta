@@ -338,9 +338,10 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <div style='display: flex; align-items: center; gap: 6px;'>
             <span style='font-size: 0.95rem; font-weight: 800; color: #f8fafc;'>{instr_name}</span>
             <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 800;'>5M</span>
+            {badge_st}
         </div>
         <div style='display: flex; gap: 4px; align-items: center;'>
-            {badge_ls}{badge_st}
+            {badge_ls}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -584,10 +585,10 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
-            <div class='kpi-title-hyper'>Capitale Conto ({nome_clean})</div>
-            <div class='kpi-val-hyper' style='color: #FFD700; font-size: 1.25rem;'>{acc_data['saldo_str']} €</div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Disp: <b style='color: #4ade80;'>{acc_data['disp_str']} €</b> | Marg: <b style='color: #f59e0b;'>{acc_data['marg_str']} €</b></div>
+        <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>Capitale Conto ({nome_clean})</div>
+            <div class='kpi-val-hyper' style='color: #FFD700; font-size: 1.25rem; text-align: center;'>{acc_data['saldo_str']} €</div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8; text-align: center;'>Disp: <b style='color: #4ade80;'>{acc_data['disp_str']} €</b> | Marg: <b style='color: #f59e0b;'>{acc_data['marg_str']} €</b></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -596,10 +597,10 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         sign_real = "+" if tot_real > 0 else ""
         pnl_real_str = f"{tot_real:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
-            <div class='kpi-title-hyper'>P&L Sessione Hyper 5M</div>
-            <div class='kpi-val-hyper' style='color: {col_real}; font-size: 1.25rem;'>{sign_real}{pnl_real_str} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} €</div>
+        <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Sessione</div>
+            <div class='kpi-val-hyper' style='color: {col_real}; font-size: 1.25rem; text-align: center;'>{sign_real}{pnl_real_str} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -607,10 +608,10 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         col_float = "#22c55e" if tot_float > 0 else ("#ef4444" if tot_float < 0 else "#94a3b8")
         sign_fl = "+" if tot_float > 0 else ""
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
-            <div class='kpi-title-hyper'>P&L Latente Hyper (Live)</div>
-            <div class='kpi-val-hyper' style='color: {col_float}; font-size: 1.25rem;'>{sign_fl}{tot_float:,.2f} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {float_gold:+.2f} € • US500 {float_us500:+.2f} €</div>
+        <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Latente (Live)</div>
+            <div class='kpi-val-hyper' style='color: {col_float}; font-size: 1.25rem; text-align: center;'>{sign_fl}{tot_float:,.2f} €</div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Gold {float_gold:+.2f} € • US500 {float_us500:+.2f} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -618,13 +619,13 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         col_g = "#22c55e" if dir_gold == "LONG" else ("#ef4444" if dir_gold == "SHORT" else "#94a3b8")
         col_u = "#22c55e" if dir_us500 == "LONG" else ("#ef4444" if dir_us500 == "SHORT" else "#94a3b8")
         st.markdown(f"""
-        <div class='kpi-card-hyper' style='padding: 8px 12px;'>
-            <div class='kpi-title-hyper'>Esposizione Hyper 5M</div>
-            <div class='kpi-val-hyper' style='font-size: 0.88rem; line-height: 1.25;'>
-                <div style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g};'>{dir_gold} ({c_gold}c)</span></div>
-                <div style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u};'>{dir_us500} ({c_us500}c)</span></div>
+        <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
+            <div class='kpi-title-hyper' style='text-align: center;'>Esposizione</div>
+            <div class='kpi-val-hyper' style='font-size: 0.88rem; line-height: 1.25; text-align: center;'>
+                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g};'>{dir_gold} ({c_gold}c)</span></div>
+                <div style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u};'>{dir_us500} ({c_us500}c)</span></div>
             </div>
-            <div class='kpi-sub-hyper' style='color: #94a3b8;'>Margine Hyper impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
+            <div class='kpi-sub-hyper' style='color: #94a3b8; text-align: center;'>Margine impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -965,7 +966,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
     is_5m_on = engine_gold_5m.trading_enabled or engine_us500_5m.trading_enabled
 
     tab_h5m, tab_sintesi = st.tabs([
-        "⚡ Operatività" + (" 🟢 ATTIVO" if is_5m_on else ""),
+        "Operatività",
         "📋 Sintesi"
     ])
 
