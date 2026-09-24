@@ -666,7 +666,7 @@ class HyperGoldM5Engine:
                     self.save_state()
                     order_mgr.send_notification(
                         "🚀 OPEN CORE 5M: Spot Gold",
-                        f"[Spot Gold] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} € (Deal ID: {deal_id})",
+                        f"[Spot Gold] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} €",
                         "rocket"
                     )
         except Exception as e:
@@ -898,7 +898,7 @@ class HyperGoldM5Engine:
         self.closing_in_progress = True
         threading.Thread(
             target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"Trailing Stop toccato @ {current_price:.2f}"),
+            args=(current_price, time_str, f"TS Spot Gold M5 @ {current_price:.2f}"),
             daemon=True
         ).start()
 

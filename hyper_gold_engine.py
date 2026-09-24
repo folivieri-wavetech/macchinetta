@@ -615,7 +615,7 @@ class HyperGoldEngine:
                     is_pullback = "Pullback" in lbl
                     tag_ico = "arrows_counterclockwise" if is_pullback else "rocket"
                     titolo_ntfy = f"🔄 OPEN PULLBACK 30S: Spot Gold" if is_pullback else f"🚀 OPEN HYPER 30S: Spot Gold"
-                    msg_ntfy = f"[Spot Gold] {lbl} {direction} a {real_open:.2f} € (Deal ID: {deal_id})"
+                    msg_ntfy = f"[Spot Gold] {lbl} {direction} a {real_open:.2f} €"
                     order_mgr.send_notification(titolo_ntfy, msg_ntfy, tag_ico)
         except Exception as e:
             logger.error(f"Eccezione durante esecuzione ordine IG: {e}")

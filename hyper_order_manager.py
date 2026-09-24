@@ -406,7 +406,7 @@ class HyperOrderManager:
                             if "POSITION_NOT_FOUND" in str(rej_reason).upper() or "ALREADY_CLOSED" in str(rej_reason).upper():
                                 logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa su IG (TP/SL o manuale).")
                                 return {"success": True, "deal_id": deal_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
-                            self.send_notification(f"⚠️ RIFIUTO CHIUSURA: {label}", f"Deal {deal_id} ({dir_close} {size_str}c) rifiutato: {rej_reason}", "warning")
+                            self.send_notification(f"⚠️ RIFIUTO CHIUSURA: {label}", f"Posizione ({dir_close} {size_str}c) rifiutata: {rej_reason}", "warning")
                             return {"success": False, "reason": rej_reason}
                     else:
                         return {"success": False, "reason": "NO_DEAL_REFERENCE"}
@@ -416,11 +416,11 @@ class HyperOrderManager:
                         logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa precedentemente.")
                         return {"success": True, "deal_id": deal_id, "already_closed": True}
                     logger.error(f"❌ Errore chiusura IG {deal_id}: HTTP {r.status_code} - {err_txt}")
-                    self.send_notification(f"⚠️ ERRORE CHIUSURA: {label}", f"Deal {deal_id} HTTP {r.status_code}: {err_txt[:100]}", "warning")
+                    self.send_notification(f"⚠️ ERRORE CHIUSURA: {label}", f"HTTP {r.status_code}: {err_txt[:100]}", "warning")
                     return {"success": False, "reason": f"HTTP_{r.status_code}: {err_txt}"}
             except Exception as e:
                 logger.error(f"❌ Eccezione chiusura IG {deal_id}: {e}")
-                self.send_notification(f"⚠️ ECCEZIONE CHIUSURA: {label}", f"Errore chiusura Deal {deal_id}: {str(e)[:100]}", "warning")
+                self.send_notification(f"⚠️ ECCEZIONE CHIUSURA: {label}", f"Errore chiusura: {str(e)[:100]}", "warning")
                 return {"success": False, "reason": str(e)}
 
     def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = "", epic: str = ""):

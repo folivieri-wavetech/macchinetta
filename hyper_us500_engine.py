@@ -538,7 +538,7 @@ class HyperUS500Engine:
                     is_pullback = (self.cycle_phase == "PULLBACK_OPEN")
                     tag_ico = "arrows_counterclockwise" if is_pullback else "rocket"
                     titolo_ntfy = "🔄 OPEN PULLBACK 30S: US 500 Cash" if is_pullback else "🚀 OPEN HYPER 30S: US 500 Cash"
-                    msg_ntfy = f"[US 500] {direction} {contracts}c a {real_open:.2f} pt (Deal ID: {deal_id}, Fase: {self.cycle_phase})"
+                    msg_ntfy = f"[US 500] {direction} {contracts}c a {real_open:.2f} pt (Fase: {self.cycle_phase})"
                     order_mgr.send_notification(titolo_ntfy, msg_ntfy, tag_ico)
         except Exception as e:
             logger.error(f"Errore apertura Core US500 IG: {e}")

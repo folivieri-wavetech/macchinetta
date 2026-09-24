@@ -407,8 +407,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     <div style='background: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 6px; padding: 5px 8px; margin-bottom: 7px;'>
         <div style='display: flex; justify-content: space-between; align-items: center; font-size: 0.73rem;'>
             <div>Pos: {pos_str}</div>
-            <div>Flott: {fl_str}</div>
-            <div>Sess: {sess_str}</div>
+            <div>Latente: {fl_str}</div>
+            <div>Tot. P/L: {sess_str}</div>
         </div>
         {sig_html}
     </div>
@@ -640,7 +640,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         sign_fl = "+" if tot_float > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px;'>
-            <div class='kpi-title-hyper'>P&L Flottante Hyper (Live)</div>
+            <div class='kpi-title-hyper'>P&L Latente Hyper (Live)</div>
             <div class='kpi-val-hyper' style='color: {col_float}; font-size: 1.25rem;'>{sign_fl}{tot_float:,.2f} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {float_gold:+.2f} € • US500 {float_us500:+.2f} €</div>
         </div>
@@ -653,8 +653,8 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         <div class='kpi-card-hyper' style='padding: 8px 12px;'>
             <div class='kpi-title-hyper'>Esposizione Hyper 5M</div>
             <div class='kpi-val-hyper' style='font-size: 0.88rem; line-height: 1.25;'>
-                <div style='color: {col_g}; white-space: nowrap;'>Gold: {dir_gold} ({c_gold}c)</div>
-                <div style='color: {col_u}; white-space: nowrap;'>US500: {dir_us500} ({c_us500}c)</div>
+                <div style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>Gold:</span> <span style='color: {col_g};'>{dir_gold} ({c_gold}c)</span></div>
+                <div style='white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>US500:</span> <span style='color: {col_u};'>{dir_us500} ({c_us500}c)</span></div>
             </div>
             <div class='kpi-sub-hyper' style='color: #94a3b8;'>Margine Hyper impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
         </div>

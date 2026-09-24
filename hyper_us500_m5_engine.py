@@ -564,7 +564,7 @@ class HyperUS500M5Engine:
                     self.save_state()
                     order_mgr.send_notification(
                         "🚀 OPEN CORE 5M: US 500 Cash",
-                        f"[US 500] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} pt (Deal ID: {deal_id})",
+                        f"[US 500] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} pt",
                         "rocket"
                     )
         except Exception as e:
@@ -787,7 +787,7 @@ class HyperUS500M5Engine:
         self.closing_in_progress = True
         threading.Thread(
             target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"Trailing Stop US500 M5 toccato @ {current_price:.2f}"),
+            args=(current_price, time_str, f"TS US500 M5 @ {current_price:.2f}"),
             daemon=True
         ).start()
 
