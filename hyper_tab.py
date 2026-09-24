@@ -207,22 +207,23 @@ def inject_hyper_css():
         .table-compact-hyper {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.71rem;
+            font-size: 0.80rem;
         }
         .table-compact-hyper th {
             background-color: #1e293b;
             color: #94a3b8;
-            padding: 4px 6px;
-            text-align: left;
-            font-size: 0.66rem;
+            padding: 5px 6px;
+            text-align: center;
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.03em;
             border-bottom: 1px solid #475569;
         }
         .table-compact-hyper td {
-            padding: 4px 6px;
+            padding: 5px 6px;
             border-bottom: 1px solid #334155;
+            text-align: center;
         }
         .btn-compact-hyper div.stButton > button {
             height: 30px !important;
@@ -442,14 +443,14 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Posizioni in Portafoglio
-    st.markdown("<div style='margin-top: 8px; margin-bottom: 3px; font-size: 0.77rem; font-weight: 700; color: #e2e8f0;'>💼 Posizioni in Portafoglio</div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 8px; margin-bottom: 3px; font-size: 0.82rem; font-weight: 700; color: #e2e8f0;'>💼 Posizioni in Portafoglio</div>", unsafe_allow_html=True)
     if pos:
         dir_pos = pos["direction"]
         dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
         dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
         ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
         ts_sign = "+" if dir_pos == "LONG" else "-"
-        ts_cell = f"<span style='color: #38bdf8; font-weight: 600;'>{ts_target:.2f}</span> <span style='font-size: 0.63rem; color: #94a3b8;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
+        ts_cell = f"<span style='color: #38bdf8; font-weight: 600;'>{ts_target:.2f}</span> <span style='font-size: 0.68rem; color: #94a3b8;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
 
         if live_mid is not None:
             core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
@@ -462,11 +463,11 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
         p_rows = [
             f"<tr>"
-            f"<td>{dir_badge}</td>"
+            f"<td style='text-align: center;'>{dir_badge}</td>"
             f"<td style='text-align: center; font-weight: 700;'>{pos.get('contracts', core_c)}c</td>"
-            f"<td style='text-align: right; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-            f"<td style='text-align: right;'>{ts_cell}</td>"
-            f"<td style='text-align: right; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
+            f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
+            f"<td style='text-align: center;'>{ts_cell}</td>"
+            f"<td style='text-align: center; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
             f"</tr>"
         ]
 
@@ -484,36 +485,42 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
             p_rows.append(
                 f"<tr>"
-                f"<td><span style='color: #f59e0b; font-weight: 600;'>➕ Inc #{idx}</span></td>"
+                f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>➕ Inc #{idx}</span></td>"
                 f"<td style='text-align: center; font-weight: 700;'>{inc.get('contracts', inc_c)}c</td>"
-                f"<td style='text-align: right; font-weight: 600;'>{inc['open_price']:.2f}</td>"
-                f"<td style='text-align: right;'>{tp_cell}</td>"
-                f"<td style='text-align: right; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
+                f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
+                f"<td style='text-align: center;'>{tp_cell}</td>"
+                f"<td style='text-align: center; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
                 f"</tr>"
             )
 
         col_tot_pnl = "#22c55e" if float_pnl >= 0 else "#ef4444"
         sign_tot = "+" if float_pnl >= 0 else ""
         p_rows.append(
-            f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.71rem;'>"
-            f"<td style='color: #f8fafc;'>TOT</td>"
+            f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.78rem;'>"
+            f"<td style='text-align: center; color: #f8fafc;'>TOT</td>"
             f"<td style='text-align: center; color: #38bdf8;'>{total_contracts}c</td>"
-            f"<td style='text-align: right; color: #94a3b8;'>Live: {px_str}</td>"
-            f"<td style='text-align: right; color: #64748b;'>--</td>"
-            f"<td style='text-align: right; color: {col_tot_pnl};'>{sign_tot}{float_pnl:,.2f} €</td>"
+            f"<td style='text-align: center; color: #94a3b8;'>Live: {px_str}</td>"
+            f"<td style='text-align: center; color: #64748b;'>--</td>"
+            f"<td style='text-align: center; color: {col_tot_pnl};'>{sign_tot}{float_pnl:,.2f} €</td>"
             f"</tr>"
         )
 
         st.markdown(f"""
         <table class='table-compact-hyper'>
             <thead>
-                <tr><th>Pos</th><th style='text-align: center;'>Size</th><th style='text-align: right;'>Open</th><th style='text-align: right;'>TP/TS</th><th style='text-align: right;'>P&L</th></tr>
+                <tr>
+                    <th style='text-align: center;'>Pos</th>
+                    <th style='text-align: center;'>Size</th>
+                    <th style='text-align: center;'>Open</th>
+                    <th style='text-align: center;'>TP/TS</th>
+                    <th style='text-align: center;'>P&L</th>
+                </tr>
             </thead>
             <tbody>{''.join(p_rows)}</tbody>
         </table>
         """, unsafe_allow_html=True)
     else:
-        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.69rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.76rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat)</div>", unsafe_allow_html=True)
 
 
 
@@ -958,7 +965,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
     is_5m_on = engine_gold_5m.trading_enabled or engine_us500_5m.trading_enabled
 
     tab_h5m, tab_sintesi = st.tabs([
-        "📊 Hyper 5M" + (" 🟢 ATTIVO" if is_5m_on else ""),
+        "⚡ Operatività" + (" 🟢 ATTIVO" if is_5m_on else ""),
         "📋 Sintesi"
     ])
 
@@ -986,7 +993,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
 
                     for (let t of tabs) {{
                         const txt = (t.innerText || t.textContent || "").trim();
-                        if (txt.includes("Hyper 5M") && !t._hyper_listener) {{
+                        if ((txt.includes("Operatività") || txt.includes("Hyper 5M")) && !t._hyper_listener) {{
                             t._hyper_listener = true;
                             t.addEventListener("click", function() {{
                                 sessionStorage.setItem("hyper_active_subtab", "5m");
@@ -999,10 +1006,10 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
                         }}
                     }}
 
-                    if (target === "5m") {{
+                    if (target === "5m" || target === "operativita") {{
                         for (let t of tabs) {{
                             const txt = (t.innerText || t.textContent || "").trim();
-                            if (txt.includes("Hyper 5M")) {{
+                            if (txt.includes("Operatività") || txt.includes("Hyper 5M")) {{
                                 if (t.getAttribute("aria-selected") !== "true") {{
                                     t.click();
                                 }}
