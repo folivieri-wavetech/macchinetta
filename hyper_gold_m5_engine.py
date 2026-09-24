@@ -772,7 +772,7 @@ class HyperGoldM5Engine:
                 self.save_state()
                 order_mgr.send_notification(
                     "🎯 TP INCREMENTO 5M: Spot Gold",
-                    f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) a target a {close_px:.2f} € [PnL: {profit:+.2f} €]",
+                    f"[Spot Gold] Close Incr. {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €]",
                     "dart"
                 )
         except Exception as e:

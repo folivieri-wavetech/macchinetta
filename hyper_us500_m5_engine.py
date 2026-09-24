@@ -669,7 +669,7 @@ class HyperUS500M5Engine:
                 self.save_state()
                 order_mgr.send_notification(
                     "🎯 TP INCREMENTO 5M: US 500 Cash",
-                    f"[US 500] Incremento {inc['direction']} ({inc['contracts']}c) a target a {close_px:.2f} pt [PnL: {profit:+.2f} €]",
+                    f"[US 500] Close Incr. {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €]",
                     "dart"
                 )
         except Exception as e:
