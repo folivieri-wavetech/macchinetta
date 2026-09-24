@@ -1879,6 +1879,20 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 deal_id_core = engine.pm.core_position.ticket
                 aggiorna_stop_posizione(deal_id_core, formatta_numero(stop_lvl, dec), headers, nome_strumento=nome)
 
+            # Uniforma lo Stop Loss reale su IG anche per gli incrementi se TS Core è più protettivo
+            dir_tr = engine.current_direction
+            for inc in engine.pm.increments:
+                if inc.ticket:
+                    aggiorna_stop = False
+                    if getattr(inc, 'sl_price', None) is None:
+                        aggiorna_stop = True
+                    elif dir_tr == "SHORT" and stop_lvl < inc.sl_price:
+                        aggiorna_stop = True
+                    elif dir_tr == "LONG" and stop_lvl > inc.sl_price:
+                        aggiorna_stop = True
+                    if aggiorna_stop:
+                        aggiorna_stop_posizione(inc.ticket, formatta_numero(stop_lvl, dec), headers, nome_strumento=nome)
+
         elif tipo == 'reversal':
             new_d = ev.get("new_direction", "FLAT")
             reason_str = ev.get("reason", "")
@@ -2304,6 +2318,9 @@ def esegui_ciclo_trend():
                                     print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
                                     if engine.pm.core_position and engine.pm.core_position.ticket:
                                         aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                                    for inc in engine.pm.increments:
+                                        if inc.ticket and (getattr(inc, 'sl_price', None) is None or engine.trailing_sl_core < inc.sl_price):
+                                            aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
                             elif stato_corrente == "LONG":
                                 dist_kj = c_close - engine.current_kj
                                 if dist_kj >= (th_h1 * pip_val):
@@ -2318,6 +2335,9 @@ def esegui_ciclo_trend():
                                     print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
                                     if engine.pm.core_position and engine.pm.core_position.ticket:
                                         aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                                    for inc in engine.pm.increments:
+                                        if inc.ticket and (getattr(inc, 'sl_price', None) is None or engine.trailing_sl_core > inc.sl_price):
+                                            aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
 
 
                     except Exception:

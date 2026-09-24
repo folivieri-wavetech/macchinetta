@@ -3125,22 +3125,42 @@ else:
                                 incr_idx = other_positions.index(p) + 1
                                 ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
                                 
-                                signal_tk_active = memoria_attuale.get(nome, {}).get("signal_candle_tk_active", False)
-                                signal_tk_stop = memoria_attuale.get(nome, {}).get("signal_stop_price_tk")
-                                trailing_sl_incr = memoria_attuale.get(nome, {}).get("trailing_sl_incr")
-                                tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                                mem_strum = memoria_attuale.get(nome, {})
+                                deal_p = p['position'].get('dealId')
+                                inc_mem = next((i for i in mem_strum.get("posizioni_incr", []) if i.get("ticket") == deal_p), None)
+                                inc_sl_mem = inc_mem.get("sl_price") if inc_mem else None
+
+                                signal_tk_active = mem_strum.get("signal_candle_tk_active", False)
+                                signal_tk_stop = mem_strum.get("signal_stop_price_tk")
+                                trailing_sl_incr = mem_strum.get("trailing_sl_incr")
+                                tk_val = mem_strum.get("current_tk")
                                 pip_val = c.get("moltiplicatore", 0.0001)
-                                if signal_tk_active and signal_tk_stop is not None:
+                                if inc_sl_mem is not None:
+                                    sl_display = inc_sl_mem
+                                    title_info = "Stop/BE Incremento salvato"
+                                elif signal_tk_active and signal_tk_stop is not None:
                                     sl_display = signal_tk_stop
                                     title_info = "Stop Candela Segnale TK (Min/Max +- 5 pip confermato)"
                                 elif trailing_sl_incr is not None:
                                     sl_display = trailing_sl_incr
-                                    title_info = "Trailing SL (+-20 pip da Close | dist TK >= 20 pip)"
+                                    title_info = "Trailing SL Incremento"
                                 elif tk_val is not None:
-                                    sl_display = (tk_val - (20 * pip_val)) if dir == 'BUY' else (tk_val + (20 * pip_val))
-                                    title_info = "Paracadute TK (TK +- 20 pip)"
+                                    sl_display = (tk_val - (15 * pip_val)) if dir == 'BUY' else (tk_val + (15 * pip_val))
+                                    title_info = "Paracadute TK (TK +- 15 pip)"
                                 else:
                                     sl_display = None
+                                
+                                # Uniformazione al Trailing Stop Core se più protettivo
+                                trailing_sl_core = mem_strum.get("trailing_sl_core")
+                                if trailing_sl_core is not None:
+                                    if dir == 'SELL':  # SHORT: stop più protettivo è quello inferiore
+                                        if sl_display is None or trailing_sl_core < sl_display:
+                                            sl_display = trailing_sl_core
+                                            title_info = "Allineato a TS Core (uscita simultanea)"
+                                    elif dir == 'BUY':  # LONG: stop più protettivo è quello superiore
+                                        if sl_display is None or trailing_sl_core > sl_display:
+                                            sl_display = trailing_sl_core
+                                            title_info = "Allineato a TS Core (uscita simultanea)"
                                 
                                 if sl_display is not None:
                                     s_str = f"<span style='color: #b0b0b0;' title='{title_info}'>{formatta_numero(sl_display, dec)}</span>"
