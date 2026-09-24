@@ -349,16 +349,6 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     kj_str = f"{kj:.2f}" if kj else "--"
     dist_str = f"{abs(live_mid - kj):.2f}{unit_lbl}" if (live_mid and kj) else "--"
 
-    if live_mid and kj:
-        if live_mid > kj:
-            regime_badge = "<span style='color: #22c55e; font-weight: 700; font-size: 0.62rem;'>🟢 SOPRA</span>"
-        elif live_mid < kj:
-            regime_badge = "<span style='color: #ef4444; font-weight: 700; font-size: 0.62rem;'>🔴 SOTTO</span>"
-        else:
-            regime_badge = "<span style='color: #f59e0b; font-weight: 700; font-size: 0.62rem;'>⚪ CONTATTO</span>"
-    else:
-        regime_badge = "<span style='color: #94a3b8; font-size: 0.62rem;'>--</span>"
-
     sec_elapsed = min(300, int(time.time() - curr_bar_t)) if curr_bar_t else 0
     sec_left = max(0, 300 - sec_elapsed)
     sec_left_str = f"{sec_left // 60:02d}:{sec_left % 60:02d}"
@@ -368,22 +358,18 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <div class='micro-card-hyper'>
             <div class='micro-label-hyper'>MID LIVE</div>
             <div class='micro-val-hyper' style='color: #22c55e;'>{px_str}</div>
-            <div class='micro-sub-hyper'>{unit_lbl}</div>
         </div>
         <div class='micro-card-hyper'>
             <div class='micro-label-hyper'>KJ 55 (S&R)</div>
             <div class='micro-val-hyper' style='color: #FFD700;'>{kj_str}</div>
-            <div class='micro-sub-hyper'>Livello</div>
         </div>
         <div class='micro-card-hyper'>
             <div class='micro-label-hyper'>DISTANZA</div>
             <div class='micro-val-hyper' style='color: #38bdf8;'>{dist_str}</div>
-            <div class='micro-sub-hyper'>{regime_badge}</div>
         </div>
         <div class='micro-card-hyper'>
             <div class='micro-label-hyper'>BARRA M5</div>
             <div class='micro-val-hyper' style='color: #cbd5e1; font-family: monospace;'>{sec_left_str}</div>
-            <div class='micro-sub-hyper'>Countdown</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -404,7 +390,6 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     sign_sess = "+" if session_realized_pnl > 0 else ""
     sess_str = f"<span style='color: {col_sess}; font-weight: 700;'>{sign_sess}{session_realized_pnl:,.2f} €</span> <span style='font-size: 0.65rem; color: #64748b;'>({num_closed} op)</span>"
 
-    sig_html = ""
     if sig_act and sig_px is not None:
         if sig_ref is None:
             if pos and pos.get("direction") == "LONG":
@@ -415,6 +400,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 sig_ref = sig_px
         sign_op = "-" if (pos and pos.get("direction") == "LONG") else "+"
         sig_html = f"<div style='font-size: 0.68rem; color: #f97316; font-weight: 700; margin-top: 3px;'>⚠️ Candela Segnale: <span style='color: #fb923c; font-weight: 800;'>{sig_px:.2f}</span> ({sig_ref:.2f} {sign_op} {sig_offset:.0f}{unit_lbl})</div>"
+    else:
+        sig_html = "<div style='font-size: 0.68rem; color: #64748b; font-weight: 600; margin-top: 3px;'>⚠️ Candela Segnale: <span style='color: #94a3b8;'>---</span></div>"
 
     st.markdown(f"""
     <div style='background: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 6px; padding: 5px 8px; margin-bottom: 7px;'>
@@ -548,9 +535,6 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 badge_act = f"<span style='color: #cbd5e1; font-weight: bold;'>⏹️ {lbl}</span>"
 
             t_str = t.get("time_close", "").split(" ")[-1] if " " in t.get("time_close", "") else t.get("time_close", "")
-            rsn_short = rsn.replace("Chiusura Paracadute", "🪂 Paracadute").replace("Take Profit", "🎯 TP").replace("Trailing Stop", "🏆 TS")
-            if len(rsn_short) > 26:
-                rsn_short = rsn_short[:24] + ".."
 
             rows_h.append(
                 f"<tr>"
@@ -559,13 +543,12 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 f"<td style='text-align: right; white-space: nowrap;'>{t['open_price']:.2f}</td>"
                 f"<td style='text-align: right; white-space: nowrap;'>{t['close_price']:.2f}</td>"
                 f"<td style='text-align: right; color: {col_p}; font-weight: 700; white-space: nowrap;'>{sign_p}&nbsp;€</td>"
-                f"<td style='color: #94a3b8; font-size: 0.67rem;'>{rsn_short}</td>"
                 f"</tr>"
             )
         st.markdown(f"""
         <table class='table-compact-hyper'>
             <thead>
-                <tr><th>Ora</th><th>Pos</th><th style='text-align: right;'>In</th><th style='text-align: right;'>Out</th><th style='text-align: right;'>P&L</th><th>Trigger</th></tr>
+                <tr><th>Ora</th><th>Pos</th><th style='text-align: right;'>In</th><th style='text-align: right;'>Out</th><th style='text-align: right;'>P&L</th></tr>
             </thead>
             <tbody>{''.join(rows_h)}</tbody>
         </table>
@@ -648,7 +631,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         <div class='kpi-card-hyper' style='padding: 8px 12px;'>
             <div class='kpi-title-hyper'>P&L Sessione Hyper 5M</div>
             <div class='kpi-val-hyper' style='color: {col_real}; font-size: 1.25rem;'>{sign_real}{pnl_real_str} €</div>
-            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} € <span style='color: #64748b;'>({tot_closed} op)</span></div>
+            <div class='kpi-sub-hyper' style='color: #cbd5e1;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} €</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -669,8 +652,9 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px;'>
             <div class='kpi-title-hyper'>Esposizione Hyper 5M</div>
-            <div class='kpi-val-hyper' style='font-size: 1.02rem; white-space: nowrap;'>
-                <span style='color: {col_g};'>Gold: {dir_gold} ({c_gold}c)</span> | <span style='color: {col_u};'>US500: {dir_us500} ({c_us500}c)</span>
+            <div class='kpi-val-hyper' style='font-size: 0.88rem; line-height: 1.25;'>
+                <div style='color: {col_g}; white-space: nowrap;'>Gold: {dir_gold} ({c_gold}c)</div>
+                <div style='color: {col_u}; white-space: nowrap;'>US500: {dir_us500} ({c_us500}c)</div>
             </div>
             <div class='kpi-sub-hyper' style='color: #94a3b8;'>Margine Hyper impegnato: <b style='color: #f59e0b;'>{tot_hyper_margin:,.0f} €</b></div>
         </div>
