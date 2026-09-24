@@ -17,7 +17,34 @@ from hyper_us500_m5_engine import (
     HyperUS500M5Engine, is_us500_trading_suspended, is_us500_feed_suspended, EPIC_US500
 )
 import json
-from hyper_order_manager import HyperOrderManager
+from hyper_order_manager import HyperOrderManager, TZ_ITALIA, now_it
+
+def is_trade_today(trade: dict, today_dt=None) -> bool:
+    """Verifica se il trade appartiene alla giornata odierna (fuso orario italiano)."""
+    if today_dt is None:
+        today_dt = now_it()
+    iso_date = today_dt.strftime("%Y-%m-%d")
+    it_date = today_dt.strftime("%d/%m/%Y")
+    
+    tc = str(trade.get("time_close") or "")
+    if iso_date in tc or it_date in tc:
+        return True
+        
+    to = str(trade.get("time_open") or "")
+    if iso_date in to or it_date in to:
+        return True
+        
+    tid = trade.get("id")
+    if tid:
+        try:
+            ts_sec = float(tid) / 1000.0 if float(tid) > 1e11 else float(tid)
+            trade_dt = datetime.datetime.fromtimestamp(ts_sec, TZ_ITALIA)
+            if trade_dt.date() == today_dt.date():
+                return True
+        except Exception:
+            pass
+            
+    return False
 
 _sidebar_cache = {"time": 0.0, "conto": None, "data": {}}
 
@@ -337,8 +364,10 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
     float_pnl = engine.get_floating_pnl()
     history_inst = order_mgr.get_trades_history(tf="5M", epic=epic_filter)
-    session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_inst)
-    num_closed = len(history_inst)
+    today_dt = now_it()
+    history_inst_today = [t for t in history_inst if is_trade_today(t, today_dt)]
+    session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_inst_today)
+    num_closed = len(history_inst_today)
 
     # Badges Stato Connessione e Trading
     if is_conn:
@@ -433,7 +462,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <div style='display: flex; justify-content: space-between; align-items: center; font-size: 0.73rem;'>
             <div>Pos: {pos_str}</div>
             <div>Latente: {fl_str}</div>
-            <div>Tot. P/L: {sess_str}</div>
+            <div>Oggi: {sess_str}</div>
         </div>
         {sig_html}
     </div>
@@ -591,10 +620,11 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     float_us500 = engine_us500.get_floating_pnl()
     tot_float = float_gold + float_us500
 
-    # Order manager & Storico 5M Reale IG
+    # Order manager & Storico 5M Reale IG (Filtrato alla data odierna)
+    today_dt = now_it()
     order_mgr = HyperOrderManager.get_instance(conto_attivo)
-    hist_gold = order_mgr.get_trades_history(tf="5M", epic="CS.D.CFDGOLD.CFD.IP")
-    hist_us500 = order_mgr.get_trades_history(tf="5M", epic="IX.D.SPTRD.IBE.IP")
+    hist_gold = [t for t in order_mgr.get_trades_history(tf="5M", epic="CS.D.CFDGOLD.CFD.IP") if is_trade_today(t, today_dt)]
+    hist_us500 = [t for t in order_mgr.get_trades_history(tf="5M", epic="IX.D.SPTRD.IBE.IP") if is_trade_today(t, today_dt)]
     real_gold = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_gold)
     real_us500 = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_us500)
     tot_real = real_gold + real_us500
@@ -632,7 +662,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         pnl_real_str = f"{tot_real:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         st.markdown(f"""
         <div class='kpi-card-hyper' style='padding: 8px 12px; text-align: center;'>
-            <div class='kpi-title-hyper' style='text-align: center;'>P&L Sessione</div>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Giornaliero</div>
             <div class='kpi-val-hyper' style='color: {col_real}; font-size: 1.25rem; text-align: center;'>{sign_real}{pnl_real_str} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Gold {real_gold:+.2f} € • US500 {real_us500:+.2f} €</div>
         </div>
