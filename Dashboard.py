@@ -2769,12 +2769,12 @@ else:
     """, unsafe_allow_html=True)
 
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "⚡ Hyper", "📋 Posizioni", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_hyper, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+        tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📄 Report"])
-        tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_report = tabs
-        tab_restore = tab_posizioni = tab_hyper = tab_console = tab_autorizzazioni = tab_statistiche = None
+        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
+        tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
+        tab_restore = tab_posizioni = tab_console = tab_autorizzazioni = tab_statistiche = None
 
 
     target_tab_to_open = st.session_state.pop("target_tab", None)
@@ -2809,8 +2809,8 @@ else:
                                 t.click();
                                 break;
                             }}
-                        }} else if (target === "Posizioni") {{
-                            if (txt.includes("Posizioni")) {{
+                        }} else if (target === "Posizioni" || target === "Pos. Week") {{
+                            if (txt.includes("Pos. Week") || txt.includes("Posizioni")) {{
                                 t.click();
                                 break;
                             }}

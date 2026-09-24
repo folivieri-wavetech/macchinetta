@@ -342,7 +342,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
     # Badges Stato Connessione e Trading
     if is_conn:
-        badge_ls = f"<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>🟢 LIVE ({total_ticks} t)</span>"
+        badge_ls = f"<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid #22c55e;'>⚡ LIVE ({total_ticks} t)</span>"
     elif is_feed_closed:
         badge_ls = "<span class='badge-live-hyper' style='background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #64748b;'>💤 Feed Chiuso</span>"
     else:
@@ -351,7 +351,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     if is_trade_frozen:
         badge_st = "<span class='badge-live-hyper' style='background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid #facc15;'>🌙 CONGELATO</span>"
     elif trading_on:
-        badge_st = "<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>⚡ ATTIVO</span>"
+        badge_st = "<span class='badge-live-hyper' style='background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #4ade80;'>🟢 ATTIVO</span>"
     else:
         badge_st = "<span class='badge-live-hyper' style='background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid #64748b;'>⏸️ PAUSA</span>"
 
