@@ -480,9 +480,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             ts_core_cell = f"<span style='color: #22c55e; font-weight: 700;'>{ts_val:.2f}</span>"
         else:
             ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
-            ts_sign = "+" if dir_pos == "LONG" else "-"
-            # Rosso Salmone per TS non ancora entrato
-            ts_core_cell = f"<span style='color: #fa8072; font-weight: 600;'>{ts_target:.2f}</span> <span style='font-size: 0.65rem; color: #fca5a5;'>({ts_sign}{ts_trig:.0f}{unit_lbl})</span>"
+            # Solo valore numerico in Rosso Salmone per TS non ancora entrato
+            ts_core_cell = f"<span style='color: #fa8072; font-weight: 600;'>{ts_target:.2f}</span>"
 
         if live_mid is not None:
             core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
@@ -544,12 +543,12 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <table class='table-compact-hyper'>
             <thead>
                 <tr>
-                    <th style='text-align: center;'>Pos</th>
-                    <th style='text-align: center;'>Size</th>
-                    <th style='text-align: center;'>Open</th>
-                    <th style='text-align: center;'>TS</th>
-                    <th style='text-align: center;'>TP</th>
-                    <th style='text-align: center;'>P&L</th>
+                    <th style='text-align: center; width: 18%;'>Pos</th>
+                    <th style='text-align: center; width: 12%;'>Size</th>
+                    <th style='text-align: center; width: 18%;'>Open</th>
+                    <th style='text-align: center; width: 15%;'>TS</th>
+                    <th style='text-align: center; width: 15%;'>TP</th>
+                    <th style='text-align: center; width: 22%;'>P&L</th>
                 </tr>
             </thead>
             <tbody>{''.join(p_rows)}</tbody>
