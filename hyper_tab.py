@@ -858,10 +858,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         </div>
         """, unsafe_allow_html=True)
 
-    tab_s_gold, tab_s_us500, tab_s_all = st.tabs([
+    tab_s_all, tab_s_gold, tab_s_us500 = st.tabs([
+        f"📜 Tutti i Trade 5M ({len(trades_active)})",
         f"🪙 Spot Gold 5M ({len(trades_gold)})",
-        f"🇺🇸 US 500 Cash 5M ({len(trades_us500)})",
-        f"📜 Tutti i Trade 5M ({len(trades_active)})"
+        f"🇺🇸 US 500 Cash 5M ({len(trades_us500)})"
     ])
 
     def _render_trades_table(trade_list, empty_msg):
@@ -930,12 +930,6 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         </table>
         """, unsafe_allow_html=True)
 
-    with tab_s_gold:
-        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 5M.")
-
-    with tab_s_us500:
-        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 5M.")
-
     with tab_s_all:
         _render_trades_table(trades_active, "Nessuna operazione 5M registrata.")
         if trades_active:
@@ -945,6 +939,12 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                     st.session_state["hyper_target_subtab"] = "sintesi"
                     mgr.clear_trades_history()
                     st.rerun()
+
+    with tab_s_gold:
+        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 5M.")
+
+    with tab_s_us500:
+        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 5M.")
 
 
 def render_hyper_tab(conto_selezionato="DANY_DEMO"):
