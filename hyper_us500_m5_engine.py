@@ -61,7 +61,18 @@ def is_us500_feed_suspended(dt: datetime.datetime = None) -> bool:
     return False
 
 def is_us500_trading_suspended(dt: datetime.datetime = None) -> bool:
-    return is_us500_feed_suspended(dt)
+    """Restituisce True se l'operatività/apertura ordini US500 è congelata:
+    - Pausa tecnica CME (22:15 - 22:30)
+    - Congelamento notturno Rollover (22:44 - 00:15)
+    - Weekend (venerdì 23:00 - domenica 23:00)"""
+    if dt is None:
+        dt = now_it()
+    if is_us500_feed_suspended(dt):
+        return True
+    t = dt.time()
+    t_start = datetime.time(22, 44, 0)
+    t_end = datetime.time(0, 15, 0)
+    return t >= t_start or t < t_end
 
 def is_us500_market_suspended(dt: datetime.datetime = None) -> bool:
     return is_us500_trading_suspended(dt)
