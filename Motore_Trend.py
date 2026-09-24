@@ -2285,6 +2285,40 @@ def esegui_ciclo_trend():
                                     if engine.pm.core_position and engine.pm.core_position.ticket:
                                         aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
 
+                        elif tf in ("HOUR", "H1") and engine.trailing_sl_core is None and engine.current_kj is not None:
+                            candidati_boot_h1 = []
+                            is_oil = any(w in nome.lower() for w in ["oil", "crude"])
+                            th_h1 = 250 if is_oil else 100
+                            ts_dist_h1 = 65 if is_oil else 30
+                            if stato_corrente == "SHORT":
+                                dist_kj = engine.current_kj - c_close
+                                if dist_kj >= (th_h1 * pip_val):
+                                    candidati_boot_h1.append(round(c_close + (ts_dist_h1 * pip_val), dec))
+                                if engine.current_tk is not None:
+                                    dist_kj_tk = engine.current_kj - engine.current_tk
+                                    if dist_kj_tk > (40 * pip_val):
+                                        candidati_boot_h1.append(round(engine.current_tk + (10 * pip_val), dec))
+                                if candidati_boot_h1:
+                                    engine.trailing_sl_core = min(candidati_boot_h1)
+                                    aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
+                                    print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
+                                    if engine.pm.core_position and engine.pm.core_position.ticket:
+                                        aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                            elif stato_corrente == "LONG":
+                                dist_kj = c_close - engine.current_kj
+                                if dist_kj >= (th_h1 * pip_val):
+                                    candidati_boot_h1.append(round(c_close - (ts_dist_h1 * pip_val), dec))
+                                if engine.current_tk is not None:
+                                    dist_kj_tk = engine.current_tk - engine.current_kj
+                                    if dist_kj_tk > (40 * pip_val):
+                                        candidati_boot_h1.append(round(engine.current_tk - (10 * pip_val), dec))
+                                if candidati_boot_h1:
+                                    engine.trailing_sl_core = max(candidati_boot_h1)
+                                    aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
+                                    print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
+                                    if engine.pm.core_position and engine.pm.core_position.ticket:
+                                        aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+
 
                     except Exception:
                         pass

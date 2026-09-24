@@ -214,18 +214,30 @@ class CoreEngine:
                 trail_pips = 0
                 ext_tf_label = ""
 
+            candidati_sl_long = []
             if apply_trailing_ext:
-                # Si attiva / aggiorna il Trailing SL Core a trail_pips dalla chiusura (picco confermato)
-                nuovo_sl = c_close - (trail_pips * pip_val)
+                candidati_sl_long.append((c_close - (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
+
+            # Controllo ulteriore H1: se la distanza tra KJ e TK è > 40 pip, il TS della core diventa TK - 10 pip
+            if is_h1:
+                dist_kj_tk_pips = (tk - kj) / pip_val
+                if dist_kj_tk_pips > 40:
+                    sl_tk = tk - (10 * pip_val)
+                    candidati_sl_long.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 40p -> TK-10p)"))
+
+            if candidati_sl_long:
+                # Per LONG si sceglie il livello di stop più alto (più protettivo)
+                candidati_sl_long.sort(key=lambda x: x[0], reverse=True)
+                nuovo_sl, used_trail_pips, used_reason = candidati_sl_long[0]
                 if self.trailing_sl_core is None:
                     self.trailing_sl_core = nuovo_sl
                     events.append({
                         "type": "trailing_core_updated",
                         "direction": "LONG",
                         "stop_level": nuovo_sl,
-                        "trail_pips": trail_pips,
+                        "trail_pips": used_trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Attivazione Trailing Core Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
+                        "reason": f"Attivazione Trailing Core {used_reason}"
                     })
                 elif nuovo_sl > self.trailing_sl_core:
                     self.trailing_sl_core = nuovo_sl
@@ -233,9 +245,9 @@ class CoreEngine:
                         "type": "trailing_core_updated",
                         "direction": "LONG",
                         "stop_level": nuovo_sl,
-                        "trail_pips": trail_pips,
+                        "trail_pips": used_trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Rettifica Trailing Core Estensione {ext_tf_label} a {nuovo_sl:.5f}"
+                        "reason": f"Rettifica Trailing Core {used_reason} a {nuovo_sl:.5f}"
                     })
 
             # 1. Chiusura Trailing SL Core a fine candela se attivo
@@ -410,18 +422,30 @@ class CoreEngine:
                 trail_pips = 0
                 ext_tf_label = ""
 
+            candidati_sl_short = []
             if apply_trailing_ext:
-                # Si attiva / aggiorna il Trailing SL Core a trail_pips dalla chiusura (picco confermato)
-                nuovo_sl = c_close + (trail_pips * pip_val)
+                candidati_sl_short.append((c_close + (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
+
+            # Controllo ulteriore H1: se la distanza tra KJ e TK è > 40 pip, il TS della core diventa TK + 10 pip
+            if is_h1:
+                dist_kj_tk_pips = (kj - tk) / pip_val
+                if dist_kj_tk_pips > 40:
+                    sl_tk = tk + (10 * pip_val)
+                    candidati_sl_short.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 40p -> TK+10p)"))
+
+            if candidati_sl_short:
+                # Per SHORT si sceglie il livello di stop più basso (più protettivo)
+                candidati_sl_short.sort(key=lambda x: x[0])
+                nuovo_sl, used_trail_pips, used_reason = candidati_sl_short[0]
                 if self.trailing_sl_core is None:
                     self.trailing_sl_core = nuovo_sl
                     events.append({
                         "type": "trailing_core_updated",
                         "direction": "SHORT",
                         "stop_level": nuovo_sl,
-                        "trail_pips": trail_pips,
+                        "trail_pips": used_trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Attivazione Trailing Core Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"
+                        "reason": f"Attivazione Trailing Core {used_reason}"
                     })
                 elif nuovo_sl < self.trailing_sl_core:
                     self.trailing_sl_core = nuovo_sl
@@ -429,9 +453,9 @@ class CoreEngine:
                         "type": "trailing_core_updated",
                         "direction": "SHORT",
                         "stop_level": nuovo_sl,
-                        "trail_pips": trail_pips,
+                        "trail_pips": used_trail_pips,
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Rettifica Trailing Core Estensione {ext_tf_label} a {nuovo_sl:.5f}"
+                        "reason": f"Rettifica Trailing Core {used_reason} a {nuovo_sl:.5f}"
                     })
 
             # 1. Chiusura Trailing SL Core a fine candela se attivo
