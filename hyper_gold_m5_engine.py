@@ -76,15 +76,43 @@ def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
     return t >= t_start
 
 def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True se l'operatività/apertura ordini è congelata (dalle 22:44 alle 00:15).
-    Alle 22:44 le posizioni vengono chiuse a FLAT automaticamente prima della chiusura del feed delle 22:45.
-    Dalle 00:00 alle 00:15 le candele si aggiornano e KJ55/TK144 vengono calcolate, ma non si aprono ordini."""
+    """Restituisce True se l'operatività/apertura ordini è congelata a FLAT:
+    - Notte feriale per rollover (22:44 - 00:15)
+    - Weekend: dal venerdì sera alle 22:44 fino alla domenica sera alle 21:58.
+    Alle 22:44 le posizioni vengono chiuse a FLAT automaticamente prima della chiusura del feed delle 22:45."""
     if dt is None:
         dt = now_it()
+    wd = dt.weekday()
     t = dt.time()
+    # Weekend: venerdì sera dalle 22:44 fino alla domenica sera alle 21:58
+    if wd == 4 and t >= datetime.time(22, 44, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    # Rollover infrasettimanale (Lun-Gio notte)
     t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0)
     t_end = datetime.time(GOLD_TRADE_SUSPEND_END_HOUR, GOLD_TRADE_SUSPEND_END_MIN, 0)
     return t >= t_start or t < t_end
+
+def is_gold_entry_suspended(dt: datetime.datetime = None) -> bool:
+    """Restituisce True se l'apertura di nuove posizioni (Core e Incrementi M5) è sospesa:
+    1. Venerdì sera dalle 22:14:00 in poi e per tutto il weekend fino alla riapertura di domenica sera (21:58),
+       lasciando 30 minuti di respiro (fino alle 22:44) alle posizioni a mercato per svilupparsi e chiudersi fisiologicamente.
+    2. Durante il normale congelamento notturno di trading (22:44 - 00:15)."""
+    if dt is None:
+        dt = now_it()
+    wd = dt.weekday()
+    t = dt.time()
+    # Blocco ingressi pre-weekend (Venerdì dalle 22:14, Sabato, Domenica fino alle 21:58)
+    if wd == 4 and t >= datetime.time(22, 14, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    return is_gold_trading_suspended(dt)
 
 def is_gold_market_suspended(dt: datetime.datetime = None) -> bool:
     """Alias retrocompatibile per lo stato operatività congelata"""
@@ -1173,12 +1201,16 @@ class HyperGoldM5Engine:
     def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
         prev_close = closed_candle["close"]
         prev_open = closed_candle["open"]
+        entry_allowed = not is_gold_entry_suspended()
 
         # =============================================================
         # 1. MERCATO SOPRA KJ55 (BULLISH)
         # =============================================================
         if prev_close > kj:
             if self.position is None:
+                if not entry_allowed:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core LONG sospesa prima del weekend.")
+                    return
                 # Ingresso Core LONG: solo se il prezzo attuale stacca sopra KJ tra 2.0 e 6.0 pip
                 dist_kj = round(exec_price - kj, 2)
                 if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
@@ -1202,7 +1234,9 @@ class HyperGoldM5Engine:
 
                 # Assioma Granitico: Incremento SEMPRE e SOLO su ritracciamento (candela chiusa ROSSA)
                 is_retracement = prev_close < prev_open
-                if is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                if not entry_allowed and is_retracement:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Incremento LONG sospesa prima del weekend.")
+                elif is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                     dist_kj = abs(exec_price - kj)
                     active_incs = [i for i in self.increments if not i.get("closing")]
                     tot_incs = len(active_incs)
@@ -1249,6 +1283,9 @@ class HyperGoldM5Engine:
         # =============================================================
         elif prev_close < kj:
             if self.position is None:
+                if not entry_allowed:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core SHORT sospesa prima del weekend.")
+                    return
                 # Ingresso Core SHORT: solo se il prezzo attuale stacca sotto KJ tra 2.0 e 6.0 pip
                 dist_kj = round(kj - exec_price, 2)
                 if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
@@ -1272,7 +1309,9 @@ class HyperGoldM5Engine:
 
                 # Assioma Granitico: Incremento SEMPRE e SOLO su ritracciamento (candela chiusa VERDE)
                 is_retracement = prev_close > prev_open
-                if is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                if not entry_allowed and is_retracement:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Incremento SHORT sospesa prima del weekend.")
+                elif is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                     dist_kj = abs(exec_price - kj)
                     active_incs = [i for i in self.increments if not i.get("closing")]
                     tot_incs = len(active_incs)

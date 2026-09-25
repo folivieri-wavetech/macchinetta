@@ -45,7 +45,7 @@ TK_FILTER_PIPS = 0.0
 CORE_REENTRY_KJ_DIST_PIPS = 3.0
 
 def is_us500_feed_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True durante la chiusura weekend o pausa tecnica CME (22:15 - 22:30)."""
+    """Restituisce True durante la chiusura weekend o pausa tecnica CME feriale (22:15 - 22:30)."""
     if dt is None:
         dt = now_it()
     wd = dt.weekday()
@@ -54,25 +54,53 @@ def is_us500_feed_suspended(dt: datetime.datetime = None) -> bool:
         return True
     if wd == 5:
         return True
-    if wd == 6 and t < datetime.time(23, 0):
+    if wd == 6 and t < datetime.time(21, 58):
         return True
-    if datetime.time(22, 15) <= t < datetime.time(22, 30):
+    if wd in (0, 1, 2, 3) and datetime.time(22, 15) <= t < datetime.time(22, 30):
         return True
     return False
 
 def is_us500_trading_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True se l'operatività/apertura ordini US500 è congelata:
-    - Pausa tecnica CME (22:15 - 22:30)
-    - Congelamento notturno Rollover (22:44 - 00:15)
-    - Weekend (venerdì 23:00 - domenica 23:00)"""
+    """Restituisce True se l'operatività US500 è congelata a FLAT:
+    - Weekend: venerdì sera dalle 22:44 fino a domenica sera alle 21:58
+    - Pausa tecnica CME (Lun-Gio 22:15 - 22:30)
+    - Congelamento notturno Rollover (Lun-Gio 22:44 - 00:15)"""
     if dt is None:
         dt = now_it()
-    if is_us500_feed_suspended(dt):
-        return True
+    wd = dt.weekday()
     t = dt.time()
+    # Weekend da venerdì 22:44 a domenica 21:58
+    if wd == 4 and t >= datetime.time(22, 44, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    # Pausa tecnica CME feriale (solo Lun-Gio)
+    if wd in (0, 1, 2, 3) and datetime.time(22, 15) <= t < datetime.time(22, 30):
+        return True
+    # Rollover infrasettimanale (Lun-Gio notte)
     t_start = datetime.time(22, 44, 0)
     t_end = datetime.time(0, 15, 0)
     return t >= t_start or t < t_end
+
+def is_us500_entry_suspended(dt: datetime.datetime = None) -> bool:
+    """Restituisce True se l'apertura di nuove posizioni US500 (Core e Incrementi M5) è sospesa:
+    1. Venerdì sera dalle 22:14:00 in poi e per tutto il weekend fino alla riapertura domenicale,
+       lasciando 30 minuti di respiro (fino alle 22:44) alle posizioni a mercato per svilupparsi e chiudersi fisiologicamente.
+    2. Durante il normale congelamento notturno o pause tecniche CME."""
+    if dt is None:
+        dt = now_it()
+    wd = dt.weekday()
+    t = dt.time()
+    # Blocco ingressi pre-weekend (Venerdì dalle 22:14, Sabato, Domenica fino alle 21:58)
+    if wd == 4 and t >= datetime.time(22, 14, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    return is_us500_trading_suspended(dt)
 
 def is_us500_market_suspended(dt: datetime.datetime = None) -> bool:
     return is_us500_trading_suspended(dt)
@@ -946,9 +974,13 @@ class HyperUS500M5Engine:
     def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
         prev_close = closed_candle["close"]
         prev_open = closed_candle["open"]
+        entry_allowed = not is_us500_entry_suspended()
 
         if prev_close > kj:
             if self.position is None:
+                if not entry_allowed:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF US500] Venerdì >= 22:14: Apertura Core LONG sospesa prima del weekend.")
+                    return
                 dist_kj = round(exec_price - kj, 2)
                 if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
                     if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
@@ -969,7 +1001,9 @@ class HyperUS500M5Engine:
                 self.signal_ref_price = None
                 dist_kj = abs(exec_price - kj)
                 troppo_vicino = any(abs(exec_price - inc["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for inc in self.increments)
-                if prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
+                if not entry_allowed and prev_close < prev_open:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF US500] Venerdì >= 22:14: Apertura Incremento LONG sospesa prima del weekend.")
+                elif prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
                     if len(self.increments) < MAX_INCREMENTS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                             self.entry_in_progress = True
@@ -992,6 +1026,9 @@ class HyperUS500M5Engine:
 
         elif prev_close < kj:
             if self.position is None:
+                if not entry_allowed:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF US500] Venerdì >= 22:14: Apertura Core SHORT sospesa prima del weekend.")
+                    return
                 dist_kj = round(kj - exec_price, 2)
                 if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
                     if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
@@ -1012,7 +1049,9 @@ class HyperUS500M5Engine:
                 self.signal_ref_price = None
                 dist_kj = abs(exec_price - kj)
                 troppo_vicino = any(abs(exec_price - inc["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for inc in self.increments)
-                if prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
+                if not entry_allowed and prev_close > prev_open:
+                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF US500] Venerdì >= 22:14: Apertura Incremento SHORT sospesa prima del weekend.")
+                elif prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
                     if len(self.increments) < MAX_INCREMENTS:
                         if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
                             self.entry_in_progress = True
