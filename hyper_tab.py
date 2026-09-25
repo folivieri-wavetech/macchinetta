@@ -564,9 +564,20 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
             col_inc_pnl = "#22c55e" if inc_pnl_val >= 0 else "#ef4444"
             sign_inc = "+" if inc_pnl_val >= 0 else ""
-            tp_val = inc.get("tp_price", 0.0)
-            # Verde Erba per TP Incremento (inserito a mercato all'apertura)
-            tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>"
+            mode_inc = inc.get("mode", "BANCOMAT")
+            tp_val = inc.get("tp_price")
+            ts_val = inc.get("ts_price")
+            if tp_val is not None:
+                tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>"
+            else:
+                tp_cell = "<span style='color: #64748b;'>-</span>"
+
+            if ts_val is not None:
+                ts_inc_cell = f"<span style='color: #38bdf8; font-weight: 700;'>{ts_val:.2f}</span>"
+            elif mode_inc == "RUNNER":
+                ts_inc_cell = "<span style='color: #38bdf8; font-size: 0.68rem;'>TS dyn</span>"
+            else:
+                ts_inc_cell = ""
 
             # Formattazione Size Incremento (senza 'c')
             inc_dir = inc.get("direction", dir_pos)
@@ -575,12 +586,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             col_i_size = "#22c55e" if inc_dir == "LONG" else "#fa8072"
             size_inc_cell = f"<span style='color: {col_i_size}; font-weight: 700;'>{sign_i_size}{inc_c_val}</span>"
 
+            lbl_inc = f"➕ Run #{idx}" if mode_inc == "RUNNER" else f"➕ Inc #{idx}"
             p_rows.append(
                 f"<tr>"
-                f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>➕ Inc #{idx}</span></td>"
+                f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>{lbl_inc}</span></td>"
                 f"<td style='text-align: center;'>{size_inc_cell}</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
-                f"<td style='text-align: center;'></td>"
+                f"<td style='text-align: center;'>{ts_inc_cell}</td>"
                 f"<td style='text-align: center;'>{tp_cell}</td>"
                 f"<td style='text-align: center; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
                 f"</tr>"
@@ -629,7 +641,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name}:</div>
             <div>• <b>Regime</b>: LONG se Chiusura > KJ55 | SHORT se Chiusura < KJ55</div>
             <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su stacco Prezzo - KJ >= 2{unit_lbl}</div>
-            <div>• <b>Incrementi Pullback</b>: fino a <b>{max_inc}</b> da <span style='color: #f59e0b; font-weight: 600;'>{inc_c}c</span> (distanza <= 5{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl})</div>
+            <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, max {max_inc} da {inc_c}c con TS e Incasso Sicurezza)</div>
             <div>• <b>Trailing Stop Core</b>: Trigger +{ts_trig:.0f}{unit_lbl}, Lock +{ts_lock:.0f}{unit_lbl}, Step {ts_stp:.0f}{unit_lbl}</div>
             <div>• <b>Protezioni</b>: Paracadute ±{parachute_p:.0f}{unit_lbl} • Candela Segnale ±{sig_offset:.0f}{unit_lbl}</div>
         </div>
