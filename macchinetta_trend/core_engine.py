@@ -216,17 +216,17 @@ class CoreEngine:
 
             candidati_sl_long = []
             
-            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip, con tolleranza <= 45 pip),
+            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip),
             # siamo in piena zona di respiro Kijun: l'eventuale Trailing Stop Core viene disattivato
             # e la Core torna ad essere gestita unicamente dalla Kijun naturale.
-            if is_h1 and dist_kj_pips <= 45:
+            if is_h1 and dist_kj_pips <= 40:
                 if self.trailing_sl_core is not None:
                     self.trailing_sl_core = None
                     events.append({
                         "type": "trailing_core_cleared",
                         "direction": "LONG",
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": "Prezzo in zona respiro Kijun H1 (<= 45p)"
+                        "reason": "Prezzo in zona respiro Kijun H1 (<= 40p)"
                     })
             else:
                 if apply_trailing_ext:
@@ -438,17 +438,17 @@ class CoreEngine:
 
             candidati_sl_short = []
             
-            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip, con tolleranza <= 45 pip),
+            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip),
             # siamo in piena zona di respiro Kijun: l'eventuale Trailing Stop Core viene disattivato
             # e la Core torna ad essere gestita unicamente dalla Kijun naturale.
-            if is_h1 and dist_kj_pips <= 45:
+            if is_h1 and dist_kj_pips <= 40:
                 if self.trailing_sl_core is not None:
                     self.trailing_sl_core = None
                     events.append({
                         "type": "trailing_core_cleared",
                         "direction": "SHORT",
                         "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": "Prezzo in zona respiro Kijun H1 (<= 45p)"
+                        "reason": "Prezzo in zona respiro Kijun H1 (<= 40p)"
                     })
             else:
                 if apply_trailing_ext:
@@ -702,10 +702,10 @@ class CoreEngine:
         sl_core_pips = 40 if ("oil" in nome_str or "crude" in nome_str) else 15
 
         if self.current_direction == "LONG":
-            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 45 pip)
+            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 40 pip)
             if is_h1:
                 dist_kj_live = (current_price - kj) / pip_val
-                if dist_kj_live <= 45 and self.trailing_sl_core is not None:
+                if dist_kj_live <= 40 and self.trailing_sl_core is not None:
                     self.trailing_sl_core = None
 
             # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip (40p per Oil) o Trailing SL Core
@@ -837,10 +837,10 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 45 pip)
+            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 40 pip)
             if is_h1:
                 dist_kj_live = (kj - current_price) / pip_val
-                if dist_kj_live <= 45 and self.trailing_sl_core is not None:
+                if dist_kj_live <= 40 and self.trailing_sl_core is not None:
                     self.trailing_sl_core = None
 
             # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip (40p per Oil) o Trailing SL Core

@@ -1895,9 +1895,9 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
 
         elif tipo == 'trailing_core_cleared':
             dist_p = ev.get('dist_kj_pips', 0)
-            msg_ts = f"🔄 Trailing Core {tf_label} DISATTIVATO: Prezzo in zona Kijun ({dist_p:.1f}p <= 45p). Core affidata a Kijun naturale."
+            msg_ts = f"🔄 Trailing Core {tf_label} DISATTIVATO: Prezzo in zona Kijun ({dist_p:.1f}p <= 40p). Core affidata a Kijun naturale."
             print_log(nome, msg_ts)
-            body_trail = f"[{nome}] Prezzo in zona Kijun ({dist_p:.1f}p <= 45p). TS Core rimosso, gestione a Kijun naturale."
+            body_trail = f"[{nome}] Prezzo in zona Kijun ({dist_p:.1f}p <= 40p). TS Core rimosso, gestione a Kijun naturale."
             invia_notifica(f"🔄 TS CORE RESET {tf_label}", body_trail, "arrows_counterclockwise")
             storico.append(f"[{ora_str}] {msg_ts}")
             ha_fatto_eventi = True
@@ -2318,11 +2318,11 @@ def esegui_ciclo_trend():
                             ts_dist_h1 = 65 if is_oil else 30
                             if stato_corrente == "SHORT":
                                 dist_kj = engine.current_kj - c_close
-                                if dist_kj <= (45 * pip_val):
+                                if dist_kj <= (40 * pip_val):
                                     if engine.trailing_sl_core is not None:
                                         engine.trailing_sl_core = None
                                         aggiorna_memoria(nome, {"trailing_sl_core": None})
-                                        print_log(nome, f"🔄 Boot: Prezzo in zona Kijun H1 ({dist_kj/pip_val:.1f}p <= 45p). Trailing SL Core rimosso.")
+                                        print_log(nome, f"🔄 Boot: Prezzo in zona Kijun H1 ({dist_kj/pip_val:.1f}p <= 40p). Trailing SL Core rimosso.")
                                         if engine.pm.core_position and engine.pm.core_position.ticket:
                                             aggiorna_stop_posizione(engine.pm.core_position.ticket, None, headers, nome_strumento=nome)
                                 elif engine.trailing_sl_core is None:
@@ -2343,11 +2343,11 @@ def esegui_ciclo_trend():
                                                 aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
                             elif stato_corrente == "LONG":
                                 dist_kj = c_close - engine.current_kj
-                                if dist_kj <= (45 * pip_val):
+                                if dist_kj <= (40 * pip_val):
                                     if engine.trailing_sl_core is not None:
                                         engine.trailing_sl_core = None
                                         aggiorna_memoria(nome, {"trailing_sl_core": None})
-                                        print_log(nome, f"🔄 Boot: Prezzo in zona Kijun H1 ({dist_kj/pip_val:.1f}p <= 45p). Trailing SL Core rimosso.")
+                                        print_log(nome, f"🔄 Boot: Prezzo in zona Kijun H1 ({dist_kj/pip_val:.1f}p <= 40p). Trailing SL Core rimosso.")
                                         if engine.pm.core_position and engine.pm.core_position.ticket:
                                             aggiorna_stop_posizione(engine.pm.core_position.ticket, None, headers, nome_strumento=nome)
                                 elif engine.trailing_sl_core is None:

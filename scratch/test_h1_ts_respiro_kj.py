@@ -34,25 +34,25 @@ def test_h1_kj_zone_resets_ts_short():
     assert engine.trailing_sl_core is not None, "TS Core doveva attivarsi con forbice 150p e prezzo a 140p da KJ"
     print(f"TS Core attivato a: {engine.trailing_sl_core}")
     
-    # Candela 2: Prezzo ritraccia a 1.3315 -> dist_kj = 1.3350 - 1.3315 = 35 pip (<= 45 pip!)
+    # Candela 2: Prezzo ritraccia a 1.3315 -> dist_kj = 1.3345 - 1.3315 = 30 pip (<= 40 pip!)
     c2 = Candle(1.3250, 1.3320, 1.3250, 1.3315)
     events2 = engine.on_candle_close(c2)
     
-    assert engine.trailing_sl_core is None, "TS Core doveva essere rimosso in zona respiro Kijun (distanza <= 45p)!"
+    assert engine.trailing_sl_core is None, "TS Core doveva essere rimosso in zona respiro Kijun (distanza <= 40p)!"
     assert any(e.get("type") == "trailing_core_cleared" for e in events2), "Evento trailing_core_cleared non generato!"
-    print("OK: TS Core disattivato correttamente a chiusura candela in zona Kijun <= 45p!")
+    print("OK: TS Core disattivato correttamente a chiusura candela in zona Kijun <= 40p!")
     
-    # Test tick live: se TS viene impostato a 1.3250, ma prezzo live sale a 1.3310 (distanza 40p <= 45p)
+    # Test tick live: se TS viene impostato a 1.3250, ma prezzo live sale a 1.3310 (distanza 35p <= 40p)
     engine.trailing_sl_core = 1.3250
     ev_live = engine.check_live_stops(1.3310)
-    assert engine.trailing_sl_core is None, "TS Core doveva essere rimosso su tick live con distanza <= 45p!"
-    print("OK: TS Core rimosso su tick live in zona Kijun <= 45p!")
+    assert engine.trailing_sl_core is None, "TS Core doveva essere rimosso su tick live con distanza <= 40p!"
+    print("OK: TS Core rimosso su tick live in zona Kijun <= 40p!")
 
 def test_h1_gbpusd_scenario():
     """
     Scenario reale GBPUSD evidenziato dall'utente:
     KJ = 1.32751, TK = 1.32289 (forbice = 46.2 pip, inferiore a 100 pip!)
-    Prezzo = 1.32350 (distanza da KJ = 40.1 pip <= 45 pip)
+    Prezzo = 1.32360 (distanza da KJ = 39.1 pip <= 40 pip)
     -> Il TS Core NON deve attivarsi a TK + 10 pip!
     """
     cfg = {
@@ -67,10 +67,10 @@ def test_h1_gbpusd_scenario():
     engine.current_kj = 1.32751
     engine.current_tk = 1.32289
     
-    c_live = Candle(1.3230, 1.3240, 1.3225, 1.3235) # dist da KJ = 40.1 pip
+    c_live = Candle(1.3230, 1.3240, 1.3225, 1.3236) # dist da KJ = 39.1 pip <= 40 pip
     events = engine.on_candle_close(c_live)
     
-    assert engine.trailing_sl_core is None, "TS Core NON deve attivarsi su GBPUSD con forbice 46.2p e dist KJ 40.1p!"
+    assert engine.trailing_sl_core is None, "TS Core NON deve attivarsi su GBPUSD con forbice 46.2p e dist KJ 39.1p!"
     print("OK: Scenario GBPUSD verificato, nessun falso TS Core!")
 
 if __name__ == "__main__":
