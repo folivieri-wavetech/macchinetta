@@ -857,7 +857,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
 
         col_w_title, col_w_sel = st.columns([1.6, 1.4], vertical_alignment="center")
         with col_w_title:
-            st.markdown("<div style='font-size: 0.88rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;'>📅 P&L Giornaliero per Strumento (Eseguiti Hyper 5M)</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size: 0.88rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;'>📅 P&L Giornaliero per Strumento</div>", unsafe_allow_html=True)
         with col_w_sel:
             st.markdown("""
             <style>
@@ -918,10 +918,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                 f"<td style='white-space: nowrap; color: {col_date}; font-weight: 600;'>{day_label}</td>"
                 f"<td style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 700;'>🪙 Spot Gold</span></td>"
                 f"<td style='text-align: center; color: #cbd5e1;'>{ng} op</td>"
-                f"<td style='text-align: center; color: {col_p_g}; font-weight: 700;'>{sign_g}{pnl_g:,.2f} €</td>"
-                f"<td style='text-align: center; white-space: nowrap;'><span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US 500</span></td>"
+                f"<td style='text-align: center; color: {col_p_g};'>{sign_g}{pnl_g:,.2f} €</td>"
+                f"<td style='text-align: center; white-space: nowrap;'><span style='color: #38bdf8; font-weight: 700;'>📈 US 500</span></td>"
                 f"<td style='text-align: center; color: #cbd5e1;'>{nu} op</td>"
-                f"<td style='text-align: center; color: {col_p_u}; font-weight: 700;'>{sign_u}{pnl_u:,.2f} €</td>"
+                f"<td style='text-align: center; color: {col_p_u};'>{sign_u}{pnl_u:,.2f} €</td>"
                 f"<td style='text-align: center; color: {col_p_tot}; font-weight: 800; font-size: 0.85rem; background-color: rgba(255, 255, 255, 0.03);'>{sign_tot}{pnl_tot:,.2f} €</td>"
                 f"</tr>"
             )
@@ -941,7 +941,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             f"<td style='text-align: center; white-space: nowrap;'><span style='color: #FFD700; font-weight: 800;'>🪙 Spot Gold</span></td>"
             f"<td style='text-align: center; color: #f8fafc;'>{tot_ng_week} op</td>"
             f"<td style='text-align: center; color: {col_p_gw}; font-weight: 800;'>{sign_gw}{tot_pnl_gw:,.2f} €</td>"
-            f"<td style='text-align: center; white-space: nowrap;'><span style='color: #38bdf8; font-weight: 800;'>🇺🇸 US 500</span></td>"
+            f"<td style='text-align: center; white-space: nowrap;'><span style='color: #38bdf8; font-weight: 800;'>📈 US 500</span></td>"
             f"<td style='text-align: center; color: #f8fafc;'>{tot_nu_week} op</td>"
             f"<td style='text-align: center; color: {col_p_uw}; font-weight: 800;'>{sign_uw}{tot_pnl_uw:,.2f} €</td>"
             f"<td style='text-align: center; color: {col_p_totw}; font-weight: 800; font-size: 0.88rem; background-color: rgba(255, 255, 255, 0.05);'>{sign_totw}{tot_pnl_totw:,.2f} €</td>"
@@ -971,17 +971,26 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
     tab_s_all, tab_s_gold, tab_s_us500 = st.tabs([
         f"📜 Tutti i Trade 5M ({len(trades_active)})",
         f"🪙 Spot Gold 5M ({len(trades_gold)})",
-        f"🇺🇸 US 500 Cash 5M ({len(trades_us500)})"
+        f"📈 US 500 Cash 5M ({len(trades_us500)})"
     ])
 
-    def _render_trades_table(trade_list, empty_msg):
+    def _render_trades_table(trade_list, empty_msg, tab_key="all"):
         if not trade_list:
             st.info(empty_msg)
             return
 
+        total_trades = len(trade_list)
+        is_expanded = st.session_state.get(f"hyper_trades_expanded_{tab_key}", False)
+        
+        # Limite visivo: 30 di default, fino a max 100 se espanso
+        if total_trades > 30 and not is_expanded:
+            visible_trades = trade_list[:30]
+        else:
+            visible_trades = trade_list[:100]
+
         # Raggruppa i giorni in ordine di apparizione per alternare i colori arancione e azzurro
         unique_days = []
-        for t in trade_list:
+        for t in visible_trades:
             tc = str(t.get("time_close", "")).strip()
             day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
             if day and day != "--" and day not in unique_days:
@@ -989,7 +998,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         day_color_map = {day: ("#fb923c" if idx % 2 == 0 else "#38bdf8") for idx, day in enumerate(unique_days)}
 
         rows = []
-        for t in trade_list:
+        for t in visible_trades:
             tc = str(t.get("time_close", "--")).strip()
             day = tc.split(" ")[0] if " " in tc else (tc[:10] if len(tc) >= 10 else tc)
             date_color = day_color_map.get(day, "#f8fafc")
@@ -999,7 +1008,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             sign = "+" if pnl > 0 else ""
             d_col = "#22c55e" if t.get("direction") == "LONG" else "#ef4444"
             is_us = ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())
-            inst_badge = "<span style='color: #38bdf8; font-weight: 700;'>🇺🇸 US500</span>" if is_us else "<span style='color: #FFD700; font-weight: 700;'>🪙 Gold</span>"
+            inst_badge = "<span style='color: #38bdf8; font-weight: 700;'>📈 US 500</span>" if is_us else "<span style='color: #FFD700; font-weight: 700;'>🪙 Gold</span>"
             reason_txt = str(t.get("reason", "--") or "--")
             reason_txt = reason_txt.replace("Paracadute KJ Intracandela", "Paracadute KJ")
             reason_txt = reason_txt.replace(
@@ -1040,8 +1049,24 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         </table>
         """, unsafe_allow_html=True)
 
+        # Pulsante di espansione sotto il 30esimo trade (fino a max 100)
+        if total_trades > 30:
+            if not is_expanded:
+                max_shown = min(total_trades, 100)
+                if st.button(f"🔍 Mostra altri trade (fino a {max_shown} / max 100)", key=f"btn_expand_hyper_{tab_key}", use_container_width=True):
+                    st.session_state[f"hyper_trades_expanded_{tab_key}"] = True
+                    st.rerun()
+            else:
+                c_exp1, c_exp2 = st.columns([3, 1], vertical_alignment="center")
+                with c_exp1:
+                    st.caption(f"Visualizzati {len(visible_trades)} di {total_trades} trade (limite max: 100)")
+                with c_exp2:
+                    if st.button("🔼 Mostra solo primi 30", key=f"btn_collapse_hyper_{tab_key}", use_container_width=True):
+                        st.session_state[f"hyper_trades_expanded_{tab_key}"] = False
+                        st.rerun()
+
     with tab_s_all:
-        _render_trades_table(trades_active, "Nessuna operazione 5M registrata.")
+        _render_trades_table(trades_active, "Nessuna operazione 5M registrata.", tab_key="all")
         if trades_active:
             c_cl1, c_cl2 = st.columns([3, 1])
             with c_cl2:
@@ -1051,10 +1076,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                     st.rerun()
 
     with tab_s_gold:
-        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 5M.")
+        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 5M.", tab_key="gold")
 
     with tab_s_us500:
-        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 5M.")
+        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 5M.", tab_key="us500")
 
 
 def render_hyper_tab(conto_selezionato="DANY_DEMO"):

@@ -4126,7 +4126,7 @@ else:
                     if "GOLD" in s:
                         return f"<span style='color: #FFD700; font-weight: 700;'>🪙 {strum}</span>"
                     elif "US 500" in s or "SPTRD" in s or "US500" in s:
-                        return f"<span style='color: #38bdf8; font-weight: 700;'>🇺🇸 {strum}</span>"
+                        return f"<span style='color: #38bdf8; font-weight: 700;'>📈 {strum}</span>"
                     elif "OIL" in s or "CRUDE" in s:
                         return f"<span style='color: #fb923c; font-weight: 700;'>🛢️ {strum}</span>"
                     elif any(k in s for k in ("GBP/JPY", "EUR/JPY", "CAD/JPY", "USD/JPY")):
