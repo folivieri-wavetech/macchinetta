@@ -444,11 +444,7 @@ class HyperGoldM5Engine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            if enabled:
-                order_mgr.send_notification("🚀 AVVIO HYPER 5M: Spot Gold", "[Spot Gold] Scalping Hyper 5M attivato.", "rocket")
-            else:
-                order_mgr.send_notification("⏹️ STOP HYPER 5M: Spot Gold", "[Spot Gold] Scalping Hyper 5M disattivato dall'utente.", "stop_button")
+            if not enabled:
                 # Quando l'utente preme STOP TRADING, chiude immediatamente tutte le posizioni aperte a FLAT
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
@@ -609,12 +605,6 @@ class HyperGoldM5Engine:
                             "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS sale a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
                         })
                         self.save_state()
-                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
-                        order_mgr.send_notification(
-                            "🎯 TRAILING STOP 5M: Spot Gold",
-                            f"[Spot Gold] TS Core LONG aggiornato a {new_ts:.2f}",
-                            "dart"
-                        )
 
                 # Verifica tocco Trailing Stop
                 if current_price <= pos["ts_price"]:
@@ -640,12 +630,6 @@ class HyperGoldM5Engine:
                             "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS scende a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
                         })
                         self.save_state()
-                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
-                        order_mgr.send_notification(
-                            "🎯 TRAILING STOP 5M: Spot Gold",
-                            f"[Spot Gold] TS Core SHORT aggiornato a {new_ts:.2f}",
-                            "dart"
-                        )
 
                 # Verifica tocco Trailing Stop
                 if current_price >= pos["ts_price"]:

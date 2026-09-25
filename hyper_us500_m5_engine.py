@@ -389,11 +389,7 @@ class HyperUS500M5Engine:
     def set_trading(self, enabled: bool):
         with self.lock:
             self.trading_enabled = enabled
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            if enabled:
-                order_mgr.send_notification("🚀 AVVIO HYPER 5M: US 500 Cash", "[US 500] Scalping Hyper 5M attivato.", "rocket")
-            else:
-                order_mgr.send_notification("⏹️ STOP HYPER 5M: US 500 Cash", "[US 500] Scalping Hyper 5M disattivato dall'utente.", "stop_button")
+            if not enabled:
                 if self.position or self.increments:
                     exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
                     t_str = now_it().strftime("%H:%M:%S")
@@ -523,12 +519,6 @@ class HyperUS500M5Engine:
                         pos["peak_price"] = round(peak_px + steps * CORE_TS_STEP_PIPS, 2)
                         pos["ts_price"] = round(pos["ts_price"] + steps * CORE_TS_STEP_PIPS, 2)
                         self.save_state()
-                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
-                        order_mgr.send_notification(
-                            "🎯 TRAILING STOP 5M: US 500 Cash",
-                            f"[US 500] TS Core LONG aggiornato a {pos['ts_price']:.2f}",
-                            "dart"
-                        )
 
                 if current_price <= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
@@ -541,12 +531,6 @@ class HyperUS500M5Engine:
                         pos["peak_price"] = round(peak_px - steps * CORE_TS_STEP_PIPS, 2)
                         pos["ts_price"] = round(pos["ts_price"] - steps * CORE_TS_STEP_PIPS, 2)
                         self.save_state()
-                        order_mgr = HyperOrderManager.get_instance(self.account_dir)
-                        order_mgr.send_notification(
-                            "🎯 TRAILING STOP 5M: US 500 Cash",
-                            f"[US 500] TS Core SHORT aggiornato a {pos['ts_price']:.2f}",
-                            "dart"
-                        )
 
                 if current_price >= pos["ts_price"]:
                     self._close_cycle_trailing_hit(current_price, time_str)
