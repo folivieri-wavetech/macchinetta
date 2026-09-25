@@ -1587,7 +1587,7 @@ st.markdown("""
         /* Master Row in Grassetto e sottolineato */
         .ig-row { border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: normal; }
         .ig-master-row td { text-decoration: underline; text-underline-offset: 3px; }
-        .ig-master-row span.ig-dot { text-decoration: none; display: inline-block; }
+        .ig-master-row span.ig-dot, .ig-master-row span.entry-date, .entry-date { text-decoration: none !important; display: inline-block !important; }
         
         .ig-row:hover { background-color: rgba(255,255,255,0.02); }
         .ig-row td { padding: 10px 8px; text-align: center; }
@@ -3067,7 +3067,7 @@ else:
 
                 td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span></td>" if is_regista else ""
                 
-                # Se è posizione singola (es. solo Core, senza incrementi), ricava la data/ora di apertura da visualizzare sotto il livello
+                # Se è posizione singola (es. solo Core, senza incrementi), ricava la data/ora di apertura da visualizzare sotto il livello (senza sottolineatura)
                 data_master_str = ""
                 if len(posizioni) == 1:
                     try:
@@ -3075,7 +3075,7 @@ else:
                         if raw_d:
                             raw_clean = raw_d.split('.')[0].replace("Z", "")
                             dt_utc = datetime.strptime(raw_clean, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                            data_master_str = f"<br><span style='font-size: 0.75rem; color: #888;'>{dt_utc.astimezone(TZ_ITALIA).strftime('%d/%m/%y %H:%M')}</span>"
+                            data_master_str = f"<br><span class='entry-date' style='font-size: 0.75rem; color: #888; text-decoration: none !important; display: inline-block;'>{dt_utc.astimezone(TZ_ITALIA).strftime('%d/%m/%y %H:%M')}</span>"
                     except Exception:
                         data_master_str = ""
 
@@ -3205,7 +3205,7 @@ else:
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
                         td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span></td>" if is_regista else ""
-                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span style='font-size: 0.75rem; color: #888;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
+                        html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span class='entry-date' style='font-size: 0.75rem; color: #888; text-decoration: none !important; display: inline-block;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
             empty_tds = "<td></td><td></td><td></td><td></td><td></td><td></td>" if is_regista else "<td></td><td></td><td></td><td></td><td></td>"
@@ -4043,7 +4043,15 @@ else:
                                                 break
                                 str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}{ora_core_str}"
                                 str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
-                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
+                                c2.markdown(
+                                    f"<div style='font-size: 0.72rem; color: #ccc; margin-top: 0px; margin-bottom: 3px; line-height: 1.15; white-space: nowrap;'>"
+                                    f"<span style='color: #eee; font-weight: 600;'>{str_core}</span><span style='color: #aaa;'>{str_incr}</span>"
+                                    f"</div>"
+                                    f"<div style='display: flex; align-items: center;'>"
+                                    f"<span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span>"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
                             elif dati.get("needs_manual_start", False):
                                 if is_rollover_active():
                                     c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(255,152,0,0.15); color: #ff9800; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🌙 IN ATTESA ROLLOVER ({dir_t})</span><span style='color:#bbb; font-size:0.8rem; white-space: nowrap;'>Attesa fine Rollover 00:15...</span></div>", unsafe_allow_html=True)
