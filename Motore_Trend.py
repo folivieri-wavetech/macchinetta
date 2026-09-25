@@ -1893,6 +1893,18 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     if aggiorna_stop:
                         aggiorna_stop_posizione(inc.ticket, formatta_numero(stop_lvl, dec), headers, nome_strumento=nome)
 
+        elif tipo == 'trailing_core_cleared':
+            dist_p = ev.get('dist_kj_pips', 0)
+            msg_ts = f"🔄 Trailing Core {tf_label} DISATTIVATO: Prezzo in zona Kijun ({dist_p:.1f}p <= 45p). Core affidata a Kijun naturale."
+            print_log(nome, msg_ts)
+            body_trail = f"[{nome}] Prezzo in zona Kijun ({dist_p:.1f}p <= 45p). TS Core rimosso, gestione a Kijun naturale."
+            invia_notifica(f"🔄 TS CORE RESET {tf_label}", body_trail, "arrows_counterclockwise")
+            storico.append(f"[{ora_str}] {msg_ts}")
+            ha_fatto_eventi = True
+            aggiorna_memoria(nome, {"trailing_sl_core": None})
+            if engine.pm.core_position and engine.pm.core_position.ticket:
+                aggiorna_stop_posizione(engine.pm.core_position.ticket, None, headers, nome_strumento=nome)
+
         elif tipo == 'reversal':
             new_d = ev.get("new_direction", "FLAT")
             reason_str = ev.get("reason", "")
@@ -2299,45 +2311,61 @@ def esegui_ciclo_trend():
                                     if engine.pm.core_position and engine.pm.core_position.ticket:
                                         aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
 
-                        elif tf in ("HOUR", "H1") and engine.trailing_sl_core is None and engine.current_kj is not None:
+                        elif tf in ("HOUR", "H1") and engine.current_kj is not None:
                             candidati_boot_h1 = []
                             is_oil = any(w in nome.lower() for w in ["oil", "crude"])
                             th_h1 = 250 if is_oil else 100
                             ts_dist_h1 = 65 if is_oil else 30
                             if stato_corrente == "SHORT":
                                 dist_kj = engine.current_kj - c_close
-                                if dist_kj >= (th_h1 * pip_val):
-                                    candidati_boot_h1.append(round(c_close + (ts_dist_h1 * pip_val), dec))
-                                if engine.current_tk is not None:
-                                    dist_kj_tk = engine.current_kj - engine.current_tk
-                                    if dist_kj_tk > (40 * pip_val):
-                                        candidati_boot_h1.append(round(engine.current_tk + (10 * pip_val), dec))
-                                if candidati_boot_h1:
-                                    engine.trailing_sl_core = min(candidati_boot_h1)
-                                    aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
-                                    print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
-                                    if engine.pm.core_position and engine.pm.core_position.ticket:
-                                        aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
-                                    for inc in engine.pm.increments:
-                                        if inc.ticket and (getattr(inc, 'sl_price', None) is None or engine.trailing_sl_core < inc.sl_price):
-                                            aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                                if dist_kj <= (45 * pip_val):
+                                    if engine.trailing_sl_core is not None:
+                                        engine.trailing_sl_core = None
+                                        aggiorna_memoria(nome, {"trailing_sl_core": None})
+                                        print_log(nome, f"🔄 Boot: Prezzo in zona Kijun H1 ({dist_kj/pip_val:.1f}p <= 45p). Trailing SL Core rimosso.")
+                                        if engine.pm.core_position and engine.pm.core_position.ticket:
+                                            aggiorna_stop_posizione(engine.pm.core_position.ticket, None, headers, nome_strumento=nome)
+                                elif engine.trailing_sl_core is None:
+                                    if dist_kj >= (th_h1 * pip_val):
+                                        candidati_boot_h1.append(round(c_close + (ts_dist_h1 * pip_val), dec))
+                                    if engine.current_tk is not None:
+                                        dist_kj_tk = engine.current_kj - engine.current_tk
+                                        if dist_kj_tk > (100 * pip_val):
+                                            candidati_boot_h1.append(round(engine.current_tk + (10 * pip_val), dec))
+                                    if candidati_boot_h1:
+                                        engine.trailing_sl_core = min(candidati_boot_h1)
+                                        aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
+                                        print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
+                                        if engine.pm.core_position and engine.pm.core_position.ticket:
+                                            aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                                        for inc in engine.pm.increments:
+                                            if inc.ticket and (getattr(inc, 'sl_price', None) is None or engine.trailing_sl_core < inc.sl_price):
+                                                aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
                             elif stato_corrente == "LONG":
                                 dist_kj = c_close - engine.current_kj
-                                if dist_kj >= (th_h1 * pip_val):
-                                    candidati_boot_h1.append(round(c_close - (ts_dist_h1 * pip_val), dec))
-                                if engine.current_tk is not None:
-                                    dist_kj_tk = engine.current_tk - engine.current_kj
-                                    if dist_kj_tk > (40 * pip_val):
-                                        candidati_boot_h1.append(round(engine.current_tk - (10 * pip_val), dec))
-                                if candidati_boot_h1:
-                                    engine.trailing_sl_core = max(candidati_boot_h1)
-                                    aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
-                                    print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
-                                    if engine.pm.core_position and engine.pm.core_position.ticket:
-                                        aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
-                                    for inc in engine.pm.increments:
-                                        if inc.ticket and (getattr(inc, 'sl_price', None) is None or engine.trailing_sl_core > inc.sl_price):
-                                            aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                                if dist_kj <= (45 * pip_val):
+                                    if engine.trailing_sl_core is not None:
+                                        engine.trailing_sl_core = None
+                                        aggiorna_memoria(nome, {"trailing_sl_core": None})
+                                        print_log(nome, f"🔄 Boot: Prezzo in zona Kijun H1 ({dist_kj/pip_val:.1f}p <= 45p). Trailing SL Core rimosso.")
+                                        if engine.pm.core_position and engine.pm.core_position.ticket:
+                                            aggiorna_stop_posizione(engine.pm.core_position.ticket, None, headers, nome_strumento=nome)
+                                elif engine.trailing_sl_core is None:
+                                    if dist_kj >= (th_h1 * pip_val):
+                                        candidati_boot_h1.append(round(c_close - (ts_dist_h1 * pip_val), dec))
+                                    if engine.current_tk is not None:
+                                        dist_kj_tk = engine.current_tk - engine.current_kj
+                                        if dist_kj_tk > (100 * pip_val):
+                                            candidati_boot_h1.append(round(engine.current_tk - (10 * pip_val), dec))
+                                    if candidati_boot_h1:
+                                        engine.trailing_sl_core = max(candidati_boot_h1)
+                                        aggiorna_memoria(nome, {"trailing_sl_core": engine.trailing_sl_core})
+                                        print_log(nome, f"🎯 Trailing SL Core (H1) attivato a {engine.trailing_sl_core:.{dec}f}")
+                                        if engine.pm.core_position and engine.pm.core_position.ticket:
+                                            aggiorna_stop_posizione(engine.pm.core_position.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
+                                        for inc in engine.pm.increments:
+                                            if inc.ticket and (getattr(inc, 'sl_price', None) is None or engine.trailing_sl_core > inc.sl_price):
+                                                aggiorna_stop_posizione(inc.ticket, formatta_numero(engine.trailing_sl_core, dec), headers, nome_strumento=nome)
 
 
                     except Exception:

@@ -215,15 +215,29 @@ class CoreEngine:
                 ext_tf_label = ""
 
             candidati_sl_long = []
-            if apply_trailing_ext:
-                candidati_sl_long.append((c_close - (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
+            
+            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip, con tolleranza <= 45 pip),
+            # siamo in piena zona di respiro Kijun: l'eventuale Trailing Stop Core viene disattivato
+            # e la Core torna ad essere gestita unicamente dalla Kijun naturale.
+            if is_h1 and dist_kj_pips <= 45:
+                if self.trailing_sl_core is not None:
+                    self.trailing_sl_core = None
+                    events.append({
+                        "type": "trailing_core_cleared",
+                        "direction": "LONG",
+                        "dist_kj_pips": round(dist_kj_pips, 1),
+                        "reason": "Prezzo in zona respiro Kijun H1 (<= 45p)"
+                    })
+            else:
+                if apply_trailing_ext:
+                    candidati_sl_long.append((c_close - (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
 
-            # Controllo ulteriore H1: se la distanza tra KJ e TK è > 40 pip, il TS della core diventa TK - 10 pip
-            if is_h1:
-                dist_kj_tk_pips = (tk - kj) / pip_val
-                if dist_kj_tk_pips > 40:
-                    sl_tk = tk - (10 * pip_val)
-                    candidati_sl_long.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 40p -> TK-10p)"))
+                # Controllo ulteriore H1: solo se la forbice KJ-TK è molto ampia (> 100 pip), TS a TK - 10 pip
+                if is_h1:
+                    dist_kj_tk_pips = (tk - kj) / pip_val
+                    if dist_kj_tk_pips > 100:
+                        sl_tk = tk - (10 * pip_val)
+                        candidati_sl_long.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 100p -> TK-10p)"))
 
             if candidati_sl_long:
                 # Per LONG si sceglie il livello di stop più alto (più protettivo)
@@ -423,15 +437,29 @@ class CoreEngine:
                 ext_tf_label = ""
 
             candidati_sl_short = []
-            if apply_trailing_ext:
-                candidati_sl_short.append((c_close + (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
+            
+            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip, con tolleranza <= 45 pip),
+            # siamo in piena zona di respiro Kijun: l'eventuale Trailing Stop Core viene disattivato
+            # e la Core torna ad essere gestita unicamente dalla Kijun naturale.
+            if is_h1 and dist_kj_pips <= 45:
+                if self.trailing_sl_core is not None:
+                    self.trailing_sl_core = None
+                    events.append({
+                        "type": "trailing_core_cleared",
+                        "direction": "SHORT",
+                        "dist_kj_pips": round(dist_kj_pips, 1),
+                        "reason": "Prezzo in zona respiro Kijun H1 (<= 45p)"
+                    })
+            else:
+                if apply_trailing_ext:
+                    candidati_sl_short.append((c_close + (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
 
-            # Controllo ulteriore H1: se la distanza tra KJ e TK è > 40 pip, il TS della core diventa TK + 10 pip
-            if is_h1:
-                dist_kj_tk_pips = (kj - tk) / pip_val
-                if dist_kj_tk_pips > 40:
-                    sl_tk = tk + (10 * pip_val)
-                    candidati_sl_short.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 40p -> TK+10p)"))
+                # Controllo ulteriore H1: solo se la forbice KJ-TK è molto ampia (> 100 pip), TS a TK + 10 pip
+                if is_h1:
+                    dist_kj_tk_pips = (kj - tk) / pip_val
+                    if dist_kj_tk_pips > 100:
+                        sl_tk = tk + (10 * pip_val)
+                        candidati_sl_short.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 100p -> TK+10p)"))
 
             if candidati_sl_short:
                 # Per SHORT si sceglie il livello di stop più basso (più protettivo)
@@ -667,10 +695,19 @@ class CoreEngine:
         tp_threshold = tp_pips * pip_val
         trail_dist = trail_dist_pips * pip_val
 
+        tf_val = str(self.config.get("timeframe", "HOUR")).upper()
+        is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
+
         nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
         sl_core_pips = 40 if ("oil" in nome_str or "crude" in nome_str) else 15
 
         if self.current_direction == "LONG":
+            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 45 pip)
+            if is_h1:
+                dist_kj_live = (current_price - kj) / pip_val
+                if dist_kj_live <= 45 and self.trailing_sl_core is not None:
+                    self.trailing_sl_core = None
+
             # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip (40p per Oil) o Trailing SL Core
             sl_core_base = kj - (sl_core_pips * pip_val)
             effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
@@ -800,6 +837,12 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
+            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 45 pip)
+            if is_h1:
+                dist_kj_live = (kj - current_price) / pip_val
+                if dist_kj_live <= 45 and self.trailing_sl_core is not None:
+                    self.trailing_sl_core = None
+
             # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip (40p per Oil) o Trailing SL Core
             sl_core_base = kj + (sl_core_pips * pip_val)
             effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
