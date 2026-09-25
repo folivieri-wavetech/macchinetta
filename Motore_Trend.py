@@ -2382,6 +2382,8 @@ def esegui_ciclo_trend():
             ora_str = now_it().strftime("%d/%m %H:%M:%S")
             valore_punto = CONFIG_STRUMENTI[nome].get("valore_punto", 1)
             mult = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+            dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
+            valuta_c = CONFIG_STRUMENTI.get(nome, {}).get("valuta", "USD")
             px_live = prezzi_live.get(nome)
             
             # CASO A: Esistono posizioni aperte reali su IG per questo strumento
@@ -2499,9 +2501,10 @@ def esegui_ciclo_trend():
                     if not has_recent_stop:
                         core_p = engine.pm.core_position
                         pnl_str = ""
+                        px_cur = px_live if (px_live and isinstance(px_live, (int, float))) else (core_p.entry_price if core_p else None)
                         if core_p and px_cur:
                             dir_c = core_p.direction
-                            raw_pts = (px_cur - core_p.entry)/mult if dir_c == "LONG" else (core_p.entry - px_cur)/mult
+                            raw_pts = (px_cur - core_p.entry_price)/mult if dir_c == "LONG" else (core_p.entry_price - px_cur)/mult
                             rate_c = get_eur_rate(valuta_c, prezzi_live)
                             pnl_eur = raw_pts * core_p.size * valore_punto * rate_c
                             sign_p = "+" if pnl_eur >= 0 else ""
