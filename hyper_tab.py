@@ -755,6 +755,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
         _render_instrument_column(engine_us500, "US500", conto_attivo, order_mgr)
 
 
+@st.fragment(run_every=5)
 def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
     """Visualizza il riepilogo analitico delle operazioni reali chiuse su IG su Hyper 5M."""
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
