@@ -3357,7 +3357,8 @@ else:
                             auto_restart = st.checkbox("Auto-Restart", value=dati_salvati.get("auto_restart", False), key=f"auto_{conto_selezionato}_{nome}")
                             
                             locked_tp = dati_salvati.get("tp", tp_calc_trend) if stato_attivo else tp_calc_trend
-                            badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else "🔴 <b>[ Spento ]</b>"
+                            is_trig_attivo = dati_salvati.get("trigger_start_attivo", False)
+                            badge = "🟢 <b>[ Attivo ]</b>" if stato_attivo else ("🟡 <b>[ Trigger In Attesa ]</b>" if is_trig_attivo else "🔴 <b>[ Spento ]</b>")
                             tp_badge_str = f" <span style='color: #FFD700; font-size: 0.82rem; font-weight: bold; margin-left: 6px;'>(TP={locked_tp})</span>"
                             extra_bandiere_str = f"(TP Live: {tp_calc_trend})"
                             titolo_html = formatta_titolo_con_bandiere_orizzontale(nome, badge + tp_badge_str, extra_bandiere=extra_bandiere_str)
@@ -3383,9 +3384,36 @@ else:
                                 tp_kj_h1_val = int(CONFIG_STRUMENTI.get(nome, {}).get("tp_kj_distance_h1", 250 if "Oil" in nome else 100))
                                 st.markdown(f"<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🎯 <b>TP Estensione H1:</b> Distanza Prezzo-KJ &ge; {tp_kj_h1_val} pip ➔ FLAT</div>", unsafe_allow_html=True)
                             
+                        # Lettura campo Prezzo Trigger
+                        trig_val_saved = dati_salvati.get("trigger_start_prezzo")
+                        trig_default = f"{float(trig_val_saved):.{dec}f}" if (trig_val_saved is not None and trig_val_saved != "" and float(trig_val_saved) > 0) else ""
+
+                        c_r1, c_r2, c_r3 = st.columns([1, 1, 1.2])
+                        with c_r1:
+                            tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
+                            tf_keys = list(tf_map.keys())
+                            idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
+                            st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
+                        with c_r2:
+                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, format="%d", key=f"sz_{conto_selezionato}_{nome}")
+                        with c_r3:
+                            trig_input_str = st.text_input("Prezzo Trigger", value=trig_default, placeholder="Vuoto = Subito", key=f"trig_px_{conto_selezionato}_{nome}", help="Prezzo per Buy/Sell stop virtuale a chiusura candela. Vuoto = ingresso a mercato immediato.")
+
+                        # Parsing dinamico input trigger
+                        trig_input_clean = str(trig_input_str or "").strip().replace(",", ".")
+                        has_trigger_input = False
+                        trig_px_val = None
+                        try:
+                            if trig_input_clean:
+                                trig_px_val = float(trig_input_clean)
+                                if trig_px_val > 0:
+                                    has_trigger_input = True
+                        except Exception:
+                            has_trigger_input = False
+
                         with col_salva:
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
-                                memoria_attuale[nome] = {
+                                up_save = {
                                     **dati_salvati,
                                     "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
                                     "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
@@ -3395,22 +3423,18 @@ else:
                                     "current_kj": current_kj,
                                     "current_tk": current_tk
                                 }
+                                if has_trigger_input:
+                                    up_save["trigger_start_prezzo"] = trig_px_val
+                                elif not is_trig_attivo:
+                                    up_save["trigger_start_prezzo"] = None
+                                memoria_attuale[nome] = up_save
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
-
-                        c_r1, c_r2 = st.columns(2)
-                        with c_r1:
-                            tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
-                            tf_keys = list(tf_map.keys())
-                            idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
-                            st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
-                        with c_r2:
-                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, format="%d", key=f"sz_{conto_selezionato}_{nome}")
                         
-                        c_r3, c_r4 = st.columns(2)
-                        with c_r3:
+                        c_r3_sub, c_r4_sub = st.columns(2)
+                        with c_r3_sub:
                             st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, format="%d", key=f"szm_{conto_selezionato}_{nome}")
-                        with c_r4:
+                        with c_r4_sub:
                             st.number_input("Scala", value=int(scala_val), min_value=1, step=1, format="%d", key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento")
                         
                         err_key = f"err_trend_{conto_selezionato}_{nome}"
@@ -3418,7 +3442,7 @@ else:
                             st.error(st.session_state[err_key])
 
                         msg_err_trend = dati_salvati.get("msg_manuale") or ("Errore avvio Trend" if dati_salvati.get("errore_avvio") else "")
-                        if msg_err_trend and not stato_attivo:
+                        if msg_err_trend and not stato_attivo and not is_trig_attivo:
                             st.error(f"🛑 **Allarme/Blocco Rilevato:** {msg_err_trend}")
                             if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_T_{conto_selezionato}_{nome}", width="stretch"):
                                 memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False}
@@ -3441,121 +3465,257 @@ else:
                             is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
                             if is_hyper_exclusive:
                                 st.warning("⚡ **Operatività Trend sospesa:** strumento riservato ad HYPER.")
-                            elif is_roll:
+                            elif is_trig_attivo:
+                                # Visualizzazione TRIGGER ATTIVO con pulsante di annullamento
+                                tr_p_att = float(dati_salvati.get("trigger_start_prezzo", 0.0) or 0.0)
+                                tr_d_att = dati_salvati.get("trigger_start_direzione", "")
+                                tr_tf_raw = dati_salvati.get("trigger_start_tf", tf_val)
+                                tr_tf_lbl = tf_map.get(tr_tf_raw, "H1")
+                                comp_sym = "&gt;=" if tr_d_att == "LONG" else "&lt;="
+                                st.markdown(
+                                    f"<div style='background: rgba(234, 179, 8, 0.12); border: 1px solid #eab308; border-radius: 6px; padding: 10px; margin-bottom: 8px;'>"
+                                    f"<b style='color: #fde047;'>🎯 TRIGGER PROGRAMMATO ATTIVO ({tr_d_att} {tr_tf_lbl})</b><br>"
+                                    f"<span style='font-size: 0.85rem; color: #fef08a;'>In attesa di chiusura candela {tr_tf_lbl}: <b>Close {comp_sym} {tr_p_att:.{dec}f}</b> e rispetto Kijun.</span>"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
+                                if st.button(f"❌ ANNULLA TRIGGER {nome}", key=f"CAN_TRIG_{conto_selezionato}_{nome}", width="stretch"):
+                                    memoria_attuale[nome] = {
+                                        **dati_salvati,
+                                        "trigger_start_attivo": False,
+                                        "trigger_start_prezzo": None,
+                                        "trigger_start_direzione": None,
+                                        "trigger_start_tf": None,
+                                        "stato": "FLAT",
+                                        "direzione": "",
+                                        "msg_manuale": ""
+                                    }
+                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    st.session_state[f"trig_px_{conto_selezionato}_{nome}"] = ""
+                                    st.session_state.target_tab = "Trend"
+                                    st.rerun()
+                            elif is_roll and not has_trigger_input:
                                 st.warning("🌙 Avvio disabilitato fino alle 00:15.")
                             elif is_wkd:
                                 st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
                             elif current_kj is not None and px_live is not None:
-                                if is_kj_short_bloccato:
+                                if has_trigger_input:
+                                    st.markdown(f"<div style='font-size: 0.82rem; color: #38bdf8; margin-bottom: 6px; white-space: nowrap;'>🎯 <b>Trigger virtuale pronto a {trig_px_val:.{dec}f} (valutato a chiusura candela {tf_badge})</b></div>", unsafe_allow_html=True)
+                                elif is_kj_short_bloccato:
                                     st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
                                 elif is_kj_long_bloccato:
                                     st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &lt; Kijun ({current_kj:.{dec}f}): Direzione SHORT</b></div>", unsafe_allow_html=True)
 
-                            c_btn1, c_btn2 = st.columns(2)
-                            with c_btn1:
-                                if is_hyper_exclusive:
-                                    help_l = "Operatività disabilitata: strumento riservato ad HYPER."
-                                elif is_roll:
-                                    help_l = "Avvio disabilitato fino alle 00:15."
-                                elif is_wkd:
-                                    help_l = "Bloccato durante il Weekend (mercati chiusi)"
-                                elif is_kj_long_bloccato:
-                                    help_l = f"Bloccato: Live ({px_live:.{dec}f}) < KJ ({current_kj:.{dec}f})"
-                                else:
-                                    help_l = None
-
-                                if st.button("🚀 AVVIA LONG", key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=(is_long_bloccato or is_hyper_exclusive), help=help_l):
+                            if not is_trig_attivo:
+                                c_btn1, c_btn2 = st.columns(2)
+                                with c_btn1:
                                     if is_hyper_exclusive:
-                                        st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
-                                        st.rerun()
-                                    if is_roll:
-                                        st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
-                                        st.rerun()
-                                    if is_wkd:
-                                        st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare LONG durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
-                                        st.rerun()
-                                    if is_kj_long_bloccato:
-                                        st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare LONG! Il prezzo Live ({px_live:.{dec}f}) si trova sotto la Kijun ({current_kj:.{dec}f}). Per andare LONG il prezzo deve trovarsi sopra la Kijun."
-                                        st.rerun()
-                                    st.session_state[err_key] = ""
-                                    memoria_attuale[nome] = {
-                                        **dati_salvati, 
-                                        "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
-                                        "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
-                                        "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
-                                        "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
-                                        "auto_restart": auto_restart,
-                                        "attivo": True, 
-                                        "comando_reset": False,
-                                        "direzione": "LONG", 
-                                        "stato": "FLAT", 
-                                        "tipo_strategia": "TREND", 
-                                        "needs_manual_start": True,
-                                        "da_chiudere_a_riapertura": False,
-                                        "msg_manuale": "",
-                                        "storico_wip_trend": [],
-                                        "posizioni_core": [],
-                                        "posizioni_incr": [],
-                                        "trailing_sl_core": None,
-                                        "trailing_sl_incr": None
-                                    }
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.session_state.target_tab = "Trend"
-                                    st.rerun()
-                            with c_btn2:
-                                if is_hyper_exclusive:
-                                    help_s = "Operatività disabilitata: strumento riservato ad HYPER."
-                                elif is_roll:
-                                    help_s = "Avvio disabilitato fino alle 00:15."
-                                elif is_wkd:
-                                    help_s = "Bloccato durante il Weekend (mercati chiusi)"
-                                elif is_kj_short_bloccato:
-                                    help_s = f"Bloccato: Live ({px_live:.{dec}f}) > KJ ({current_kj:.{dec}f})"
-                                else:
-                                    help_s = None
+                                        help_l = "Operatività disabilitata: strumento riservato ad HYPER."
+                                        dis_l = True
+                                    elif is_wkd:
+                                        help_l = "Bloccato durante il Weekend (mercati chiusi)"
+                                        dis_l = True
+                                    elif has_trigger_input:
+                                        help_l = f"Programma ingresso LONG a chiusura candela {tf_badge} quando Close >= {trig_px_val:.{dec}f} e Close >= Kijun"
+                                        dis_l = False
+                                    elif is_roll:
+                                        help_l = "Avvio disabilitato fino alle 00:15."
+                                        dis_l = True
+                                    elif is_kj_long_bloccato:
+                                        help_l = f"Bloccato: Live ({px_live:.{dec}f}) < KJ ({current_kj:.{dec}f})"
+                                        dis_l = True
+                                    else:
+                                        help_l = None
+                                        dis_l = False
 
-                                if st.button("🚀 AVVIA SHORT", key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=(is_short_bloccato or is_hyper_exclusive), help=help_s):
+                                    btn_l_label = "🎯 PROGRAMMA TRIGGER LONG" if has_trigger_input else "🚀 AVVIA LONG"
+                                    if st.button(btn_l_label, key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=dis_l, help=help_l):
+                                        if is_hyper_exclusive:
+                                            st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
+                                            st.rerun()
+                                        if is_wkd:
+                                            st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
+                                            st.rerun()
+                                        
+                                        tf_sel = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
+                                        tf_lbl_sel = tf_map.get(tf_sel, "H1")
+                                        if has_trigger_input:
+                                            # Salva TRIGGER CONDIZIONALE
+                                            st.session_state[err_key] = ""
+                                            ora_n = now_it().strftime("%d/%m %H:%M:%S")
+                                            memoria_attuale[nome] = {
+                                                **dati_salvati, 
+                                                "timeframe": tf_sel,
+                                                "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                                "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                                "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
+                                                "auto_restart": auto_restart,
+                                                "attivo": False, 
+                                                "comando_reset": False,
+                                                "direzione": "LONG", 
+                                                "stato": "TRIGGER_ATTESA", 
+                                                "tipo_strategia": "TREND", 
+                                                "needs_manual_start": False,
+                                                "trigger_start_attivo": True,
+                                                "trigger_start_prezzo": trig_px_val,
+                                                "trigger_start_direzione": "LONG",
+                                                "trigger_start_tf": tf_sel,
+                                                "da_chiudere_a_riapertura": False,
+                                                "msg_manuale": f"🎯 Trigger programmato: LONG @ {trig_px_val:.{dec}f} ({tf_lbl_sel} chiusa)",
+                                                "storico_wip_trend": dati_salvati.get("storico_wip_trend", []) + [f"[{ora_n}] 🎯 Trigger programmato LONG @ {trig_px_val:.{dec}f} ({tf_lbl_sel})"],
+                                                "posizioni_core": [],
+                                                "posizioni_incr": [],
+                                                "trailing_sl_core": None,
+                                                "trailing_sl_incr": None
+                                            }
+                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            st.session_state.target_tab = "Trend"
+                                            st.rerun()
+                                        else:
+                                            # Avvio standard immediato
+                                            if is_roll:
+                                                st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
+                                                st.rerun()
+                                            if is_kj_long_bloccato:
+                                                st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare LONG! Il prezzo Live ({px_live:.{dec}f}) si trova sotto la Kijun ({current_kj:.{dec}f}). Per andare LONG il prezzo deve trovarsi sopra la Kijun."
+                                                st.rerun()
+                                            st.session_state[err_key] = ""
+                                            memoria_attuale[nome] = {
+                                                **dati_salvati, 
+                                                "timeframe": tf_sel,
+                                                "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                                "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                                "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
+                                                "auto_restart": auto_restart,
+                                                "attivo": True, 
+                                                "comando_reset": False,
+                                                "direzione": "LONG", 
+                                                "stato": "FLAT", 
+                                                "tipo_strategia": "TREND", 
+                                                "needs_manual_start": True,
+                                                "trigger_start_attivo": False,
+                                                "trigger_start_prezzo": None,
+                                                "trigger_start_direzione": None,
+                                                "trigger_start_tf": None,
+                                                "da_chiudere_a_riapertura": False,
+                                                "msg_manuale": "",
+                                                "storico_wip_trend": [],
+                                                "posizioni_core": [],
+                                                "posizioni_incr": [],
+                                                "trailing_sl_core": None,
+                                                "trailing_sl_incr": None
+                                            }
+                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            st.session_state.target_tab = "Trend"
+                                            st.rerun()
+
+                                with c_btn2:
                                     if is_hyper_exclusive:
-                                        st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
-                                        st.rerun()
-                                    if is_wkd:
-                                        st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare SHORT durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
-                                        st.rerun()
-                                    if is_kj_short_bloccato:
-                                        st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare SHORT! Il prezzo Live ({px_live:.{dec}f}) si trova sopra la Kijun ({current_kj:.{dec}f}). Per andare SHORT il prezzo deve trovarsi sotto la Kijun."
-                                        st.rerun()
-                                    st.session_state[err_key] = ""
-                                    memoria_attuale[nome] = {
-                                        **dati_salvati, 
-                                        "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
-                                        "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
-                                        "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
-                                        "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
-                                        "auto_restart": auto_restart,
-                                        "attivo": True, 
-                                        "comando_reset": False,
-                                        "direzione": "SHORT", 
-                                        "stato": "FLAT", 
-                                        "tipo_strategia": "TREND", 
-                                        "needs_manual_start": True,
-                                        "da_chiudere_a_riapertura": False,
-                                        "msg_manuale": "",
-                                        "storico_wip_trend": [],
-                                        "posizioni_core": [],
-                                        "posizioni_incr": [],
-                                        "trailing_sl_core": None,
-                                        "trailing_sl_incr": None
-                                    }
-                                    salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.session_state.target_tab = "Trend"
-                                    st.rerun()
+                                        help_s = "Operatività disabilitata: strumento riservato ad HYPER."
+                                        dis_s = True
+                                    elif is_wkd:
+                                        help_s = "Bloccato durante il Weekend (mercati chiusi)"
+                                        dis_s = True
+                                    elif has_trigger_input:
+                                        help_s = f"Programma ingresso SHORT a chiusura candela {tf_badge} quando Close <= {trig_px_val:.{dec}f} e Close <= Kijun"
+                                        dis_s = False
+                                    elif is_roll:
+                                        help_s = "Avvio disabilitato fino alle 00:15."
+                                        dis_s = True
+                                    elif is_kj_short_bloccato:
+                                        help_s = f"Bloccato: Live ({px_live:.{dec}f}) > KJ ({current_kj:.{dec}f})"
+                                        dis_s = True
+                                    else:
+                                        help_s = None
+                                        dis_s = False
 
-                            if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=is_hyper_exclusive, help="Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else None):
-                                st.session_state[f"sync_trend_open_{nome}"] = True
-                                st.rerun()
-                            
-                            if st.session_state.get(f"sync_trend_open_{nome}", False):
-                                dialog_sync_start_trend(conto_selezionato, nome)
+                                    btn_s_label = "🎯 PROGRAMMA TRIGGER SHORT" if has_trigger_input else "🚀 AVVIA SHORT"
+                                    if st.button(btn_s_label, key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=dis_s, help=help_s):
+                                        if is_hyper_exclusive:
+                                            st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
+                                            st.rerun()
+                                        if is_wkd:
+                                            st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
+                                            st.rerun()
+                                        
+                                        tf_sel = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
+                                        tf_lbl_sel = tf_map.get(tf_sel, "H1")
+                                        if has_trigger_input:
+                                            # Salva TRIGGER CONDIZIONALE
+                                            st.session_state[err_key] = ""
+                                            ora_n = now_it().strftime("%d/%m %H:%M:%S")
+                                            memoria_attuale[nome] = {
+                                                **dati_salvati, 
+                                                "timeframe": tf_sel,
+                                                "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                                "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                                "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
+                                                "auto_restart": auto_restart,
+                                                "attivo": False, 
+                                                "comando_reset": False,
+                                                "direzione": "SHORT", 
+                                                "stato": "TRIGGER_ATTESA", 
+                                                "tipo_strategia": "TREND", 
+                                                "needs_manual_start": False,
+                                                "trigger_start_attivo": True,
+                                                "trigger_start_prezzo": trig_px_val,
+                                                "trigger_start_direzione": "SHORT",
+                                                "trigger_start_tf": tf_sel,
+                                                "da_chiudere_a_riapertura": False,
+                                                "msg_manuale": f"🎯 Trigger programmato: SHORT @ {trig_px_val:.{dec}f} ({tf_lbl_sel} chiusa)",
+                                                "storico_wip_trend": dati_salvati.get("storico_wip_trend", []) + [f"[{ora_n}] 🎯 Trigger programmato SHORT @ {trig_px_val:.{dec}f} ({tf_lbl_sel})"],
+                                                "posizioni_core": [],
+                                                "posizioni_incr": [],
+                                                "trailing_sl_core": None,
+                                                "trailing_sl_incr": None
+                                            }
+                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            st.session_state.target_tab = "Trend"
+                                            st.rerun()
+                                        else:
+                                            # Avvio standard immediato
+                                            if is_roll:
+                                                st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
+                                                st.rerun()
+                                            if is_kj_short_bloccato:
+                                                st.session_state[err_key] = f"🛑 BLOCCO KIJUN: Impossibile avviare SHORT! Il prezzo Live ({px_live:.{dec}f}) si trova sopra la Kijun ({current_kj:.{dec}f}). Per andare SHORT il prezzo deve trovarsi sotto la Kijun."
+                                                st.rerun()
+                                            st.session_state[err_key] = ""
+                                            memoria_attuale[nome] = {
+                                                **dati_salvati, 
+                                                "timeframe": tf_sel,
+                                                "size": st.session_state.get(f"sz_{conto_selezionato}_{nome}", size_val),
+                                                "size_max": st.session_state.get(f"szm_{conto_selezionato}_{nome}", size_max_val),
+                                                "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
+                                                "auto_restart": auto_restart,
+                                                "attivo": True, 
+                                                "comando_reset": False,
+                                                "direzione": "SHORT", 
+                                                "stato": "FLAT", 
+                                                "tipo_strategia": "TREND", 
+                                                "needs_manual_start": True,
+                                                "trigger_start_attivo": False,
+                                                "trigger_start_prezzo": None,
+                                                "trigger_start_direzione": None,
+                                                "trigger_start_tf": None,
+                                                "da_chiudere_a_riapertura": False,
+                                                "msg_manuale": "",
+                                                "storico_wip_trend": [],
+                                                "posizioni_core": [],
+                                                "posizioni_incr": [],
+                                                "trailing_sl_core": None,
+                                                "trailing_sl_incr": None
+                                            }
+                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            st.session_state.target_tab = "Trend"
+                                            st.rerun()
+
+                                if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=is_hyper_exclusive, help="Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else None):
+                                    st.session_state[f"sync_trend_open_{nome}"] = True
+                                    st.rerun()
+                                
+                                if st.session_state.get(f"sync_trend_open_{nome}", False):
+                                    dialog_sync_start_trend(conto_selezionato, nome)
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
@@ -3728,7 +3888,10 @@ else:
                         tipo_strat = dati.get("tipo_strategia", "RANGE")
                     
                         # Colore e stile del pulsante Strumento WIP
-                        if is_attivo and tipo_strat == "TREND":
+                        if dati.get("trigger_start_attivo"):
+                            bg_color_t = "#b45309" # Ambra per trigger armato
+                            text_color_t = "white"
+                        elif is_attivo and tipo_strat == "TREND":
                             if dir_t == "LONG":
                                 bg_color_t = "#198754" # Verde
                             elif dir_t == "SHORT":
@@ -3850,7 +4013,15 @@ else:
                         elif is_attivo and tipo_strat == "RANGE":
                             c2.markdown("<span style='background-color: rgba(23, 162, 184, 0.1); color: #17a2b8; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>🛡️ IN RANGE</span>", unsafe_allow_html=True)
                         else:
-                            if nome in STRUMENTI_ESCLUSIVI_HYPER:
+                            if dati.get("trigger_start_attivo"):
+                                tr_p_s = float(dati.get("trigger_start_prezzo", 0.0) or 0.0)
+                                tr_d_s = dati.get("trigger_start_direzione", "")
+                                tf_raw_s = dati.get("trigger_start_tf", tf)
+                                tf_map_s = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                                tf_lbl_s = tf_map_s.get(tf_raw_s, tf_raw_s)
+                                dec_s = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(234, 179, 8, 0.15); color: #fde047; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🎯 TRIGGER ({tr_d_s} {tf_lbl_s})</span><span style='color:#fef08a; font-size:0.8rem; white-space: nowrap;'>Attesa candela @ {tr_p_s:.{dec_s}f}</span></div>", unsafe_allow_html=True)
+                            elif nome in STRUMENTI_ESCLUSIVI_HYPER:
                                 c2.markdown("<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ RISERVATO HYPER</span>", unsafe_allow_html=True)
                             else:
                                 c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)

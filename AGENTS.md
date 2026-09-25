@@ -1,7 +1,9 @@
 # Regole Operative Progetto Macchinetta IG
 
 ## 🔄 1. Sincronizzazione e Deploy Server Kubernetes (Produzione)
-- **Autorizzazione Implicita al Deploy:** Quando l'utente dice "sincronizza server" (o simile), si procede sempre all'istante: il server è attivo, operativo e i permessi sul namespace `macchinetta` sono abilitati al 100%.
+- **DIVIETO DI DEPLOY AUTOMATICO SENZA CONFERMA:** Non avviare MAI la sincronizzazione/deploy in autonomia dopo una modifica al codice. Chiedi SEMPRE preventivamente conferma all'utente ("Vuoi che sincronizzi il server ora?"). Un riavvio intempestivo dei pod mentre una candela M5 (o altro TF) è in corso di chiusura può causare disallineamenti operativi gravi.
+- **Raggruppamento Modifiche (Batching):** Possiamo accumulare modifiche multiple in locale, verificarle con i test unitari e la compilazione, e sincronizzare il server in un unico passaggio solo quando l'utente decide di rilasciare il pacchetto.
+- **Autorizzazione Implicita al Deploy:** Solo quando l'utente dice esplicitamente "sincronizza server" (o simile, oppure risponde affermativamente alla richiesta di deploy), si procede all'istante: il server è attivo, operativo e i permessi sul namespace `macchinetta` sono abilitati al 100%.
 - **Metodo Ufficiale di Deploy:** Non si usa Docker (la virtualizzazione non è attiva sul PC ed è stata concordata e confermata la modalità diretta PVC/Kubernetes). I pod eseguono il codice direttamente dal volume condiviso Longhorn (`/data`).
 - **Comando Unico di Sincronizzazione:**
   Per aggiornare il server, eseguire sempre:
