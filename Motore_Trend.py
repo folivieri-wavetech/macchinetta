@@ -2606,11 +2606,11 @@ def esegui_ciclo_trend():
             continue
 
         candele_locali = carica_candele_locali(nome, tf)
-        if not candele_locali and not needs_start:
+        if not candele_locali and not needs_start and not trigger_attivo:
             continue
 
         is_candle_just_closed = (nome, tf) in candele_appena_chiuse
-        if not is_candle_just_closed and not needs_start:
+        if not is_candle_just_closed and not needs_start and not trigger_attivo:
             continue
 
         # Seed dello storico (tutte le candele chiuse TRANNE l'ultima se è fine candela appena chiusa)
@@ -2691,101 +2691,88 @@ def esegui_ciclo_trend():
         dec = CONFIG_STRUMENTI[nome]["decimali"]
         
         # -------------------------------------------------------------
-        # FASE 2-B: CONTROLLO ED ESECUZIONE TRIGGER CONDIZIONALE A FINE CANDELA
+        # FASE 2-B: CONTROLLO ED ESECUZIONE TRIGGER CONDIZIONALE LIVE INTRACANDELA (BUY STOP / SELL STOP VIRTUALE)
         # -------------------------------------------------------------
         if trigger_attivo:
-            if is_candle_just_closed:
-                trig_px = float(dati.get("trigger_start_prezzo", 0.0) or 0.0)
-                trig_dir = (dati.get("trigger_start_direzione") or direzione or "LONG").upper()
-                closed_close = 0.0
-                if candele_locali:
-                    try:
-                        c_last = candele_locali[-1]
-                        closed_close = (c_last['closePrice']['bid'] + c_last['closePrice']['ask']) / 2.0
-                    except Exception:
-                        pass
-                
-                cond_soddisfatta = False
-                if closed_close > 0 and trig_px > 0:
-                    mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
-                    dist_kj_pip = abs(closed_close - kj_val) / mult if (kj_val is not None and mult) else 0.0
-                    
-                    # Filtro distanza Kijun su H1: per dare lo start la distanza da KJ deve essere > 5 pip e < 25 pip
-                    dist_h1_ok = True
-                    motivo_blocco_dist = ""
-                    if tf == "HOUR" and kj_val is not None:
-                        if dist_kj_pip <= 5.0:
-                            dist_h1_ok = False
-                            motivo_blocco_dist = f"distanza da KJ insufficiente ({dist_kj_pip:.1f}p <= 5p)"
-                        elif dist_kj_pip >= 25.0:
-                            dist_h1_ok = False
-                            motivo_blocco_dist = f"candela troppo estesa da KJ ({dist_kj_pip:.1f}p >= 25p)"
+            trig_px = float(dati.get("trigger_start_prezzo", 0.0) or 0.0)
+            trig_dir = (dati.get("trigger_start_direzione") or direzione or "LONG").upper()
+            check_px = live_px if (live_px and isinstance(live_px, (int, float))) else 0.0
 
-                    if trig_dir == "SHORT":
-                        # SHORT: candela chiusa <= trigger AND candela chiusa <= Kijun AND filtro distanza H1 (5-25 pip)
-                        kj_ok = (kj_val is None or closed_close <= kj_val)
-                        if closed_close <= trig_px and kj_ok and dist_h1_ok:
-                            cond_soddisfatta = True
-                        else:
-                            kj_txt = f"{kj_val:.{dec}f}" if kj_val is not None else "-"
-                            blocco_txt = f" [{motivo_blocco_dist}]" if motivo_blocco_dist else ""
-                            print_log(nome, f"⏳ Trigger SHORT in attesa {format_tf_label(tf)}: Candela chiusa a {closed_close:.{dec}f} (Trigger: {trig_px:.{dec}f}, KJ: {kj_txt}, Dist: {dist_kj_pip:.1f}p){blocco_txt}.")
-                    elif trig_dir == "LONG":
-                        # LONG: candela chiusa >= trigger AND candela chiusa >= Kijun AND filtro distanza H1 (5-25 pip)
-                        kj_ok = (kj_val is None or closed_close >= kj_val)
-                        if closed_close >= trig_px and kj_ok and dist_h1_ok:
-                            cond_soddisfatta = True
-                        else:
-                            kj_txt = f"{kj_val:.{dec}f}" if kj_val is not None else "-"
-                            blocco_txt = f" [{motivo_blocco_dist}]" if motivo_blocco_dist else ""
-                            print_log(nome, f"⏳ Trigger LONG in attesa {format_tf_label(tf)}: Candela chiusa a {closed_close:.{dec}f} (Trigger: {trig_px:.{dec}f}, KJ: {kj_txt}, Dist: {dist_kj_pip:.1f}p){blocco_txt}.")
-                
-                if cond_soddisfatta:
-                    print_log(nome, f"🎯 CONDIZIONE TRIGGER SODDISFATTA! Avvio ordine Core {trig_dir} a mercato...")
-                    pos = engine.start(closed_close, trig_dir)
-                    ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, trig_dir, size_i, headers, dec, etichetta="[CORE-TRIG]")
-                    if ok:
-                        pos.entry_price = real_lvl if real_lvl else closed_close
-                        pos.ticket = deal_id
-                        ora_str = now_it().strftime("%d/%m %H:%M:%S")
-                        mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
-                        dist_kj_pip = abs(pos.entry_price - kj_val) / mult if (kj_val is not None and mult) else 0.0
-                        dist_str = f" (Distanza KJ: {dist_kj_pip:.1f} pip)" if kj_val is not None else ""
-                        msg = f"🎯 Trigger Eseguito! Open Core {trig_dir} a {pos.entry_price:.{dec}f}{dist_str} [Trigger: {trig_px:.{dec}f}]"
-                        storico = dati.get("storico_wip_trend", [])
-                        storico.append(f"[{ora_str}] {msg}")
-                        aggiorna_memoria(nome, {
-                            "attivo": True,
-                            "stato": trig_dir,
-                            "direzione": trig_dir,
-                            "posizioni_core": [pos.to_dict()],
-                            "posizioni_incr": [],
-                            "trigger_start_attivo": False,
-                            "trigger_start_prezzo": None,
-                            "trigger_start_direzione": None,
-                            "trigger_start_tf": None,
-                            "needs_manual_start": False,
-                            "comando_reset": False,
-                            "msg_manuale": "",
-                            "storico_wip_trend": storico[-30:]
-                        })
-                        print_log(nome, f"🎯 Trigger Eseguito! Open Core {trig_dir} a {pos.entry_price:.{dec}f}{dist_str}")
-                        body_ntfy = f"[{nome}] Trigger Eseguito: {trig_dir} a {pos.entry_price:.{dec}f}{dist_str} (Trigger: {trig_px:.{dec}f})"
-                        invia_notifica(f"🎯 TRIGGER CORE {format_tf_label(tf)}", body_ntfy, "dart")
+            cond_soddisfatta = False
+            if check_px > 0 and trig_px > 0:
+                mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                dist_kj_pip = abs(check_px - kj_val) / mult if (kj_val is not None and mult) else 0.0
+
+                if trig_dir == "SHORT":
+                    # SHORT (Sell Stop live): prezzo live <= trigger AND prezzo live <= Kijun
+                    kj_ok = (kj_val is None or check_px <= kj_val)
+                    if check_px <= trig_px and kj_ok:
+                        cond_soddisfatta = True
                     else:
-                        engine.reset()
-                        aggiorna_memoria(nome, {
-                            "attivo": False,
-                            "stato": "FLAT",
-                            "errore_avvio": True,
-                            "trigger_start_attivo": False,
-                            "needs_manual_start": False,
-                            "msg_manuale": f"🛑 Errore invio ordine IG per Trigger {trig_dir}"
-                        })
-                        print_log(nome, f"🛑 Errore invio ordine IG per Trigger {trig_dir}")
+                        ora_cur = time.time()
+                        if ora_cur - ULTIMO_LOG_ATTESA.get(f"{nome}_trig", 0) > 60:
+                            ULTIMO_LOG_ATTESA[f"{nome}_trig"] = ora_cur
+                            kj_txt = f"{kj_val:.{dec}f}" if kj_val is not None else "-"
+                            print_log(nome, f"⏳ Trigger SELL STOP in attesa {format_tf_label(tf)}: Prezzo live {check_px:.{dec}f} (Livello: {trig_px:.{dec}f}, KJ: {kj_txt}, Dist: {dist_kj_pip:.1f}p).")
+                elif trig_dir == "LONG":
+                    # LONG (Buy Stop live): prezzo live >= trigger AND prezzo live >= Kijun
+                    kj_ok = (kj_val is None or check_px >= kj_val)
+                    if check_px >= trig_px and kj_ok:
+                        cond_soddisfatta = True
+                    else:
+                        ora_cur = time.time()
+                        if ora_cur - ULTIMO_LOG_ATTESA.get(f"{nome}_trig", 0) > 60:
+                            ULTIMO_LOG_ATTESA[f"{nome}_trig"] = ora_cur
+                            kj_txt = f"{kj_val:.{dec}f}" if kj_val is not None else "-"
+                            print_log(nome, f"⏳ Trigger BUY STOP in attesa {format_tf_label(tf)}: Prezzo live {check_px:.{dec}f} (Livello: {trig_px:.{dec}f}, KJ: {kj_txt}, Dist: {dist_kj_pip:.1f}p).")
+
+            if cond_soddisfatta:
+                print_log(nome, f"🎯 TRIGGER {trig_dir} COLPITO LIVE A {check_px:.{dec}f}! Avvio ordine Core a mercato...")
+                pos = engine.start(check_px, trig_dir)
+                ok, real_lvl, deal_id = invia_ordine_mercato(nome, epic, valuta, trig_dir, size_i, headers, dec, etichetta="[CORE-TRIG]")
+                if ok:
+                    pos.entry_price = real_lvl if real_lvl else check_px
+                    pos.ticket = deal_id
+                    ora_str = now_it().strftime("%d/%m %H:%M:%S")
+                    mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                    dist_kj_pip = abs(pos.entry_price - kj_val) / mult if (kj_val is not None and mult) else 0.0
+                    dist_str = f" (Distanza KJ: {dist_kj_pip:.1f} pip)" if kj_val is not None else ""
+                    msg = f"🎯 Trigger Live Eseguito! Open Core {trig_dir} a {pos.entry_price:.{dec}f}{dist_str} [Livello Trigger: {trig_px:.{dec}f}]"
+                    storico = dati.get("storico_wip_trend", [])
+                    storico.append(f"[{ora_str}] {msg}")
+                    aggiorna_memoria(nome, {
+                        "attivo": True,
+                        "stato": trig_dir,
+                        "direzione": trig_dir,
+                        "posizioni_core": [pos.to_dict()],
+                        "posizioni_incr": [],
+                        "trigger_start_attivo": False,
+                        "trigger_start_prezzo": None,
+                        "trigger_start_direzione": None,
+                        "trigger_start_tf": None,
+                        "needs_manual_start": False,
+                        "comando_reset": False,
+                        "msg_manuale": "",
+                        "storico_wip_trend": storico[-30:]
+                    })
+                    print_log(nome, f"🎯 Trigger Live Eseguito! Open Core {trig_dir} a {pos.entry_price:.{dec}f}{dist_str}")
+                    body_ntfy = f"[{nome}] Trigger Eseguito Live: {trig_dir} a {pos.entry_price:.{dec}f}{dist_str} (Livello: {trig_px:.{dec}f})"
+                    invia_notifica(f"🎯 TRIGGER CORE LIVE {format_tf_label(tf)}", body_ntfy, "dart")
+                else:
+                    engine.reset()
+                    aggiorna_memoria(nome, {
+                        "attivo": False,
+                        "stato": "FLAT",
+                        "errore_avvio": True,
+                        "trigger_start_attivo": False,
+                        "needs_manual_start": False,
+                        "msg_manuale": f"🛑 Errore invio ordine IG per Trigger {trig_dir}"
+                    })
+                    print_log(nome, f"🛑 Errore invio ordine IG per Trigger {trig_dir}")
                 continue
             else:
-                continue
+                if not is_candle_just_closed:
+                    continue
 
         # Se l'utente ha premuto AVVIA LONG/SHORT (needs_start), avviamo l'engine e l'ordine SUBITO a mercato
         if needs_start:

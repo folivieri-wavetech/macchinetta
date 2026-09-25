@@ -3481,8 +3481,8 @@ else:
                                 filtro_h1_str = " (Filtro H1: 5 &lt; Dist KJ &lt; 25 pip)" if tr_tf_lbl == "H1" else ""
                                 st.markdown(
                                     f"<div style='background: rgba(234, 179, 8, 0.12); border: 1px solid #eab308; border-radius: 6px; padding: 10px; margin-bottom: 8px;'>"
-                                    f"<b style='color: #fde047;'>🎯 TRIGGER PROGRAMMATO ATTIVO ({tr_d_att} {tr_tf_lbl})</b><br>"
-                                    f"<span style='font-size: 0.85rem; color: #fef08a;'>In attesa di chiusura candela {tr_tf_lbl}: <b>Close {comp_sym} {tr_p_att:.{dec}f}</b> e rispetto Kijun{filtro_h1_str}.</span>"
+                                    f"<b style='color: #fde047;'>🎯 TRIGGER {tr_d_att} STOP LIVE ATTIVO ({tr_tf_lbl})</b><br>"
+                                    f"<span style='font-size: 0.85rem; color: #fef08a;'>In attesa che il prezzo live batta: <b>Prezzo {comp_sym} {tr_p_att:.{dec}f}</b> (rispetto Kijun). Esecuzione immediata a mercato al tocco.</span>"
                                     f"</div>",
                                     unsafe_allow_html=True
                                 )
@@ -3567,8 +3567,8 @@ else:
                                                 "trigger_start_direzione": "LONG",
                                                 "trigger_start_tf": tf_sel,
                                                 "da_chiudere_a_riapertura": False,
-                                                "msg_manuale": f"🎯 Trigger programmato: LONG @ {trig_px_val:.{dec}f} ({tf_lbl_sel} chiusa)",
-                                                "storico_wip_trend": dati_salvati.get("storico_wip_trend", []) + [f"[{ora_n}] 🎯 Trigger programmato LONG @ {trig_px_val:.{dec}f} ({tf_lbl_sel})"],
+                                                "msg_manuale": f"🎯 Trigger Buy Stop Live: LONG @ {trig_px_val:.{dec}f} ({tf_lbl_sel})",
+                                                "storico_wip_trend": dati_salvati.get("storico_wip_trend", []) + [f"[{ora_n}] 🎯 Trigger Buy Stop Live LONG @ {trig_px_val:.{dec}f} ({tf_lbl_sel})"],
                                                 "posizioni_core": [],
                                                 "posizioni_incr": [],
                                                 "trailing_sl_core": None,
@@ -3669,8 +3669,8 @@ else:
                                                 "trigger_start_direzione": "SHORT",
                                                 "trigger_start_tf": tf_sel,
                                                 "da_chiudere_a_riapertura": False,
-                                                "msg_manuale": f"🎯 Trigger programmato: SHORT @ {trig_px_val:.{dec}f} ({tf_lbl_sel} chiusa)",
-                                                "storico_wip_trend": dati_salvati.get("storico_wip_trend", []) + [f"[{ora_n}] 🎯 Trigger programmato SHORT @ {trig_px_val:.{dec}f} ({tf_lbl_sel})"],
+                                                "msg_manuale": f"🎯 Trigger Sell Stop Live: SHORT @ {trig_px_val:.{dec}f} ({tf_lbl_sel})",
+                                                "storico_wip_trend": dati_salvati.get("storico_wip_trend", []) + [f"[{ora_n}] 🎯 Trigger Sell Stop Live SHORT @ {trig_px_val:.{dec}f} ({tf_lbl_sel})"],
                                                 "posizioni_core": [],
                                                 "posizioni_incr": [],
                                                 "trailing_sl_core": None,
@@ -4030,7 +4030,7 @@ else:
                                 tf_map_s = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                                 tf_lbl_s = tf_map_s.get(tf_raw_s, tf_raw_s)
                                 dec_s = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
-                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(234, 179, 8, 0.15); color: #fde047; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🎯 TRIGGER ({tr_d_s} {tf_lbl_s})</span><span style='color:#fef08a; font-size:0.8rem; white-space: nowrap;'>Attesa candela @ {tr_p_s:.{dec_s}f}</span></div>", unsafe_allow_html=True)
+                                c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(234, 179, 8, 0.15); color: #fde047; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🎯 TRIGGER LIVE ({tr_d_s} {tf_lbl_s})</span><span style='color:#fef08a; font-size:0.8rem; white-space: nowrap;'>Attesa tocco @ {tr_p_s:.{dec_s}f}</span></div>", unsafe_allow_html=True)
                             elif nome in STRUMENTI_ESCLUSIVI_HYPER:
                                 c2.markdown("<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ RISERVATO HYPER</span>", unsafe_allow_html=True)
                             else:
