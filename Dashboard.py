@@ -3067,7 +3067,19 @@ else:
 
                 td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span></td>" if is_regista else ""
                 
-                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{tot_size:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(avg_entry, dec)}</u></td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td>{td_tipo_master}<td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
+                # Se è posizione singola (es. solo Core, senza incrementi), ricava la data/ora di apertura da visualizzare sotto il livello
+                data_master_str = ""
+                if len(posizioni) == 1:
+                    try:
+                        raw_d = posizioni[0]['position'].get('createdDateUTC') or posizioni[0]['position'].get('createdDate') or ""
+                        if raw_d:
+                            raw_clean = raw_d.split('.')[0].replace("Z", "")
+                            dt_utc = datetime.strptime(raw_clean, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                            data_master_str = f"<br><span style='font-size: 0.75rem; color: #888;'>{dt_utc.astimezone(TZ_ITALIA).strftime('%d/%m/%y %H:%M')}</span>"
+                    except Exception:
+                        data_master_str = ""
+
+                html_pos += f"<tr class='ig-row ig-master-row' style='{master_style}'>{td_mercato}<td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{tot_size:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(avg_entry, dec)}</u>{data_master_str}</td><td style='color: #00E676;'>{prezzo_str}</td><td>{stop_str}</td><td>{lim_str}</td>{td_tipo_master}<td class='{pnl_class}'><u>{pnl_str}</u></td></tr>\n"
                 
                 if has_subrows:
                     if is_trend:
@@ -3086,8 +3098,13 @@ else:
                         sz = float(p['position']['size'])
                         lvl = float(p['position']['level'])
                         
-                        dt_utc = datetime.strptime(p['position']['createdDateUTC'], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                        data_str = dt_utc.astimezone(TZ_ITALIA).strftime("%d/%m/%y %H:%M")
+                        raw_sub_d = p['position'].get('createdDateUTC') or p['position'].get('createdDate') or ""
+                        try:
+                            raw_clean = raw_sub_d.split('.')[0].replace("Z", "")
+                            dt_utc = datetime.strptime(raw_clean, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                            data_str = dt_utc.astimezone(TZ_ITALIA).strftime("%d/%m/%y %H:%M")
+                        except Exception:
+                            data_str = ""
                         
                         s_str = ""
                         l_str = ""
@@ -4008,7 +4025,23 @@ else:
                                 bg_c = "rgba(40,167,69,0.15)" if dir_t == "LONG" else "rgba(220,53,69,0.15)"
                                 dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
                                 core_sz_val = posizioni_core[0].get("size", sz) if core_count > 0 else sz
-                                str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}"
+                                ora_core_str = ""
+                                core_tick = posizioni_core[0].get("ticket")
+                                if pos_live_all and c_epic:
+                                    for p in pos_live_all:
+                                        if p.get('market', {}).get('epic') == c_epic:
+                                            p_deal = p.get('position', {}).get('dealId')
+                                            if (core_tick and p_deal == core_tick) or not core_tick:
+                                                raw_d = p.get('position', {}).get('createdDateUTC') or p.get('position', {}).get('createdDate') or ""
+                                                if raw_d:
+                                                    try:
+                                                        clean_d = raw_d.split('.')[0].replace("Z", "")
+                                                        dt_u = datetime.strptime(clean_d, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                                                        ora_core_str = f" ({dt_u.astimezone(TZ_ITALIA).strftime('%d/%m %H:%M')})"
+                                                    except Exception:
+                                                        pass
+                                                break
+                                str_core = f"Core: {core_sz_val:g}@{core_entry:.{dec}f}{ora_core_str}"
                                 str_incr = f" | Incr: {incr_count} @ {incr_avg:.{dec}f}" if incr_count > 0 else " | Incr: 0"
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: {bg_c}; color: {color}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>⚡ {dir_t} ({tf_display})</span><span style='color:#ccc; font-size:0.8rem; white-space: nowrap;'>{str_core}{str_incr}</span></div>", unsafe_allow_html=True)
                             elif dati.get("needs_manual_start", False):
