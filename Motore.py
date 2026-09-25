@@ -1162,6 +1162,10 @@ def esegui_motore():
                     if nome in STRUMENTI_ESCLUSIVI_HYPER:
                         continue
                         
+                    # Se lo strumento è in modalità TREND, il motore Range non deve interferire
+                    if param.get("tipo_strategia") == "TREND":
+                        continue
+                        
                     epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
                     c = CONFIG_STRUMENTI.get(nome)
                     

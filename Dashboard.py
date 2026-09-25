@@ -1364,6 +1364,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
             full_mem_t[nome_strumento] = {
                 **mem_t,
                 "attivo": True,
+                "comando_reset": False,
                 "direzione": dir_trend,
                 "stato": "FLAT",
                 "tipo_strategia": "TREND",
@@ -3485,6 +3486,7 @@ else:
                                         "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
                                         "auto_restart": auto_restart,
                                         "attivo": True, 
+                                        "comando_reset": False,
                                         "direzione": "LONG", 
                                         "stato": "FLAT", 
                                         "tipo_strategia": "TREND", 
@@ -3531,6 +3533,7 @@ else:
                                         "scala": st.session_state.get(f"sc_{conto_selezionato}_{nome}", scala_val),
                                         "auto_restart": auto_restart,
                                         "attivo": True, 
+                                        "comando_reset": False,
                                         "direzione": "SHORT", 
                                         "stato": "FLAT", 
                                         "tipo_strategia": "TREND", 

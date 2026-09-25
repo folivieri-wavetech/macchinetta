@@ -2746,11 +2746,13 @@ def esegui_ciclo_trend():
                 
                 msg = f"🚀 Open Core {direzione} a {pos.entry_price:.{dec}f}{dist_str}"
                 aggiorna_memoria(nome, {
+                    "attivo": True,
                     "stato": direzione, 
                     "direzione": direzione, 
                     "posizioni_core": [pos.to_dict()], 
                     "posizioni_incr": [], 
                     "needs_manual_start": False,
+                    "comando_reset": False,
                     "msg_manuale": "",
                     "storico_wip_trend": [f"[{ora_str}] {msg}"]
                 })
