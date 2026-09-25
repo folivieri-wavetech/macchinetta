@@ -198,10 +198,17 @@ class HyperGoldM5Engine:
             except Exception:
                 pass
 
+        raw_prices = []
+        # UNICO CONTO AUTORIZZATO AL RECUPERO DATI STORICI: FIORDOK_DEMO
+        acc = "FIORDOK_DEMO"
         try:
-            # Preferisce credenziali DANY_DEMO per risparmiare quote o usa il conto corrente
             user, pwd, api_key = None, None, None
-            for p in ["DANY_DEMO/.env", "/data/DANY_DEMO/.env"]:
+            candidates = [
+                os.path.join(acc, ".env"),
+                os.path.join("/data", acc, ".env"),
+                ".env"
+            ]
+            for p in candidates:
                 if os.path.exists(p):
                     try:
                         with open(p, "r", encoding="utf-8") as f:
@@ -210,14 +217,13 @@ class HyperGoldM5Engine:
                                 if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
                                 elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
                                 elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
-                        if user and pwd and api_key: break
-                    except Exception: pass
-            if not user or not pwd or not api_key:
-                user, pwd, api_key = self._get_ig_credentials()
+                        if user and pwd and api_key:
+                            break
+                    except Exception:
+                        pass
             if not user or not pwd or not api_key:
                 return
 
-            # Login REST IG per sessione
             url_session = "https://demo-api.ig.com/gateway/deal/session"
             h_session = {
                 "X-IG-API-KEY": api_key,
@@ -245,66 +251,72 @@ class HyperGoldM5Engine:
             if r_px.status_code == 200:
                 d = r_px.json()
                 raw_prices = d.get("prices", [])
-                with self.lock:
-                    loaded_candles = []
-                    for p in raw_prices:
-                        try:
-                            st_time_utc = p.get("snapshotTimeUTC")
-                            st_time = p.get("snapshotTime", "")
-                            if st_time_utc:
-                                try:
-                                    dt_u = datetime.datetime.fromisoformat(st_time_utc).replace(tzinfo=datetime.timezone.utc)
-                                except Exception:
-                                    dt_u = datetime.datetime.strptime(st_time_utc, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
-                                dt_it = dt_u.astimezone(TZ_ITALIA)
-                                t_str = dt_it.strftime("%H:%M:%S")
-                                boundary = int(dt_u.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
-                            else:
-                                dt_it = datetime.datetime.strptime(st_time, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
-                                t_str = dt_it.strftime("%H:%M:%S")
-                                boundary = int(dt_it.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
+                if raw_prices:
+                    print(f"✅ [HYPER GOLD M5] Scaricate con successo {len(raw_prices)} barre storiche M5 tramite account autorizzato {user}.")
+            elif r_px.status_code == 403:
+                print(f"⚠️ [HYPER GOLD M5] Quota storica IG esaurita per account {user} (403).")
+        except Exception as e:
+            print(f"⚠️ [HYPER GOLD M5] Errore fetch barre: {e}")
 
-                            op = round((p["openPrice"]["bid"] + p["openPrice"]["ask"]) / 2.0, 2)
-                            hi = round((p["highPrice"]["bid"] + p["highPrice"]["ask"]) / 2.0, 2)
-                            lo = round((p["lowPrice"]["bid"] + p["lowPrice"]["ask"]) / 2.0, 2)
-                            cl = round((p["closePrice"]["bid"] + p["closePrice"]["ask"]) / 2.0, 2)
-                            loaded_candles.append({
-                                "boundary": boundary,
-                                "time": t_str,
-                                "open": op,
-                                "high": hi,
-                                "low": lo,
-                                "close": cl
-                            })
-                        except Exception:
-                            pass
-
-                    if loaded_candles:
-                        self.candles = loaded_candles[-500:]
-                        self._recalculate_indicators()
-                        self.save_state()
-
-                        # Salva centralmente per condividere con tutti gli altri account
-                        try:
-                            with open(central_file, "w", encoding="utf-8") as f:
-                                json.dump(self.candles, f, indent=2)
-                        except Exception:
-                            pass
-
-                        # Sincronizza istantaneamente su FIORDOK_DEMO, DANY_DEMO, BONGIOLO_DEMO
-                        for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
+        if raw_prices:
+            with self.lock:
+                loaded_candles = []
+                for p in raw_prices:
+                    try:
+                        st_time_utc = p.get("snapshotTimeUTC")
+                        st_time = p.get("snapshotTime", "")
+                        if st_time_utc:
                             try:
-                                p_acc = os.path.join(acc, STATE_FILE)
-                                if os.path.exists(acc) and os.path.exists(p_acc):
-                                    with open(p_acc, "r", encoding="utf-8") as f_r:
-                                        d_acc = json.load(f_r)
-                                    d_acc["candles"] = self.candles
-                                    with open(p_acc, "w", encoding="utf-8") as f_w:
-                                        json.dump(d_acc, f_w, indent=2)
+                                dt_u = datetime.datetime.fromisoformat(st_time_utc).replace(tzinfo=datetime.timezone.utc)
                             except Exception:
-                                pass
-        except Exception:
-            pass
+                                dt_u = datetime.datetime.strptime(st_time_utc, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+                            dt_it = dt_u.astimezone(TZ_ITALIA)
+                            t_str = dt_it.strftime("%H:%M:%S")
+                            boundary = int(dt_u.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
+                        else:
+                            dt_it = datetime.datetime.strptime(st_time, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
+                            t_str = dt_it.strftime("%H:%M:%S")
+                            boundary = int(dt_it.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
+
+                        op = round((p["openPrice"]["bid"] + p["openPrice"]["ask"]) / 2.0, 2)
+                        hi = round((p["highPrice"]["bid"] + p["highPrice"]["ask"]) / 2.0, 2)
+                        lo = round((p["lowPrice"]["bid"] + p["lowPrice"]["ask"]) / 2.0, 2)
+                        cl = round((p["closePrice"]["bid"] + p["closePrice"]["ask"]) / 2.0, 2)
+                        loaded_candles.append({
+                            "boundary": boundary,
+                            "time": t_str,
+                            "open": op,
+                            "high": hi,
+                            "low": lo,
+                            "close": cl
+                        })
+                    except Exception:
+                        pass
+
+                if loaded_candles:
+                    self.candles = loaded_candles[-500:]
+                    self._recalculate_indicators()
+                    self.save_state()
+
+                    # Salva centralmente per condividere con tutti gli altri account
+                    try:
+                        with open(central_file, "w", encoding="utf-8") as f:
+                            json.dump(self.candles, f, indent=2)
+                    except Exception:
+                        pass
+
+                    # Sincronizza istantaneamente su FIORDOK_DEMO, DANY_DEMO, BONGIOLO_DEMO
+                    for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
+                        try:
+                            p_acc = os.path.join(acc, STATE_FILE)
+                            if os.path.exists(acc) and os.path.exists(p_acc):
+                                with open(p_acc, "r", encoding="utf-8") as f_r:
+                                    d_acc = json.load(f_r)
+                                d_acc["candles"] = self.candles
+                                with open(p_acc, "w", encoding="utf-8") as f_w:
+                                    json.dump(d_acc, f_w, indent=2)
+                        except Exception:
+                            pass
 
     def _recalculate_indicators(self):
         """Calcola KJ55 (Supporto & Resistenza Puro) in base allo storico candele M5 disponibile"""

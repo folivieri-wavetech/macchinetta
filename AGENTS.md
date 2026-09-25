@@ -59,3 +59,14 @@ Alla ricezione di questo comando, devo:
    - Regola 2: Se il token scade (401), si chiede solo all'utente.
    - Regola 3: Massima disciplina operativa senza congetture.
 3. **Eseguire subito `deploy\sincronizza.ps1`** senza fare ulteriori domande o commenti inutili.
+
+---
+
+## 🛑 6. Distinzione Chiamate API IG: Operatività vs Dati Storici
+- **OPERATIVITÀ A MERCATO (LIBERA):** Sei assolutamente libero e autorizzato a eseguire tutte le chiamate API necessarie per la normale operatività di trading: apertura/chiusura ordini a mercato, modifica stop loss, take profit, lettura posizioni aperte, streaming prezzi tick-by-tick.
+- **DATI STORICI E CANDELE (DIVIETO ASSOLUTO SENZA AUTORIZZAZIONE):** Non sei ASSOLUTAMENTE libero di fare chiamate REST a IG per scaricare dati storici, candele, prezzi passati (`/gateway/deal/prices`) o qualsiasi richiesta che consumi quota dati e rischi di mandare il conto in errore 403 (allowance overflow).
+- **PROCEDURA OBBLIGATORIA PER DATI STORICI:**
+  1. L'assistente chiede preventivamente l'autorizzazione all'utente ("Posso richiedere dati storici candele a IG?").
+  2. L'utente fa fare una verifica preventiva delle quote.
+  3. Solo dopo l'esplicita autorizzazione dell'utente si può procedere; **altrimenti si sta fermi**.
+- **UNICO CONTO AUTORIZZATO:** Quando autorizzato, l'unico ed esclusivo conto da utilizzare è **FIORDOK_DEMO** (MAI `DANY_DEMO` o altri conti). Nessun rischio di 403, poiché IG contatta direttamente l'utente via telefono.
