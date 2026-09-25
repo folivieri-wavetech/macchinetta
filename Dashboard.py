@@ -3388,6 +3388,12 @@ else:
                         trig_val_saved = dati_salvati.get("trigger_start_prezzo")
                         trig_default = f"{float(trig_val_saved):.{dec}f}" if (trig_val_saved is not None and trig_val_saved != "" and float(trig_val_saved) > 0) else ""
 
+                        # Placeholder dinamico: SELL STOP se Prezzo > KJ, BUY STOP se Prezzo < KJ
+                        if current_kj is not None and px_live is not None:
+                            trig_placeholder = "SELL STOP" if px_live > current_kj else ("BUY STOP" if px_live < current_kj else "BUY/SELL STOP")
+                        else:
+                            trig_placeholder = "BUY/SELL STOP"
+
                         c_r1, c_r2, c_r3 = st.columns([1, 1, 1.2])
                         with c_r1:
                             tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
@@ -3397,7 +3403,7 @@ else:
                         with c_r2:
                             st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, format="%d", key=f"sz_{conto_selezionato}_{nome}")
                         with c_r3:
-                            trig_input_str = st.text_input("Prezzo Trigger", value=trig_default, placeholder="Vuoto = Subito", key=f"trig_px_{conto_selezionato}_{nome}", help="Prezzo per Buy/Sell stop virtuale a chiusura candela. Vuoto = ingresso a mercato immediato.")
+                            trig_input_str = st.text_input("Prezzo Trigger", value=trig_default, placeholder=trig_placeholder, key=f"trig_px_{conto_selezionato}_{nome}", help="Prezzo per stop virtuale a chiusura candela. Vuoto = ingresso a mercato immediato.")
 
                         # Parsing dinamico input trigger
                         trig_input_clean = str(trig_input_str or "").strip().replace(",", ".")
@@ -3472,10 +3478,11 @@ else:
                                 tr_tf_raw = dati_salvati.get("trigger_start_tf", tf_val)
                                 tr_tf_lbl = tf_map.get(tr_tf_raw, "H1")
                                 comp_sym = "&gt;=" if tr_d_att == "LONG" else "&lt;="
+                                filtro_h1_str = " (Filtro H1: 5 &lt; Dist KJ &lt; 25 pip)" if tr_tf_lbl == "H1" else ""
                                 st.markdown(
                                     f"<div style='background: rgba(234, 179, 8, 0.12); border: 1px solid #eab308; border-radius: 6px; padding: 10px; margin-bottom: 8px;'>"
                                     f"<b style='color: #fde047;'>🎯 TRIGGER PROGRAMMATO ATTIVO ({tr_d_att} {tr_tf_lbl})</b><br>"
-                                    f"<span style='font-size: 0.85rem; color: #fef08a;'>In attesa di chiusura candela {tr_tf_lbl}: <b>Close {comp_sym} {tr_p_att:.{dec}f}</b> e rispetto Kijun.</span>"
+                                    f"<span style='font-size: 0.85rem; color: #fef08a;'>In attesa di chiusura candela {tr_tf_lbl}: <b>Close {comp_sym} {tr_p_att:.{dec}f}</b> e rispetto Kijun{filtro_h1_str}.</span>"
                                     f"</div>",
                                     unsafe_allow_html=True
                                 )
@@ -3500,7 +3507,8 @@ else:
                                 st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
                             elif current_kj is not None and px_live is not None:
                                 if has_trigger_input:
-                                    st.markdown(f"<div style='font-size: 0.82rem; color: #38bdf8; margin-bottom: 6px; white-space: nowrap;'>🎯 <b>Trigger virtuale pronto a {trig_px_val:.{dec}f} (valutato a chiusura candela {tf_badge})</b></div>", unsafe_allow_html=True)
+                                    filtro_info_h1 = " (su H1: 5 &lt; Dist KJ &lt; 25 pip)" if tf_badge == "H1" else ""
+                                    st.markdown(f"<div style='font-size: 0.82rem; color: #38bdf8; margin-bottom: 6px; white-space: nowrap;'>🎯 <b>Trigger virtuale pronto a {trig_px_val:.{dec}f} (chiusura candela {tf_badge}{filtro_info_h1})</b></div>", unsafe_allow_html=True)
                                 elif is_kj_short_bloccato:
                                     st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 6px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) &gt; Kijun ({current_kj:.{dec}f}): Direzione LONG</b></div>", unsafe_allow_html=True)
                                 elif is_kj_long_bloccato:
@@ -3512,12 +3520,13 @@ else:
                                     if is_hyper_exclusive:
                                         help_l = "Operatività disabilitata: strumento riservato ad HYPER."
                                         dis_l = True
+                                    elif has_trigger_input:
+                                        h1_extra_l = " e 5 < Distanza KJ < 25 pip" if tf_badge == "H1" else ""
+                                        help_l = f"Programma ingresso LONG a chiusura candela {tf_badge} quando Close >= {trig_px_val:.{dec}f}, Close >= Kijun{h1_extra_l}"
+                                        dis_l = False
                                     elif is_wkd:
                                         help_l = "Bloccato durante il Weekend (mercati chiusi)"
                                         dis_l = True
-                                    elif has_trigger_input:
-                                        help_l = f"Programma ingresso LONG a chiusura candela {tf_badge} quando Close >= {trig_px_val:.{dec}f} e Close >= Kijun"
-                                        dis_l = False
                                     elif is_roll:
                                         help_l = "Avvio disabilitato fino alle 00:15."
                                         dis_l = True
@@ -3533,14 +3542,11 @@ else:
                                         if is_hyper_exclusive:
                                             st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                             st.rerun()
-                                        if is_wkd:
-                                            st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
-                                            st.rerun()
                                         
                                         tf_sel = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
                                         tf_lbl_sel = tf_map.get(tf_sel, "H1")
                                         if has_trigger_input:
-                                            # Salva TRIGGER CONDIZIONALE
+                                            # Salva TRIGGER CONDIZIONALE (consentito anche in rollover e weekend)
                                             st.session_state[err_key] = ""
                                             ora_n = now_it().strftime("%d/%m %H:%M:%S")
                                             memoria_attuale[nome] = {
@@ -3573,6 +3579,9 @@ else:
                                             st.rerun()
                                         else:
                                             # Avvio standard immediato
+                                            if is_wkd:
+                                                st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
+                                                st.rerun()
                                             if is_roll:
                                                 st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
                                                 st.rerun()
@@ -3613,12 +3622,13 @@ else:
                                     if is_hyper_exclusive:
                                         help_s = "Operatività disabilitata: strumento riservato ad HYPER."
                                         dis_s = True
+                                    elif has_trigger_input:
+                                        h1_extra_s = " e 5 < Distanza KJ < 25 pip" if tf_badge == "H1" else ""
+                                        help_s = f"Programma ingresso SHORT a chiusura candela {tf_badge} quando Close <= {trig_px_val:.{dec}f}, Close <= Kijun{h1_extra_s}"
+                                        dis_s = False
                                     elif is_wkd:
                                         help_s = "Bloccato durante il Weekend (mercati chiusi)"
                                         dis_s = True
-                                    elif has_trigger_input:
-                                        help_s = f"Programma ingresso SHORT a chiusura candela {tf_badge} quando Close <= {trig_px_val:.{dec}f} e Close <= Kijun"
-                                        dis_s = False
                                     elif is_roll:
                                         help_s = "Avvio disabilitato fino alle 00:15."
                                         dis_s = True
@@ -3634,14 +3644,11 @@ else:
                                         if is_hyper_exclusive:
                                             st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                             st.rerun()
-                                        if is_wkd:
-                                            st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
-                                            st.rerun()
                                         
                                         tf_sel = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
                                         tf_lbl_sel = tf_map.get(tf_sel, "H1")
                                         if has_trigger_input:
-                                            # Salva TRIGGER CONDIZIONALE
+                                            # Salva TRIGGER CONDIZIONALE (consentito anche in rollover e weekend)
                                             st.session_state[err_key] = ""
                                             ora_n = now_it().strftime("%d/%m %H:%M:%S")
                                             memoria_attuale[nome] = {
@@ -3674,6 +3681,9 @@ else:
                                             st.rerun()
                                         else:
                                             # Avvio standard immediato
+                                            if is_wkd:
+                                                st.session_state[err_key] = "🛑 BLOCCATO: Impossibile avviare durante il Weekend (mercati chiusi). Riprova domenica dopo le 23:00."
+                                                st.rerun()
                                             if is_roll:
                                                 st.session_state[err_key] = "🛑 Avvio disabilitato fino alle 00:15."
                                                 st.rerun()

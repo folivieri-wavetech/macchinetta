@@ -2707,22 +2707,38 @@ def esegui_ciclo_trend():
                 
                 cond_soddisfatta = False
                 if closed_close > 0 and trig_px > 0:
+                    mult = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                    dist_kj_pip = abs(closed_close - kj_val) / mult if (kj_val is not None and mult) else 0.0
+                    
+                    # Filtro distanza Kijun su H1: per dare lo start la distanza da KJ deve essere > 5 pip e < 25 pip
+                    dist_h1_ok = True
+                    motivo_blocco_dist = ""
+                    if tf == "HOUR" and kj_val is not None:
+                        if dist_kj_pip <= 5.0:
+                            dist_h1_ok = False
+                            motivo_blocco_dist = f"distanza da KJ insufficiente ({dist_kj_pip:.1f}p <= 5p)"
+                        elif dist_kj_pip >= 25.0:
+                            dist_h1_ok = False
+                            motivo_blocco_dist = f"candela troppo estesa da KJ ({dist_kj_pip:.1f}p >= 25p)"
+
                     if trig_dir == "SHORT":
-                        # SHORT: candela chiusa <= trigger AND candela chiusa <= Kijun
+                        # SHORT: candela chiusa <= trigger AND candela chiusa <= Kijun AND filtro distanza H1 (5-25 pip)
                         kj_ok = (kj_val is None or closed_close <= kj_val)
-                        if closed_close <= trig_px and kj_ok:
+                        if closed_close <= trig_px and kj_ok and dist_h1_ok:
                             cond_soddisfatta = True
                         else:
                             kj_txt = f"{kj_val:.{dec}f}" if kj_val is not None else "-"
-                            print_log(nome, f"⏳ Trigger SHORT in attesa {format_tf_label(tf)}: Candela chiusa a {closed_close:.{dec}f} (Trigger: {trig_px:.{dec}f}, KJ: {kj_txt}).")
+                            blocco_txt = f" [{motivo_blocco_dist}]" if motivo_blocco_dist else ""
+                            print_log(nome, f"⏳ Trigger SHORT in attesa {format_tf_label(tf)}: Candela chiusa a {closed_close:.{dec}f} (Trigger: {trig_px:.{dec}f}, KJ: {kj_txt}, Dist: {dist_kj_pip:.1f}p){blocco_txt}.")
                     elif trig_dir == "LONG":
-                        # LONG: candela chiusa >= trigger AND candela chiusa >= Kijun
+                        # LONG: candela chiusa >= trigger AND candela chiusa >= Kijun AND filtro distanza H1 (5-25 pip)
                         kj_ok = (kj_val is None or closed_close >= kj_val)
-                        if closed_close >= trig_px and kj_ok:
+                        if closed_close >= trig_px and kj_ok and dist_h1_ok:
                             cond_soddisfatta = True
                         else:
                             kj_txt = f"{kj_val:.{dec}f}" if kj_val is not None else "-"
-                            print_log(nome, f"⏳ Trigger LONG in attesa {format_tf_label(tf)}: Candela chiusa a {closed_close:.{dec}f} (Trigger: {trig_px:.{dec}f}, KJ: {kj_txt}).")
+                            blocco_txt = f" [{motivo_blocco_dist}]" if motivo_blocco_dist else ""
+                            print_log(nome, f"⏳ Trigger LONG in attesa {format_tf_label(tf)}: Candela chiusa a {closed_close:.{dec}f} (Trigger: {trig_px:.{dec}f}, KJ: {kj_txt}, Dist: {dist_kj_pip:.1f}p){blocco_txt}.")
                 
                 if cond_soddisfatta:
                     print_log(nome, f"🎯 CONDIZIONE TRIGGER SODDISFATTA! Avvio ordine Core {trig_dir} a mercato...")
