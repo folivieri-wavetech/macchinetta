@@ -84,6 +84,24 @@ def is_us500_trading_suspended(dt: datetime.datetime = None) -> bool:
     t_end = datetime.time(0, 15, 0)
     return t >= t_start or t < t_end
 
+def is_us500_rollover_window(dt: datetime.datetime = None) -> bool:
+    """Restituisce True SOLO nella finestra operativa utile di chiusura anticipata a FLAT (22:44:00 - 22:44:55),
+    sia il venerdì prima del freeze del weekend sia nelle notti feriali Lun-Gio prima del rollover.
+    Evita di inviare ordini a mercati chiusi durante il weekend o dopo le 22:45."""
+    if dt is None:
+        dt = now_it()
+    wd = dt.weekday()
+    t = dt.time()
+    t_start = datetime.time(22, 44, 0)
+    t_end = datetime.time(22, 44, 55)
+    # Venerdì sera: 22:44:00 - 22:44:55
+    if wd == 4 and t_start <= t <= t_end:
+        return True
+    # Lun-Gio notte: 22:44:00 - 22:44:55
+    if wd in (0, 1, 2, 3) and t_start <= t <= t_end:
+        return True
+    return False
+
 def is_us500_entry_suspended(dt: datetime.datetime = None) -> bool:
     """Restituisce True se l'apertura di nuove posizioni US500 (Core e Incrementi M5) è sospesa:
     1. Venerdì sera dalle 22:14:00 in poi e per tutto il weekend fino alla riapertura domenicale,
@@ -177,6 +195,10 @@ class HyperUS500M5Engine:
         # 3. Avvia thread di streaming Lightstreamer in background
         self.stream_thread = threading.Thread(target=self._run_streaming_loop, daemon=True)
         self.stream_thread.start()
+
+        # 4. Avvia watchdog indipendente per chiusura proattiva rollover / pre-weekend alle 22:44 (non dipende da Lightstreamer)
+        self.watchdog_thread = threading.Thread(target=self._run_rollover_watchdog, daemon=True)
+        self.watchdog_thread.start()
 
     def _get_ig_credentials(self):
         user, pwd, api_key = None, None, None
@@ -424,6 +446,23 @@ class HyperUS500M5Engine:
                     self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura immediata di tutte le posizioni a FLAT")
             self.save_state()
 
+    def _run_rollover_watchdog(self):
+        """Watchdog temporale indipendente: garantisce la chiusura automatica a FLAT
+        nella finestra utile (22:44:00 - 22:44:55) prima del freeze del feed e del weekend,
+        anche in assenza di tick live da Lightstreamer."""
+        while self.running:
+            try:
+                time.sleep(2)
+                if is_us500_rollover_window():
+                    with self.lock:
+                        has_pos = (self.position is not None or len(self.increments) > 0)
+                        mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                    if has_pos and not getattr(self, "closing_in_progress", False):
+                        t_str = now_it().strftime("%H:%M:%S")
+                        self._close_all_to_flat(mid_px, t_str, reason="Pausa / Weekend US500 ➔ Chiusura automatica anticipata di sicurezza a FLAT")
+            except Exception as e:
+                logger.error(f"Errore watchdog rollover US500: {e}")
+
     def _run_streaming_loop(self):
         while self.running:
             try:
@@ -486,11 +525,11 @@ class HyperUS500M5Engine:
 
                 while self.running and self.ls_connected:
                     time.sleep(2)
-                    if is_us500_market_suspended():
+                    if is_us500_rollover_window():
                         with self.lock:
                             has_pos = (self.position is not None or len(self.increments) > 0)
                             mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                        if has_pos:
+                        if has_pos and not getattr(self, "closing_in_progress", False):
                             t_str = now_it().strftime("%H:%M:%S")
                             self._close_all_to_flat(mid_px, t_str, reason="Pausa / Weekend US500 ➔ Chiusura automatica anticipata di sicurezza a FLAT")
                     if self.last_tick_time and (time.time() - self.last_tick_time) > 40:
@@ -731,45 +770,51 @@ class HyperUS500M5Engine:
                     label="Chiusura Flat US500 Core",
                     reason_note=reason
                 )
-                profit = float(res.get("profit") or 0.0)
-                close_px = float(res.get("close_level") or exec_price)
-                with self.lock:
-                    self.balance += profit
-                    order_mgr.record_closed_trade(
-                        tf="5M",
-                        direction=pos_to_close["direction"],
-                        contracts=pos_to_close["contracts"],
-                        open_price=pos_to_close["open_price"],
-                        close_price=close_px,
-                        pnl_eur=profit,
-                        deal_id=deal_id,
-                        reason=reason,
-                        time_open=pos_to_close.get("open_time", time_str),
-                        label="Core US500 M5"
-                    )
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": f"🏁 CLOSE REAL IG US500 {pos_to_close['direction']} ({profit:+.2f} €)",
-                        "open_price": pos_to_close["open_price"],
-                        "close_price": close_px,
-                        "contracts": pos_to_close["contracts"],
-                        "pnl": profit,
-                        "balance": round(self.balance, 2),
-                        "reason": reason
-                    })
-                is_ts = "Trailing" in reason or "TS" in reason
-                is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
-                if is_ts:
-                    tag_cl = "dart"
-                    tit_cl = "🎯 TS HIT 5M: US 500 Cash"
-                elif is_rev:
-                    tag_cl = "warning"
-                    tit_cl = "🛑 REVERSAL 5M: US 500 Cash"
+                if not res.get("success") and not res.get("already_closed"):
+                    logger.warning(f"❌ Chiusura Core US500 {deal_id} non riuscita su IG ({res.get('reason')}). Posizione mantenuta attiva.")
+                    with self.lock:
+                        self.position = pos_to_close
+                        self.save_state()
                 else:
-                    tag_cl = "octagonal_sign"
-                    tit_cl = "🛑 CHIUSURA FLAT 5M: US 500 Cash"
-                msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
-                order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
+                    profit = float(res.get("profit") or 0.0)
+                    close_px = float(res.get("close_level") or exec_price)
+                    with self.lock:
+                        self.balance += profit
+                        order_mgr.record_closed_trade(
+                            tf="5M",
+                            direction=pos_to_close["direction"],
+                            contracts=pos_to_close["contracts"],
+                            open_price=pos_to_close["open_price"],
+                            close_price=close_px,
+                            pnl_eur=profit,
+                            deal_id=deal_id,
+                            reason=reason,
+                            time_open=pos_to_close.get("open_time", time_str),
+                            label="Core US500 M5"
+                        )
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"🏁 CLOSE REAL IG US500 {pos_to_close['direction']} ({profit:+.2f} €)",
+                            "open_price": pos_to_close["open_price"],
+                            "close_price": close_px,
+                            "contracts": pos_to_close["contracts"],
+                            "pnl": profit,
+                            "balance": round(self.balance, 2),
+                            "reason": reason
+                        })
+                    is_ts = "Trailing" in reason or "TS" in reason
+                    is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                    if is_ts:
+                        tag_cl = "dart"
+                        tit_cl = "🎯 TS HIT 5M: US 500 Cash"
+                    elif is_rev:
+                        tag_cl = "warning"
+                        tit_cl = "🛑 REVERSAL 5M: US 500 Cash"
+                    else:
+                        tag_cl = "octagonal_sign"
+                        tit_cl = "🛑 CHIUSURA FLAT 5M: US 500 Cash"
+                    msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
+                    order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
 
             for inc in incs_to_close:
                 if inc.get("deal_id"):
@@ -780,6 +825,12 @@ class HyperUS500M5Engine:
                         label="Chiusura Flat Residuo US500 M5",
                         reason_note=reason
                     )
+                    if not res_i.get("success") and not res_i.get("already_closed"):
+                        logger.warning(f"❌ Chiusura Inc US500 {inc.get('deal_id')} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                        with self.lock:
+                            self.increments.append(inc)
+                            self.save_state()
+                        continue
                     prof_i = float(res_i.get("profit") or 0.0)
                     close_i = float(res_i.get("close_level") or exec_price)
                     with self.lock:
@@ -794,11 +845,11 @@ class HyperUS500M5Engine:
                             deal_id=inc["deal_id"],
                             reason=reason,
                             time_open=inc.get("open_time", time_str),
-                            label="Incremento US500 M5"
+                            label="Inc US500 M5"
                         )
                         self.trades.insert(0, {
                             "time": time_str,
-                            "action": f"🏁 CLOSE REAL INC US500 {inc['direction']} ({prof_i:+.2f} €)",
+                            "action": f"🎯 CLOSE INC US500 {inc['direction']} ({prof_i:+.2f} €)",
                             "open_price": inc["open_price"],
                             "close_price": close_i,
                             "contracts": inc["contracts"],
@@ -912,12 +963,11 @@ class HyperUS500M5Engine:
             self.live_mid = mid
             self.live_time_str = time_str
 
-            market_suspended = is_us500_market_suspended()
-
-            if market_suspended:
+            # Verifica finestra utile di chiusura rollover/pre-weekend US500 (22:44:00 - 22:44:55)
+            if is_us500_rollover_window():
                 if self.position or self.increments:
                     self._close_all_to_flat(mid, time_str, reason="Pausa / Weekend US500 ➔ Chiusura automatica anticipata di sicurezza a FLAT")
-            else:
+            elif not is_us500_market_suspended():
                 if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
                     self._check_core_trailing_stop(mid, time_str)
 

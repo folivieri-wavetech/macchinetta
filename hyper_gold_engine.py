@@ -56,21 +56,59 @@ GOLD_TRADE_SUSPEND_END_HOUR = 0
 GOLD_TRADE_SUSPEND_END_MIN = 15
 
 def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True SOLO durante la chiusura reale del feed dati Gold (22:45 - 00:00).
-    Dalle 00:00 il feed riapre: Lightstreamer si connette per aggiornare le candele e ricalcolare la KJ55."""
+    """Restituisce True durante la chiusura reale del feed dati Gold (nessun tick disponibile):
+    - Weekend: da venerdì sera ore 22:45 fino alla domenica sera ore 21:58.
+    - Notturno feriale (Lun-Gio): dalle 22:45 alle 23:59:59 (dalle 00:00 il feed riapre per candele M5)."""
     if dt is None:
         dt = now_it()
+    wd = dt.weekday()
     t = dt.time()
-    t_start = datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0)
-    return t >= t_start
+    # Weekend: da venerdì 22:45 a domenica 21:58
+    if wd == 4 and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    # Notturno feriale Lun-Gio (22:45 - 23:59:59)
+    if wd in (0, 1, 2, 3) and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
+        return True
+    return False
+
+def is_gold_rollover_window(dt: datetime.datetime = None) -> bool:
+    """Restituisce True SOLO nella finestra operativa utile di chiusura anticipata a FLAT (22:44:00 - 22:44:55),
+    sia il venerdì prima del freeze del weekend sia nelle notti feriali Lun-Gio prima del rollover.
+    Evita di inviare ordini a mercati chiusi durante il weekend o dopo le 22:45."""
+    if dt is None:
+        dt = now_it()
+    wd = dt.weekday()
+    t = dt.time()
+    t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0) # 22:44:00
+    t_end = datetime.time(22, 44, 55)
+    # Venerdì sera: 22:44:00 - 22:44:55
+    if wd == 4 and t_start <= t <= t_end:
+        return True
+    # Lun-Gio notte: 22:44:00 - 22:44:55
+    if wd in (0, 1, 2, 3) and t_start <= t <= t_end:
+        return True
+    return False
 
 def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True se l'operatività/apertura ordini è congelata (dalle 22:44 alle 00:15).
-    Alle 22:44 le posizioni vengono chiuse a FLAT automaticamente prima della chiusura del feed delle 22:45.
-    Dalle 00:00 alle 00:15 le candele si aggiornano e KJ55 viene calcolata, ma non si aprono ordini."""
+    """Restituisce True se l'operatività/apertura ordini è congelata a FLAT:
+    - Notte feriale per rollover (22:44 - 00:15)
+    - Weekend: dal venerdì sera alle 22:44 fino alla domenica sera alle 21:58."""
     if dt is None:
         dt = now_it()
+    wd = dt.weekday()
     t = dt.time()
+    # Weekend: venerdì sera dalle 22:44 fino alla domenica sera alle 21:58
+    if wd == 4 and t >= datetime.time(22, 44, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    # Rollover infrasettimanale (Lun-Gio notte)
     t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0)
     t_end = datetime.time(GOLD_TRADE_SUSPEND_END_HOUR, GOLD_TRADE_SUSPEND_END_MIN, 0)
     return t >= t_start or t < t_end

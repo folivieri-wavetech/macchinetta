@@ -67,19 +67,47 @@ GOLD_TRADE_SUSPEND_END_HOUR = 0
 GOLD_TRADE_SUSPEND_END_MIN = 15
 
 def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True SOLO durante la chiusura reale del feed dati Gold (22:45 - 00:00).
-    Dalle 00:00 il feed riapre: Lightstreamer si connette per aggiornare le candele e ricalcolare KJ55 e TK144."""
+    """Restituisce True durante la chiusura reale del feed dati Gold (nessun tick disponibile):
+    - Weekend: da venerdì sera ore 22:45 fino alla domenica sera ore 21:58.
+    - Notturno feriale (Lun-Gio): dalle 22:45 alle 23:59:59 (dalle 00:00 il feed riapre per candele M5)."""
     if dt is None:
         dt = now_it()
+    wd = dt.weekday()
     t = dt.time()
-    t_start = datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0)
-    return t >= t_start
+    # Weekend: da venerdì 22:45 a domenica 21:58
+    if wd == 4 and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
+        return True
+    if wd == 5:
+        return True
+    if wd == 6 and t < datetime.time(21, 58, 0):
+        return True
+    # Notturno feriale Lun-Gio (22:45 - 23:59:59)
+    if wd in (0, 1, 2, 3) and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
+        return True
+    return False
+
+def is_gold_rollover_window(dt: datetime.datetime = None) -> bool:
+    """Restituisce True SOLO nella finestra operativa utile di chiusura anticipata a FLAT (22:44:00 - 22:44:55),
+    sia il venerdì prima del freeze del weekend sia nelle notti feriali Lun-Gio prima del rollover.
+    Evita di inviare ordini a mercati chiusi durante il weekend o dopo le 22:45."""
+    if dt is None:
+        dt = now_it()
+    wd = dt.weekday()
+    t = dt.time()
+    t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0) # 22:44:00
+    t_end = datetime.time(22, 44, 55)
+    # Venerdì sera: 22:44:00 - 22:44:55
+    if wd == 4 and t_start <= t <= t_end:
+        return True
+    # Lun-Gio notte: 22:44:00 - 22:44:55
+    if wd in (0, 1, 2, 3) and t_start <= t <= t_end:
+        return True
+    return False
 
 def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
     """Restituisce True se l'operatività/apertura ordini è congelata a FLAT:
     - Notte feriale per rollover (22:44 - 00:15)
-    - Weekend: dal venerdì sera alle 22:44 fino alla domenica sera alle 21:58.
-    Alle 22:44 le posizioni vengono chiuse a FLAT automaticamente prima della chiusura del feed delle 22:45."""
+    - Weekend: dal venerdì sera alle 22:44 fino alla domenica sera alle 21:58."""
     if dt is None:
         dt = now_it()
     wd = dt.weekday()
@@ -195,6 +223,10 @@ class HyperGoldM5Engine:
         # 3. Avvia thread di streaming Lightstreamer in background
         self.stream_thread = threading.Thread(target=self._run_streaming_loop, daemon=True)
         self.stream_thread.start()
+
+        # 4. Avvia watchdog indipendente per chiusura proattiva rollover / pre-weekend alle 22:44 (non dipende da Lightstreamer)
+        self.watchdog_thread = threading.Thread(target=self._run_rollover_watchdog, daemon=True)
+        self.watchdog_thread.start()
 
     def _get_ig_credentials(self):
         user, pwd, api_key = None, None, None
@@ -480,6 +512,23 @@ class HyperGoldM5Engine:
                     self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura immediata di tutte le posizioni a FLAT")
             self.save_state()
 
+    def _run_rollover_watchdog(self):
+        """Watchdog temporale indipendente: garantisce la chiusura automatica a FLAT
+        nella finestra utile (22:44:00 - 22:44:55) prima del freeze del feed e del weekend,
+        anche in assenza di tick live da Lightstreamer."""
+        while self.running:
+            try:
+                time.sleep(2)
+                if is_gold_rollover_window():
+                    with self.lock:
+                        has_pos = (self.position is not None or len(self.increments) > 0)
+                        mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                    if has_pos and not getattr(self, "closing_in_progress", False):
+                        t_str = now_it().strftime("%H:%M:%S")
+                        self._close_all_to_flat(mid_px, t_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
+            except Exception as e:
+                logger.error(f"Errore watchdog rollover Gold: {e}")
+
     def _run_streaming_loop(self):
         while self.running:
             try:
@@ -545,12 +594,12 @@ class HyperGoldM5Engine:
 
                 while self.running and self.ls_connected:
                     time.sleep(2)
-                    # Controllo proattivo chiusura Rollover alle 22:44 (1 min prima del freeze del feed)
-                    if is_gold_market_suspended():
+                    # Controllo proattivo chiusura Rollover solo nella finestra utile (22:44:00 - 22:44:55)
+                    if is_gold_rollover_window():
                         with self.lock:
                             has_pos = (self.position is not None or len(self.increments) > 0)
                             mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                        if has_pos:
+                        if has_pos and not getattr(self, "closing_in_progress", False):
                             t_str = now_it().strftime("%H:%M:%S")
                             self._close_all_to_flat(mid_px, t_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
                     if self.last_tick_time and (time.time() - self.last_tick_time) > 40:
@@ -853,45 +902,51 @@ class HyperGoldM5Engine:
                     label="Chiusura Core Spot Gold M5 Flat",
                     reason_note=reason
                 )
-                prof_c = float(res_c.get("profit") or 0.0)
-                cl_c = float(res_c.get("close_level") or exec_price)
-                order_mgr.record_closed_trade(
-                    tf="5M",
-                    direction=pos_to_close["direction"],
-                    contracts=pos_to_close["contracts"],
-                    open_price=pos_to_close["open_price"],
-                    close_price=cl_c,
-                    pnl_eur=prof_c,
-                    deal_id=deal_c,
-                    reason=reason,
-                    time_open=pos_to_close.get("open_time", time_str),
-                    label="Core M5"
-                )
-                with self.lock:
-                    self.balance += prof_c
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": f"CLOSE CORE M5 {pos_to_close['direction']} ({prof_c:+.2f} €)",
-                        "open_price": pos_to_close["open_price"],
-                        "close_price": cl_c,
-                        "contracts": pos_to_close["contracts"],
-                        "pnl": prof_c,
-                        "balance": round(self.balance, 2),
-                        "reason": reason
-                    })
-                is_ts = "Trailing" in reason or "TS" in reason
-                is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
-                if is_ts:
-                    tag_cl = "dart"
-                    tit_cl = "🎯 TS HIT 5M: Spot Gold"
-                elif is_rev:
-                    tag_cl = "warning"
-                    tit_cl = "🛑 REVERSAL 5M: Spot Gold"
+                if not res_c.get("success") and not res_c.get("already_closed"):
+                    logger.warning(f"❌ Chiusura Core {deal_c} non riuscita su IG ({res_c.get('reason')}). Posizione mantenuta attiva.")
+                    with self.lock:
+                        self.position = pos_to_close
+                        self.save_state()
                 else:
-                    tag_cl = "octagonal_sign"
-                    tit_cl = "🛑 CHIUSURA FLAT 5M: Spot Gold"
-                msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
-                order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
+                    prof_c = float(res_c.get("profit") or 0.0)
+                    cl_c = float(res_c.get("close_level") or exec_price)
+                    order_mgr.record_closed_trade(
+                        tf="5M",
+                        direction=pos_to_close["direction"],
+                        contracts=pos_to_close["contracts"],
+                        open_price=pos_to_close["open_price"],
+                        close_price=cl_c,
+                        pnl_eur=prof_c,
+                        deal_id=deal_c,
+                        reason=reason,
+                        time_open=pos_to_close.get("open_time", time_str),
+                        label="Core M5"
+                    )
+                    with self.lock:
+                        self.balance += prof_c
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"CLOSE CORE M5 {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                            "open_price": pos_to_close["open_price"],
+                            "close_price": cl_c,
+                            "contracts": pos_to_close["contracts"],
+                            "pnl": prof_c,
+                            "balance": round(self.balance, 2),
+                            "reason": reason
+                        })
+                    is_ts = "Trailing" in reason or "TS" in reason
+                    is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                    if is_ts:
+                        tag_cl = "dart"
+                        tit_cl = "🎯 TS HIT 5M: Spot Gold"
+                    elif is_rev:
+                        tag_cl = "warning"
+                        tit_cl = "🛑 REVERSAL 5M: Spot Gold"
+                    else:
+                        tag_cl = "octagonal_sign"
+                        tit_cl = "🛑 CHIUSURA FLAT 5M: Spot Gold"
+                    msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
+                    order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
                 # Pausa prima degli incrementi
                 time.sleep(1.5)
 
@@ -906,6 +961,12 @@ class HyperGoldM5Engine:
                         label="Chiusura Inc Spot Gold M5 Flat",
                         reason_note=reason
                     )
+                    if not res_i.get("success") and not res_i.get("already_closed"):
+                        logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                        with self.lock:
+                            self.increments.append(inc)
+                            self.save_state()
+                        continue
                     prof_i = float(res_i.get("profit") or 0.0)
                     cl_i = float(res_i.get("close_level") or exec_price)
                     order_mgr.record_closed_trade(
@@ -1125,14 +1186,11 @@ class HyperGoldM5Engine:
             self.live_mid = mid
             self.live_time_str = time_str
 
-            # Verifica sospensione notturna / rollover Gold (22:44 - 00:15)
-            market_suspended = is_gold_market_suspended()
-
-            if market_suspended:
-                # Se è scattata l'ora di sospensione (22:44) con posizioni ancora aperte, le chiudiamo a FLAT di sicurezza
+            # Verifica finestra utile di chiusura rollover/pre-weekend Gold (22:44:00 - 22:44:55)
+            if is_gold_rollover_window():
                 if self.position or self.increments:
                     self._close_all_to_flat(mid, time_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
-            else:
+            elif not is_gold_market_suspended():
                 # 1. Verifica Trailing Stop per la Core (Attivo di default: Trigger +10p, Lock +6p, Step 2p)
                 if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
                     self._check_core_trailing_stop(mid, time_str)
