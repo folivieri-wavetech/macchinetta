@@ -5941,27 +5941,27 @@ else:
                         marg_html = f"<span style='color: #d1d4dc;'>{formatta_eur(marg_val)} €</span>"
                         
                         righe_tabella.append(f"""
-                        <tr style='border-bottom: 1px solid rgba(255,255,255,0.05);'>
-                            <td style='padding: 8px 12px; text-align: center; color: #fff; font-weight: 500;'>{d_str}</td>
-                            <td style='padding: 8px 12px; text-align: center;'>{cap_html}</td>
-                            <td style='padding: 8px 12px; text-align: center;'>{diff_html}</td>
-                            <td style='padding: 8px 12px; text-align: center;'>{rend_html}</td>
-                            <td style='padding: 8px 12px; text-align: center;'>{marg_html}</td>
-                            <td style='padding: 8px 12px; text-align: center;'>{dd_html}</td>
+                        <tr style='border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.78rem;'>
+                            <td style='padding: 6px 10px; text-align: center; color: #fff; font-weight: 500;'>{d_str}</td>
+                            <td style='padding: 6px 10px; text-align: center;'>{cap_html}</td>
+                            <td style='padding: 6px 10px; text-align: center;'>{diff_html}</td>
+                            <td style='padding: 6px 10px; text-align: center;'>{rend_html}</td>
+                            <td style='padding: 6px 10px; text-align: center;'>{marg_html}</td>
+                            <td style='padding: 6px 10px; text-align: center;'>{dd_html}</td>
                         </tr>
                         """)
                         
                     tabella_report_html = f"""
                     <div class='table-responsive'>
-                    <table style='width: 90%; max-width: 950px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 0.86rem; background-color: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.25);'>
+                    <table style='width: 90%; max-width: 950px; margin: 0 auto; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 0.78rem; background-color: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.25);'>
                         <thead>
-                            <tr style='background-color: rgba(0,255,204,0.08); border-bottom: 1px solid rgba(0,255,204,0.25); color: #00FFCC; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.5px;'>
-                                <th style='padding: 10px 12px; text-align: center;'>📅 Data</th>
-                                <th style='padding: 10px 12px; text-align: center;'>💰 Capitale Totale</th>
-                                <th style='padding: 10px 12px; text-align: center;'>📊 DIFF.</th>
-                                <th style='padding: 10px 12px; text-align: center;'>📈 Rendimento (%)</th>
-                                <th style='padding: 10px 12px; text-align: center;'>🔒 Margine Utilizzato</th>
-                                <th style='padding: 10px 12px; text-align: center;'>📉 Drawdown</th>
+                            <tr style='background-color: rgba(0,255,204,0.08); border-bottom: 1px solid rgba(0,255,204,0.25); color: #00FFCC; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;'>
+                                <th style='padding: 8px 10px; text-align: center;'>📅 Data</th>
+                                <th style='padding: 8px 10px; text-align: center;'>💰 Capitale Totale</th>
+                                <th style='padding: 8px 10px; text-align: center;'>📊 DIFF.</th>
+                                <th style='padding: 8px 10px; text-align: center;'>📈 Rendimento (%)</th>
+                                <th style='padding: 8px 10px; text-align: center;'>🔒 Margine Utilizzato</th>
+                                <th style='padding: 8px 10px; text-align: center;'>📉 Drawdown</th>
                             </tr>
                         </thead>
                         <tbody>
