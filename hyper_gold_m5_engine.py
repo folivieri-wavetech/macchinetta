@@ -581,8 +581,8 @@ class HyperGoldM5Engine:
                             b = float(bid_s)
                             a = float(ask_s)
                             self._process_tick(b, a, t_str)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.error(f"Errore _process_tick Gold M5: {e}")
 
                 sub = LightstreamerSubscription(
                     mode="DISTINCT",
@@ -1252,6 +1252,7 @@ class HyperGoldM5Engine:
 
                 self.save_state()
 
+                market_suspended = is_gold_market_suspended()
                 # Strategia S&R Puro KJ55: solo se il mercato NON è sospeso
                 if self.trading_enabled and not market_suspended and self.kj55 is not None:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)

@@ -512,8 +512,8 @@ class HyperUS500M5Engine:
                             b = float(bid_s)
                             a = float(ask_s)
                             self._process_tick(b, a, t_str)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.error(f"Errore _process_tick US500 M5: {e}")
 
                 sub = LightstreamerSubscription(
                     mode="DISTINCT",
@@ -1018,6 +1018,7 @@ class HyperUS500M5Engine:
 
                 self.save_state()
 
+                market_suspended = is_us500_market_suspended()
                 if self.trading_enabled and not market_suspended and self.kj55 is not None:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 

@@ -3318,6 +3318,9 @@ else:
 
                 radar_data, _ = carica_radar_trend_dash(conto_selezionato)
 
+                def _cb_annulla_trigger(c_sel, n_strum):
+                    st.session_state[f"trig_px_{c_sel}_{n_strum}"] = ""
+
                 def crea_riquadro_trend(nome, def_body=10, def_size=None, def_size_max=None, def_scala=None):
                     with st.container(border=True):
                         is_oil = ("oil" in nome.lower() or "crude" in nome.lower())
@@ -3503,7 +3506,7 @@ else:
                                     f"</div>",
                                     unsafe_allow_html=True
                                 )
-                                if st.button(f"❌ ANNULLA TRIGGER {nome}", key=f"CAN_TRIG_{conto_selezionato}_{nome}", width="stretch"):
+                                if st.button(f"❌ ANNULLA TRIGGER {nome}", key=f"CAN_TRIG_{conto_selezionato}_{nome}", on_click=_cb_annulla_trigger, args=(conto_selezionato, nome), width="stretch"):
                                     memoria_attuale[nome] = {
                                         **dati_salvati,
                                         "trigger_start_attivo": False,
@@ -3515,7 +3518,6 @@ else:
                                         "msg_manuale": ""
                                     }
                                     salva_memoria(conto_selezionato, memoria_attuale)
-                                    st.session_state[f"trig_px_{conto_selezionato}_{nome}"] = ""
                                     st.session_state.target_tab = "Trend"
                                     st.rerun()
                             elif is_roll and not has_trigger_input:
