@@ -52,21 +52,33 @@ def aggregate_candles_to_10m(candles):
         })
     return aggregated
 
-# Parametri Strategia: S&R Puro KJ55 (Core 4c + Incrementi Pullback 2c + Trailing Stop M5 - Max 8c)
+# Parametri Strategia: S&R Puro KJ55 a Doppia Velocità (Core 4c + Incrementi Bancomat/Runner + Trailing Stop M10)
 CORE_CONTRACTS = 4          # Size iniziale Core: 4 contratti
-CORE_TS_TRIGGER_PIPS = 15.0 # Attivazione Trailing Stop: a +15 punti di guadagno
-CORE_TS_LOCK_PIPS = 10.0    # Lock profit iniziale: +10 punti garantiti (+40.00 €)
-CORE_TS_STEP_PIPS = 4.0     # Avanzamento a scatti: di 4 in 4 punti
+CORE_TS_TRIGGER_PIPS = 15.0 # Attivazione Trailing Stop Core: a +15 punti di guadagno
+CORE_TS_LOCK_PIPS = 10.0    # Lock profit iniziale Core: +10 punti garantiti (+40.00 €)
+CORE_TS_STEP_PIPS = 4.0     # Avanzamento a scatti Core: di 4 in 4 punti
 INC_CONTRACTS = 4           # Incrementi: 4 contratti ciascuno (pari alla size Core)
-MAX_INCREMENTS = 2          # Max 2 incrementi
-INC_TP_PIPS = 10.0          # TP incrementi su M5: 10 punti (+40.00 € a incremento)
-KJ_TOLERANCE_PIPS = 10.0    # Tolleranza su Kijun 55
-MAX_INC_KJ_DISTANCE_PIPS = 10.0 # Max distanza da KJ per consentire incrementi: <= 10 punti
-MIN_DIST_INCR_PIPS = 10.0       # Distanza minima tra incrementi consecutivi: >= 10 punti
+MAX_INCREMENTS = 3          # Max 3 incrementi complessivi a mercato (totale max 16c con Core)
+
+# Regime 1: "Bancomat" (Distanza da KJ <= 10 punti)
+BANCOMAT_MAX_DIST_KJ = 10.0 # Soglia max per regime Bancomat: <= 10 punti da KJ
+INC_TP_PIPS = 10.0          # TP incrementi Bancomat: 10 punti (+40.00 € a incremento)
+
+# Regime 2: "Runner / Piramidazione di Trend" (Distanza da KJ > 10 punti)
+RUNNER_THRESHOLD_KJ_DIST = 10.0 # Soglia spartiacque Bancomat (<= 10p) vs Runner (> 10p)
+MAX_RUNNER_INCREMENTS = 3       # Max 3 incrementi Runner contemporanei
+MIN_DIST_RUNNER_PIPS = 8.0      # Distanza minima di progressione a gradini tra incrementi Runner (>= 8 punti)
+RUNNER_TS_TRIGGER_PIPS = 10.0   # Runner TS: a +10 punti dal prezzo di carico blocca a Pareggio (Breakeven +2p)
+RUNNER_TS_LOCK_PIPS = 2.0       # Lock profit pareggio Runner (+2 punti garantiti)
+RUNNER_TS_STEP_PIPS = 6.0       # Runner TS: insegue a 6 punti di distanza dal picco massimo favorevole
+
+# Protezioni di sicurezza
 PARACADUTE_KJ_PIPS = 10.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 10 punti
 CANDELA_SEGNALE_OFFSET_PIPS = 5.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 5 punti
 CORE_MIN_KJ_DIST_PIPS = 3.0     # Minima distanza Prezzo - KJ per ingresso Core M5: >= 3 punti (stacco da KJ)
 CORE_MAX_KJ_DIST_PIPS = 10.0    # Massima distanza Prezzo - KJ per ingresso Core M5: <= 10 punti (coerente con Paracadute)
+KJ_TOLERANCE_PIPS = 10.0
+MIN_DIST_INCR_PIPS = 8.0
 
 # Parametri legacy per retrocompatibilità
 KJ_TK_MIN_FORBICE_PIPS = 0.0
@@ -649,15 +661,26 @@ class HyperUS500M5Engine:
             with self.lock:
                 self.entry_in_progress = False
 
-    def _execute_entry_increment(self, direction: str, exec_price: float, time_str: str):
+    def _execute_entry_increment(self, direction: str, exec_price: float, time_str: str, mode: str = "BANCOMAT"):
+        """Apre a mercato reale su IG un incremento a 4 contratti.
+        - Se mode='BANCOMAT': imposta Limit Order (TP fisso a +10 pt)
+        - Se mode='RUNNER': nessun TP fisso, profitto corre con Trailing Stop Virtuale"""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            tp_px = round(exec_price + self.inc_tp_pips if direction == "LONG" else exec_price - self.inc_tp_pips, 2)
+            if mode == "BANCOMAT":
+                tp_px = round(exec_price + self.inc_tp_pips if direction == "LONG" else exec_price - self.inc_tp_pips, 2)
+                lbl_order = f"Inc. Bancomat US500 10M #{len(self.increments)+1}"
+                limit_level = tp_px
+            else: # RUNNER
+                tp_px = None
+                lbl_order = f"Inc. Runner US500 10M #{len(self.increments)+1}"
+                limit_level = None
+
             res = order_mgr.open_market_deal(
                 direction=direction,
                 size=INC_CONTRACTS,
-                limit_level=tp_px,
-                label=f"Incremento US500 10M #{len(self.increments)+1}",
+                limit_level=limit_level,
+                label=lbl_order,
                 epic=EPIC_US500
             )
             if res.get("success"):
@@ -672,46 +695,56 @@ class HyperUS500M5Engine:
                         "open_price": real_open,
                         "contracts": INC_CONTRACTS,
                         "tp_price": tp_px,
-                        "open_time": res.get("time") or time_str
+                        "open_time": res.get("time") or time_str,
+                        "mode": mode,
+                        "ts_active": False,
+                        "ts_price": None,
+                        "peak_price": real_open
                     }
                     self.increments.append(new_inc)
                     tot_c = CORE_CONTRACTS + sum(i["contracts"] for i in self.increments)
+                    tp_desc = f"TP: {tp_px:.2f} pt" if tp_px else "Runner No-TP (TS attivo)"
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"➕ OPEN REAL IG INC US500 {direction} (+{INC_CONTRACTS}c, Tot: {tot_c}c)",
+                        "action": f"➕ OPEN REAL IG INC {mode} US500 {direction} (+{INC_CONTRACTS}c, Tot: {tot_c}c)",
                         "open_price": real_open,
                         "close_price": None,
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Incremento US500 10M @ {real_open:.2f} (TP: {tp_px:.2f}, Deal ID: {deal_id})"
+                        "reason": f"Incremento {mode} US500 10M @ {real_open:.2f} ({tp_desc}, Deal ID: {deal_id})"
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        "➕ INCREMENTO 10M: US 500 Cash",
-                        f"[US 500] Incremento #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} pt (TP: {tp_px:.2f} pt, Tot: {tot_c}c)",
+                        f"➕ INCREMENTO {mode} 10M: US 500 Cash",
+                        f"[US 500] Incremento {mode} #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} pt ({tp_desc}, Tot: {tot_c}c)",
                         "heavy_plus_sign"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura incremento US500 10M IG: {e}")
+            logger.error(f"Errore apertura incremento {mode} US500 10M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
 
-    def _execute_close_increment(self, inc: dict, current_price: float, time_str: str):
+    def _execute_close_increment(self, inc: dict, current_price: float, time_str: str, reason: str = None):
+        """Chiude a mercato reale un singolo incremento 10M (per TP Bancomat, Trailing Stop Runner, o Incasso Sicurezza)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             deal_id = inc.get("deal_id")
+            mode = inc.get("mode", "BANCOMAT")
+            if reason is None:
+                reason = f"TP Incremento (+{self.inc_tp_pips:.1f}p)"
+
             res = order_mgr.close_market_deal(
                 deal_id=deal_id,
                 direction_open=inc["direction"],
                 size=inc["contracts"],
-                label="TP Incremento US500 10M",
-                reason_note=f"Raggiunto TP a +{self.inc_tp_pips:.1f}p @ {current_price:.2f}"
+                label=f"Chiusura Inc {mode} US500 10M",
+                reason_note=reason
             )
             profit = float(res.get("profit") or 0.0)
             close_px = float(res.get("close_level") or current_price)
-            if profit == 0.0 and res.get("already_closed"):
+            if profit == 0.0 and res.get("already_closed") and inc.get("tp_price"):
                 profit = round(abs(inc["open_price"] - inc["tp_price"]) * inc["contracts"] * self.point_value, 2)
                 close_px = inc["tp_price"]
 
@@ -727,25 +760,25 @@ class HyperUS500M5Engine:
                     close_price=close_px,
                     pnl_eur=profit,
                     deal_id=deal_id,
-                    reason=f"TP Incremento US500 (+{self.inc_tp_pips:.1f}p)",
+                    reason=reason,
                     time_open=inc.get("open_time", time_str),
-                    label="Incremento US500 10M"
+                    label=f"Inc {mode} US500 10M"
                 )
 
                 self.trades.insert(0, {
                     "time": time_str,
-                    "action": f"🎯 TP INC US500 {inc['direction']} (+{profit:+.2f} €)",
+                    "action": f"🎯 CLOSE INC {mode} US500 {inc['direction']} ({profit:+.2f} €)",
                     "open_price": inc["open_price"],
                     "close_price": close_px,
                     "contracts": inc["contracts"],
                     "pnl": profit,
                     "balance": round(self.balance, 2),
-                    "reason": f"Chiusura Deal US500 {deal_id}: TP raggiunto @ {close_px:.2f}"
+                    "reason": f"Chiusura Deal US500 {deal_id}: {reason} @ {close_px:.2f}"
                 })
                 self.save_state()
                 order_mgr.send_notification(
-                    "🎯 TP INCREMENTO 10M: US 500 Cash",
-                    f"[US 500] Close Incr. {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €]",
+                    f"🎯 CHIUSURA INC {mode} 10M: US 500 Cash",
+                    f"[US 500] Close Incr {mode} {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}",
                     "dart"
                 )
         except Exception as e:
@@ -817,16 +850,18 @@ class HyperUS500M5Engine:
                     order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
 
             for inc in incs_to_close:
-                if inc.get("deal_id"):
+                deal_i = inc.get("deal_id")
+                if deal_i:
+                    mode_i = inc.get("mode", "BANCOMAT")
                     res_i = order_mgr.close_market_deal(
-                        deal_id=inc["deal_id"],
+                        deal_id=deal_i,
                         direction_open=inc["direction"],
                         size=inc["contracts"],
-                        label="Chiusura Flat Residuo US500 10M",
+                        label=f"Chiusura Inc {mode_i} US500 10M Flat",
                         reason_note=reason
                     )
                     if not res_i.get("success") and not res_i.get("already_closed"):
-                        logger.warning(f"❌ Chiusura Inc US500 {inc.get('deal_id')} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                        logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
                         with self.lock:
                             self.increments.append(inc)
                             self.save_state()
@@ -845,11 +880,11 @@ class HyperUS500M5Engine:
                             deal_id=inc["deal_id"],
                             reason=reason,
                             time_open=inc.get("open_time", time_str),
-                            label="Inc US500 10M"
+                            label=f"Inc {mode_i} 10M"
                         )
                         self.trades.insert(0, {
                             "time": time_str,
-                            "action": f"🎯 CLOSE INC US500 {inc['direction']} ({prof_i:+.2f} €)",
+                            "action": f"🎯 CLOSE INC {mode_i} US500 {inc['direction']} ({prof_i:+.2f} €)",
                             "open_price": inc["open_price"],
                             "close_price": close_i,
                             "contracts": inc["contracts"],
@@ -858,8 +893,8 @@ class HyperUS500M5Engine:
                             "reason": reason
                         })
                     order_mgr.send_notification(
-                        "🛑 CHIUSURA FLAT INC 10M: US 500 Cash",
-                        f"[US 500] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
+                        f"🛑 CHIUSURA FLAT INC {mode_i} 10M: US 500 Cash",
+                        f"[US 500] Incremento {mode_i} {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
                         "octagonal_sign"
                     )
                     time.sleep(1.5)
@@ -882,21 +917,98 @@ class HyperUS500M5Engine:
             daemon=True
         ).start()
 
-    def _check_increments_tp(self, current_price: float, time_str: str):
+    def _check_increments_management(self, current_price: float, time_str: str):
+        """Controlla tick-by-tick:
+        - Take Profit (+10 pt) per incrementi BANCOMAT
+        - Trailing Stop Virtuale (Trigger +10pt, Lock BE +2pt, Trailing 6pt) per incrementi RUNNER"""
         for inc in list(self.increments):
             if inc.get("closing"):
                 continue
-            hit_tp = False
-            if inc["direction"] == "LONG" and current_price >= inc["tp_price"]:
-                hit_tp = True
-            elif inc["direction"] == "SHORT" and current_price <= inc["tp_price"]:
-                hit_tp = True
 
-            if hit_tp:
+            mode = inc.get("mode", "BANCOMAT")
+            direction = inc["direction"]
+            open_px = inc["open_price"]
+
+            # 1. Regime BANCOMAT: TP fisso a +10 punti
+            if mode == "BANCOMAT":
+                hit_tp = False
+                if direction == "LONG" and inc.get("tp_price") and current_price >= inc["tp_price"]:
+                    hit_tp = True
+                elif direction == "SHORT" and inc.get("tp_price") and current_price <= inc["tp_price"]:
+                    hit_tp = True
+
+                if hit_tp:
+                    inc["closing"] = True
+                    threading.Thread(
+                        target=self._execute_close_increment,
+                        args=(inc, current_price, time_str, f"TP Bancomat (+{self.inc_tp_pips:.1f}p)"),
+                        daemon=True
+                    ).start()
+
+            # 2. Regime RUNNER: Trailing Stop Virtuale dinamico (Trigger +10pt -> Lock BE +2pt -> Trailing 6pt)
+            elif mode == "RUNNER":
+                # Aggiorna picco massimo favorevole
+                if direction == "LONG":
+                    if current_price > inc.get("peak_price", open_px):
+                        inc["peak_price"] = current_price
+                    gain_pips = current_price - open_px
+                else:
+                    if current_price < inc.get("peak_price", open_px):
+                        inc["peak_price"] = current_price
+                    gain_pips = open_px - current_price
+
+                # Attivazione Trailing / Breakeven Lock a +10 pt
+                if gain_pips >= RUNNER_TS_TRIGGER_PIPS:
+                    if not inc.get("ts_active"):
+                        inc["ts_active"] = True
+                        inc["ts_price"] = round(open_px + RUNNER_TS_LOCK_PIPS if direction == "LONG" else open_px - RUNNER_TS_LOCK_PIPS, 2)
+                        logger.info(f"[{time_str}] 🔒 [US500 RUNNER BE LOCKED] Inc #{inc.get('id')} locked a {inc['ts_price']:.2f}")
+                    else:
+                        # Insegue a RUNNER_TS_STEP_PIPS (6pt) dal picco massimo
+                        if direction == "LONG":
+                            cand_ts = round(inc["peak_price"] - RUNNER_TS_STEP_PIPS, 2)
+                            if cand_ts > inc["ts_price"]:
+                                inc["ts_price"] = cand_ts
+                        else:
+                            cand_ts = round(inc["peak_price"] + RUNNER_TS_STEP_PIPS, 2)
+                            if cand_ts < inc["ts_price"]:
+                                inc["ts_price"] = cand_ts
+
+                # Verifica se prezzo tocca il Trailing Stop
+                if inc.get("ts_active") and inc.get("ts_price") is not None:
+                    hit_ts = False
+                    if direction == "LONG" and current_price <= inc["ts_price"]:
+                        hit_ts = True
+                    elif direction == "SHORT" and current_price >= inc["ts_price"]:
+                        hit_ts = True
+
+                    if hit_ts:
+                        inc["closing"] = True
+                        pnl_pips = round(current_price - open_px if direction == "LONG" else open_px - current_price, 2)
+                        threading.Thread(
+                            target=self._execute_close_increment,
+                            args=(inc, current_price, time_str, f"TS Runner Inc ({pnl_pips:+.2f}p)"),
+                            daemon=True
+                        ).start()
+
+    def _check_runner_harvesting(self, current_price: float, time_str: str):
+        """Incasso di Sicurezza:
+        Se ci sono incrementi Runner aperti e la distanza Prezzo - KJ scende <= 10 punti
+        (la Kijun è salita/scesa e ha raggiunto il prezzo che si è fermato/ha ritracciato),
+        chiude istantaneamente a mercato tutti i Runner incassando il profitto e lasciando la sola Core."""
+        runner_incs = [i for i in self.increments if i.get("mode") == "RUNNER" and not i.get("closing")]
+        if not runner_incs or self.kj55 is None:
+            return
+
+        dist_kj = abs(current_price - self.kj55)
+        if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
+            logger.info(f"[{time_str}] 🎯 [US500 INCASSO SICUREZZA RUNNER] Distanza KJ ridotta a {dist_kj:.2f}p (<= {RUNNER_THRESHOLD_KJ_DIST:.1f}p). Incasso {len(runner_incs)} Runner!")
+            for inc in runner_incs:
                 inc["closing"] = True
+                pnl_pips = round(current_price - inc["open_price"] if inc["direction"] == "LONG" else inc["open_price"] - current_price, 2)
                 threading.Thread(
                     target=self._execute_close_increment,
-                    args=(inc, current_price, time_str),
+                    args=(inc, current_price, time_str, f"Incasso Sicurezza Runner (dist KJ {dist_kj:.1f}p <= {RUNNER_THRESHOLD_KJ_DIST:.0f}p, PnL: {pnl_pips:+.1f}p)"),
                     daemon=True
                 ).start()
 
@@ -972,7 +1084,9 @@ class HyperUS500M5Engine:
                     self._check_core_trailing_stop(mid, time_str)
 
                 if self.trading_enabled and self.increments:
-                    self._check_increments_tp(mid, time_str)
+                    self._check_increments_management(mid, time_str)
+                    if self.kj55 is not None:
+                        self._check_runner_harvesting(mid, time_str)
 
                 if self.trading_enabled and self.position and self.kj55 is not None:
                     self._check_paracadute_kj(mid, time_str)
@@ -1082,19 +1196,39 @@ class HyperUS500M5Engine:
                 self.signal_candle_active = False
                 self.signal_stop_price = None
                 self.signal_ref_price = None
-                dist_kj = abs(exec_price - kj)
-                troppo_vicino = any(abs(exec_price - inc["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for inc in self.increments)
-                if not entry_allowed and prev_close < prev_open:
+
+                is_retracement = prev_close < prev_open
+                if not entry_allowed and is_retracement:
                     print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF US500] Venerdì >= 22:14: Apertura Incremento LONG sospesa prima del weekend.")
-                elif prev_close < prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
-                    if len(self.increments) < MAX_INCREMENTS:
-                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                            self.entry_in_progress = True
-                            threading.Thread(
-                                target=self._execute_entry_increment,
-                                args=("LONG", exec_price, time_str),
-                                daemon=True
-                            ).start()
+                elif is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                    dist_kj = abs(exec_price - kj)
+                    active_incs = [i for i in self.increments if not i.get("closing")]
+                    tot_incs = len(active_incs)
+
+                    if tot_incs < MAX_INCREMENTS:
+                        # 1. Regime BANCOMAT (distanza da KJ <= 10.0 pt): max 1 incremento con TP rapido a +10pt
+                        if dist_kj <= BANCOMAT_MAX_DIST_KJ:
+                            has_bancomat = any(i.get("mode", "BANCOMAT") == "BANCOMAT" for i in active_incs)
+                            troppo_vicino = any(abs(exec_price - i["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for i in active_incs)
+                            if not has_bancomat and not troppo_vicino:
+                                self.entry_in_progress = True
+                                threading.Thread(
+                                    target=self._execute_entry_increment,
+                                    args=("LONG", exec_price, time_str, "BANCOMAT"),
+                                    daemon=True
+                                ).start()
+
+                        # 2. Regime RUNNER (distanza da KJ > 10.0 pt): piramidazione di trend, max 3 runner contemporanei con Trailing Stop
+                        else:
+                            runner_incs = [i for i in active_incs if i.get("mode") == "RUNNER"]
+                            troppo_vicino_runner = any(abs(exec_price - i["open_price"]) < (MIN_DIST_RUNNER_PIPS - 1e-7) for i in active_incs)
+                            if len(runner_incs) < MAX_RUNNER_INCREMENTS and not troppo_vicino_runner:
+                                self.entry_in_progress = True
+                                threading.Thread(
+                                    target=self._execute_entry_increment,
+                                    args=("LONG", exec_price, time_str, "RUNNER"),
+                                    daemon=True
+                                ).start()
             elif self.position and self.position["direction"] == "SHORT":
                 stop_livello = round(closed_candle["high"] + CANDELA_SEGNALE_OFFSET_PIPS, 2)
                 if self.signal_candle_active and self.signal_stop_price is not None:
@@ -1138,19 +1272,39 @@ class HyperUS500M5Engine:
                 self.signal_candle_active = False
                 self.signal_stop_price = None
                 self.signal_ref_price = None
-                dist_kj = abs(exec_price - kj)
-                troppo_vicino = any(abs(exec_price - inc["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for inc in self.increments)
-                if not entry_allowed and prev_close > prev_open:
+
+                is_retracement = prev_close > prev_open
+                if not entry_allowed and is_retracement:
                     print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF US500] Venerdì >= 22:14: Apertura Incremento SHORT sospesa prima del weekend.")
-                elif prev_close > prev_open and dist_kj <= MAX_INC_KJ_DISTANCE_PIPS and not troppo_vicino:
-                    if len(self.increments) < MAX_INCREMENTS:
-                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                            self.entry_in_progress = True
-                            threading.Thread(
-                                target=self._execute_entry_increment,
-                                args=("SHORT", exec_price, time_str),
-                                daemon=True
-                            ).start()
+                elif is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                    dist_kj = abs(exec_price - kj)
+                    active_incs = [i for i in self.increments if not i.get("closing")]
+                    tot_incs = len(active_incs)
+
+                    if tot_incs < MAX_INCREMENTS:
+                        # 1. Regime BANCOMAT (distanza da KJ <= 10.0 pt): max 1 incremento con TP rapido a +10pt
+                        if dist_kj <= BANCOMAT_MAX_DIST_KJ:
+                            has_bancomat = any(i.get("mode", "BANCOMAT") == "BANCOMAT" for i in active_incs)
+                            troppo_vicino = any(abs(exec_price - i["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for i in active_incs)
+                            if not has_bancomat and not troppo_vicino:
+                                self.entry_in_progress = True
+                                threading.Thread(
+                                    target=self._execute_entry_increment,
+                                    args=("SHORT", exec_price, time_str, "BANCOMAT"),
+                                    daemon=True
+                                ).start()
+
+                        # 2. Regime RUNNER (distanza da KJ > 10.0 pt): piramidazione di trend, max 3 runner contemporanei con Trailing Stop
+                        else:
+                            runner_incs = [i for i in active_incs if i.get("mode") == "RUNNER"]
+                            troppo_vicino_runner = any(abs(exec_price - i["open_price"]) < (MIN_DIST_RUNNER_PIPS - 1e-7) for i in active_incs)
+                            if len(runner_incs) < MAX_RUNNER_INCREMENTS and not troppo_vicino_runner:
+                                self.entry_in_progress = True
+                                threading.Thread(
+                                    target=self._execute_entry_increment,
+                                    args=("SHORT", exec_price, time_str, "RUNNER"),
+                                    daemon=True
+                                ).start()
             elif self.position and self.position["direction"] == "LONG":
                 stop_livello = round(closed_candle["low"] - CANDELA_SEGNALE_OFFSET_PIPS, 2)
                 if self.signal_candle_active and self.signal_stop_price is not None:

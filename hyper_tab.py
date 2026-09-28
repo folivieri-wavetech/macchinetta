@@ -334,7 +334,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         unit_lbl = "pt"
         core_c = 4
         inc_c = 4
-        max_inc = 2
+        max_inc = 3
         inc_tp = 10.0
         parachute_p = 10.0
         ts_trig = 15.0
