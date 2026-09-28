@@ -379,7 +379,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         sig_ref = getattr(engine, "signal_ref_price", None)
 
     float_pnl = engine.get_floating_pnl()
-    history_inst = order_mgr.get_trades_history(tf="5M", epic=epic_filter)
+    history_inst = [t for t in order_mgr.get_trades_history(epic=epic_filter) if t.get("tf") in ("10M", "5M")]
     today_dt = now_it()
     history_inst_today = [t for t in history_inst if is_trade_today(t, today_dt)]
     session_realized_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in history_inst_today)
@@ -513,8 +513,10 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         if st.button("🔄 Azzera", key=f"btn_clr_trades_m5_{btn_sfx}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione per questo strumento", use_container_width=True):
             st.session_state["hyper_target_subtab"] = "5m"
             order_mgr.clear_trades_history(epic=epic_filter)
-            engine.clear_session_trades()
-            st.rerun()
+            if hasattr(engine, "clear_session_trades"):
+                engine.clear_session_trades()
+            st.toast(f"Storico {instr_name} azzerato!", icon="🔄")
+            st.rerun(scope="app")
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<div style='height: 24px; margin-top: 4px;'></div>", unsafe_allow_html=True)
 
@@ -646,8 +648,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown(f"""
         <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.70rem; line-height: 1.4;'>
             <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name} (10M):</div>
-            <div>• <b>Regime</b>: LONG se Chiusura > KJ55 | SHORT se Chiusura < KJ55</div>
-            <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su stacco Prezzo - KJ >= 2{unit_lbl}</div>
+            <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su <b>Taglio KJ55</b> (stacco Prezzo - KJ &ge; {2 if instr_type == 'GOLD' else 3}{unit_lbl})</div>
             <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, max {max_inc} da {inc_c}c con TS e Incasso Sicurezza)</div>
             <div>• <b>Trailing Stop Core</b>: Trigger +{ts_trig:.0f}{unit_lbl}, Lock +{ts_lock:.0f}{unit_lbl}, Step {ts_stp:.0f}{unit_lbl}</div>
             <div>• <b>Protezioni</b>: Paracadute ±{parachute_p:.0f}{unit_lbl} • Candela Segnale ±{sig_offset:.0f}{unit_lbl}</div>
@@ -1094,13 +1095,19 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                 if st.button("🗑️ Azzera Archivio Sintesi", key="btn_clear_sintesi"):
                     st.session_state["hyper_target_subtab"] = "sintesi"
                     mgr.clear_trades_history()
-                    st.rerun()
+                    try:
+                        HyperGoldM5Engine.get_instance(account_dir=conto_attivo).clear_session_trades()
+                        HyperUS500M5Engine.get_instance(account_dir=conto_attivo).clear_session_trades()
+                    except Exception:
+                        pass
+                    st.toast("Archivio storico completamente azzerato!", icon="🗑️")
+                    st.rerun(scope="app")
 
     with tab_s_gold:
-        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 5M.", tab_key="gold")
+        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 10M.", tab_key="gold")
 
     with tab_s_us500:
-        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 5M.", tab_key="us500")
+        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 10M.", tab_key="us500")
 
 
 def render_hyper_tab(conto_selezionato="DANY_DEMO"):

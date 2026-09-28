@@ -239,6 +239,10 @@ class HyperGoldM5Engine:
         self.trades = []
         self.last_ts_cycle = None
 
+        # Tracciamento Regime e Taglio KJ (Opzione B: Ingresso su Taglio Puro, no pullback)
+        self.last_regime = None
+        self.regime_traded = True
+
         # Flag controllo esecuzione ordini reali IG (evita collisioni e ordini multipli)
         self.entry_in_progress = False
         self.closing_in_progress = False
@@ -383,6 +387,8 @@ class HyperGoldM5Engine:
             self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
             self.trades = d.get("trades", [])
             self.last_ts_cycle = d.get("last_ts_cycle")
+            self.last_regime = d.get("last_regime", None)
+            self.regime_traded = bool(d.get("regime_traded", True))
             raw_c = d.get("candles", [])
             self.candles = aggregate_candles_to_10m(raw_c) if raw_c else []
             if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 600):
@@ -407,6 +413,8 @@ class HyperGoldM5Engine:
                 "signal_ref_price": getattr(self, "signal_ref_price", None),
                 "trades": self.trades[-100:],
                 "last_ts_cycle": self.last_ts_cycle,
+                "last_regime": getattr(self, "last_regime", None),
+                "regime_traded": getattr(self, "regime_traded", True),
                 "candles": self.candles[-500:]
             }
             # Scrittura diretta con truncate e retry per compatibilità Windows
@@ -1224,29 +1232,57 @@ class HyperGoldM5Engine:
         prev_open = closed_candle["open"]
         entry_allowed = not is_gold_entry_suspended()
 
+        # Determinazione del regime della candela appena chiusa
+        if prev_close > kj:
+            current_regime = "LONG"
+        elif prev_close < kj:
+            current_regime = "SHORT"
+        else:
+            current_regime = self.last_regime
+
+        # Rilevamento Taglio (Cross) KJ55
+        if self.last_regime is not None and current_regime is not None and current_regime != self.last_regime:
+            logger.info(f"⚡ [TAGLIO KJ 10M] Spot Gold: cambio regime da {self.last_regime} a {current_regime} (Close={prev_close:.2f}, KJ={kj:.2f})")
+            self.last_regime = current_regime
+            self.regime_traded = False
+            self.save_state()
+        elif self.last_regime is None and current_regime is not None:
+            is_fresh_cut = False
+            if len(self.candles) >= 2:
+                c_prev = self.candles[-2]["close"]
+                if (current_regime == "LONG" and c_prev <= kj) or (current_regime == "SHORT" and c_prev >= kj):
+                    is_fresh_cut = True
+            self.last_regime = current_regime
+            self.regime_traded = not is_fresh_cut
+            self.save_state()
+
         # =============================================================
         # 1. MERCATO SOPRA KJ55 (BULLISH)
         # =============================================================
-        if prev_close > kj:
+        if current_regime == "LONG":
             if self.position is None:
-                if not entry_allowed:
-                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core LONG sospesa prima del weekend.")
-                    return
-                # Ingresso Core LONG: solo se il prezzo attuale stacca sopra KJ tra 2.0 e 6.0 pip
-                dist_kj = round(exec_price - kj, 2)
-                if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
-                    if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                        self.entry_in_progress = True
-                        self.signal_candle_active = False
-                        self.signal_stop_price = None
-                        self.signal_ref_price = None
-                        threading.Thread(
-                            target=self._execute_entry_core,
-                            args=("LONG", exec_price, time_str),
-                            daemon=True
-                        ).start()
-                elif dist_kj > CORE_MAX_KJ_DIST_PIPS:
-                    print(f"[{time_str}] ⏸️ [CORE SKIP LONG] Prezzo {exec_price:.2f} troppo distante da KJ {kj:.2f} ({dist_kj:.2f}p > max {CORE_MAX_KJ_DIST_PIPS:.1f}p). Attendo rientro/pullback.")
+                if not self.regime_traded:
+                    if not entry_allowed:
+                        print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core LONG sospesa prima del weekend.")
+                        return
+                    dist_kj = round(exec_price - kj, 2)
+                    if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
+                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                            self.entry_in_progress = True
+                            self.regime_traded = True
+                            self.signal_candle_active = False
+                            self.signal_stop_price = None
+                            self.signal_ref_price = None
+                            self.save_state()
+                            threading.Thread(
+                                target=self._execute_entry_core,
+                                args=("LONG", exec_price, time_str),
+                                daemon=True
+                            ).start()
+                    else:
+                        print(f"[{time_str}] ⏸️ [TAGLIO LONG] Distacco Prezzo-KJ insufficiente ({dist_kj:.2f}p < min {CORE_MIN_KJ_DIST_PIPS:.1f}p). Attendo conferma.")
+                else:
+                    print(f"[{time_str}] ⏸️ [ATTESA TAGLIO LONG] Mercato sopra KJ {kj:.2f} ma trend già avviato (nessun taglio). In attesa del prossimo taglio da sotto a sopra.")
             elif self.position and self.position["direction"] == "LONG":
                 # Core già LONG: azzera eventuale Candela Segnale e valuta incremento
                 self.signal_candle_active = False
@@ -1302,26 +1338,30 @@ class HyperGoldM5Engine:
         # =============================================================
         # 2. MERCATO SOTTO KJ55 (BEARISH)
         # =============================================================
-        elif prev_close < kj:
+        elif current_regime == "SHORT":
             if self.position is None:
-                if not entry_allowed:
-                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core SHORT sospesa prima del weekend.")
-                    return
-                # Ingresso Core SHORT: solo se il prezzo attuale stacca sotto KJ tra 2.0 e 6.0 pip
-                dist_kj = round(kj - exec_price, 2)
-                if CORE_MIN_KJ_DIST_PIPS <= dist_kj <= CORE_MAX_KJ_DIST_PIPS:
-                    if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                        self.entry_in_progress = True
-                        self.signal_candle_active = False
-                        self.signal_stop_price = None
-                        self.signal_ref_price = None
-                        threading.Thread(
-                            target=self._execute_entry_core,
-                            args=("SHORT", exec_price, time_str),
-                            daemon=True
-                        ).start()
-                elif dist_kj > CORE_MAX_KJ_DIST_PIPS:
-                    print(f"[{time_str}] ⏸️ [CORE SKIP SHORT] Prezzo {exec_price:.2f} troppo distante da KJ {kj:.2f} ({dist_kj:.2f}p > max {CORE_MAX_KJ_DIST_PIPS:.1f}p). Attendo rientro/pullback.")
+                if not self.regime_traded:
+                    if not entry_allowed:
+                        print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core SHORT sospesa prima del weekend.")
+                        return
+                    dist_kj = round(kj - exec_price, 2)
+                    if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
+                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
+                            self.entry_in_progress = True
+                            self.regime_traded = True
+                            self.signal_candle_active = False
+                            self.signal_stop_price = None
+                            self.signal_ref_price = None
+                            self.save_state()
+                            threading.Thread(
+                                target=self._execute_entry_core,
+                                args=("SHORT", exec_price, time_str),
+                                daemon=True
+                            ).start()
+                    else:
+                        print(f"[{time_str}] ⏸️ [TAGLIO SHORT] Distacco Prezzo-KJ insufficiente ({dist_kj:.2f}p < min {CORE_MIN_KJ_DIST_PIPS:.1f}p). Attendo conferma.")
+                else:
+                    print(f"[{time_str}] ⏸️ [ATTESA TAGLIO SHORT] Mercato sotto KJ {kj:.2f} ma trend già avviato (nessun taglio). In attesa del prossimo taglio da sopra a sotto.")
             elif self.position and self.position["direction"] == "SHORT":
                 # Core già SHORT: azzera eventuale Candela Segnale e valuta incremento
                 self.signal_candle_active = False
