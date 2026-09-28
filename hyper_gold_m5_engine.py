@@ -18,10 +18,39 @@ except Exception:
     pass
 
 EPIC_GOLD = "CS.D.CFEGOLD.CBE.IP"
-CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
-WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M5 = 275 min = ~4.5 ore)
+CANDLE_SECONDS = 600    # 10 Minuti (M10) per barra
+WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M10 = 550 min = ~9.1 ore)
 WARMUP_BARS_TK = 55     # Retrocompatibilità
 STATE_FILE = "hyper_gold_m5_state.json"
+
+def aggregate_candles_to_10m(candles):
+    """Aggrega una lista di candele a 10 Minuti (600s boundary) da candele 5M o 10M esistenti"""
+    if not candles:
+        return []
+    buckets = {}
+    for c in candles:
+        b_target = int(c["boundary"] // CANDLE_SECONDS) * CANDLE_SECONDS
+        if b_target not in buckets:
+            buckets[b_target] = []
+        buckets[b_target].append(c)
+
+    aggregated = []
+    for b_target in sorted(buckets.keys()):
+        group = buckets[b_target]
+        op = group[0]["open"]
+        hi = max(x["high"] for x in group)
+        lo = min(x["low"] for x in group)
+        cl = group[-1]["close"]
+        t_str = datetime.datetime.fromtimestamp(b_target, TZ_ITALIA).strftime("%H:%M:%S")
+        aggregated.append({
+            "boundary": b_target,
+            "time": t_str,
+            "open": op,
+            "high": hi,
+            "low": lo,
+            "close": cl
+        })
+    return aggregated
 
 # Parametri Strategia: S&R Puro KJ55 a Doppia Velocità (Core + Incrementi Bancomat/Runner + Trailing Stop M5)
 CORE_CONTRACTS = 5          # Size iniziale Core: 5 contratti
@@ -250,144 +279,43 @@ class HyperGoldM5Engine:
         return user, pwd, api_key
 
     def _fetch_historical_m5_bars_from_ig(self):
-        """Singola chiamata REST una tantum per scaricare le barre M5 storiche contigue con cache centralizzata condivisa"""
-        # 1. Verifica se esiste già una cache centralizzata recente (meno di 5 minuti)
+        """Caricamento e aggregazione a 10M da cache/stato locale (ZERO chiamate IG REST)"""
+        with self.lock:
+            if len(self.candles) >= WARMUP_BARS_KJ:
+                self.candles = aggregate_candles_to_10m(self.candles)[-500:]
+                self._recalculate_indicators()
+                self.save_state()
+                return
+
         central_file = "candele_Spot_Gold_M5.json"
-        if os.path.exists(central_file):
-            try:
-                mtime = os.path.getmtime(central_file)
-                if (time.time() - mtime) < 300: # Meno di 5 minuti
-                    with open(central_file, "r", encoding="utf-8") as f:
-                        cached = json.load(f)
-                    if isinstance(cached, list) and len(cached) >= WARMUP_BARS_KJ:
-                        if cached[-1].get("boundary", 0) <= (time.time() + 600):
-                            with self.lock:
-                                self.candles = cached[-500:]
-                                self._recalculate_indicators()
-                                self.save_state()
-                            return
-            except Exception:
-                pass
+        candidates = [central_file, STATE_FILE]
+        if getattr(self, "account_dir", None):
+            candidates.append(os.path.join(self.account_dir, STATE_FILE))
+            candidates.append(os.path.join("/data", self.account_dir, STATE_FILE))
+        candidates.extend([
+            os.path.join("DANY_DEMO", STATE_FILE),
+            os.path.join("FIORDOK_DEMO", STATE_FILE),
+            os.path.join("BONGIOLO_DEMO", STATE_FILE),
+            os.path.join("/data", "DANY_DEMO", STATE_FILE),
+            os.path.join("/data", "FIORDOK_DEMO", STATE_FILE),
+            "candele_Spot_Gold_HOUR.json"
+        ])
 
-        raw_prices = []
-        # UNICO CONTO AUTORIZZATO AL RECUPERO DATI STORICI: FIORDOK_DEMO
-        acc = "FIORDOK_DEMO"
-        try:
-            user, pwd, api_key = None, None, None
-            candidates = [
-                os.path.join(acc, ".env"),
-                os.path.join("/data", acc, ".env"),
-                ".env"
-            ]
-            for p in candidates:
-                if os.path.exists(p):
-                    try:
-                        with open(p, "r", encoding="utf-8") as f:
-                            for line in f:
-                                line = line.strip()
-                                if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
-                                elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
-                                elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
-                        if user and pwd and api_key:
-                            break
-                    except Exception:
-                        pass
-            if not user or not pwd or not api_key:
-                return
-
-            url_session = "https://demo-api.ig.com/gateway/deal/session"
-            h_session = {
-                "X-IG-API-KEY": api_key,
-                "Version": "2",
-                "Accept": "application/json; charset=UTF-8",
-                "Content-Type": "application/json; charset=UTF-8"
-            }
-            payload = {"identifier": user, "password": pwd}
-            r_sess = requests.post(url_session, headers=h_session, json=payload, timeout=10)
-            if r_sess.status_code != 200:
-                return
-
-            cst = r_sess.headers.get("CST")
-            xst = r_sess.headers.get("X-SECURITY-TOKEN")
-
-            # Recupera fino a 250 barre storiche M5 in UNA SOLA chiamata REST condivisa
-            url_px = f"https://demo-api.ig.com/gateway/deal/prices/{EPIC_GOLD}?resolution=MINUTE_5&max=250&pageSize=0"
-            h_px = {
-                "X-IG-API-KEY": api_key,
-                "CST": cst,
-                "X-SECURITY-TOKEN": xst,
-                "Version": "3"
-            }
-            r_px = requests.get(url_px, headers=h_px, timeout=15)
-            if r_px.status_code == 200:
-                d = r_px.json()
-                raw_prices = d.get("prices", [])
-                if raw_prices:
-                    print(f"✅ [HYPER GOLD M5] Scaricate con successo {len(raw_prices)} barre storiche M5 tramite account autorizzato {user}.")
-            elif r_px.status_code == 403:
-                print(f"⚠️ [HYPER GOLD M5] Quota storica IG esaurita per account {user} (403).")
-        except Exception as e:
-            print(f"⚠️ [HYPER GOLD M5] Errore fetch barre: {e}")
-
-        if raw_prices:
-            with self.lock:
-                loaded_candles = []
-                for p in raw_prices:
-                    try:
-                        st_time_utc = p.get("snapshotTimeUTC")
-                        st_time = p.get("snapshotTime", "")
-                        if st_time_utc:
-                            try:
-                                dt_u = datetime.datetime.fromisoformat(st_time_utc).replace(tzinfo=datetime.timezone.utc)
-                            except Exception:
-                                dt_u = datetime.datetime.strptime(st_time_utc, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
-                            dt_it = dt_u.astimezone(TZ_ITALIA)
-                            t_str = dt_it.strftime("%H:%M:%S")
-                            boundary = int(dt_u.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
-                        else:
-                            dt_it = datetime.datetime.strptime(st_time, "%Y/%m/%d %H:%M:%S").replace(tzinfo=TZ_ITALIA)
-                            t_str = dt_it.strftime("%H:%M:%S")
-                            boundary = int(dt_it.timestamp() // CANDLE_SECONDS) * CANDLE_SECONDS
-
-                        op = round((p["openPrice"]["bid"] + p["openPrice"]["ask"]) / 2.0, 2)
-                        hi = round((p["highPrice"]["bid"] + p["highPrice"]["ask"]) / 2.0, 2)
-                        lo = round((p["lowPrice"]["bid"] + p["lowPrice"]["ask"]) / 2.0, 2)
-                        cl = round((p["closePrice"]["bid"] + p["closePrice"]["ask"]) / 2.0, 2)
-                        loaded_candles.append({
-                            "boundary": boundary,
-                            "time": t_str,
-                            "open": op,
-                            "high": hi,
-                            "low": lo,
-                            "close": cl
-                        })
-                    except Exception:
-                        pass
-
-                if loaded_candles:
-                    self.candles = loaded_candles[-500:]
-                    self._recalculate_indicators()
-                    self.save_state()
-
-                    # Salva centralmente per condividere con tutti gli altri account
-                    try:
-                        with open(central_file, "w", encoding="utf-8") as f:
-                            json.dump(self.candles, f, indent=2)
-                    except Exception:
-                        pass
-
-                    # Sincronizza istantaneamente su FIORDOK_DEMO, DANY_DEMO, BONGIOLO_DEMO
-                    for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
-                        try:
-                            p_acc = os.path.join(acc, STATE_FILE)
-                            if os.path.exists(acc) and os.path.exists(p_acc):
-                                with open(p_acc, "r", encoding="utf-8") as f_r:
-                                    d_acc = json.load(f_r)
-                                d_acc["candles"] = self.candles
-                                with open(p_acc, "w", encoding="utf-8") as f_w:
-                                    json.dump(d_acc, f_w, indent=2)
-                        except Exception:
-                            pass
+        for fpath in candidates:
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        d = json.load(f)
+                    c_list = d if isinstance(d, list) else d.get("candles", [])
+                    if len(c_list) >= 55:
+                        with self.lock:
+                            self.candles = aggregate_candles_to_10m(c_list)[-500:]
+                            self._recalculate_indicators()
+                            self.save_state()
+                        print(f"✅ [HYPER GOLD 10M] Caricate {len(self.candles)} barre 10M aggregate da file locale {fpath} (ZERO chiamate IG).")
+                        return
+                except Exception:
+                    pass
 
     def _recalculate_indicators(self):
         """Calcola KJ55 (Supporto & Resistenza Puro) in base allo storico candele M5 disponibile"""
@@ -441,13 +369,22 @@ class HyperGoldM5Engine:
         with self.lock:
             self.balance = float(d.get("balance", 10000.0))
             self.trading_enabled = bool(d.get("trading_enabled", False))
+            # Salvaguardia weekend: se il server riparte nel weekend (da venerdì 23:05 a domenica 21:58), forza DA AVVIARE
+            _now = now_it()
+            _wd = _now.weekday()
+            _t = _now.time()
+            if (_wd == 4 and _t >= datetime.time(23, 5)) or (_wd == 5) or (_wd == 6 and _t < datetime.time(21, 58)):
+                if self.trading_enabled:
+                    self.trading_enabled = False
+                    logger.info("🛑 [WEEKEND SAFEGUARD] Spot Gold: weekend in corso, trading forzato a DA AVVIARE.")
             self.use_core_trailing = True
             self.position = d.get("position")
             self.increments = d.get("increments", [])
             self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
             self.trades = d.get("trades", [])
             self.last_ts_cycle = d.get("last_ts_cycle")
-            self.candles = d.get("candles", [])
+            raw_c = d.get("candles", [])
+            self.candles = aggregate_candles_to_10m(raw_c) if raw_c else []
             if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 600):
                 self.candles = []
             self.signal_candle_active = bool(d.get("signal_candle_active", False))
@@ -515,17 +452,42 @@ class HyperGoldM5Engine:
     def _run_rollover_watchdog(self):
         """Watchdog temporale indipendente: garantisce la chiusura automatica a FLAT
         nella finestra utile (22:44:00 - 22:44:55) prima del freeze del feed e del weekend,
-        anche in assenza di tick live da Lightstreamer."""
+        anche in assenza di tick live da Lightstreamer, e disattiva il trading al venerdì sera (23:05)."""
+        last_friday_disarmed_date = None
         while self.running:
             try:
                 time.sleep(2)
-                if is_gold_rollover_window():
+                now = now_it()
+                wd = now.weekday()
+                t = now.time()
+                today_str = now.strftime("%Y-%m-%d")
+
+                # 1. Chiusura proattiva a FLAT a 22:44 (rollover e pre-weekend)
+                if is_gold_rollover_window(now):
                     with self.lock:
                         has_pos = (self.position is not None or len(self.increments) > 0)
                         mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
                     if has_pos and not getattr(self, "closing_in_progress", False):
-                        t_str = now_it().strftime("%H:%M:%S")
+                        t_str = now.strftime("%H:%M:%S")
                         self._close_all_to_flat(mid_px, t_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
+
+                # 2. Venerdì sera alle 23:05: Disattivazione automatica per il weekend (stato 'DA AVVIARE')
+                if wd == 4 and t >= datetime.time(23, 5):
+                    if last_friday_disarmed_date != today_str:
+                        last_friday_disarmed_date = today_str
+                        if self.trading_enabled:
+                            with self.lock:
+                                self.trading_enabled = False
+                                self.save_state()
+                            logger.info(f"🛑 [WEEKEND SHUTDOWN] Venerdì ore {t.strftime('%H:%M:%S')}: Trading Spot Gold disattivato automaticamente per il weekend. Stato impostato su DA AVVIARE.")
+                            try:
+                                order_mgr.send_notification(
+                                    "🛑 SPOT GOLD 10M: WEEKEND SHUTDOWN",
+                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore Spot Gold 10M disattivato e reimpostato su DA AVVIARE.",
+                                    "pause_button"
+                                )
+                            except Exception:
+                                pass
             except Exception as e:
                 logger.error(f"Errore watchdog rollover Gold: {e}")
 
@@ -850,7 +812,7 @@ class HyperGoldM5Engine:
                 self.balance += profit
 
                 order_mgr.record_closed_trade(
-                    tf="5M",
+                    tf="10M",
                     direction=inc["direction"],
                     contracts=inc["contracts"],
                     open_price=inc["open_price"],
@@ -859,7 +821,7 @@ class HyperGoldM5Engine:
                     deal_id=deal_id,
                     reason=reason,
                     time_open=inc.get("open_time", time_str),
-                    label=f"Inc {mode} M5"
+                    label=f"Inc {mode} 10M"
                 )
 
                 self.trades.insert(0, {
@@ -911,7 +873,7 @@ class HyperGoldM5Engine:
                     prof_c = float(res_c.get("profit") or 0.0)
                     cl_c = float(res_c.get("close_level") or exec_price)
                     order_mgr.record_closed_trade(
-                        tf="5M",
+                        tf="10M",
                         direction=pos_to_close["direction"],
                         contracts=pos_to_close["contracts"],
                         open_price=pos_to_close["open_price"],
@@ -920,7 +882,7 @@ class HyperGoldM5Engine:
                         deal_id=deal_c,
                         reason=reason,
                         time_open=pos_to_close.get("open_time", time_str),
-                        label="Core M5"
+                        label="Core 10M"
                     )
                     with self.lock:
                         self.balance += prof_c
@@ -970,7 +932,7 @@ class HyperGoldM5Engine:
                     prof_i = float(res_i.get("profit") or 0.0)
                     cl_i = float(res_i.get("close_level") or exec_price)
                     order_mgr.record_closed_trade(
-                        tf="5M",
+                        tf="10M",
                         direction=inc["direction"],
                         contracts=inc["contracts"],
                         open_price=inc["open_price"],
@@ -979,7 +941,7 @@ class HyperGoldM5Engine:
                         deal_id=deal_i,
                         reason=reason,
                         time_open=inc.get("open_time", time_str),
-                        label="Incremento M5"
+                        label="Incremento 10M"
                     )
                     with self.lock:
                         self.balance += prof_i
