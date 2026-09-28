@@ -261,6 +261,9 @@ class HyperGoldM5Engine:
         self.watchdog_thread = threading.Thread(target=self._run_rollover_watchdog, daemon=True)
         self.watchdog_thread.start()
 
+        # 5. Avvia riconciliazione asincrona posizioni con IG (ripulisce deal già chiusi a server spento)
+        threading.Thread(target=self._reconcile_open_positions_with_ig, daemon=True).start()
+
     def _get_ig_credentials(self):
         user, pwd, api_key = None, None, None
         candidates = []
@@ -396,7 +399,44 @@ class HyperGoldM5Engine:
             self.signal_candle_active = bool(d.get("signal_candle_active", False))
             self.signal_stop_price = d.get("signal_stop_price")
             self.signal_ref_price = d.get("signal_ref_price")
+            if not self.position:
+                self.signal_candle_active = False
+                self.signal_stop_price = None
+                self.signal_ref_price = None
             self._recalculate_indicators()
+
+    def _reconcile_open_positions_with_ig(self):
+        """Verifica all'avvio che le posizioni/incrementi registrati esistano ancora realmente su IG.
+        Se un deal è già stato chiuso (es. per TP o chiusura manuale a server spento), lo ripulisce dallo stato."""
+        try:
+            time.sleep(3.0) # Attendi connessione sessione
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+            changed = False
+            with self.lock:
+                if self.position and self.position.get("deal_id"):
+                    deal_c = self.position["deal_id"]
+                    if not order_mgr.is_deal_open(deal_c):
+                        logger.info(f"ℹ️ [RECONCILE GOLD] Posizione Core {deal_c} non più presente su IG. Stato locale allineato a FLAT.")
+                        self.position = None
+                        self.signal_candle_active = False
+                        self.signal_stop_price = None
+                        self.signal_ref_price = None
+                        changed = True
+
+                valid_incs = []
+                for inc in self.increments:
+                    deal_i = inc.get("deal_id")
+                    if deal_i and not order_mgr.is_deal_open(deal_i):
+                        logger.info(f"ℹ️ [RECONCILE GOLD] Incremento {deal_i} non più presente su IG. Rimosso dallo stato locale.")
+                        changed = True
+                    else:
+                        valid_incs.append(inc)
+                self.increments = valid_incs
+
+                if changed:
+                    self.save_state()
+        except Exception as e:
+            logger.warning(f"Errore riconciliazione posizioni Gold con IG all'avvio: {e}")
 
     def save_state(self):
         st_file = self._get_state_file()
@@ -1179,7 +1219,7 @@ class HyperGoldM5Engine:
                 if self.trading_enabled and self.position and self.signal_candle_active:
                     self._check_candela_segnale_stop(mid, time_str)
 
-            # Inizializzazione prima barra M5
+            # Inizializzazione prima barra M10
             if self.curr_boundary is None:
                 self.curr_boundary = boundary
                 self.curr_open = mid
@@ -1187,15 +1227,19 @@ class HyperGoldM5Engine:
                 self.curr_low = mid
                 self.curr_close = mid
                 self.curr_bar_start_t = now_t
+                # Se il motore parte a più di 60s dall'inizio del boundary M10, la prima barra è parziale
+                self.curr_bar_is_partial = (now_t - boundary) > 60
+                if self.curr_bar_is_partial:
+                    logger.info(f"⏳ [CANDELA M10 PARZIALE AVVIATA] Spot Gold: motore avviato a metà barra (trascorsi {int(now_t - boundary)}s). La prima barra sarà di solo allineamento.")
                 return
 
             if boundary == self.curr_boundary:
-                # Barra M5 corrente in formazione
+                # Barra M10 corrente in formazione
                 if mid > self.curr_high: self.curr_high = mid
                 if mid < self.curr_low: self.curr_low = mid
                 self.curr_close = mid
             else:
-                # Chiusura barra M5 (300s)
+                # Chiusura barra M10
                 closed_candle = {
                     "boundary": self.curr_boundary,
                     "time": datetime.datetime.fromtimestamp(self.curr_boundary, TZ_ITALIA).strftime("%H:%M:%S"),
@@ -1204,6 +1248,9 @@ class HyperGoldM5Engine:
                     "low": self.curr_low,
                     "close": self.curr_close
                 }
+                was_partial = getattr(self, "curr_bar_is_partial", False)
+                self.curr_bar_is_partial = False
+
                 self.candles.append(closed_candle)
                 if len(self.candles) > 500:
                     self.candles = self.candles[-500:]
@@ -1211,7 +1258,7 @@ class HyperGoldM5Engine:
                 # Ricalcola KJ55 e TK144
                 self._recalculate_indicators()
 
-                # Apertura nuova candela M5
+                # Apertura nuova candela M10
                 new_open = mid
                 self.curr_boundary = boundary
                 self.curr_open = new_open
@@ -1223,8 +1270,9 @@ class HyperGoldM5Engine:
                 self.save_state()
 
                 market_suspended = is_gold_market_suspended()
-                # Strategia S&R Puro KJ55: solo se il mercato NON è sospeso
-                if self.trading_enabled and not market_suspended and self.kj55 is not None:
+                if was_partial:
+                    logger.info(f"⏳ [PRIMA BARRA PARZIALE CONCLUSA] Spot Gold @ {time_str}: Kijun ricalcolata ({self.kj55}). Operatività attiva dalla prima candela interamente formata.")
+                elif self.trading_enabled and not market_suspended and self.kj55 is not None:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 
     def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
@@ -1247,13 +1295,12 @@ class HyperGoldM5Engine:
             self.regime_traded = False
             self.save_state()
         elif self.last_regime is None and current_regime is not None:
-            is_fresh_cut = False
-            if len(self.candles) >= 2:
-                c_prev = self.candles[-2]["close"]
-                if (current_regime == "LONG" and c_prev <= kj) or (current_regime == "SHORT" and c_prev >= kj):
-                    is_fresh_cut = True
+            # BLINDATURA DI SICUREZZA ALL'AVVIO:
+            # All'avvio senza stato pregresso, aggancia il regime attuale ma forza SEMPRE regime_traded = True.
+            # Non azzarda mai ingressi a freddo su trend preesistenti. Si opera SOLO su tagli confermati in diretta.
             self.last_regime = current_regime
-            self.regime_traded = not is_fresh_cut
+            self.regime_traded = True
+            logger.info(f"🔄 [BOOTSTRAP KJ 10M] Spot Gold: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
             self.save_state()
 
         # =============================================================
