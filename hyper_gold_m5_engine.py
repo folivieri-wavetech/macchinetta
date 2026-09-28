@@ -683,14 +683,14 @@ class HyperGoldM5Engine:
                     self._close_cycle_trailing_hit(current_price, time_str)
 
     def _execute_entry_core(self, direction: str, exec_price: float, time_str: str):
-        """Esegue l'apertura a mercato reale su IG della Core M5 (5 contratti)."""
+        """Esegue l'apertura a mercato reale su IG della Core 10M (5 contratti)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             res = order_mgr.open_market_deal(
                 direction=direction,
                 size=CORE_CONTRACTS,
                 limit_level=None,
-                label="Core M5"
+                label="Core 10M"
             )
             if res.get("success"):
                 deal_id = res.get("deal_id")
@@ -709,7 +709,7 @@ class HyperGoldM5Engine:
                     }
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"🚀 OPEN REAL IG {direction} ({CORE_CONTRACTS}c Core M5)",
+                        "action": f"🚀 OPEN REAL IG {direction} ({CORE_CONTRACTS}c Core 10M)",
                         "open_price": real_open,
                         "close_price": None,
                         "contracts": CORE_CONTRACTS,
@@ -719,18 +719,18 @@ class HyperGoldM5Engine:
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        "🚀 OPEN CORE 5M: Spot Gold",
+                        "🚀 OPEN CORE 10M: Spot Gold",
                         f"[Spot Gold] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} €",
                         "rocket"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura Core M5 IG: {e}")
+            logger.error(f"Errore apertura Core 10M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
 
     def _execute_entry_increment(self, direction: str, exec_price: float, time_str: str, mode: str = "BANCOMAT"):
-        """Esegue l'apertura a mercato reale su IG di un incremento M5 (5 contratti):
+        """Esegue l'apertura a mercato reale su IG di un incremento 10M (5 contratti):
         - Se mode='BANCOMAT': imposta TP a +5p
         - Se mode='RUNNER': nessun TP fisso, profitto corre con Trailing Stop Virtuale"""
         try:
@@ -738,11 +738,11 @@ class HyperGoldM5Engine:
             if mode == "BANCOMAT":
                 tp_px = round(exec_price + self.inc_tp_pips if direction == "LONG" else exec_price - self.inc_tp_pips, 2)
                 limit_lvl = tp_px
-                lbl_order = f"Inc. Bancomat Spot Gold M5 #{len(self.increments)+1}"
+                lbl_order = f"Inc. Bancomat Spot Gold 10M #{len(self.increments)+1}"
             else:
                 tp_px = None
                 limit_lvl = None
-                lbl_order = f"Inc. Runner Spot Gold M5 #{len(self.increments)+1}"
+                lbl_order = f"Inc. Runner Spot Gold 10M #{len(self.increments)+1}"
 
             res = order_mgr.open_market_deal(
                 direction=direction,
@@ -779,16 +779,16 @@ class HyperGoldM5Engine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Incremento {mode} M5 IG @ {real_open:.2f} € ({tp_desc}, Deal ID: {deal_id})"
+                        "reason": f"Incremento {mode} 10M IG @ {real_open:.2f} € ({tp_desc}, Deal ID: {deal_id})"
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        f"➕ INCREMENTO {mode} 5M: Spot Gold",
+                        f"➕ INCREMENTO {mode} 10M: Spot Gold",
                         f"[Spot Gold] Incremento {mode} #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} € ({tp_desc}, Tot: {tot_c}c)",
                         "heavy_plus_sign"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura incremento M5 IG: {e}")
+            logger.error(f"Errore apertura incremento 10M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
@@ -806,7 +806,7 @@ class HyperGoldM5Engine:
                 deal_id=deal_id,
                 direction_open=inc["direction"],
                 size=inc["contracts"],
-                label=f"Chiusura Inc {mode} Spot Gold M5",
+                label=f"Chiusura Inc {mode} Spot Gold 10M",
                 reason_note=reason
             )
             profit = float(res.get("profit") or 0.0)
@@ -844,15 +844,15 @@ class HyperGoldM5Engine:
                 })
                 self.save_state()
                 order_mgr.send_notification(
-                    f"🎯 CHIUSURA INC {mode} 5M: Spot Gold",
+                    f"🎯 CHIUSURA INC {mode} 10M: Spot Gold",
                     f"[Spot Gold] Close Incr {mode} {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €] - Motivo: {reason}",
                     "dart"
                 )
         except Exception as e:
-            logger.error(f"Errore chiusura incremento M5 IG: {e}")
+            logger.error(f"Errore chiusura incremento 10M IG: {e}")
 
     def _execute_close_all_flat(self, exec_price: float, time_str: str, reason: str):
-        """Chiude a mercato reale tutte le posizioni aperte su IG (Core + Incrementi M5)."""
+        """Chiude a mercato reale tutte le posizioni aperte su IG (Core + Incrementi 10M)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             with self.lock:
@@ -869,7 +869,7 @@ class HyperGoldM5Engine:
                     deal_id=deal_c,
                     direction_open=pos_to_close["direction"],
                     size=pos_to_close["contracts"],
-                    label="Chiusura Core Spot Gold M5 Flat",
+                    label="Chiusura Core Spot Gold 10M Flat",
                     reason_note=reason
                 )
                 if not res_c.get("success") and not res_c.get("already_closed"):
@@ -896,7 +896,7 @@ class HyperGoldM5Engine:
                         self.balance += prof_c
                         self.trades.insert(0, {
                             "time": time_str,
-                            "action": f"CLOSE CORE M5 {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                            "action": f"CLOSE CORE 10M {pos_to_close['direction']} ({prof_c:+.2f} €)",
                             "open_price": pos_to_close["open_price"],
                             "close_price": cl_c,
                             "contracts": pos_to_close["contracts"],
@@ -908,13 +908,13 @@ class HyperGoldM5Engine:
                     is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
                     if is_ts:
                         tag_cl = "dart"
-                        tit_cl = "🎯 TS HIT 5M: Spot Gold"
+                        tit_cl = "🎯 TS HIT 10M: Spot Gold"
                     elif is_rev:
                         tag_cl = "warning"
-                        tit_cl = "🛑 REVERSAL 5M: Spot Gold"
+                        tit_cl = "🛑 REVERSAL 10M: Spot Gold"
                     else:
                         tag_cl = "octagonal_sign"
-                        tit_cl = "🛑 CHIUSURA FLAT 5M: Spot Gold"
+                        tit_cl = "🛑 CHIUSURA FLAT 10M: Spot Gold"
                     msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
                     order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
                 # Pausa prima degli incrementi
@@ -928,7 +928,7 @@ class HyperGoldM5Engine:
                         deal_id=deal_i,
                         direction_open=inc["direction"],
                         size=inc["contracts"],
-                        label="Chiusura Inc Spot Gold M5 Flat",
+                        label="Chiusura Inc Spot Gold 10M Flat",
                         reason_note=reason
                     )
                     if not res_i.get("success") and not res_i.get("already_closed"):
@@ -955,7 +955,7 @@ class HyperGoldM5Engine:
                         self.balance += prof_i
                         self.trades.insert(0, {
                             "time": time_str,
-                            "action": f"CLOSE INC M5 {inc['direction']} ({prof_i:+.2f} €)",
+                            "action": f"CLOSE INC 10M {inc['direction']} ({prof_i:+.2f} €)",
                             "open_price": inc["open_price"],
                             "close_price": cl_i,
                             "contracts": inc["contracts"],
@@ -964,7 +964,7 @@ class HyperGoldM5Engine:
                             "reason": reason
                         })
                     order_mgr.send_notification(
-                        "🛑 CHIUSURA FLAT INC 5M: Spot Gold",
+                        "🛑 CHIUSURA FLAT INC 10M: Spot Gold",
                         f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {cl_i:.2f} € [PnL: {prof_i:+.2f} €]",
                         "octagonal_sign"
                     )
@@ -974,19 +974,19 @@ class HyperGoldM5Engine:
             with self.lock:
                 self.save_state()
         except Exception as e:
-            logger.error(f"Errore chiusura posizioni flat M5 IG: {e}")
+            logger.error(f"Errore chiusura posizioni flat 10M IG: {e}")
         finally:
             with self.lock:
                 self.closing_in_progress = False
 
     def _close_cycle_trailing_hit(self, current_price: float, time_str: str):
-        """Chiusura completa a FLAT all'entrata del Trailing Stop su M5"""
+        """Chiusura completa a FLAT all'entrata del Trailing Stop su 10M"""
         if not self.position or getattr(self, "closing_in_progress", False):
             return
         self.closing_in_progress = True
         threading.Thread(
             target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"TS Spot Gold M5 @ {current_price:.2f}"),
+            args=(current_price, time_str, f"TS Spot Gold 10M @ {current_price:.2f}"),
             daemon=True
         ).start()
 

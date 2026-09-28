@@ -1088,7 +1088,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                         st.rerun()
 
     with tab_s_all:
-        _render_trades_table(trades_active, "Nessuna operazione 5M registrata.", tab_key="all")
+        _render_trades_table(trades_active, "Nessuna operazione 10M registrata.", tab_key="all")
         if trades_active:
             c_cl1, c_cl2 = st.columns([3, 1])
             with c_cl2:
@@ -1149,7 +1149,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
 
                     for (let t of tabs) {{
                         const txt = (t.innerText || t.textContent || "").trim();
-                        if ((txt.includes("Operatività") || txt.includes("Hyper 5M")) && !t._hyper_listener) {{
+                        if ((txt.includes("Operatività") || txt.includes("Hyper 10M") || txt.includes("Hyper 5M")) && !t._hyper_listener) {{
                             t._hyper_listener = true;
                             t.addEventListener("click", function() {{
                                 sessionStorage.setItem("hyper_active_subtab", "5m");
@@ -1165,7 +1165,7 @@ def render_hyper_tab(conto_selezionato="DANY_DEMO"):
                     if (target === "5m" || target === "operativita") {{
                         for (let t of tabs) {{
                             const txt = (t.innerText || t.textContent || "").trim();
-                            if (txt.includes("Operatività") || txt.includes("Hyper 5M")) {{
+                            if (txt.includes("Operatività") || txt.includes("Hyper 10M") || txt.includes("Hyper 5M")) {{
                                 if (t.getAttribute("aria-selected") !== "true") {{
                                     t.click();
                                 }}

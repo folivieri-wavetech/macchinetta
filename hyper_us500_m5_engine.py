@@ -566,7 +566,7 @@ class HyperUS500M5Engine:
 
                 self.trades.insert(0, {
                     "time": time_str,
-                    "action": f"🚀 TRAILING ATTIVATO US500 M5 {direction}",
+                    "action": f"🚀 TRAILING ATTIVATO US500 10M {direction}",
                     "open_price": open_px,
                     "close_price": current_price,
                     "contracts": pos["contracts"],
@@ -609,7 +609,7 @@ class HyperUS500M5Engine:
                 direction=direction,
                 size=CORE_CONTRACTS,
                 limit_level=None,
-                label="Core US500 M5",
+                label="Core US500 10M",
                 epic=EPIC_US500
             )
             if res.get("success"):
@@ -629,7 +629,7 @@ class HyperUS500M5Engine:
                     }
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"🚀 OPEN REAL IG US500 {direction} ({CORE_CONTRACTS}c Core M5)",
+                        "action": f"🚀 OPEN REAL IG US500 {direction} ({CORE_CONTRACTS}c Core 10M)",
                         "open_price": real_open,
                         "close_price": None,
                         "contracts": CORE_CONTRACTS,
@@ -639,12 +639,12 @@ class HyperUS500M5Engine:
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        "🚀 OPEN CORE 5M: US 500 Cash",
+                        "🚀 OPEN CORE 10M: US 500 Cash",
                         f"[US 500] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} pt",
                         "rocket"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura Core US500 M5 IG: {e}")
+            logger.error(f"Errore apertura Core US500 10M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
@@ -657,7 +657,7 @@ class HyperUS500M5Engine:
                 direction=direction,
                 size=INC_CONTRACTS,
                 limit_level=tp_px,
-                label=f"Incremento US500 M5 #{len(self.increments)+1}",
+                label=f"Incremento US500 10M #{len(self.increments)+1}",
                 epic=EPIC_US500
             )
             if res.get("success"):
@@ -684,16 +684,16 @@ class HyperUS500M5Engine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Incremento US500 M5 @ {real_open:.2f} (TP: {tp_px:.2f}, Deal ID: {deal_id})"
+                        "reason": f"Incremento US500 10M @ {real_open:.2f} (TP: {tp_px:.2f}, Deal ID: {deal_id})"
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        "➕ INCREMENTO 5M: US 500 Cash",
+                        "➕ INCREMENTO 10M: US 500 Cash",
                         f"[US 500] Incremento #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} pt (TP: {tp_px:.2f} pt, Tot: {tot_c}c)",
                         "heavy_plus_sign"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura incremento US500 M5 IG: {e}")
+            logger.error(f"Errore apertura incremento US500 10M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
@@ -706,7 +706,7 @@ class HyperUS500M5Engine:
                 deal_id=deal_id,
                 direction_open=inc["direction"],
                 size=inc["contracts"],
-                label="TP Incremento US500 M5",
+                label="TP Incremento US500 10M",
                 reason_note=f"Raggiunto TP a +{self.inc_tp_pips:.1f}p @ {current_price:.2f}"
             )
             profit = float(res.get("profit") or 0.0)
@@ -744,12 +744,12 @@ class HyperUS500M5Engine:
                 })
                 self.save_state()
                 order_mgr.send_notification(
-                    "🎯 TP INCREMENTO 5M: US 500 Cash",
+                    "🎯 TP INCREMENTO 10M: US 500 Cash",
                     f"[US 500] Close Incr. {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €]",
                     "dart"
                 )
         except Exception as e:
-            logger.error(f"Errore chiusura incremento US500 M5 IG: {e}")
+            logger.error(f"Errore chiusura incremento US500 10M IG: {e}")
 
     def _execute_close_all_flat(self, exec_price: float, time_str: str, reason: str):
         try:
@@ -806,13 +806,13 @@ class HyperUS500M5Engine:
                     is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
                     if is_ts:
                         tag_cl = "dart"
-                        tit_cl = "🎯 TS HIT 5M: US 500 Cash"
+                        tit_cl = "🎯 TS HIT 10M: US 500 Cash"
                     elif is_rev:
                         tag_cl = "warning"
-                        tit_cl = "🛑 REVERSAL 5M: US 500 Cash"
+                        tit_cl = "🛑 REVERSAL 10M: US 500 Cash"
                     else:
                         tag_cl = "octagonal_sign"
-                        tit_cl = "🛑 CHIUSURA FLAT 5M: US 500 Cash"
+                        tit_cl = "🛑 CHIUSURA FLAT 10M: US 500 Cash"
                     msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
                     order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
 
@@ -822,7 +822,7 @@ class HyperUS500M5Engine:
                         deal_id=inc["deal_id"],
                         direction_open=inc["direction"],
                         size=inc["contracts"],
-                        label="Chiusura Flat Residuo US500 M5",
+                        label="Chiusura Flat Residuo US500 10M",
                         reason_note=reason
                     )
                     if not res_i.get("success") and not res_i.get("already_closed"):
@@ -858,7 +858,7 @@ class HyperUS500M5Engine:
                             "reason": reason
                         })
                     order_mgr.send_notification(
-                        "🛑 CHIUSURA FLAT INC 5M: US 500 Cash",
+                        "🛑 CHIUSURA FLAT INC 10M: US 500 Cash",
                         f"[US 500] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
                         "octagonal_sign"
                     )
@@ -867,7 +867,7 @@ class HyperUS500M5Engine:
             with self.lock:
                 self.save_state()
         except Exception as e:
-            logger.error(f"Errore chiusura posizioni flat US500 M5 IG: {e}")
+            logger.error(f"Errore chiusura posizioni flat US500 10M IG: {e}")
         finally:
             with self.lock:
                 self.closing_in_progress = False
@@ -878,7 +878,7 @@ class HyperUS500M5Engine:
         self.closing_in_progress = True
         threading.Thread(
             target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"TS US500 M5 @ {current_price:.2f}"),
+            args=(current_price, time_str, f"TS US500 10M @ {current_price:.2f}"),
             daemon=True
         ).start()
 
