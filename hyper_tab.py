@@ -656,7 +656,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         """, unsafe_allow_html=True)
 
 
-@st.fragment(run_every=2)
+@st.fragment(run_every=5)
 def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     """Visualizzazione unificata e affiancata di Spot Gold 1€ e US 500 Cash 1€ su timeframe 10M."""
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
