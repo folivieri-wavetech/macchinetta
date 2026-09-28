@@ -1185,6 +1185,57 @@ class HyperUS500M5Engine:
                 elif self.trading_enabled and not market_suspended and self.kj55 is not None:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 
+    def _update_increments_dynamic_mode(self, dist_kj: float, exec_price: float, time_str: str):
+        """A fine candela M10, valuta dinamicamente gli incrementi già aperti in base alla distanza da KJ:
+        1. Se dist_kj > 10 pt: i Bancomat vengono promossi a RUNNER (rimozione TP su IG a broker e attivazione Trailing)
+        2. Se dist_kj <= 10 pt: i Runner vengono incassati a mercato per sicurezza (Incasso Sicurezza)"""
+        with self.lock:
+            active_incs = [i for i in self.increments if not i.get("closing")]
+            if not active_incs:
+                return
+
+            order_mgr = HyperOrderManager.get_instance(self.account_dir)
+
+            # Caso 1: Distanza > 10 pt -> Trend allunga, promuovi Bancomat a Runner
+            if dist_kj > RUNNER_THRESHOLD_KJ_DIST:
+                for inc in active_incs:
+                    if inc.get("mode") == "BANCOMAT" and inc.get("tp_price") is not None:
+                        deal_id = inc.get("deal_id")
+                        old_tp = inc.get("tp_price")
+                        inc["mode"] = "RUNNER"
+                        inc["tp_price"] = None
+                        inc["ts_active"] = False
+                        inc["ts_price"] = None
+                        inc["peak_price"] = exec_price
+
+                        logger.info(f"[{time_str}] 🚀 [PROMOZIONE RUNNER] Deal {deal_id} convertito in RUNNER (dist KJ {dist_kj:.1f}p > 10p). Rimozione TP {old_tp:.2f} su IG.")
+                        if deal_id:
+                            threading.Thread(target=order_mgr.remove_limit_order, args=(deal_id, "Promozione Runner US500"), daemon=True).start()
+
+                        self.trades.insert(0, {
+                            "time": time_str,
+                            "action": f"🚀 PROMOZIONE RUNNER US500 {inc['direction']}",
+                            "open_price": inc["open_price"],
+                            "close_price": None,
+                            "contracts": inc["contracts"],
+                            "pnl": 0.0,
+                            "balance": round(self.balance, 2),
+                            "reason": f"Distanza KJ {dist_kj:.1f}p > 10p: Take Profit ({old_tp:.2f}) rimosso a broker IG, attivo Trailing Stop"
+                        })
+                        self.save_state()
+                        order_mgr.send_notification(
+                            "🚀 PROMOZIONE RUNNER 10M: US 500 Cash",
+                            f"[US 500] Incremento #{inc.get('id')} {inc['direction']} convertito in RUNNER! Distanza KJ {dist_kj:.1f}p > 10p: Take Profit rimosso a broker IG, attivo Trailing Stop.",
+                            "rocket"
+                        )
+
+            # Caso 2: Distanza <= 10 pt -> Ritracciamento verso KJ, incasso immediato di sicurezza per tutti i Runner
+            else:
+                has_runners = any(i.get("mode") == "RUNNER" for i in active_incs)
+                if has_runners:
+                    logger.info(f"[{time_str}] 🎯 [INCASSO SICUREZZA RUNNER A FINE CANDELA] Distanza KJ {dist_kj:.1f}p <= 10p. Esecuzione incasso Runner.")
+                    self._check_runner_harvesting(exec_price, time_str)
+
     def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
         prev_close = closed_candle["close"]
         prev_open = closed_candle["open"]
@@ -1212,6 +1263,12 @@ class HyperUS500M5Engine:
             self.regime_traded = True
             logger.info(f"🔄 [BOOTSTRAP KJ 10M] US 500 Cash: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
             self.save_state()
+
+        # AGGIORNAMENTO DINAMICO INCREMENTI A FINE CANDELA (OPZIONE 1):
+        # - Se dist_kj > 10 pt: promuovi i Bancomat a RUNNER (rimozione TP su IG a broker e attivo Trailing Stop)
+        # - Se dist_kj <= 10 pt: incasso di sicurezza a mercato per tutti i Runner
+        dist_kj_candle = abs(prev_close - kj)
+        self._update_increments_dynamic_mode(dist_kj_candle, exec_price, time_str)
 
         # =============================================================
         # 1. MERCATO SOPRA KJ55 (BULLISH)

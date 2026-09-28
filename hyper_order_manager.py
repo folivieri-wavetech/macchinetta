@@ -449,7 +449,37 @@ class HyperOrderManager:
                     logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta dopo eccezione (già chiusa).")
                     return {"success": True, "deal_id": deal_id, "already_closed": True}
                 self.send_notification(f"⚠️ ECCEZIONE CHIUSURA: {label}", f"Errore chiusura: {str(e)[:100]}", "warning")
-                return {"success": False, "reason": str(e)}
+    def remove_limit_order(self, deal_id: str, label: str = "Rimozione TP") -> bool:
+        """Invia una richiesta PUT a IG per rimuovere il Limit Order (Take Profit) da una posizione aperta,
+        trasformando il deal in posizione a corsa libera con Trailing Stop."""
+        if not deal_id:
+            return False
+        with self.lock:
+            self._throttle()
+            if not self._ensure_session():
+                logger.warning(f"⚠️ Impossibile rimuovere TP per {deal_id}: sessione IG non valida.")
+                return False
+            url = f"{self.base_url}/positions/otc/{deal_id}"
+            payload = {
+                "limitLevel": None,
+                "trailingStop": False
+            }
+            h = self._get_headers(version="2")
+            try:
+                r = requests.put(url, headers=h, json=payload, timeout=10)
+                if r.status_code == 401:
+                    self._ensure_session()
+                    h = self._get_headers(version="2")
+                    r = requests.put(url, headers=h, json=payload, timeout=10)
+                if r.status_code == 200:
+                    logger.info(f"🚀 [IG TP RIMOSSO] Deal {deal_id} ({label}): Take Profit eliminato su IG con successo! Posizione libera per Trailing Stop.")
+                    return True
+                else:
+                    logger.warning(f"⚠️ [IG TP INFO] Rimozione TP per {deal_id} non riuscita (HTTP {r.status_code}): {r.text[:120]}")
+                    return False
+            except Exception as e:
+                logger.error(f"❌ Eccezione remove_limit_order {deal_id}: {e}")
+                return False
 
     def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = "", epic: str = ""):
         """Salva in modo persistente l'operazione conclusa in hyper_trades_history.json."""
