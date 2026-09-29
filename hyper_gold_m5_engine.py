@@ -497,6 +497,34 @@ class HyperGoldM5Engine:
                     self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura immediata di tutte le posizioni a FLAT")
             self.save_state()
 
+    def manual_entry_core(self, direction: str) -> dict:
+        """Avvio manuale discrezionale della posizione Core 10M (5 contratti)."""
+        norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
+        with self.lock:
+            if not self.trading_enabled:
+                return {"success": False, "error": "Motore non avviato (trading disabilitato)"}
+            if self.position is not None or len(self.increments) > 0:
+                return {"success": False, "error": "Posizione già aperta (strumento non FLAT)"}
+            if getattr(self, "entry_in_progress", False):
+                return {"success": False, "error": "Operazione di ingresso già in corso"}
+
+            self.entry_in_progress = True
+            self.regime_traded = True
+            self.signal_candle_active = False
+            self.signal_stop_price = None
+            self.signal_ref_price = None
+            self.save_state()
+
+        exec_price = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+        time_str = now_it().strftime("%H:%M:%S")
+
+        threading.Thread(
+            target=self._execute_entry_core,
+            args=(norm_dir, exec_price, time_str),
+            daemon=True
+        ).start()
+        return {"success": True, "message": f"Avvio Core {norm_dir} inviato a mercato"}
+
     def _run_rollover_watchdog(self):
         """Watchdog temporale indipendente: garantisce la chiusura automatica a FLAT
         nella finestra utile (22:44:00 - 22:44:55) prima del freeze del feed e del weekend,

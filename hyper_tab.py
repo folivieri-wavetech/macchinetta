@@ -171,20 +171,75 @@ def inject_hyper_css():
             color: #ffffff !important;
         }
         .btn-azzera-hyper div.stButton > button {
+            background-color: rgba(30, 41, 59, 0.7) !important;
+            border: 1px solid #475569 !important;
+            color: #94a3b8 !important;
             white-space: nowrap !important;
-            font-size: 0.82rem !important;
+            font-size: 0.80rem !important;
             padding: 4px 12px !important;
-            height: 34px !important;
+            height: 32px !important;
             font-weight: 600 !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
             width: 100% !important;
+            border-radius: 6px !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-azzera-hyper div.stButton > button:hover:not(:disabled) {
+            background-color: #334155 !important;
+            border-color: #64748b !important;
+            color: #f8fafc !important;
+            box-shadow: 0 0 8px rgba(100, 116, 139, 0.3) !important;
         }
         .btn-azzera-hyper div.stButton > button p {
             white-space: nowrap !important;
             word-break: keep-all !important;
             margin: 0 !important;
+        }
+        .btn-manual-long div.stButton > button {
+            background-color: #166534 !important;
+            border: 1px solid #22c55e !important;
+            color: #ffffff !important;
+            height: 36px !important;
+            font-size: 0.82rem !important;
+            font-weight: 700 !important;
+            border-radius: 6px !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-manual-long div.stButton > button:hover:not(:disabled) {
+            background-color: #15803d !important;
+            border-color: #4ade80 !important;
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.45) !important;
+        }
+        .btn-manual-long div.stButton > button:disabled {
+            background-color: rgba(30, 41, 59, 0.5) !important;
+            border-color: #334155 !important;
+            color: #64748b !important;
+            opacity: 0.55 !important;
+            cursor: not-allowed !important;
+        }
+        .btn-manual-short div.stButton > button {
+            background-color: #991b1b !important;
+            border: 1px solid #ef4444 !important;
+            color: #ffffff !important;
+            height: 36px !important;
+            font-size: 0.82rem !important;
+            font-weight: 700 !important;
+            border-radius: 6px !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-manual-short div.stButton > button:hover:not(:disabled) {
+            background-color: #b91c1c !important;
+            border-color: #f87171 !important;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.45) !important;
+        }
+        .btn-manual-short div.stButton > button:disabled {
+            background-color: rgba(30, 41, 59, 0.5) !important;
+            border-color: #334155 !important;
+            color: #64748b !important;
+            opacity: 0.55 !important;
+            cursor: not-allowed !important;
         }
         /* Forza la visibilità di tutte le sottotab di Hyper (5m) */
         div[data-testid="stTabsContent"] div[data-testid="stTabs"] div[role="tablist"] > button,
@@ -485,8 +540,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     </div>
     """, unsafe_allow_html=True)
 
-    # Pulsanti di Controllo compatti
-    c_b1, c_b2, c_b3 = st.columns([1.1, 1.1, 1.0])
+    # Pulsanti di Controllo Motore 10M (AVVIA / STOP)
+    c_b1, c_b2 = st.columns(2)
     with c_b1:
         st.markdown("<div class='btn-start-hyper btn-compact-hyper'>", unsafe_allow_html=True)
         if st.button("🟢 AVVIA 10M", key=f"btn_start_m5_{btn_sfx}", disabled=trading_on, use_container_width=True):
@@ -508,17 +563,41 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<div style='height: 24px; margin-top: 4px;'></div>", unsafe_allow_html=True)
 
-    with c_b3:
-        st.markdown("<div class='btn-azzera-hyper btn-compact-hyper'>", unsafe_allow_html=True)
-        if st.button("🔄 Azzera", key=f"btn_clr_trades_m5_{btn_sfx}", help="Azzera lo storico delle operazioni chiuse e il P&L di sessione per questo strumento", use_container_width=True):
+    # Pulsanti di Avvio Manuale Core (LONG / SHORT)
+    # Condizione: Motore Hyper avviato E strumento FLAT (nessuna posizione e nessun incremento)
+    is_flat = (pos is None) and (len(increments) == 0)
+    can_manual = trading_on and is_flat
+
+    c_m1, c_m2 = st.columns(2)
+    with c_m1:
+        st.markdown("<div class='btn-manual-long btn-compact-hyper'>", unsafe_allow_html=True)
+        help_m_long = f"Apre a mercato reale una posizione Core LONG da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente")
+        if st.button("🟢 LONG Manuale", key=f"btn_man_long_{btn_sfx}", disabled=(not can_manual), help=help_m_long, use_container_width=True):
             st.session_state["hyper_target_subtab"] = "5m"
-            order_mgr.clear_trades_history(epic=epic_filter)
-            if hasattr(engine, "clear_session_trades"):
-                engine.clear_session_trades()
-            st.toast(f"Storico {instr_name} azzerato!", icon="🔄")
-            st.rerun(scope="app")
+            if hasattr(engine, "manual_entry_core"):
+                res = engine.manual_entry_core("LONG")
+                if res.get("success"):
+                    st.toast(f"🚀 Inviato ordine Core LONG ({core_c}c) su {instr_name}!", icon="🟢")
+                else:
+                    st.error(res.get("error", "Errore invio ordine"))
+            st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("<div style='height: 24px; margin-top: 4px;'></div>", unsafe_allow_html=True)
+
+    with c_m2:
+        st.markdown("<div class='btn-manual-short btn-compact-hyper'>", unsafe_allow_html=True)
+        help_m_short = f"Apre a mercato reale una posizione Core SHORT da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente")
+        if st.button("🔴 SHORT Manuale", key=f"btn_man_short_{btn_sfx}", disabled=(not can_manual), help=help_m_short, use_container_width=True):
+            st.session_state["hyper_target_subtab"] = "5m"
+            if hasattr(engine, "manual_entry_core"):
+                res = engine.manual_entry_core("SHORT")
+                if res.get("success"):
+                    st.toast(f"🚀 Inviato ordine Core SHORT ({core_c}c) su {instr_name}!", icon="🔴")
+                else:
+                    st.error(res.get("error", "Errore invio ordine"))
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
     # Posizioni in Portafoglio
     instr_code = "US500" if instr_type == "US500" else "GOLD"
@@ -654,6 +733,18 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             <div>• <b>Protezioni</b>: Paracadute ±{parachute_p:.0f}{unit_lbl} • Candela Segnale ±{sig_offset:.0f}{unit_lbl}</div>
         </div>
         """, unsafe_allow_html=True)
+
+    # Tasto Azzera Storico Operazioni (spostato in basso)
+    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div class='btn-azzera-hyper'>", unsafe_allow_html=True)
+    if st.button(f"🔄 Azzera Storico Operazioni ({instr_name})", key=f"btn_clr_trades_m5_{btn_sfx}", help=f"Azzera lo storico delle operazioni chiuse e il P&L di sessione per {instr_name}", use_container_width=True):
+        st.session_state["hyper_target_subtab"] = "5m"
+        order_mgr.clear_trades_history(epic=epic_filter)
+        if hasattr(engine, "clear_session_trades"):
+            engine.clear_session_trades()
+        st.toast(f"Storico {instr_name} azzerato!", icon="🔄")
+        st.rerun(scope="app")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 @st.fragment(run_every=5)
