@@ -830,7 +830,8 @@ class HyperUS500M5Engine:
                     deal_id=deal_id,
                     reason=reason,
                     time_open=inc.get("open_time", time_str),
-                    label=f"Inc {mode} US500 10M"
+                    label=f"Inc {mode} US500 10M",
+                    epic=EPIC_US500
                 )
 
                 self.trades.insert(0, {
@@ -891,7 +892,8 @@ class HyperUS500M5Engine:
                             deal_id=deal_id,
                             reason=reason,
                             time_open=pos_to_close.get("open_time", time_str),
-                            label="Core US500 10M"
+                            label="Core US500 10M",
+                            epic=EPIC_US500
                         )
                         self.trades.insert(0, {
                             "time": time_str,
@@ -948,7 +950,8 @@ class HyperUS500M5Engine:
                             deal_id=inc["deal_id"],
                             reason=reason,
                             time_open=inc.get("open_time", time_str),
-                            label=f"Inc {mode_i} 10M"
+                            label=f"Inc {mode_i} US500 10M",
+                            epic=EPIC_US500
                         )
                         self.trades.insert(0, {
                             "time": time_str,

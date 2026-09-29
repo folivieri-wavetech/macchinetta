@@ -484,8 +484,13 @@ class HyperOrderManager:
     def record_closed_trade(self, tf: str, direction: str, contracts: float, open_price: float, close_price: float, pnl_eur: float, deal_id: str, reason: str, time_open: str = "", label: str = "", epic: str = ""):
         """Salva in modo persistente l'operazione conclusa in hyper_trades_history.json."""
         with self.lock:
-            now_str = now_it().strftime("%Y-%m-%d %H:%M:%S")
-            target_epic = epic or ("IX.D.SPTRD.IBE.IP" if "US500" in (label or "").upper() else EPIC_GOLD)
+            is_us_hint = (
+                (epic and ("SPTRD" in epic.upper() or "US500" in epic.upper()))
+                or ("US500" in (label or "").upper())
+                or ("US500" in (reason or "").upper())
+                or (open_price and float(open_price) > 4000.0)
+            )
+            target_epic = "IX.D.SPTRD.IBE.IP" if is_us_hint else (epic or EPIC_GOLD)
             trade_item = {
                 "id": str(int(time.time() * 1000)),
                 "time_open": time_open or now_str,
@@ -527,6 +532,18 @@ class HyperOrderManager:
                 import re
                 for t in data:
                     if isinstance(t, dict):
+                        # Auto-fix e riconciliazione automatica strumento per trade US500
+                        is_us_trade = (
+                            "SPTRD" in str(t.get("epic", "")).upper()
+                            or "US500" in str(t.get("label", "")).upper()
+                            or "US500" in str(t.get("reason", "")).upper()
+                            or float(t.get("open_price", 0.0) or 0.0) > 4000.0
+                        )
+                        if is_us_trade:
+                            t["epic"] = "IX.D.SPTRD.IBE.IP"
+                            if "US500" not in str(t.get("label", "")).upper():
+                                t["label"] = f"{t.get('label', '')} US500".strip()
+
                         rsn = str(t.get("reason", "") or "")
                         if rsn:
                             rsn = rsn.replace("Paracadute KJ Intracandela", "Paracadute KJ")
@@ -542,9 +559,9 @@ class HyperOrderManager:
                     res = [t for t in res if t.get("tf") == tf]
                 if epic:
                     if "SPTRD" in epic.upper() or "US500" in epic.upper():
-                        res = [t for t in res if ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())]
+                        res = [t for t in res if ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or "US500" in str(t.get("reason", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 4000.0)]
                     else:
-                        res = [t for t in res if not ("SPTRD" in t.get("epic", "").upper() or "US500" in t.get("label", "").upper())]
+                        res = [t for t in res if not ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or "US500" in str(t.get("reason", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 4000.0)]
                 return res
         except Exception:
             return []
