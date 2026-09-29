@@ -1228,13 +1228,14 @@ class HyperGoldM5Engine:
             return
 
         pos_dir = self.position["direction"]
+        core_open_time = self.position.get("open_time", "??")
         if pos_dir == "LONG":
             threshold = round(self.kj55 - PARACADUTE_KJ_PIPS, 2)
             if mid <= threshold:
                 self._close_all_to_flat(
                     mid,
                     time_str,
-                    reason=f"Paracadute KJ: Mid live {mid:.2f} <= (KJ {self.kj55:.2f} - {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
+                    reason=f"Paracadute KJ: Mid live {mid:.2f} <= (KJ {self.kj55:.2f} - {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT (Apertura Core: {core_open_time} {pos_dir})"
                 )
         elif pos_dir == "SHORT":
             threshold = round(self.kj55 + PARACADUTE_KJ_PIPS, 2)
@@ -1242,7 +1243,7 @@ class HyperGoldM5Engine:
                 self._close_all_to_flat(
                     mid,
                     time_str,
-                    reason=f"Paracadute KJ: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT"
+                    reason=f"Paracadute KJ: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT (Apertura Core: {core_open_time} {pos_dir})"
                 )
 
     def _check_candela_segnale_stop(self, mid: float, time_str: str):
