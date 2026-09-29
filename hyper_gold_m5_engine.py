@@ -909,18 +909,22 @@ class HyperGoldM5Engine:
                 self.increments = [i for i in self.increments if i.get("deal_id") != deal_id and i.get("id") != inc.get("id")]
                 self.balance += profit
 
-                order_mgr.record_closed_trade(
-                    tf="10M",
-                    direction=inc["direction"],
-                    contracts=inc["contracts"],
-                    open_price=inc["open_price"],
-                    close_price=close_px,
-                    pnl_eur=profit,
-                    deal_id=deal_id,
-                    reason=reason,
-                    time_open=inc.get("open_time", time_str),
-                    label=f"Inc {mode} 10M"
-                )
+                try:
+                    order_mgr.record_closed_trade(
+                        tf="10M",
+                        direction=inc["direction"],
+                        contracts=inc["contracts"],
+                        open_price=inc["open_price"],
+                        close_price=close_px,
+                        pnl_eur=profit,
+                        deal_id=deal_id,
+                        reason=reason,
+                        time_open=inc.get("open_time", time_str),
+                        label=f"Inc {mode} Spot Gold 10M",
+                        epic=self.epic
+                    )
+                except Exception as ex_rec:
+                    logger.warning(f"Errore registrazione trade incremento: {ex_rec}")
 
                 self.trades.insert(0, {
                     "time": time_str,
@@ -954,105 +958,121 @@ class HyperGoldM5Engine:
 
             # 1. Chiudi Core se presente
             if pos_to_close and pos_to_close.get("deal_id"):
-                deal_c = pos_to_close["deal_id"]
-                res_c = order_mgr.close_market_deal(
-                    deal_id=deal_c,
-                    direction_open=pos_to_close["direction"],
-                    size=pos_to_close["contracts"],
-                    label="Chiusura Core Spot Gold 10M Flat",
-                    reason_note=reason
-                )
-                if not res_c.get("success") and not res_c.get("already_closed"):
-                    logger.warning(f"❌ Chiusura Core {deal_c} non riuscita su IG ({res_c.get('reason')}). Posizione mantenuta attiva.")
-                    with self.lock:
-                        self.position = pos_to_close
-                        self.save_state()
-                else:
-                    prof_c = float(res_c.get("profit") or 0.0)
-                    cl_c = float(res_c.get("close_level") or exec_price)
-                    order_mgr.record_closed_trade(
-                        tf="10M",
-                        direction=pos_to_close["direction"],
-                        contracts=pos_to_close["contracts"],
-                        open_price=pos_to_close["open_price"],
-                        close_price=cl_c,
-                        pnl_eur=prof_c,
+                try:
+                    deal_c = pos_to_close["deal_id"]
+                    res_c = order_mgr.close_market_deal(
                         deal_id=deal_c,
-                        reason=reason,
-                        time_open=pos_to_close.get("open_time", time_str),
-                        label="Core 10M"
+                        direction_open=pos_to_close["direction"],
+                        size=pos_to_close["contracts"],
+                        label="Chiusura Core Spot Gold 10M Flat",
+                        reason_note=reason
                     )
-                    with self.lock:
-                        self.balance += prof_c
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"CLOSE CORE 10M {pos_to_close['direction']} ({prof_c:+.2f} €)",
-                            "open_price": pos_to_close["open_price"],
-                            "close_price": cl_c,
-                            "contracts": pos_to_close["contracts"],
-                            "pnl": prof_c,
-                            "balance": round(self.balance, 2),
-                            "reason": reason
-                        })
-                    is_ts = "Trailing" in reason or "TS" in reason
-                    is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
-                    if is_ts:
-                        tag_cl = "dart"
-                        tit_cl = "🎯 TS HIT 10M: Spot Gold"
-                    elif is_rev:
-                        tag_cl = "warning"
-                        tit_cl = "🛑 REVERSAL 10M: Spot Gold"
+                    if not res_c.get("success") and not res_c.get("already_closed"):
+                        logger.warning(f"❌ Chiusura Core {deal_c} non riuscita su IG ({res_c.get('reason')}). Posizione mantenuta attiva.")
+                        with self.lock:
+                            self.position = pos_to_close
+                            self.save_state()
                     else:
-                        tag_cl = "octagonal_sign"
-                        tit_cl = "🛑 CHIUSURA FLAT 10M: Spot Gold"
-                    msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
-                    order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
+                        prof_c = float(res_c.get("profit") or 0.0)
+                        cl_c = float(res_c.get("close_level") or exec_price)
+                        try:
+                            order_mgr.record_closed_trade(
+                                tf="10M",
+                                direction=pos_to_close["direction"],
+                                contracts=pos_to_close["contracts"],
+                                open_price=pos_to_close["open_price"],
+                                close_price=cl_c,
+                                pnl_eur=prof_c,
+                                deal_id=deal_c,
+                                reason=reason,
+                                time_open=pos_to_close.get("open_time", time_str),
+                                label="Core Spot Gold 10M",
+                                epic=self.epic
+                            )
+                        except Exception as ex_rec:
+                            logger.warning(f"Errore registrazione core trade: {ex_rec}")
+                        with self.lock:
+                            self.balance += prof_c
+                            self.trades.insert(0, {
+                                "time": time_str,
+                                "action": f"CLOSE CORE 10M {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                                "open_price": pos_to_close["open_price"],
+                                "close_price": cl_c,
+                                "contracts": pos_to_close["contracts"],
+                                "pnl": prof_c,
+                                "balance": round(self.balance, 2),
+                                "reason": reason
+                            })
+                            self.save_state()
+                        is_ts = "Trailing" in reason or "TS" in reason
+                        is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                        if is_ts:
+                            tag_cl = "dart"
+                            tit_cl = "🎯 TS HIT 10M: Spot Gold"
+                        elif is_rev:
+                            tag_cl = "warning"
+                            tit_cl = "🛑 REVERSAL 10M: Spot Gold"
+                        else:
+                            tag_cl = "octagonal_sign"
+                            tit_cl = "🛑 CHIUSURA FLAT 10M: Spot Gold"
+                        msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
+                        order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
+                except Exception as ex_c:
+                    logger.error(f"Errore chiusura Core Spot Gold: {ex_c}")
                 # Pausa prima degli incrementi
                 time.sleep(1.5)
 
             # 2. Chiudi incrementi residui
             for inc in incs_to_close:
-                deal_i = inc.get("deal_id")
-                if deal_i:
-                    res_i = order_mgr.close_market_deal(
-                        deal_id=deal_i,
-                        direction_open=inc["direction"],
-                        size=inc["contracts"],
-                        label="Chiusura Inc Spot Gold 10M Flat",
-                        reason_note=reason
-                    )
-                    if not res_i.get("success") and not res_i.get("already_closed"):
-                        logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                try:
+                    deal_i = inc.get("deal_id")
+                    if deal_i:
+                        res_i = order_mgr.close_market_deal(
+                            deal_id=deal_i,
+                            direction_open=inc["direction"],
+                            size=inc["contracts"],
+                            label="Chiusura Inc Spot Gold 10M Flat",
+                            reason_note=reason
+                        )
+                        if not res_i.get("success") and not res_i.get("already_closed"):
+                            logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                            with self.lock:
+                                self.increments.append(inc)
+                                self.save_state()
+                            continue
+                        prof_i = float(res_i.get("profit") or 0.0)
+                        cl_i = float(res_i.get("close_level") or exec_price)
+                        try:
+                            order_mgr.record_closed_trade(
+                                tf="10M",
+                                direction=inc["direction"],
+                                contracts=inc["contracts"],
+                                open_price=inc["open_price"],
+                                close_price=cl_i,
+                                pnl_eur=prof_i,
+                                deal_id=deal_i,
+                                reason=reason,
+                                time_open=inc.get("open_time", time_str),
+                                label=f"Inc {inc.get('mode', 'BANCOMAT')} Spot Gold 10M",
+                                epic=self.epic
+                            )
+                        except Exception as ex_rec:
+                            logger.warning(f"Errore registrazione trade incremento: {ex_rec}")
                         with self.lock:
-                            self.increments.append(inc)
+                            self.balance += prof_i
+                            self.trades.insert(0, {
+                                "time": time_str,
+                                "action": f"CLOSE INC 10M {inc['direction']} ({prof_i:+.2f} €)",
+                                "open_price": inc["open_price"],
+                                "close_price": cl_i,
+                                "contracts": inc["contracts"],
+                                "pnl": prof_i,
+                                "balance": round(self.balance, 2),
+                                "reason": reason
+                            })
                             self.save_state()
-                        continue
-                    prof_i = float(res_i.get("profit") or 0.0)
-                    cl_i = float(res_i.get("close_level") or exec_price)
-                    order_mgr.record_closed_trade(
-                        tf="10M",
-                        direction=inc["direction"],
-                        contracts=inc["contracts"],
-                        open_price=inc["open_price"],
-                        close_price=cl_i,
-                        pnl_eur=prof_i,
-                        deal_id=deal_i,
-                        reason=reason,
-                        time_open=inc.get("open_time", time_str),
-                        label="Incremento 10M"
-                    )
-                    with self.lock:
-                        self.balance += prof_i
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"CLOSE INC 10M {inc['direction']} ({prof_i:+.2f} €)",
-                            "open_price": inc["open_price"],
-                            "close_price": cl_i,
-                            "contracts": inc["contracts"],
-                            "pnl": prof_i,
-                            "balance": round(self.balance, 2),
-                            "reason": reason
-                        })
+                except Exception as ex_i:
+                    logger.error(f"Errore chiusura incremento Spot Gold {inc.get('deal_id')}: {ex_i}")
                     order_mgr.send_notification(
                         "🛑 CHIUSURA FLAT INC 10M: Spot Gold",
                         f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {cl_i:.2f} € [PnL: {prof_i:+.2f} €]",

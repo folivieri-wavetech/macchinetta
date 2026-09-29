@@ -695,7 +695,8 @@ class HyperGoldEngine:
                     deal_id=deal_c,
                     reason=reason,
                     time_open=pos_to_close.get("open_time", time_str),
-                    label=c_lbl
+                    label=c_lbl,
+                    epic=self.epic
                 )
                 with self.lock:
                     self.balance += prof_c
@@ -746,7 +747,8 @@ class HyperGoldEngine:
                         deal_id=deal_i,
                         reason=reason,
                         time_open=inc.get("open_time", time_str),
-                        label=f"Scalino #{inc.get('step_idx')}"
+                        label=f"Scalino #{inc.get('step_idx')}",
+                        epic=self.epic
                     )
                     with self.lock:
                         self.balance += prof_i

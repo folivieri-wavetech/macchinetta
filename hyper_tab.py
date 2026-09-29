@@ -866,8 +866,21 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
     if not trades_active:
         trades_active = [t for t in trades_all if t.get("tf") != "30S"]
 
-    trades_us500 = [t for t in trades_active if ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or "US500" in str(t.get("reason", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 4000.0)]
-    trades_gold = [t for t in trades_active if not ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or "US500" in str(t.get("reason", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 4000.0)]
+    def _is_us500_trade(t: dict) -> bool:
+        ep = str(t.get("epic", "")).upper()
+        lbl = str(t.get("label", "")).upper()
+        rsn = str(t.get("reason", "")).upper()
+        op = float(t.get("open_price", 0.0) or 0.0)
+        # Se esplicitamente Gold, non è mai US500
+        if any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl or "ORO" in lbl:
+            return False
+        # Se esplicitamente US500 o prezzo tipico di US500 (> 6000 pt)
+        if "SPTRD" in ep or "US500" in lbl or "US500" in rsn or op > 6000.0:
+            return True
+        return False
+
+    trades_us500 = [t for t in trades_active if _is_us500_trade(t)]
+    trades_gold = [t for t in trades_active if not _is_us500_trade(t)]
 
     tot_pnl = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_active)
     tot_gold = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in trades_gold)
@@ -937,7 +950,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         if day not in daily_stats:
             daily_stats[day] = {"gold": 0.0, "us500": 0.0, "n_gold": 0, "n_us500": 0}
         pnl = float(t.get("pnl_eur", 0.0) or 0.0)
-        is_us = ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or "US500" in str(t.get("reason", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 4000.0)
+        is_us = _is_us500_trade(t)
         if is_us:
             daily_stats[day]["us500"] += pnl
             daily_stats[day]["n_us500"] += 1
@@ -1120,7 +1133,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             col_p = "#22c55e" if pnl > 0 else ("#ef4444" if pnl < 0 else "#94a3b8")
             sign = "+" if pnl > 0 else ""
             d_col = "#22c55e" if t.get("direction") == "LONG" else "#ef4444"
-            is_us = ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or "US500" in str(t.get("reason", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 4000.0)
+            is_us = _is_us500_trade(t)
             inst_badge = "<span style='color: #38bdf8; font-weight: 700;'>📈 US 500</span>" if is_us else "<span style='color: #FFD700; font-weight: 700;'>🪙 Gold</span>"
             reason_txt = str(t.get("reason", "--") or "--")
             reason_txt = reason_txt.replace("Paracadute KJ Intracandela", "Paracadute KJ")

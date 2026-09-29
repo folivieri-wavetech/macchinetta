@@ -579,7 +579,8 @@ class HyperUS500Engine:
                         deal_id=deal_id,
                         reason=reason,
                         time_open=pos_to_close.get("open_time", time_str),
-                        label="US500 30S Flat"
+                        label="US500 30S Flat",
+                        epic=self.epic
                     )
                     self.trades.insert(0, {
                         "time": time_str,
@@ -628,7 +629,8 @@ class HyperUS500Engine:
                             deal_id=inc["deal_id"],
                             reason=reason,
                             time_open=inc.get("open_time", time_str),
-                            label="Residuo US500"
+                            label="Residuo US500",
+                            epic=self.epic
                         )
                     time.sleep(1.5)
 

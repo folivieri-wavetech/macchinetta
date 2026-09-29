@@ -885,112 +885,128 @@ class HyperUS500M5Engine:
                 self.increments = []
                 self.save_state()
 
+            # 1. Chiudi Core se presente
             if pos_to_close and pos_to_close.get("deal_id"):
-                deal_id = pos_to_close["deal_id"]
-                res = order_mgr.close_market_deal(
-                    deal_id=deal_id,
-                    direction_open=pos_to_close["direction"],
-                    size=pos_to_close["contracts"],
-                    label="Chiusura Flat US500 Core",
-                    reason_note=reason
-                )
-                if not res.get("success") and not res.get("already_closed"):
-                    logger.warning(f"❌ Chiusura Core US500 {deal_id} non riuscita su IG ({res.get('reason')}). Posizione mantenuta attiva.")
-                    with self.lock:
-                        self.position = pos_to_close
-                        self.save_state()
-                else:
-                    profit = float(res.get("profit") or 0.0)
-                    close_px = float(res.get("close_level") or exec_price)
-                    with self.lock:
-                        self.balance += profit
-                        order_mgr.record_closed_trade(
-                            tf="10M",
-                            direction=pos_to_close["direction"],
-                            contracts=pos_to_close["contracts"],
-                            open_price=pos_to_close["open_price"],
-                            close_price=close_px,
-                            pnl_eur=profit,
-                            deal_id=deal_id,
-                            reason=reason,
-                            time_open=pos_to_close.get("open_time", time_str),
-                            label="Core US500 10M",
-                            epic=EPIC_US500
-                        )
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"🏁 CLOSE REAL IG US500 {pos_to_close['direction']} ({profit:+.2f} €)",
-                            "open_price": pos_to_close["open_price"],
-                            "close_price": close_px,
-                            "contracts": pos_to_close["contracts"],
-                            "pnl": profit,
-                            "balance": round(self.balance, 2),
-                            "reason": reason
-                        })
-                    is_ts = "Trailing" in reason or "TS" in reason
-                    is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
-                    if is_ts:
-                        tag_cl = "dart"
-                        tit_cl = "🎯 TS HIT 10M: US 500 Cash"
-                    elif is_rev:
-                        tag_cl = "warning"
-                        tit_cl = "🛑 REVERSAL 10M: US 500 Cash"
-                    else:
-                        tag_cl = "octagonal_sign"
-                        tit_cl = "🛑 CHIUSURA FLAT 10M: US 500 Cash"
-                    msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
-                    order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
-
-            for inc in incs_to_close:
-                deal_i = inc.get("deal_id")
-                if deal_i:
-                    mode_i = inc.get("mode", "BANCOMAT")
-                    res_i = order_mgr.close_market_deal(
-                        deal_id=deal_i,
-                        direction_open=inc["direction"],
-                        size=inc["contracts"],
-                        label=f"Chiusura Inc {mode_i} US500 10M Flat",
+                try:
+                    deal_id = pos_to_close["deal_id"]
+                    res = order_mgr.close_market_deal(
+                        deal_id=deal_id,
+                        direction_open=pos_to_close["direction"],
+                        size=pos_to_close["contracts"],
+                        label="Chiusura Flat US500 Core",
                         reason_note=reason
                     )
-                    if not res_i.get("success") and not res_i.get("already_closed"):
-                        logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                    if not res.get("success") and not res.get("already_closed"):
+                        logger.warning(f"❌ Chiusura Core US500 {deal_id} non riuscita su IG ({res.get('reason')}). Posizione mantenuta attiva.")
                         with self.lock:
-                            self.increments.append(inc)
+                            self.position = pos_to_close
                             self.save_state()
-                        continue
-                    prof_i = float(res_i.get("profit") or 0.0)
-                    close_i = float(res_i.get("close_level") or exec_price)
-                    with self.lock:
-                        self.balance += prof_i
-                        order_mgr.record_closed_trade(
-                            tf="10M",
-                            direction=inc["direction"],
-                            contracts=inc["contracts"],
-                            open_price=inc["open_price"],
-                            close_price=close_i,
-                            pnl_eur=prof_i,
-                            deal_id=inc["deal_id"],
-                            reason=reason,
-                            time_open=inc.get("open_time", time_str),
-                            label=f"Inc {mode_i} US500 10M",
-                            epic=EPIC_US500
+                    else:
+                        profit = float(res.get("profit") or 0.0)
+                        close_px = float(res.get("close_level") or exec_price)
+                        try:
+                            order_mgr.record_closed_trade(
+                                tf="10M",
+                                direction=pos_to_close["direction"],
+                                contracts=pos_to_close["contracts"],
+                                open_price=pos_to_close["open_price"],
+                                close_price=close_px,
+                                pnl_eur=profit,
+                                deal_id=deal_id,
+                                reason=reason,
+                                time_open=pos_to_close.get("open_time", time_str),
+                                label="Core US500 10M",
+                                epic=EPIC_US500
+                            )
+                        except Exception as ex_rec:
+                            logger.warning(f"Errore registrazione core US500: {ex_rec}")
+                        with self.lock:
+                            self.balance += profit
+                            self.trades.insert(0, {
+                                "time": time_str,
+                                "action": f"🏁 CLOSE REAL IG US500 {pos_to_close['direction']} ({profit:+.2f} €)",
+                                "open_price": pos_to_close["open_price"],
+                                "close_price": close_px,
+                                "contracts": pos_to_close["contracts"],
+                                "pnl": profit,
+                                "balance": round(self.balance, 2),
+                                "reason": reason
+                            })
+                            self.save_state()
+                        is_ts = "Trailing" in reason or "TS" in reason
+                        is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
+                        if is_ts:
+                            tag_cl = "dart"
+                            tit_cl = "🎯 TS HIT 10M: US 500 Cash"
+                        elif is_rev:
+                            tag_cl = "warning"
+                            tit_cl = "🛑 REVERSAL 10M: US 500 Cash"
+                        else:
+                            tag_cl = "octagonal_sign"
+                            tit_cl = "🛑 CHIUSURA FLAT 10M: US 500 Cash"
+                        msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
+                        order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
+                except Exception as ex_c:
+                    logger.error(f"Errore chiusura Core US500: {ex_c}")
+
+            # 2. Chiudi incrementi residui
+            for inc in incs_to_close:
+                try:
+                    deal_i = inc.get("deal_id")
+                    if deal_i:
+                        mode_i = inc.get("mode", "BANCOMAT")
+                        res_i = order_mgr.close_market_deal(
+                            deal_id=deal_i,
+                            direction_open=inc["direction"],
+                            size=inc["contracts"],
+                            label=f"Chiusura Inc {mode_i} US500 10M Flat",
+                            reason_note=reason
                         )
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"🎯 CLOSE INC {mode_i} US500 {inc['direction']} ({prof_i:+.2f} €)",
-                            "open_price": inc["open_price"],
-                            "close_price": close_i,
-                            "contracts": inc["contracts"],
-                            "pnl": prof_i,
-                            "balance": round(self.balance, 2),
-                            "reason": reason
-                        })
-                    order_mgr.send_notification(
-                        f"🛑 CHIUSURA FLAT INC {mode_i} 10M: US 500 Cash",
-                        f"[US 500] Incremento {mode_i} {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
-                        "octagonal_sign"
-                    )
-                    time.sleep(1.5)
+                        if not res_i.get("success") and not res_i.get("already_closed"):
+                            logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
+                            with self.lock:
+                                self.increments.append(inc)
+                                self.save_state()
+                            continue
+                        prof_i = float(res_i.get("profit") or 0.0)
+                        close_i = float(res_i.get("close_level") or exec_price)
+                        try:
+                            order_mgr.record_closed_trade(
+                                tf="10M",
+                                direction=inc["direction"],
+                                contracts=inc["contracts"],
+                                open_price=inc["open_price"],
+                                close_price=close_i,
+                                pnl_eur=prof_i,
+                                deal_id=inc["deal_id"],
+                                reason=reason,
+                                time_open=inc.get("open_time", time_str),
+                                label=f"Inc {mode_i} US500 10M",
+                                epic=EPIC_US500
+                            )
+                        except Exception as ex_rec:
+                            logger.warning(f"Errore registrazione incremento US500: {ex_rec}")
+                        with self.lock:
+                            self.balance += prof_i
+                            self.trades.insert(0, {
+                                "time": time_str,
+                                "action": f"🎯 CLOSE INC {mode_i} US500 {inc['direction']} ({prof_i:+.2f} €)",
+                                "open_price": inc["open_price"],
+                                "close_price": close_i,
+                                "contracts": inc["contracts"],
+                                "pnl": prof_i,
+                                "balance": round(self.balance, 2),
+                                "reason": reason
+                            })
+                            self.save_state()
+                except Exception as ex_i:
+                    logger.error(f"Errore chiusura incremento US500 {inc.get('deal_id')}: {ex_i}")
+                order_mgr.send_notification(
+                    f"🛑 CHIUSURA FLAT INC {mode_i} 10M: US 500 Cash",
+                    f"[US 500] Incremento {mode_i} {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
+                    "octagonal_sign"
+                )
+                time.sleep(1.5)
 
             with self.lock:
                 self.save_state()
