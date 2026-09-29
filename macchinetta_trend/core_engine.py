@@ -103,20 +103,13 @@ class CoreEngine:
     def _get_increment_rules(self):
         """
         Restituisce le soglie Break-Even, Trailing e Take Profit per singolo incremento:
-        - Crude Oil (Oil - US Crude):
-            be_pips = 90, be_offset = 5, tp_pips = 100, trail_dist = 30
         - Commodities e Indici (Spot Gold, US 500 Cash):
             be_pips = 40, be_offset = 2, tp_pips = 50, trail_dist = 15
         - Cross Forex:
             be_pips = 25, be_offset = 1, tp_pips = 40, trail_dist = 12
         """
         nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
-        if "oil" in nome or "crude" in nome:
-            be_pips = self.config.get("increment_be_pips", 90)
-            be_offset = self.config.get("increment_be_offset", 5)
-            tp_pips = self.config.get("increment_tp_pips", 100)
-            trail_dist = self.config.get("increment_trail_pips", 30)
-        elif any(c in nome for c in ["gold", "us 500", "us500", "sp500"]):
+        if any(c in nome for c in ["gold", "us 500", "us500", "sp500"]):
             be_pips = self.config.get("increment_be_pips", 40)
             be_offset = self.config.get("increment_be_offset", 2)
             tp_pips = self.config.get("increment_tp_pips", 50)
@@ -131,9 +124,7 @@ class CoreEngine:
     def _get_tk_increment_filters(self):
         """Restituisce (tolleranza_tk, max_dist_tk, min_dist_incr, min_candle_body) in pip/punti."""
         nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
-        if "oil" in nome or "crude" in nome:
-            return 10, 40, 30, 5 # Per Oil: tolleranza 10p, zona TK 40p, dist tra incr 30p, body 5p
-        return 5, 20, 10, 1 # Per Forex e altri: 5p, 20p, 10p, 1p
+        return 5, 20, 10, 1 # Per tutti: 5p, 20p, 10p, 1p
 
     def _get_max_kj_tk_threshold_pips(self):
         """Restituisce la soglia di forbice Kijun-Tenkan in pip per Timeframe: H1=30, H4=40, D1=50."""
@@ -186,7 +177,6 @@ class CoreEngine:
             is_d1 = ("DAY" in tf_val or "D1" in tf_val)
             dist_kj_pips = (c_close - kj) / pip_val
             nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
-            is_oil = ("OIL" in nome_str or "CRUDE" in nome_str)
 
             if is_d1:
                 # Regola D1: attivazione > 150 pip da Kijun, trailing stop a 75 pip dietro il Close
@@ -203,9 +193,9 @@ class CoreEngine:
                 apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
                 ext_tf_label = "H4"
             elif is_h1:
-                default_tp_h1 = 250 if is_oil else 100
+                default_tp_h1 = 100
                 tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
-                trail_pips = 65 if is_oil else 30
+                trail_pips = 30
                 apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
                 ext_tf_label = "H1"
             else:
@@ -408,7 +398,6 @@ class CoreEngine:
             is_d1 = ("DAY" in tf_val or "D1" in tf_val)
             dist_kj_pips = (kj - c_close) / pip_val
             nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
-            is_oil = ("OIL" in nome_str or "CRUDE" in nome_str)
 
             if is_d1:
                 # Regola D1: attivazione > 150 pip da Kijun, trailing stop a 75 pip dietro il Close
@@ -425,9 +414,9 @@ class CoreEngine:
                 apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
                 ext_tf_label = "H4"
             elif is_h1:
-                default_tp_h1 = 250 if is_oil else 100
+                default_tp_h1 = 100
                 tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
-                trail_pips = 65 if is_oil else 30
+                trail_pips = 30
                 apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
                 ext_tf_label = "H1"
             else:
@@ -699,7 +688,7 @@ class CoreEngine:
         is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
 
         nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
-        sl_core_pips = 40 if ("oil" in nome_str or "crude" in nome_str) else 15
+        sl_core_pips = 15
 
         if self.current_direction == "LONG":
             # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 40 pip)

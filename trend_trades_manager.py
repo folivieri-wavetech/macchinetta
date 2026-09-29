@@ -17,7 +17,7 @@ FILE_MEMORIA = "memoria_parametri.json"
 
 TUTTI_STRUMENTI_TREND = [
     "AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", 
-    "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"
+    "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "CHF/JPY"
 ]
 
 def _resolve_history_path(conto: str = None) -> str:

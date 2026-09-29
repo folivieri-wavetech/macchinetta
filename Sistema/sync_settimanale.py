@@ -25,7 +25,7 @@ CONFIG_STRUMENTI = {
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP"},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP"},
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP"},
-    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP"}
+    "CHF/JPY": {"epic": "CS.D.CHFJPY.MINI.IP"}
 }
 
 TIMEFRAMES = ["HOUR", "HOUR_4", "DAY"]

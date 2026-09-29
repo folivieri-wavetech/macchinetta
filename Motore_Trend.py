@@ -149,7 +149,7 @@ CONFIG_STRUMENTI = {
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "tp_kj_distance_h1": 200},
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "tp_kj_distance_h1": 100},
-    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "tp_kj_distance_h1": 250}
+    "CHF/JPY": {"epic": "CS.D.CHFJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100}
 }
 
 # Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
@@ -779,10 +779,10 @@ def aggrega_candele_multitf(candele_src, tf_src, tf_dest):
 def is_session_break_active(nome, dt=None):
     """
     Ritorna True se lo strumento si trova nella pausa tecnica giornaliera a mercato chiuso (23:00 - 00:00 italiana, Lunedì-Giovedì).
-    Applicabile a Spot Gold (COMEX) e Oil - US Crude (NYMEX).
+    Applicabile a Spot Gold (COMEX).
     Il venerdì alle 23:00 scatta invece il weekend per tutti (gestito da is_weekend_active).
     """
-    if nome not in ("Spot Gold", "Oil - US Crude"):
+    if nome not in ("Spot Gold",):
         return False
     ora = dt if dt else now_it()
     # Lunedì (0), Martedì (1), Mercoledì (2), Giovedì (3) dalle 23:00 alle 23:59:59
@@ -960,8 +960,8 @@ def salva_quota_ig(allowance_dict):
 def salva_candele_locali(nome, tf, candele_list):
     clean = nome.replace("/", "_").replace(" ", "_")
     fname = f"candele_{clean}_{tf}.json"
-    # REGOLA COMEX/NYMEX: Spot Gold e Oil - US Crude non hanno candela H1 alle 23:00
-    if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude"):
+    # REGOLA COMEX: Spot Gold non ha candela H1 alle 23:00
+    if tf == "HOUR" and nome in ("Spot Gold",):
         candele_list = [c for c in candele_list if " 23:00:00" not in c.get("snapshotTime", "")]
     buffer_60 = candele_list[-60:]
     
@@ -1357,12 +1357,12 @@ def aggiorna_candele_live_globale(prezzi_live):
             if is_venerdi_23 and tf in ("HOUR_4", "DAY"):
                 curr_snap = f"{base_dt.strftime('%Y/%m/%d')} 23:00:00"
 
-            # REGOLA APERTURA DOMENICA E CHIUSURA 01:00 LUNEDÌ (FOREX, GOLD, CRUDE):
+            # REGOLA APERTURA DOMENICA E CHIUSURA 01:00 LUNEDÌ (FOREX, GOLD):
             # - Forex apre domenica alle 22:00: 3 candele H1 (22:00, 23:00, 00:00).
-            # - Gold e Crude aprono lunedì alle 00:00: 1 candela H1 (00:00).
+            # - Gold apre lunedì alle 00:00: 1 candela H1 (00:00).
             # - All'01:00 di lunedì scatta la chiusura per TUTTI gli 11 strumenti:
-            #   * H4 chiude aggregando le prime ore (Forex 3h: 22:00-01:00, Gold/Crude 1h: 00:00-01:00).
-            #   * D1 chiude con data di DOMENICA (per Forex aggrega le 3h, per Gold/Crude aggrega l'ora 00:00-01:00).
+            #   * H4 chiude aggregando le prime ore (Forex 3h: 22:00-01:00, Gold 1h: 00:00-01:00).
+            #   * D1 chiude con data di DOMENICA (per Forex aggrega le 3h, per Gold aggrega l'ora 00:00-01:00).
             # - Dalle 01:00 di lunedì parte la candela D1 del Lunedì per tutti.
             
             tracker = LIVE_OHLC_TRACKER.get((nome, tf))
@@ -1370,7 +1370,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 # Durante la chiusura del venerdì non aprire tracker se non esistenti
                 if is_venerdi_23:
                     continue
-                # Durante la pausa tecnica (23:00-00:00) per Spot Gold e Oil non aprire tracker H1
+                # Durante la pausa tecnica (23:00-00:00) per Spot Gold non aprire tracker H1
                 if tf == "HOUR" and is_session_break_active(nome, now_t):
                     continue
 
@@ -1382,7 +1382,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 if c_loc:
                     last_c = c_loc[-1]
                     if tf == "HOUR":
-                        is_after_break = (nome in ("Spot Gold", "Oil - US Crude") and " 00:00:00" in curr_snap)
+                        is_after_break = (nome in ("Spot Gold",) and " 00:00:00" in curr_snap)
                         is_after_weekend = (now_t.weekday() == 6 and now_t.hour == 22) or (now_t.weekday() == 0 and now_t.hour == 0)
                         if not is_after_break and not is_after_weekend and last_c.get("closePrice"):
                             try:
@@ -1433,9 +1433,9 @@ def aggiorna_candele_live_globale(prezzi_live):
                 # Candela conclusa al passaggio del boundary!
                 closed_snap = tracker["snap"]
                 
-                # REGOLA COMEX/NYMEX: Spot Gold e Oil - US Crude non hanno candela H1 alle 23:00
+                # REGOLA COMEX: Spot Gold non ha candela H1 alle 23:00
                 # Scarta la candela fake e reimposta il tracker sulla nuova candela (es. 00:00)
-                if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude") and " 23:00:00" in closed_snap and not is_venerdi_23:
+                if tf == "HOUR" and nome in ("Spot Gold",) and " 23:00:00" in closed_snap and not is_venerdi_23:
                     LIVE_OHLC_TRACKER[(nome, tf)] = {
                         "snap": curr_snap,
                         "open": live_px,
@@ -1456,7 +1456,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                 
                 # Certificazione dell'Open per H1: verifica continuità assoluta rispetto alla chiusura precedente
                 if tf == "HOUR":
-                    is_after_break = (nome in ("Spot Gold", "Oil - US Crude") and " 00:00:00" in closed_snap)
+                    is_after_break = (nome in ("Spot Gold",) and " 00:00:00" in closed_snap)
                     is_after_weekend = (now_t.weekday() == 6 and now_t.hour == 22) or (now_t.weekday() == 0 and now_t.hour == 0)
                     try:
                         c_prev_all = carica_candele_locali(nome, "HOUR")
@@ -1571,7 +1571,7 @@ def aggiorna_candele_live_globale(prezzi_live):
                     pass
 
             else:
-                # Se siamo in session break per Gold o Oil, non tracciare tick a mercato chiuso
+                # Se siamo in session break per Gold, non tracciare tick a mercato chiuso
                 if tf == "HOUR" and is_session_break_active(nome, now_t):
                     continue
                 # Aggiorna candela in corso
@@ -2089,11 +2089,10 @@ def esegui_ciclo_trend():
         epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
         if not epic: continue
         
-        # Recupera parametri con default specifici (Oil: Core 1, Max 3, Scala 1; altri: Core 4, Max 10, Scala 2)
-        is_oil = ("oil" in nome.lower() or "crude" in nome.lower())
-        def_size = 1 if is_oil else 4
-        def_size_max = 3 if is_oil else 10
-        def_scala = 1 if is_oil else 2
+        # Recupera parametri con default specifici (Core 4, Max 10, Scala 2)
+        def_size = 4
+        def_size_max = 10
+        def_scala = 2
 
         tf = dati.get("timeframe", "HOUR")
         size_i = dati.get("size", def_size)
@@ -2228,7 +2227,7 @@ def esegui_ciclo_trend():
                 "max_kj_distance": 30.0,
                 "max_entry_delay": 5,
                 "auto_restart": auto_restart,
-                "tp_kj_distance_h1": CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 250 if "Oil" in nome else 100)
+                "tp_kj_distance_h1": CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 100)
             }
             stato_motore.motori[nome] = CoreEngine(cfg)
         else:
@@ -2241,7 +2240,7 @@ def esegui_ciclo_trend():
             stato_motore.motori[nome].config["pip_value"] = CONFIG_STRUMENTI[nome]["moltiplicatore"]
             stato_motore.motori[nome].config["max_kj_distance"] = 30.0
             stato_motore.motori[nome].config["auto_restart"] = auto_restart
-            stato_motore.motori[nome].config["tp_kj_distance_h1"] = CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 250 if "Oil" in nome else 100)
+            stato_motore.motori[nome].config["tp_kj_distance_h1"] = CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 100)
         
         engine = stato_motore.motori[nome]
         
@@ -2313,9 +2312,8 @@ def esegui_ciclo_trend():
 
                         elif tf in ("HOUR", "H1") and engine.current_kj is not None:
                             candidati_boot_h1 = []
-                            is_oil = any(w in nome.lower() for w in ["oil", "crude"])
-                            th_h1 = 250 if is_oil else 100
-                            ts_dist_h1 = 65 if is_oil else 30
+                            th_h1 = 100
+                            ts_dist_h1 = 30
                             if stato_corrente == "SHORT":
                                 dist_kj = engine.current_kj - c_close
                                 if dist_kj <= (40 * pip_val):

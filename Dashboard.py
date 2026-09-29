@@ -82,7 +82,7 @@ CONFIG_STRUMENTI = {
     "USD/JPY": {"epic": "CS.D.USDJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290, "tp_kj_distance_h1": 100},
     "Spot Gold": {"epic": "CS.D.CFEGOLD.CBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 220, "tp_kj_distance_h1": 200},
     "US 500 Cash": {"epic": "IX.D.SPTRD.IBE.IP", "moltiplicatore": 1.0, "decimali": 2, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 400, "tp_kj_distance_h1": 100},
-    "Oil - US Crude": {"epic": "CC.D.CL.UBE.IP", "moltiplicatore": 1.0, "decimali": 1, "valuta": "EUR", "valore_punto": 1, "margine_unitario": 900, "tp_kj_distance_h1": 250}
+    "CHF/JPY": {"epic": "CS.D.CHFJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290, "tp_kj_distance_h1": 100}
 }
 
 # Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
@@ -1292,10 +1292,9 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
             st.rerun()
         return
     
-    is_oil = ("oil" in nome_strumento.lower() or "crude" in nome_strumento.lower())
-    sz_t = mem_t.get("size", 1 if is_oil else 4)
-    szm_t = mem_t.get("size_max", 3 if is_oil else 10)
-    sc_t = mem_t.get("scala", 1 if is_oil else 2)
+    sz_t = mem_t.get("size", 4)
+    szm_t = mem_t.get("size_max", 10)
+    sc_t = mem_t.get("scala", 2)
     
     def_tp, def_opp, def_dts = calcola_default_range_da_atr_dash(conto_r, nome_strumento)
     tp_r = mem_r.get("tp")
@@ -1958,9 +1957,9 @@ def aggrega_candele_dash(candele_src, tf_src, tf_dest):
 def is_session_break_active_dash(nome, dt=None):
     """
     Ritorna True se lo strumento si trova nella pausa tecnica giornaliera a mercato chiuso (23:00 - 00:00 italiana, Lunedì-Giovedì).
-    Applicabile a Spot Gold (COMEX) e Oil - US Crude (NYMEX).
+    Applicabile a Spot Gold (COMEX).
     """
-    if nome not in ("Spot Gold", "Oil - US Crude"):
+    if nome not in ("Spot Gold",):
         return False
     ora = dt if dt else now_it()
     if ora.weekday() in (0, 1, 2, 3) and ora.hour == 23:
@@ -2030,7 +2029,7 @@ def carica_candele_locali_dash(conto, nome, tf, px_live=None):
                 with open(p, "r", encoding="utf-8") as f:
                     d = json.load(f)
                     if len(d) >= 55 and is_valid_candele_dash(d, tf):
-                        if tf == "HOUR" and nome in ("Spot Gold", "Oil - US Crude"):
+                        if tf == "HOUR" and nome in ("Spot Gold",):
                             d = [c for c in d if " 23:00:00" not in c.get("snapshotTime", "")]
                         if px_live and isinstance(px_live, (int, float)):
                             return allinea_candele_live_dash(d, nome, tf, px_live)
@@ -2110,9 +2109,9 @@ def calcola_default_range_da_atr_dash(conto, nome):
             pips_d1 = atr_d1 / mult
             tp_suggerito = max(80, int(round(pips_d1 / 20.0) * 20))
         else:
-            tp_suggerito = 100 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else 80
+            tp_suggerito = 100 if nome in ["Spot Gold", "US 500 Cash"] else 80
     except Exception:
-        tp_suggerito = 100 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else 80
+        tp_suggerito = 100 if nome in ["Spot Gold", "US 500 Cash"] else 80
         
     opp_suggerito = max(1, int(round(tp_suggerito / 4.0)))
     dts_suggerito = max(1, int(round(tp_suggerito / 8.0)))
@@ -2197,7 +2196,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
 
         gruppi_tabelle = [
             ("💱 Cross Forex", ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY"], "#38bdf8"),
-            ("🪙 Commodities & Indici (Spot Gold, US 500, Oil)", ["Spot Gold", "US 500 Cash", "Oil - US Crude"], "#f59e0b")
+            ("🪙 Commodities & Indici (Spot Gold, US 500)", ["Spot Gold", "US 500 Cash"], "#f59e0b")
         ]
         tf_map_code = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
         
@@ -3323,10 +3322,9 @@ else:
 
                 def crea_riquadro_trend(nome, def_body=10, def_size=None, def_size_max=None, def_scala=None):
                     with st.container(border=True):
-                        is_oil = ("oil" in nome.lower() or "crude" in nome.lower())
-                        if def_size is None: def_size = 1 if is_oil else 4
-                        if def_size_max is None: def_size_max = 3 if is_oil else 10
-                        if def_scala is None: def_scala = 1 if is_oil else 2
+                        if def_size is None: def_size = 4
+                        if def_size_max is None: def_size_max = 10
+                        if def_scala is None: def_scala = 2
 
                         dati_salvati = memoria_attuale.get(nome, {})
                         stato_corrente = dati_salvati.get("stato", "FLAT")
@@ -3401,7 +3399,7 @@ else:
                                 dir_comp = "LONG" if px_live > current_kj else ("SHORT" if px_live < current_kj else "NEUTRO")
                                 st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 4px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
                             if tf_val == "HOUR":
-                                tp_kj_h1_val = int(CONFIG_STRUMENTI.get(nome, {}).get("tp_kj_distance_h1", 250 if "Oil" in nome else 100))
+                                tp_kj_h1_val = int(CONFIG_STRUMENTI.get(nome, {}).get("tp_kj_distance_h1", 100))
                                 st.markdown(f"<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🎯 <b>TP Estensione H1:</b> Distanza Prezzo-KJ &ge; {tp_kj_h1_val} pip ➔ FLAT</div>", unsafe_allow_html=True)
                             
                         # Lettura campo Prezzo Trigger
@@ -3862,7 +3860,7 @@ else:
                         
 
 
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "CHF/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
@@ -3878,7 +3876,7 @@ else:
                 stato_sys = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato_sys.get("prezzi_live", {})
             
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "CHF/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
             
                 st.html("""
@@ -4170,8 +4168,8 @@ else:
                         return f"<span style='color: #FFD700; font-weight: 700;'>🪙 {strum}</span>"
                     elif "US 500" in s or "SPTRD" in s or "US500" in s:
                         return f"<span style='color: #38bdf8; font-weight: 700;'>📈 {strum}</span>"
-                    elif "OIL" in s or "CRUDE" in s:
-                        return f"<span style='color: #fb923c; font-weight: 700;'>🛢️ {strum}</span>"
+                    elif "CHF/JPY" in s or "CHFJPY" in s:
+                        return f"<span style='color: #c084fc; font-weight: 700;'>🇯🇵 {strum}</span>"
                     elif any(k in s for k in ("GBP/JPY", "EUR/JPY", "CAD/JPY", "USD/JPY")):
                         return f"<span style='color: #c084fc; font-weight: 700;'>🇯🇵 {strum}</span>"
                     elif "GBP/USD" in s:
@@ -4394,7 +4392,7 @@ else:
                         if atr_d1_val is not None:
                             mult_r = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
                             atr_d1_pips = int(round(atr_d1_val / mult_r))
-                            unita_r = "pt" if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "pip"
+                            unita_r = "pt" if nome in ["Spot Gold", "US 500 Cash"] else "pip"
                             st.markdown(f"<div style='font-size: 0.82rem; color: #888; margin-top: 1px; margin-bottom: 3px;'>📊 <span style='color: #FFA500; font-weight: 600;'>ATR(21) Live: {atr_d1_pips} {unita_r}</span> ➡️ <span style='color: #FFA500; font-weight: 600;'>TP Live: {tp_default}</span> (OPP: {opp_default} | DTS: {dts_default})</div>", unsafe_allow_html=True)
 
                         margine_u = CONFIG_STRUMENTI.get(nome, {}).get("margine_unitario", "N/D")
@@ -4529,16 +4527,16 @@ else:
                                 else: st.success(f"🟢 ATTIVO ({direzione}) | Motore: {stato_corrente_disp}")
                             else: st.error(f"🔴 SPENTO | Motore: {stato_corrente_disp}")
 
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "CHF/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 for i in range(0, len(tutti_strumenti), 2):
                     c1, c2 = st.columns(2)
                     with c1:
                         def_r1 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i])
-                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r1, 4)
+                        crea_riquadro_strumento(tutti_strumenti[i], "Asset" if tutti_strumenti[i] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *def_r1, 4)
                     with c2:
                         if i + 1 < len(tutti_strumenti):
                             def_r2 = calcola_default_range_da_atr_dash(conto_selezionato, tutti_strumenti[i+1])
-                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash", "Oil - US Crude"] else "Forex Mini", *def_r2, 4)
+                            crea_riquadro_strumento(tutti_strumenti[i+1], "Asset" if tutti_strumenti[i+1] in ["Spot Gold", "US 500 Cash"] else "Forex Mini", *def_r2, 4)
 
 
             @st.fragment(run_every=15)
@@ -4604,7 +4602,7 @@ else:
                     c4.markdown("<div style='color: #888; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; margin-top: 5px; margin-bottom: -5px;'>Ultimo Evento</div>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);'>", unsafe_allow_html=True)
                 
-                    tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                    tutti_strumenti = ["AUD/NZD", "CAD/JPY", "CHF/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                     strumenti_ordinati = sorted(tutti_strumenti, key=lambda x: (not memoria.get(x, {}).get("attivo", False), x))
                 
                     for nome in strumenti_ordinati:
@@ -4618,7 +4616,7 @@ else:
                         stato_display = stato.replace("OverGain", "OG").replace("OverLoss", "OL")
                     
                         if is_attivo and isinstance(prezzo, (int, float)):
-                            mult = 1 if nome in ["Spot Gold", "US 500 Cash", "Oil - US Crude", "Ethereum"] else (0.01 if "JPY" in nome else 0.0001)
+                            mult = 1 if nome in ["Spot Gold", "US 500 Cash", "Ethereum"] else (0.01 if "JPY" in nome else 0.0001)
                             if stato == "FASE_1 + Micro":
                                 dir_core = dati.get("direzione")
                                 base = dati.get("prezzo_base")
@@ -4908,7 +4906,7 @@ else:
 
             col1, col2, col3 = st.columns(3)
             with col1:
-                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"]
+                tutti_strumenti = ["AUD/NZD", "CAD/JPY", "CHF/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash"]
                 r_nome = st.selectbox("1. Seleziona Strumento", tutti_strumenti)
             with col2:
                 r_fase = st.selectbox("2. Seleziona Fase", ["FASE 1", "FASE 2", "FASE 3"])
@@ -5607,7 +5605,7 @@ else:
                     
                     tutti_strumenti_kj = [
                         "AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", 
-                        "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "Oil - US Crude"
+                        "USD/CAD", "USD/CHF", "USD/JPY", "Spot Gold", "US 500 Cash", "CHF/JPY"
                     ]
                     timeframes_kj = ["H1", "H4", "D1"]
                     radar_cached_kj, _ = carica_radar_trend_dash(conto_selezionato)
