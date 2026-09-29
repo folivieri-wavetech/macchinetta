@@ -309,8 +309,30 @@ class HyperUS500M5Engine:
                     pass
 
     def _recalculate_indicators(self):
+        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M10 US500.
+        Allineato agli standard di mercato (TradingView / IG Charts):
+        prende le ultime 54 candele chiuse + gli estremi della candela corrente in formazione."""
         n = len(self.candles)
-        if n >= WARMUP_BARS_KJ:
+        if n >= (WARMUP_BARS_KJ - 1):
+            sub_kj = self.candles[-(WARMUP_BARS_KJ - 1):]
+            highs = [c["high"] for c in sub_kj]
+            lows = [c["low"] for c in sub_kj]
+
+            curr_h = getattr(self, "curr_high", None)
+            curr_l = getattr(self, "curr_low", None)
+            if curr_h is not None and curr_l is not None:
+                highs.append(curr_h)
+                lows.append(curr_l)
+            elif n >= WARMUP_BARS_KJ:
+                highs.append(self.candles[-WARMUP_BARS_KJ]["high"])
+                lows.append(self.candles[-WARMUP_BARS_KJ]["low"])
+
+            max_h_kj = max(highs)
+            min_l_kj = min(lows)
+            self.kj55 = round((max_h_kj + min_l_kj) / 2.0, 2)
+            if self.candles:
+                self.candles[-1]["kj55"] = self.kj55
+        elif n == WARMUP_BARS_KJ:
             sub_kj = self.candles[-WARMUP_BARS_KJ:]
             max_h_kj = max(c["high"] for c in sub_kj)
             min_l_kj = min(c["low"] for c in sub_kj)
@@ -1179,9 +1201,16 @@ class HyperUS500M5Engine:
                 return
 
             if boundary == self.curr_boundary:
-                if mid > self.curr_high: self.curr_high = mid
-                if mid < self.curr_low: self.curr_low = mid
+                new_extreme = False
+                if mid > self.curr_high:
+                    self.curr_high = mid
+                    new_extreme = True
+                if mid < self.curr_low:
+                    self.curr_low = mid
+                    new_extreme = True
                 self.curr_close = mid
+                if new_extreme and self.kj55 is not None:
+                    self._recalculate_indicators()
             else:
                 closed_candle = {
                     "boundary": self.curr_boundary,

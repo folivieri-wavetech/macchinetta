@@ -85,9 +85,9 @@ TK_FILTER_PIPS = 0.0
 CORE_REENTRY_KJ_DIST_PIPS = 2.0
 
 # Orari Sospensione Gold:
-# 1. Chiusura Feed IG Spot Gold (Nessun tick disponibile dalle 22:45 alle 00:00)
-GOLD_FEED_SUSPEND_START_HOUR = 22
-GOLD_FEED_SUSPEND_START_MIN = 45
+# 1. Chiusura Feed IG Spot Gold (Session break COMEX dalle 23:00 alle 00:00)
+GOLD_FEED_SUSPEND_START_HOUR = 23
+GOLD_FEED_SUSPEND_START_MIN = 0
 
 # 2. Congelamento Operatività / Ordini (Dalle 22:44 alle 00:15 per rollover e spread)
 GOLD_TRADE_SUSPEND_START_HOUR = 22
@@ -96,21 +96,21 @@ GOLD_TRADE_SUSPEND_END_HOUR = 0
 GOLD_TRADE_SUSPEND_END_MIN = 15
 
 def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True durante la chiusura reale del feed dati Gold (nessun tick disponibile):
-    - Weekend: da venerdì sera ore 22:45 fino alla domenica sera ore 21:58.
-    - Notturno feriale (Lun-Gio): dalle 22:45 alle 23:59:59 (dalle 00:00 il feed riapre per candele M5)."""
+    """Restituisce True durante la chiusura reale del mercato Gold (pausa tecnica COMEX 23:00 - 00:00):
+    - Weekend: da venerdì sera ore 23:00 fino alla domenica sera ore 21:58.
+    - Notturno feriale (Lun-Gio): dalle 23:00:00 alle 23:59:59 (dalle 00:00 il feed riapre per candele M10)."""
     if dt is None:
         dt = now_it()
     wd = dt.weekday()
     t = dt.time()
-    # Weekend: da venerdì 22:45 a domenica 21:58
+    # Weekend: da venerdì 23:00 a domenica 21:58
     if wd == 4 and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
         return True
     if wd == 5:
         return True
     if wd == 6 and t < datetime.time(21, 58, 0):
         return True
-    # Notturno feriale Lun-Gio (22:45 - 23:59:59)
+    # Notturno feriale Lun-Gio (23:00 - 23:59:59)
     if wd in (0, 1, 2, 3) and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
         return True
     return False
@@ -118,7 +118,7 @@ def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
 def is_gold_rollover_window(dt: datetime.datetime = None) -> bool:
     """Restituisce True SOLO nella finestra operativa utile di chiusura anticipata a FLAT (22:44:00 - 22:44:55),
     sia il venerdì prima del freeze del weekend sia nelle notti feriali Lun-Gio prima del rollover.
-    Evita di inviare ordini a mercati chiusi durante il weekend o dopo le 22:45."""
+    Evita di inviare ordini a mercati chiusi durante il weekend o dopo le 23:00."""
     if dt is None:
         dt = now_it()
     wd = dt.weekday()
@@ -325,9 +325,31 @@ class HyperGoldM5Engine:
                     pass
 
     def _recalculate_indicators(self):
-        """Calcola KJ55 (Supporto & Resistenza Puro) in base allo storico candele M5 disponibile"""
+        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M10.
+        Allineato agli standard di mercato (TradingView / IG Charts):
+        prende le ultime 54 candele chiuse + gli estremi della candela corrente in formazione."""
         n = len(self.candles)
-        if n >= WARMUP_BARS_KJ:
+        if n >= (WARMUP_BARS_KJ - 1):
+            sub_kj = self.candles[-(WARMUP_BARS_KJ - 1):]
+            highs = [c["high"] for c in sub_kj]
+            lows = [c["low"] for c in sub_kj]
+
+            # Includi la barra live in corso
+            curr_h = getattr(self, "curr_high", None)
+            curr_l = getattr(self, "curr_low", None)
+            if curr_h is not None and curr_l is not None:
+                highs.append(curr_h)
+                lows.append(curr_l)
+            elif n >= WARMUP_BARS_KJ:
+                highs.append(self.candles[-WARMUP_BARS_KJ]["high"])
+                lows.append(self.candles[-WARMUP_BARS_KJ]["low"])
+
+            max_h_kj = max(highs)
+            min_l_kj = min(lows)
+            self.kj55 = round((max_h_kj + min_l_kj) / 2.0, 2)
+            if self.candles:
+                self.candles[-1]["kj55"] = self.kj55
+        elif n == WARMUP_BARS_KJ:
             sub_kj = self.candles[-WARMUP_BARS_KJ:]
             max_h_kj = max(c["high"] for c in sub_kj)
             min_l_kj = min(c["low"] for c in sub_kj)
@@ -570,8 +592,8 @@ class HyperGoldM5Engine:
     def _run_streaming_loop(self):
         while self.running:
             try:
-                # Durante la chiusura effettiva del feed Gold (22:45 - 00:00) NON effettuiamo chiamate API né login.
-                # Dalle 00:00 in poi lo streaming è attivo per aggiornare le candele e ricalcolare KJ55 e TK144!
+                # Durante la pausa tecnica effettiva del feed Gold (23:00 - 00:00) NON effettuiamo chiamate API né login.
+                # Dalle 00:00 in poi lo streaming è attivo per aggiornare le candele e ricalcolare KJ55!
                 if is_gold_feed_suspended():
                     with self.lock:
                         self.ls_connected = False
@@ -1263,9 +1285,16 @@ class HyperGoldM5Engine:
 
             if boundary == self.curr_boundary:
                 # Barra M10 corrente in formazione
-                if mid > self.curr_high: self.curr_high = mid
-                if mid < self.curr_low: self.curr_low = mid
+                new_extreme = False
+                if mid > self.curr_high:
+                    self.curr_high = mid
+                    new_extreme = True
+                if mid < self.curr_low:
+                    self.curr_low = mid
+                    new_extreme = True
                 self.curr_close = mid
+                if new_extreme and self.kj55 is not None:
+                    self._recalculate_indicators()
             else:
                 # Chiusura barra M10
                 closed_candle = {
