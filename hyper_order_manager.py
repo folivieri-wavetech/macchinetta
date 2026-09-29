@@ -489,20 +489,16 @@ class HyperOrderManager:
                 ep_upper = (epic or "").upper()
                 lbl_upper = (label or "").upper()
                 rsn_upper = (reason or "").upper()
-                op_val = float(open_price or 0.0)
 
-                # Classificazione univoca:
-                # 1. Se contiene esplicitamente riferimenti a Gold/Oro -> Spot Gold
-                # 2. Se contiene riferimenti a US500/SPTRD o prezzo tipico di US500 (> 6000 pt) -> US 500
-                # 3. Altrimenti in base a epic o default Gold
+                # Identificazione 100% deterministica tramite EPIC (e fallback solo su label/reason se epic assente)
+                # ZERO confronti di prezzo.
                 if any(k in ep_upper for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl_upper or "ORO" in lbl_upper:
-                    is_us_hint = False
-                elif "SPTRD" in ep_upper or "US500" in lbl_upper or "US500" in rsn_upper or op_val > 6000.0:
-                    is_us_hint = True
+                    target_epic = epic or EPIC_GOLD
+                elif "SPTRD" in ep_upper or "US500" in ep_upper or "SPX" in ep_upper or "US500" in lbl_upper or "US500" in rsn_upper:
+                    target_epic = epic or "IX.D.SPTRD.IBE.IP"
                 else:
-                    is_us_hint = False
+                    target_epic = epic or EPIC_GOLD
 
-                target_epic = "IX.D.SPTRD.IBE.IP" if is_us_hint else (epic or EPIC_GOLD)
                 trade_item = {
                     "id": str(int(time.time() * 1000)),
                     "time_open": time_open or now_str,
@@ -546,19 +542,15 @@ class HyperOrderManager:
                         ep = str(t.get("epic", "")).upper()
                         lbl = str(t.get("label", "")).upper()
                         rsn = str(t.get("reason", "")).upper()
-                        op = float(t.get("open_price", 0.0) or 0.0)
 
-                        # Auto-fix e riconciliazione robusta strumento
-                        is_gold = any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl or "ORO" in lbl or (op > 0 and op < 6000.0 and "SPTRD" not in ep and "US500" not in lbl)
-                        is_us_trade = not is_gold and ("SPTRD" in ep or "US500" in lbl or "US500" in rsn or op > 6000.0)
-
-                        if is_us_trade:
+                        # Identificazione deterministica basata ESCLUSIVAMENTE sull'EPIC (e label come fallback)
+                        # ZERO confronti di prezzo.
+                        if "SPTRD" in ep or "US500" in ep or "SPX" in ep or ("US500" in lbl and "GOLD" not in ep and "GOLD" not in lbl):
                             t["epic"] = "IX.D.SPTRD.IBE.IP"
                             if "US500" not in lbl:
                                 t["label"] = f"{t.get('label', '')} US500".strip()
-                        else:
+                        elif any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl or "ORO" in lbl:
                             t["epic"] = EPIC_GOLD
-                            # Se era stato erroneamente etichettato come US500 per via della vecchia soglia >4000
                             if "US500" in t.get("label", ""):
                                 t["label"] = t["label"].replace("US500", "Spot Gold").replace("  ", " ").strip()
 
@@ -576,10 +568,13 @@ class HyperOrderManager:
                 if tf:
                     res = [t for t in res if t.get("tf") == tf]
                 if epic:
-                    if "SPTRD" in epic.upper() or "US500" in epic.upper():
-                        res = [t for t in res if "SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 6000.0]
+                    ep_filter = epic.upper()
+                    if "SPTRD" in ep_filter or "US500" in ep_filter:
+                        res = [t for t in res if "SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper()]
+                    elif any(k in ep_filter for k in ("CFEGOLD", "CFDGOLD", "GOLD")):
+                        res = [t for t in res if any(k in str(t.get("epic", "")).upper() for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in str(t.get("label", "")).upper()]
                     else:
-                        res = [t for t in res if not ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper() or float(t.get("open_price", 0.0) or 0.0) > 6000.0)]
+                        res = [t for t in res if str(t.get("epic", "")).upper() == ep_filter]
                 return res
         except Exception:
             return []

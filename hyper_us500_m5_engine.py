@@ -689,8 +689,17 @@ class HyperUS500M5Engine:
                         pos["ts_price"] = round(pos["ts_price"] + steps * CORE_TS_STEP_PIPS, 2)
                         self.save_state()
 
+                # Verifica tocco Trailing Stop (eseguito solo se distanza da KJ <= RUNNER_THRESHOLD_KJ_DIST)
                 if current_price <= pos["ts_price"]:
-                    self._close_cycle_trailing_hit(current_price, time_str)
+                    dist_kj = abs(current_price - self.kj55) if self.kj55 is not None else 0.0
+                    if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
+                        self._close_cycle_trailing_hit(current_price, time_str)
+                    else:
+                        if not pos.get("ts_suspended_logged"):
+                            logger.info(f"[{time_str}] ⏸️ [TS CORE US500 SOSPESO] Prezzo {current_price:.2f} <= TS {pos['ts_price']:.2f}, ma distanza da KJ è {dist_kj:.1f}p > {RUNNER_THRESHOLD_KJ_DIST:.0f}p. TS sospeso in regime di estensione.")
+                            pos["ts_suspended_logged"] = True
+                else:
+                    pos.pop("ts_suspended_logged", None)
 
             else: # SHORT
                 if current_price < peak_px:
@@ -701,8 +710,17 @@ class HyperUS500M5Engine:
                         pos["ts_price"] = round(pos["ts_price"] - steps * CORE_TS_STEP_PIPS, 2)
                         self.save_state()
 
+                # Verifica tocco Trailing Stop (eseguito solo se distanza da KJ <= RUNNER_THRESHOLD_KJ_DIST)
                 if current_price >= pos["ts_price"]:
-                    self._close_cycle_trailing_hit(current_price, time_str)
+                    dist_kj = abs(current_price - self.kj55) if self.kj55 is not None else 0.0
+                    if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
+                        self._close_cycle_trailing_hit(current_price, time_str)
+                    else:
+                        if not pos.get("ts_suspended_logged"):
+                            logger.info(f"[{time_str}] ⏸️ [TS CORE US500 SOSPESO] Prezzo {current_price:.2f} >= TS {pos['ts_price']:.2f}, ma distanza da KJ è {dist_kj:.1f}p > {RUNNER_THRESHOLD_KJ_DIST:.0f}p. TS sospeso in regime di estensione.")
+                            pos["ts_suspended_logged"] = True
+                else:
+                    pos.pop("ts_suspended_logged", None)
 
     def _execute_entry_core(self, direction: str, exec_price: float, time_str: str):
         try:
@@ -1083,7 +1101,7 @@ class HyperUS500M5Engine:
                             if cand_ts < inc["ts_price"]:
                                 inc["ts_price"] = cand_ts
 
-                # Verifica se prezzo tocca il Trailing Stop
+                # Verifica se prezzo tocca il Trailing Stop (sospeso se dist_kj > 10p)
                 if inc.get("ts_active") and inc.get("ts_price") is not None:
                     hit_ts = False
                     if direction == "LONG" and current_price <= inc["ts_price"]:
@@ -1092,13 +1110,21 @@ class HyperUS500M5Engine:
                         hit_ts = True
 
                     if hit_ts:
-                        inc["closing"] = True
-                        pnl_pips = round(current_price - open_px if direction == "LONG" else open_px - current_price, 2)
-                        threading.Thread(
-                            target=self._execute_close_increment,
-                            args=(inc, current_price, time_str, f"TS Runner Inc ({pnl_pips:+.2f}p)"),
-                            daemon=True
-                        ).start()
+                        dist_kj = abs(current_price - self.kj55) if self.kj55 is not None else 0.0
+                        if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
+                            inc["closing"] = True
+                            pnl_pips = round(current_price - open_px if direction == "LONG" else open_px - current_price, 2)
+                            threading.Thread(
+                                target=self._execute_close_increment,
+                                args=(inc, current_price, time_str, f"TS Runner Inc ({pnl_pips:+.2f}p)"),
+                                daemon=True
+                            ).start()
+                        else:
+                            if not inc.get("ts_runner_suspended_logged"):
+                                logger.info(f"[{time_str}] ⏸️ [TS RUNNER US500 SOSPESO] Inc #{inc.get('id')} toccato TS {inc['ts_price']:.2f}, ma distanza da KJ è {dist_kj:.1f}p > {RUNNER_THRESHOLD_KJ_DIST:.0f}p. TS sospeso.")
+                                inc["ts_runner_suspended_logged"] = True
+                    else:
+                        inc.pop("ts_runner_suspended_logged", None)
 
     def _check_runner_harvesting(self, current_price: float, time_str: str):
         """Incasso di Sicurezza:

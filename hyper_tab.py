@@ -868,14 +868,15 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
 
     def _is_us500_trade(t: dict) -> bool:
         ep = str(t.get("epic", "")).upper()
+        # 1. Priorità assoluta ed esclusiva all'EPIC dello strumento
+        if "SPTRD" in ep or "US500" in ep or "SPX" in ep:
+            return True
+        if any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")):
+            return False
+        # 2. Fallback su Label / Reason solo se l'epic è assente o non standard
         lbl = str(t.get("label", "")).upper()
         rsn = str(t.get("reason", "")).upper()
-        op = float(t.get("open_price", 0.0) or 0.0)
-        # Se esplicitamente Gold, non è mai US500
-        if any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl or "ORO" in lbl:
-            return False
-        # Se esplicitamente US500 o prezzo tipico di US500 (> 6000 pt)
-        if "SPTRD" in ep or "US500" in lbl or "US500" in rsn or op > 6000.0:
+        if "US500" in lbl or "US500" in rsn:
             return True
         return False
 
