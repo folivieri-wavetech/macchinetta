@@ -11,7 +11,7 @@ from hyper_gold_m5_engine import (
     MAX_INCREMENTS as MAX_INCREMENTS_5M, INC_TP_PIPS as INC_TP_PIPS_5M,
     CANDELA_SEGNALE_OFFSET_PIPS as CANDELA_SEGNALE_OFFSET_PIPS_5M,
     TK_FILTER_PIPS as TK_FILTER_PIPS_5M,
-    is_gold_trading_suspended, is_gold_feed_suspended
+    is_gold_trading_suspended, is_gold_feed_suspended, EPIC_GOLD
 )
 from hyper_us500_m5_engine import (
     HyperUS500M5Engine, is_us500_trading_suspended, is_us500_feed_suspended, EPIC_US500
@@ -620,7 +620,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
             ts_core_cell = f"<span style='color: #fa8072; font-weight: 600;'>{ts_target:.2f}</span>"
         else:
-            ts_core_cell = "<span style='color: #FFD700; font-size: 0.72rem; font-weight: 600;'>KJ Parac.</span>"
+            # Core governata da Kijun: mostra il valore numerico live della Kijun (o dello stop Candela Segnale se attiva)
+            if sig_act and sig_px is not None:
+                ts_core_cell = f"<span style='color: #FFD700; font-weight: 700;' title='Stop Candela Segnale KJ'>{sig_px:.2f}</span>"
+            elif kj is not None:
+                ts_core_cell = f"<span style='color: #FFD700; font-weight: 700;' title='Livello Kijun 55'>{kj:.2f}</span>"
+            else:
+                ts_core_cell = "<span style='color: #FFD700; font-weight: 700;'>--</span>"
 
         if live_mid is not None:
             core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
@@ -774,7 +780,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     # Order manager & Storico 10M/5M Reale IG (Filtrato alla data odierna)
     today_dt = now_it()
     order_mgr = HyperOrderManager.get_instance(conto_attivo)
-    hist_gold = [t for t in order_mgr.get_trades_history(epic="CS.D.CFDGOLD.CFD.IP") if is_trade_today(t, today_dt) and t.get("tf") in ("10M", "5M")]
+    hist_gold = [t for t in order_mgr.get_trades_history(epic=EPIC_GOLD) if is_trade_today(t, today_dt) and t.get("tf") in ("10M", "5M")]
     hist_us500 = [t for t in order_mgr.get_trades_history(epic="IX.D.SPTRD.IBE.IP") if is_trade_today(t, today_dt) and t.get("tf") in ("10M", "5M")]
     real_gold = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_gold)
     real_us500 = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_us500)
