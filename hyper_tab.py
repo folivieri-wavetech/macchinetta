@@ -607,15 +607,17 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
         dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
         
-        # Gestione TS Core: Verde Erba se già attivo, Rosso Salmone se target futuro (non ancora entrato)
+        # Gestione TS Core: Verde se attivo, KJ Parac. se Core governata da Kijun (libera da TS)
+        core_has_ts = getattr(engine, "use_core_trailing", False)
         ts_is_active = pos.get("ts_active", False) and pos.get("ts_price") is not None
         if ts_is_active:
             ts_val = pos["ts_price"]
             ts_core_cell = f"<span style='color: #22c55e; font-weight: 700;'>{ts_val:.2f}</span>"
-        else:
+        elif core_has_ts:
             ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
-            # Solo valore numerico in Rosso Salmone per TS non ancora entrato
             ts_core_cell = f"<span style='color: #fa8072; font-weight: 600;'>{ts_target:.2f}</span>"
+        else:
+            ts_core_cell = "<span style='color: #FFD700; font-size: 0.72rem; font-weight: 600;'>KJ Parac.</span>"
 
         if live_mid is not None:
             core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
@@ -728,9 +730,9 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.70rem; line-height: 1.4;'>
             <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name} (10M):</div>
             <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su <b>Taglio KJ55</b> (stacco Prezzo - KJ &ge; {2 if instr_type == 'GOLD' else 3}{unit_lbl})</div>
-            <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, max {max_inc} da {inc_c}c con TS e Incasso Sicurezza)</div>
-            <div>• <b>Trailing Stop Core</b>: Trigger +{ts_trig:.0f}{unit_lbl}, Lock +{ts_lock:.0f}{unit_lbl}, Step {ts_stp:.0f}{unit_lbl}</div>
-            <div>• <b>Protezioni</b>: Paracadute ±{parachute_p:.0f}{unit_lbl} • Candela Segnale ±{sig_offset:.0f}{unit_lbl}</div>
+            <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, TS Dinamico KJ Close &plusmn; 10{unit_lbl})</div>
+            <div>• <b>Gestione Core</b>: Libera da TS (governata al 100% da Kijun &amp; Candela Segnale)</div>
+            <div>• <b>Protezioni</b>: Paracadute &plusmn;{parachute_p:.0f}{unit_lbl} • Candela Segnale &plusmn;{sig_offset:.0f}{unit_lbl}</div>
         </div>
         """, unsafe_allow_html=True)
 

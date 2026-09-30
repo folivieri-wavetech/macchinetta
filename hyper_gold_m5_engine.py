@@ -221,7 +221,7 @@ class HyperGoldM5Engine:
         self.point_value = 1.0   # 1 EUR per punto/pip per contratto
         self.num_contracts = CORE_CONTRACTS
         self.trading_enabled = False
-        self.use_core_trailing = True   # Trailing Stop Core attivo di default (+10 pip trigger, +6 pip lock, step 2p)
+        self.use_core_trailing = False   # Core libera da Trailing Stop: governata al 100% da Kijun naturale e Candela Segnale
 
         # Posizione Core: None (FLAT) o {"direction": "LONG"/"SHORT", "open_price": float, "contracts": 5, "tp_price": float, "open_time": str}
         self.position = None
@@ -406,7 +406,7 @@ class HyperGoldM5Engine:
                 if self.trading_enabled:
                     self.trading_enabled = False
                     logger.info("🛑 [WEEKEND SAFEGUARD] Spot Gold: weekend in corso, trading forzato a DA AVVIARE.")
-            self.use_core_trailing = True
+            self.use_core_trailing = False
             self.position = d.get("position")
             self.increments = d.get("increments", [])
             self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
@@ -1119,7 +1119,7 @@ class HyperGoldM5Engine:
     def _check_increments_management(self, current_price: float, time_str: str):
         """Controlla tick-by-tick:
         - Take Profit (+5 pip) per incrementi BANCOMAT
-        - Trailing Stop Virtuale (Trigger +5p, Lock BE, Trailing 4p) per incrementi RUNNER"""
+        - Trailing Stop Dinamico Kijun (calcolato a fine candela) per incrementi RUNNER"""
         for inc in list(self.increments):
             if inc.get("closing"):
                 continue
@@ -1145,36 +1145,8 @@ class HyperGoldM5Engine:
                         daemon=True
                     ).start()
 
-            # 2. Regime RUNNER: Trailing Stop Virtuale dinamico (Trigger +5p -> Lock BE +1p -> Trailing 4p)
+            # 2. Regime RUNNER: Trailing Stop Dinamico Kijun (calcolato a fine candela con 10p di respiro)
             elif mode == "RUNNER":
-                # Aggiorna picco massimo favorevole
-                if direction == "LONG":
-                    if current_price > inc.get("peak_price", open_px):
-                        inc["peak_price"] = current_price
-                    gain_pips = current_price - open_px
-                else:
-                    if current_price < inc.get("peak_price", open_px):
-                        inc["peak_price"] = current_price
-                    gain_pips = open_px - current_price
-
-                # Attivazione Trailing / Breakeven Lock a +5 pip
-                if gain_pips >= RUNNER_TS_TRIGGER_PIPS:
-                    if not inc.get("ts_active"):
-                        inc["ts_active"] = True
-                        inc["ts_price"] = round(open_px + 1.0 if direction == "LONG" else open_px - 1.0, 2)
-                        logger.info(f"[{time_str}] 🔒 [RUNNER BE LOCKED] Inc #{inc.get('id')} locked a {inc['ts_price']:.2f}")
-                    else:
-                        # Insegue a RUNNER_TS_STEP_PIPS (4p) dal picco massimo
-                        if direction == "LONG":
-                            cand_ts = round(inc["peak_price"] - RUNNER_TS_STEP_PIPS, 2)
-                            if cand_ts > inc["ts_price"]:
-                                inc["ts_price"] = cand_ts
-                        else:
-                            cand_ts = round(inc["peak_price"] + RUNNER_TS_STEP_PIPS, 2)
-                            if cand_ts < inc["ts_price"]:
-                                inc["ts_price"] = cand_ts
-
-                # Verifica se prezzo tocca il Trailing Stop (sospeso se dist_kj > 10p)
                 if inc.get("ts_active") and inc.get("ts_price") is not None:
                     hit_ts = False
                     if direction == "LONG" and current_price <= inc["ts_price"]:
@@ -1183,42 +1155,18 @@ class HyperGoldM5Engine:
                         hit_ts = True
 
                     if hit_ts:
-                        dist_kj = abs(current_price - self.kj55) if self.kj55 is not None else 0.0
-                        if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
-                            inc["closing"] = True
-                            pnl_pips = round(current_price - open_px if direction == "LONG" else open_px - current_price, 2)
-                            threading.Thread(
-                                target=self._execute_close_increment,
-                                args=(inc, current_price, time_str, f"TS Runner Inc ({pnl_pips:+.2f}p)"),
-                                daemon=True
-                            ).start()
-                        else:
-                            if not inc.get("ts_runner_suspended_logged"):
-                                logger.info(f"[{time_str}] ⏸️ [TS RUNNER SOSPESO] Inc #{inc.get('id')} toccato TS {inc['ts_price']:.2f}, ma distanza da KJ è {dist_kj:.1f}p > {RUNNER_THRESHOLD_KJ_DIST:.0f}p. TS sospeso.")
-                                inc["ts_runner_suspended_logged"] = True
-                    else:
-                        inc.pop("ts_runner_suspended_logged", None)
+                        inc["closing"] = True
+                        pnl_pips = round(current_price - open_px if direction == "LONG" else open_px - current_price, 2)
+                        threading.Thread(
+                            target=self._execute_close_increment,
+                            args=(inc, current_price, time_str, f"TS Dinamico KJ Runner ({pnl_pips:+.2f}p @ {current_price:.2f})"),
+                            daemon=True
+                        ).start()
 
     def _check_runner_harvesting(self, current_price: float, time_str: str):
-        """Soluzione 1 (Incasso di Sicurezza):
-        Se ci sono incrementi Runner aperti e la distanza Prezzo - KJ scende <= 10 pip
-        (la Kijun è salita e ha raggiunto il prezzo che si è fermato/ha lateralizzato),
-        chiude istantaneamente a mercato tutti i Runner incassando il profitto e lasciando la sola Core."""
-        runner_incs = [i for i in self.increments if i.get("mode") == "RUNNER" and not i.get("closing")]
-        if not runner_incs or self.kj55 is None:
-            return
-
-        dist_kj = abs(current_price - self.kj55)
-        if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
-            logger.info(f"[{time_str}] 🎯 [INCASSO SICUREZZA RUNNER] Distanza KJ ridotta a {dist_kj:.2f}p (<= {RUNNER_THRESHOLD_KJ_DIST:.1f}p). Incasso {len(runner_incs)} Runner!")
-            for inc in runner_incs:
-                inc["closing"] = True
-                pnl_pips = round(current_price - inc["open_price"] if inc["direction"] == "LONG" else inc["open_price"] - current_price, 2)
-                threading.Thread(
-                    target=self._execute_close_increment,
-                    args=(inc, current_price, time_str, f"Incasso Sicurezza Runner (dist KJ {dist_kj:.1f}p <= {RUNNER_THRESHOLD_KJ_DIST:.0f}p, PnL: {pnl_pips:+.1f}p)"),
-                    daemon=True
-                ).start()
+        """Disattivato: nessun incasso forzato a mercato tick-by-tick per calo distanza da Kijun.
+        Gli incrementi sono gestiti dal TS Dinamico Kijun a fine candela o tornano Bancomat."""
+        pass
 
     def _check_paracadute_kj(self, mid: float, time_str: str):
         """Paracadute KJ Intracandela (Tick-by-Tick):
@@ -1296,15 +1244,13 @@ class HyperGoldM5Engine:
                 if self.position or self.increments:
                     self._close_all_to_flat(mid, time_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
             elif not is_gold_market_suspended():
-                # 1. Verifica Trailing Stop per la Core (Attivo di default: Trigger +10p, Lock +6p, Step 2p)
-                if self.trading_enabled and self.position and getattr(self, "use_core_trailing", True):
+                # 1. Verifica Trailing Stop per la Core (Disattivato di default: Core governata unicamente da Kijun)
+                if self.trading_enabled and self.position and getattr(self, "use_core_trailing", False):
                     self._check_core_trailing_stop(mid, time_str)
 
-                # 2. Gestione Incrementi: Bancomat (TP +5p), Runner (Trailing Stop Virtuale) e Incasso Sicurezza (<= 10p da KJ)
+                # 2. Gestione Incrementi: Bancomat (TP +5p) e Runner (TS Dinamico Kijun Close +- 10p)
                 if self.trading_enabled and self.increments:
                     self._check_increments_management(mid, time_str)
-                    if self.position and self.kj55 is not None:
-                        self._check_runner_harvesting(mid, time_str)
 
                 # 3. Paracadute KJ Intracandela (6 pip): Chiusura istantanea di sicurezza a FLAT
                 if self.trading_enabled and self.position and self.kj55 is not None:
@@ -1377,10 +1323,10 @@ class HyperGoldM5Engine:
                 elif self.trading_enabled and not market_suspended and self.kj55 is not None:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 
-    def _update_increments_dynamic_mode(self, dist_kj: float, exec_price: float, time_str: str):
+    def _update_increments_dynamic_mode(self, dist_kj: float, closed_close: float, time_str: str):
         """A fine candela M10, valuta dinamicamente gli incrementi già aperti in base alla distanza da KJ:
-        1. Se dist_kj > 10 pip: i Bancomat vengono promossi a RUNNER (rimozione TP su IG a broker e attivazione Trailing)
-        2. Se dist_kj <= 10 pip: i Runner vengono incassati a mercato per sicurezza (Incasso Sicurezza)"""
+        1. Se dist_kj > 10 pip: i Bancomat passano a RUNNER (rimozione TP su IG e attivazione TS Dinamico KJ Close +- 10p con cricchetto)
+        2. Se dist_kj <= 10 pip: i Runner tornano BANCOMAT (ripristino TP a +5 pip dall'ingresso, nessun TS ravvicinato)"""
         with self.lock:
             active_incs = [i for i in self.increments if not i.get("closing")]
             if not active_incs:
@@ -1388,45 +1334,64 @@ class HyperGoldM5Engine:
 
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
 
-            # Caso 1: Distanza > 10 pip -> Trend allunga, promuovi Bancomat a Runner
+            # Caso 1: Distanza > 10 pip -> Regime RUNNER (TS Dinamico KJ Close +- 10p)
             if dist_kj > RUNNER_THRESHOLD_KJ_DIST:
                 for inc in active_incs:
-                    if inc.get("mode") == "BANCOMAT" and inc.get("tp_price") is not None:
-                        deal_id = inc.get("deal_id")
+                    direction = inc["direction"]
+                    deal_id = inc.get("deal_id")
+
+                    # Se era BANCOMAT, converti in RUNNER e rimuovi TP su broker IG
+                    if inc.get("mode") == "BANCOMAT" or inc.get("tp_price") is not None:
                         old_tp = inc.get("tp_price")
                         inc["mode"] = "RUNNER"
                         inc["tp_price"] = None
-                        inc["ts_active"] = False
-                        inc["ts_price"] = None
-                        inc["peak_price"] = exec_price
-
-                        logger.info(f"[{time_str}] 🚀 [PROMOZIONE RUNNER] Deal {deal_id} convertito in RUNNER (dist KJ {dist_kj:.1f}p > 10p). Rimozione TP {old_tp:.2f} su IG.")
+                        logger.info(f"[{time_str}] 🚀 [PROMOZIONE RUNNER] Deal {deal_id} convertito in RUNNER (dist KJ {dist_kj:.1f}p > 10p). Rimozione TP {old_tp} su IG.")
                         if deal_id:
                             threading.Thread(target=order_mgr.remove_limit_order, args=(deal_id, "Promozione Runner Spot Gold"), daemon=True).start()
 
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"🚀 PROMOZIONE RUNNER GOLD {inc['direction']}",
-                            "open_price": inc["open_price"],
-                            "close_price": None,
-                            "contracts": inc["contracts"],
-                            "pnl": 0.0,
-                            "balance": round(self.balance, 2),
-                            "reason": f"Distanza KJ {dist_kj:.1f}p > 10p: Take Profit ({old_tp:.2f}) rimosso a broker IG, attivo Trailing Stop"
-                        })
-                        self.save_state()
-                        order_mgr.send_notification(
-                            "🚀 PROMOZIONE RUNNER 10M: Spot Gold",
-                            f"[Spot Gold] Incremento #{inc.get('id')} {inc['direction']} convertito in RUNNER! Distanza KJ {dist_kj:.1f}p > 10p: Take Profit rimosso a broker IG, attivo Trailing Stop.",
-                            "rocket"
-                        )
+                    # Calcolo TS Dinamico Kijun a fine candela (Close - 10p per LONG, Close + 10p per SHORT)
+                    if direction == "LONG":
+                        target_ts = round(closed_close - 10.0, 2)
+                        prev_ts = inc.get("ts_price")
+                        if prev_ts is None:
+                            inc["ts_price"] = target_ts
+                            inc["ts_active"] = True
+                            logger.info(f"[{time_str}] 🎯 [TS DINAMICO KJ INIZIALIZZATO] Inc #{inc.get('id')} TS impostato a {target_ts:.2f} (Close {closed_close:.2f} - 10p)")
+                        elif target_ts > prev_ts:
+                            inc["ts_price"] = target_ts
+                            logger.info(f"[{time_str}] 📈 [TS DINAMICO KJ CRICCHETTO SALE] Inc #{inc.get('id')} TS sale da {prev_ts:.2f} a {target_ts:.2f} (Close {closed_close:.2f} - 10p)")
+                    else:
+                        target_ts = round(closed_close + 10.0, 2)
+                        prev_ts = inc.get("ts_price")
+                        if prev_ts is None:
+                            inc["ts_price"] = target_ts
+                            inc["ts_active"] = True
+                            logger.info(f"[{time_str}] 🎯 [TS DINAMICO KJ INIZIALIZZATO] Inc #{inc.get('id')} TS impostato a {target_ts:.2f} (Close {closed_close:.2f} + 10p)")
+                        elif target_ts < prev_ts:
+                            inc["ts_price"] = target_ts
+                            logger.info(f"[{time_str}] 📉 [TS DINAMICO KJ CRICCHETTO SCENDE] Inc #{inc.get('id')} TS scende da {prev_ts:.2f} a {target_ts:.2f} (Close {closed_close:.2f} + 10p)")
 
-            # Caso 2: Distanza <= 10 pip -> Ritracciamento verso KJ, incasso immediato di sicurezza per tutti i Runner
+                self.save_state()
+
+            # Caso 2: Distanza <= 10 pip -> Rientro in Regime BANCOMAT (ripristino TP a +5 pip dall'ingresso)
             else:
-                has_runners = any(i.get("mode") == "RUNNER" for i in active_incs)
-                if has_runners:
-                    logger.info(f"[{time_str}] 🎯 [INCASSO SICUREZZA RUNNER A FINE CANDELA] Distanza KJ {dist_kj:.1f}p <= 10p. Esecuzione incasso Runner.")
-                    self._check_runner_harvesting(exec_price, time_str)
+                for inc in active_incs:
+                    if inc.get("mode") == "RUNNER":
+                        deal_id = inc.get("deal_id")
+                        direction = inc["direction"]
+                        open_px = inc["open_price"]
+                        tp_px = round(open_px + self.inc_tp_pips if direction == "LONG" else open_px - self.inc_tp_pips, 2)
+
+                        inc["mode"] = "BANCOMAT"
+                        inc["tp_price"] = tp_px
+                        inc["ts_active"] = False
+                        inc["ts_price"] = None
+
+                        logger.info(f"[{time_str}] 🔄 [RITORNO BANCOMAT] Inc #{inc.get('id')} rientrato in zona Bancomat (dist KJ {dist_kj:.1f}p <= 10p). Ripristinato TP a {tp_px:.2f} (+{self.inc_tp_pips:.0f}p).")
+                        if deal_id:
+                            threading.Thread(target=order_mgr.set_limit_order, args=(deal_id, tp_px, "Ripristino TP Bancomat Spot Gold"), daemon=True).start()
+
+                self.save_state()
 
     def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
         prev_close = closed_candle["close"]
@@ -1460,7 +1425,7 @@ class HyperGoldM5Engine:
         # - Se dist_kj > 10 pip: promuovi i Bancomat a RUNNER (rimozione TP su IG a broker e attivo Trailing Stop)
         # - Se dist_kj <= 10 pip: incasso di sicurezza a mercato per tutti i Runner
         dist_kj_candle = abs(prev_close - kj)
-        self._update_increments_dynamic_mode(dist_kj_candle, exec_price, time_str)
+        self._update_increments_dynamic_mode(dist_kj_candle, prev_close, time_str)
 
         # =============================================================
         # 1. MERCATO SOPRA KJ55 (BULLISH)
