@@ -109,6 +109,7 @@ Write-Host "==========================================" -ForegroundColor Cyan
 & $KUBECTL --kubeconfig=$KUBECONFIG rollout restart deploy/macchinetta-dashboard -n macchinetta
 & $KUBECTL --kubeconfig=$KUBECONFIG rollout restart deploy/macchinetta-motore-bongiolo deploy/macchinetta-motore-dany deploy/macchinetta-motore-fiordok -n macchinetta
 & $KUBECTL --kubeconfig=$KUBECONFIG rollout status deploy/macchinetta-dashboard -n macchinetta --timeout=120s
+& $KUBECTL --kubeconfig=$KUBECONFIG rollout status deploy/macchinetta-motore-dany -n macchinetta --timeout=120s
 
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "5. VERIFICA HEALTH CHECK" -ForegroundColor Cyan

@@ -155,6 +155,24 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+        - name: modulo-chirurgico-reale
+          image: docker.wavetech.it/macchinetta:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-u", "/data/modulo_chirurgico_dany_reale.py"]
+          workingDir: /data
+          envFrom:
+            - secretRef:
+                name: macchinetta-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
       volumes:
         - name: seed
           configMap:
