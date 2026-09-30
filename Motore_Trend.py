@@ -2109,10 +2109,16 @@ def esegui_ciclo_trend():
         candele_locali = carica_candele_locali(nome, tf)
 
         if not is_attivo:
-            # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria o da chiudere per Trend, ripuliscile
-            pos_core = dati.get("posizioni_core", [])
-            pos_incr = dati.get("posizioni_incr", [])
+            # Salvaguardia: se ci sono posizioni reali aperte su IG per questo strumento e non è richiesta la chiusura,
+            # consentiamo alla sezione di riconciliazione (CASO A) di riagganciare la posizione
+            pos_ig_epic = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic] if has_pos_live_data else []
             da_chiudere = dati.get("da_chiudere_a_riapertura", False) or (stato_corrente == "IN_ATTESA_CHIUSURA")
+            if pos_ig_epic and not da_chiudere:
+                pass
+            else:
+                # Se la macchina è spenta MA risultano ancora posizioni registrate in memoria o da chiudere per Trend, ripuliscile
+                pos_core = dati.get("posizioni_core", [])
+                pos_incr = dati.get("posizioni_incr", [])
             
             # REGOLE FERREE:
             # Trend deve considerare SOLO ED ESCLUSIVAMENTE ticket che appartengono alle sue posizioni core o incr!
@@ -2210,7 +2216,7 @@ def esegui_ciclo_trend():
                         }]
                         up_pend["direzione"] = d_str
                     aggiorna_memoria(nome, up_pend)
-            continue
+                continue
         
         # Inizializza/Recupera Engine
         if nome not in stato_motore.motori:
@@ -2255,6 +2261,7 @@ def esegui_ciclo_trend():
                     dir_pos = c_d.get("direction", stato_corrente)
                     pos = engine.pm.open_core(c_d.get("entry", 0), c_d.get("size", 1), dir_pos)
                     pos.ticket = c_d.get("ticket")
+                    pos.opened_at = c_d.get("opened_at", 0)
                 for i_d in pos_incr:
                     dir_pos = i_d.get("direction", stato_corrente)
                     pos = engine.pm.open_increment(
@@ -2418,6 +2425,11 @@ def esegui_ciclo_trend():
             
             # CASO B: Nessuna posizione aperta su IG per questo strumento ma il motore pensa di essere in trade
             elif not pos_ig_strum and engine.is_running:
+                core_p = engine.pm.core_position
+                # Salvaguardia: se la posizione è stata aperta da meno di 60 secondi,
+                # concedi tempo all'endpoint /positions di IG di aggiornare la sua cache interna ed evita falsi reset
+                if core_p and (time.time() - getattr(core_p, "opened_at", 0)) < 60:
+                    continue
                 if engine.pm.core_position or engine.pm.increments:
                     has_recent_stop = any("STOP" in r.upper() or "[PNL:" in r.upper() for r in storico[-5:])
                     if not has_recent_stop:
@@ -2744,6 +2756,7 @@ def esegui_ciclo_trend():
             if ok:
                 pos.entry_price = real_lvl if real_lvl else px_start
                 pos.ticket = deal_id
+                pos.opened_at = time.time()
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
                 
                 # Calcola distanza da KJ in pip per arricchire il log e differenziare la notifica

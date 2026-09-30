@@ -1,3 +1,5 @@
+import time
+
 class Position:
     def __init__(self, entry_price, size, position_type="increment", direction="LONG"):
         """
@@ -13,6 +15,7 @@ class Position:
         self.pnl = 0.0
         self.close_price = None
         self.ticket = None
+        self.opened_at = time.time()
         
         # Campi per gestione dinamica Break-Even e Trailing Stop del singolo incremento
         self.highest_price = entry_price
@@ -27,6 +30,7 @@ class Position:
             "type": self.position_type,
             "direction": self.direction,
             "ticket": self.ticket,
+            "opened_at": getattr(self, "opened_at", time.time()),
             "highest_price": getattr(self, "highest_price", self.entry_price),
             "lowest_price": getattr(self, "lowest_price", self.entry_price),
             "be_active": getattr(self, "be_active", False),

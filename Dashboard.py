@@ -771,7 +771,7 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
                 return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {st_num}</span>"
 
         if deal_id == pos_5m.get("deal_id"):
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 10M</span>"
         for idx_5, inc in enumerate(incs_5m):
             if inc.get("deal_id") == deal_id:
                 return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {idx_5 + 1}</span>"
@@ -780,7 +780,7 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
         if deal_id == u_pos_30s.get("deal_id"):
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S (US500)</span>"
         if deal_id == u_pos_5m.get("deal_id"):
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m (US500)</span>"
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 10M (US500)</span>"
         for idx_u5, inc in enumerate(u_incs_5m):
             if inc.get("deal_id") == deal_id:
                 return f"<span style='color: #38bdf8; font-weight: bold;'>incremento US500 n. {idx_u5 + 1}</span>"
@@ -789,7 +789,7 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
         if abs(sz_pos - 2.0) < 0.001:
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
         elif abs(sz_pos - 5.0) < 0.001:
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5m</span>"
+            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 10M</span>"
         elif abs(sz_pos - 4.0) < 0.001:
             matching_4c = [p for p in pos_data if abs(float(p['position']['size']) - 4.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
             try:
@@ -2901,7 +2901,7 @@ else:
                     elif abs(sz_pos - 2.0) < 0.001:
                         return "<span style='color: #FFD700;'>Ordine hyper 30S</span>"
                     elif abs(sz_pos - 5.0) < 0.001:
-                        return "<span style='color: #FFD700;'>Ordine hyper 5m</span>"
+                        return "<span style='color: #FFD700;'>Ordine hyper 10M</span>"
 
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
