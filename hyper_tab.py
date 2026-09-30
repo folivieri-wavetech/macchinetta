@@ -469,14 +469,17 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     </div>
     """, unsafe_allow_html=True)
 
-    # 4 Micro cards: Prezzo, KJ, Distanza e Countdown Barra
+    # 4 Micro cards: Prezzo, KJ, Distanza e Candela Segnale
     px_str = f"{live_mid:.2f}" if live_mid else "--"
     kj_str = f"{kj:.2f}" if kj else "--"
     dist_str = f"{abs(live_mid - kj):.2f}{unit_lbl}" if (live_mid and kj) else "--"
 
-    sec_elapsed = min(600, int(time.time() - curr_bar_t)) if curr_bar_t else 0
-    sec_left = max(0, 600 - sec_elapsed)
-    sec_left_str = f"{sec_left // 60:02d}:{sec_left % 60:02d}"
+    if sig_act and sig_px is not None:
+        sig_card_val = f"<span style='color: #fb923c; font-weight: 800;'>{sig_px:.2f}</span>"
+        sig_card_sub = "<div class='micro-sub-hyper' style='color: #f97316; font-size: 0.60rem;'>Stop Attivo</div>"
+    else:
+        sig_card_val = "<span style='color: #475569;'>--</span>"
+        sig_card_sub = ""
 
     st.markdown(f"""
     <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 7px;'>
@@ -493,13 +496,14 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             <div class='micro-val-hyper' style='color: #38bdf8;'>{dist_str}</div>
         </div>
         <div class='micro-card-hyper'>
-            <div class='micro-label-hyper'>BARRA M10</div>
-            <div class='micro-val-hyper' style='color: #cbd5e1; font-family: monospace;'>{sec_left_str}</div>
+            <div class='micro-label-hyper'>CANDELA SEGNALE</div>
+            <div class='micro-val-hyper' style='font-family: monospace;'>{sig_card_val}</div>
+            {sig_card_sub}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Mini Barra Stato: Esposizione, Flottante, Sessione e Candela Segnale
+    # Mini Barra Stato: Esposizione, Flottante e Sessione
     if pos:
         dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
         dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
@@ -516,19 +520,6 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     sign_sess = "+" if session_realized_pnl > 0 else ""
     sess_str = f"<span style='color: {col_sess}; font-weight: 700;'>{sign_sess}{session_realized_pnl:,.2f} €</span> <span style='font-size: 0.65rem; color: #64748b;'>({num_closed} op)</span>"
 
-    if sig_act and sig_px is not None:
-        if sig_ref is None:
-            if pos and pos.get("direction") == "LONG":
-                sig_ref = round(sig_px + sig_offset, 2)
-            elif pos and pos.get("direction") == "SHORT":
-                sig_ref = round(sig_px - sig_offset, 2)
-            else:
-                sig_ref = sig_px
-        sign_op = "-" if (pos and pos.get("direction") == "LONG") else "+"
-        sig_html = f"<div style='font-size: 0.68rem; color: #f97316; font-weight: 700; margin-top: 3px;'>⚠️ Candela Segnale: <span style='color: #fb923c; font-weight: 800;'>{sig_px:.2f}</span> ({sig_ref:.2f} {sign_op} {sig_offset:.0f}{unit_lbl})</div>"
-    else:
-        sig_html = "<div style='font-size: 0.68rem; color: #64748b; font-weight: 600; margin-top: 3px;'>⚠️ Candela Segnale: <span style='color: #94a3b8;'>---</span></div>"
-
     st.markdown(f"""
     <div style='background: rgba(15, 23, 42, 0.5); border: 1px solid #334155; border-radius: 6px; padding: 5px 8px; margin-bottom: 7px;'>
         <div style='display: flex; justify-content: space-between; align-items: center; font-size: 0.73rem;'>
@@ -536,7 +527,6 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             <div>Latente: {fl_str}</div>
             <div>Oggi: {sess_str}</div>
         </div>
-        {sig_html}
     </div>
     """, unsafe_allow_html=True)
 
