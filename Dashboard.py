@@ -6090,10 +6090,14 @@ else:
                 st.markdown("##### Configurazione Nuovo Conto IG")
                 st.caption("Inserisci le credenziali API IG per attivare un nuovo conto (es. **DANY_REALE**). Verrà creata la cartella protetta con la configurazione operativa.")
                 
+                utenti_opt = ["Nessuno (Istituzionale)"] + list(auth_manager.get_tutti_utenti().keys())
+                idx_sel = utenti_opt.index("Daniele") if "Daniele" in utenti_opt else 0
+                
                 col_nc1, col_nc2 = st.columns(2)
                 with col_nc1:
                     nuovo_conto_nome = st.text_input("Nome Conto", placeholder="es. DANY_REALE", key="inp_nuovo_conto_nome")
                     nuovo_conto_tipo = st.selectbox("Tipo Conto", ["REALE", "DEMO"], index=0, key="sel_nuovo_conto_tipo")
+                    nuovo_conto_associa = st.selectbox("👤 Associa all'Utente", utenti_opt, index=idx_sel, key="sel_nuovo_conto_associa")
                     nuovo_conto_user = st.text_input("IG Username", key="inp_nuovo_conto_user")
                 with col_nc2:
                     nuovo_conto_pwd = st.text_input("IG Password", type="password", key="inp_nuovo_conto_pwd")
@@ -6112,7 +6116,8 @@ else:
                             ig_password=nuovo_conto_pwd,
                             ig_api_key=nuovo_conto_key,
                             ig_account_id=nuovo_conto_acc_id,
-                            tipo_conto=nuovo_conto_tipo
+                            tipo_conto=nuovo_conto_tipo,
+                            associa_a_utente=nuovo_conto_associa
                         )
                         if ok_nc:
                             st.success(msg_nc)

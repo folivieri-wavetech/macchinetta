@@ -193,7 +193,7 @@ def inizializza_cartella_conto(nome_conto, ig_username, ig_password, ig_api_key,
             
     return True
 
-def crea_nuovo_conto(nome_conto, ig_username, ig_password, ig_api_key, ig_account_id="", tipo_conto="REALE"):
+def crea_nuovo_conto(nome_conto, ig_username, ig_password, ig_api_key, ig_account_id="", tipo_conto="REALE", associa_a_utente=""):
     """Censisce e crea un nuovo conto IG ordinario/istituzionale con le relative credenziali e cartella."""
     nome = (nome_conto or "").strip().upper()
     if not nome:
@@ -213,6 +213,19 @@ def crea_nuovo_conto(nome_conto, ig_username, ig_password, ig_api_key, ig_accoun
         return False, "Username, Password e API Key di IG sono obbligatori."
         
     inizializza_cartella_conto(nome, u, p, k, tipo_conto=tipo_up, ig_account_id=acc_id)
+    
+    # Se è stato indicato un utente a cui associarlo automaticamente:
+    associa_clean = (associa_a_utente or "").strip()
+    if associa_clean and associa_clean != "Nessuno (Istituzionale)":
+        db = _carica_db()
+        if associa_clean in db:
+            if "conti_autorizzati" not in db[associa_clean]:
+                db[associa_clean]["conti_autorizzati"] = []
+            if nome not in db[associa_clean]["conti_autorizzati"]:
+                db[associa_clean]["conti_autorizzati"].append(nome)
+            _salva_db(db)
+            return True, f"Conto '{nome}' creato e associato automaticamente all'utente '{associa_clean}'!"
+            
     return True, f"Conto '{nome}' creato con successo!"
 
 def aggiungi_utente(username, password, ruolo="VIEWER", conti_autorizzati=None):
