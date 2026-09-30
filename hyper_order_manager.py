@@ -567,10 +567,17 @@ class HyperOrderManager:
         import re
         modified = False
         known_deals = set()
+        known_daily_pnl = set()
         for t in current_history:
             d_id = t.get("deal_id")
             if d_id and d_id != "--":
                 known_deals.add(d_id)
+            tc = str(t.get("time_close", ""))
+            day_str = tc[:10]
+            ep = str(t.get("epic", "")).upper()
+            ep_key = "US500" if ("SPTRD" in ep or "US500" in ep) else "GOLD"
+            pnl_val = round(float(t.get("pnl_eur", 0.0) or 0.0), 2)
+            known_daily_pnl.add((ep_key, day_str, pnl_val))
 
         now_str = now_it().strftime("%Y-%m-%d %H:%M:%S")
         today_date = now_str[:10]
@@ -591,13 +598,19 @@ class HyperOrderManager:
                             if deal_id != "--" and deal_id in known_deals:
                                 continue
 
+                            pnl_eur = float(t.get("pnl") or 0.0)
+                            pnl_key = round(pnl_eur, 2)
+                            time_val = str(t.get("time", ""))
+                            time_close = f"{today_date} {time_val}" if (len(time_val) <= 8 and ":" in time_val) else (time_val or now_str)
+                            day_key = time_close[:10]
+
+                            if deal_id == "--" and ("GOLD", day_key, pnl_key) in known_daily_pnl:
+                                continue
+
                             direction = "LONG" if "LONG" in act else ("SHORT" if "SHORT" in act else "LONG")
                             open_px = float(t.get("open_price") or 0.0)
                             close_px = float(t.get("close_price") or 0.0)
-                            pnl_eur = float(t.get("pnl") or 0.0)
                             contracts = float(t.get("contracts") or 5.0)
-                            time_val = str(t.get("time", ""))
-                            time_close = f"{today_date} {time_val}" if (len(time_val) <= 8 and ":" in time_val) else (time_val or now_str)
 
                             # Modalità incremento o core
                             lbl = "Spot Gold 10M"
@@ -626,6 +639,7 @@ class HyperOrderManager:
                             current_history.insert(0, trade_recovered)
                             if deal_id != "--":
                                 known_deals.add(deal_id)
+                            known_daily_pnl.add(("GOLD", day_key, pnl_key))
                             modified = True
             except Exception as e_g:
                 logger.warning(f"Errore auto-riconciliazione Gold: {e_g}")
@@ -645,13 +659,19 @@ class HyperOrderManager:
                             if deal_id != "--" and deal_id in known_deals:
                                 continue
 
+                            pnl_eur = float(t.get("pnl") or 0.0)
+                            pnl_key = round(pnl_eur, 2)
+                            time_val = str(t.get("time", ""))
+                            time_close = f"{today_date} {time_val}" if (len(time_val) <= 8 and ":" in time_val) else (time_val or now_str)
+                            day_key = time_close[:10]
+
+                            if deal_id == "--" and ("US500", day_key, pnl_key) in known_daily_pnl:
+                                continue
+
                             direction = "LONG" if "LONG" in act else ("SHORT" if "SHORT" in act else "LONG")
                             open_px = float(t.get("open_price") or 0.0)
                             close_px = float(t.get("close_price") or 0.0)
-                            pnl_eur = float(t.get("pnl") or 0.0)
                             contracts = float(t.get("contracts") or 5.0)
-                            time_val = str(t.get("time", ""))
-                            time_close = f"{today_date} {time_val}" if (len(time_val) <= 8 and ":" in time_val) else (time_val or now_str)
 
                             lbl = "US500 10M"
                             if "INC" in act:
@@ -679,6 +699,7 @@ class HyperOrderManager:
                             current_history.insert(0, trade_recovered)
                             if deal_id != "--":
                                 known_deals.add(deal_id)
+                            known_daily_pnl.add(("US500", day_key, pnl_key))
                             modified = True
             except Exception as e_u:
                 logger.warning(f"Errore auto-riconciliazione US500: {e_u}")
@@ -697,10 +718,44 @@ class HyperOrderManager:
             except Exception:
                 data = []
 
+        # Deduplica preliminare e rigorosa
+        # Prima raccogliamo tutti i deal_id noti per scartare eventuali cloni senza deal_id
+        known_valid_deals = {t.get("deal_id") for t in data if isinstance(t, dict) and t.get("deal_id") and t.get("deal_id") != "--"}
+        known_deals_pnl = {
+            ("US500" if ("SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper()) else "GOLD",
+             str(t.get("time_close", ""))[:10],
+             round(float(t.get("pnl_eur", 0.0) or 0.0), 2))
+            for t in data if isinstance(t, dict) and t.get("deal_id") and t.get("deal_id") != "--"
+        }
+
+        dedup_seen = set()
+        clean_data = []
+        for t in data:
+            if isinstance(t, dict):
+                d_id = t.get("deal_id")
+                ep = str(t.get("epic", "")).upper()
+                ep_key = "US500" if ("SPTRD" in ep or "US500" in str(t.get("label", "")).upper()) else "GOLD"
+                pnl_v = round(float(t.get("pnl_eur", 0.0) or 0.0), 2)
+                day_k = str(t.get("time_close", ""))[:10]
+
+                # Se è un record senza deal_id ma ne esiste già uno ufficiale con deal_id con stesso pnl, scartalo
+                if (not d_id or d_id == "--") and (ep_key, day_k, pnl_v) in known_deals_pnl:
+                    continue
+
+                if d_id and d_id != "--":
+                    sig = ("DEAL", d_id)
+                else:
+                    sig = (ep_key, day_k, pnl_v)
+
+                if sig not in dedup_seen:
+                    dedup_seen.add(sig)
+                    clean_data.append(t)
+        data = clean_data
+
         # Auto-riconciliazione con i motori live per non perdere mai alcuna chiusura
         try:
             data, was_mod = self._reconcile_from_engines_state(data)
-            if was_mod:
+            if was_mod or len(data) != len(clean_data):
                 with open(self.history_file, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
         except Exception:
