@@ -655,9 +655,24 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
         size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}</span>"
 
+        # Helper orario apertura formato HH:MM:SS
+        def _fmt_open_t(t_raw):
+            if not t_raw:
+                return "--:--:--"
+            s = str(t_raw).strip()
+            if " " in s:
+                s = s.split(" ")[-1]
+            if "T" in s:
+                s = s.split("T")[-1]
+            return s[:8]
+
+        core_t_str = _fmt_open_t(pos.get("open_time"))
+        time_core_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{core_t_str}</span>"
+
         p_rows = [
             f"<tr>"
             f"<td style='text-align: center;'>{dir_badge}</td>"
+            f"<td style='text-align: center;'>{time_core_cell}</td>"
             f"<td style='text-align: center;'>{size_core_cell}</td>"
             f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
             f"<td style='text-align: center;'>{ts_core_cell}</td>"
@@ -697,10 +712,14 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             col_i_size = "#22c55e" if inc_dir == "LONG" else "#fa8072"
             size_inc_cell = f"<span style='color: {col_i_size}; font-weight: 700;'>{sign_i_size}{inc_c_val}</span>"
 
+            inc_t_str = _fmt_open_t(inc.get("open_time"))
+            time_inc_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{inc_t_str}</span>"
+
             lbl_inc = f"➕ Run #{idx}" if mode_inc == "RUNNER" else f"➕ Inc #{idx}"
             p_rows.append(
                 f"<tr>"
                 f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>{lbl_inc}</span></td>"
+                f"<td style='text-align: center;'>{time_inc_cell}</td>"
                 f"<td style='text-align: center;'>{size_inc_cell}</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
                 f"<td style='text-align: center;'>{ts_inc_cell}</td>"
@@ -718,6 +737,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         p_rows.append(
             f"<tr style='background: rgba(30, 41, 59, 0.9); border-top: 1px solid #475569; font-weight: 800; font-size: 0.78rem;'>"
             f"<td style='text-align: center; color: #f8fafc;'>TOT</td>"
+            f"<td></td>"
             f"<td style='text-align: center;'>{size_tot_cell}</td>"
             f"<td></td>"
             f"<td colspan='2' style='text-align: center; color: #38bdf8;'>Live: {px_str}</td>"
@@ -729,12 +749,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <table class='table-compact-hyper'>
             <thead>
                 <tr>
-                    <th style='text-align: center; width: 18%;'>Pos</th>
-                    <th style='text-align: center; width: 12%;'>Size</th>
-                    <th style='text-align: center; width: 18%;'>Open</th>
-                    <th style='text-align: center; width: 15%;'>TS</th>
-                    <th style='text-align: center; width: 15%;'>TP</th>
-                    <th style='text-align: center; width: 22%;'>P&L</th>
+                    <th style='text-align: center; width: 16%;'>Pos</th>
+                    <th style='text-align: center; width: 14%;'>Time</th>
+                    <th style='text-align: center; width: 10%;'>Size</th>
+                    <th style='text-align: center; width: 16%;'>Open</th>
+                    <th style='text-align: center; width: 13%;'>TS</th>
+                    <th style='text-align: center; width: 13%;'>TP</th>
+                    <th style='text-align: center; width: 18%;'>P&L</th>
                 </tr>
             </thead>
             <tbody>{''.join(p_rows)}</tbody>
