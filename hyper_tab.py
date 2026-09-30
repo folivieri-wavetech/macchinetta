@@ -702,10 +702,16 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             inc_t_str = _fmt_open_t(inc.get("open_time"))
             time_inc_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{inc_t_str}</span>"
 
-            lbl_inc = f"➕ Run #{idx}" if mode_inc == "RUNNER" else f"➕ Inc #{idx}"
+            if mode_inc == "RUNNER":
+                lbl_inc = f"➕ Run #{idx}"
+                col_lbl = "#38bdf8"
+            else:
+                lbl_inc = f"➕ Bco #{idx}"
+                col_lbl = "#f59e0b"
+
             p_rows.append(
                 f"<tr>"
-                f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600; font-size: 0.71rem; white-space: nowrap;'>{lbl_inc}</span></td>"
+                f"<td style='text-align: center;'><span style='color: {col_lbl}; font-weight: 600; font-size: 0.71rem; white-space: nowrap;'>{lbl_inc}</span></td>"
                 f"<td style='text-align: center;'>{time_inc_cell}</td>"
                 f"<td style='text-align: center;'>{size_inc_cell}</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
