@@ -163,25 +163,60 @@ def renderizza_tab_goldfinger(conto):
         </div>
     """, unsafe_allow_html=True)
 
-    # Metriche principali
+    # Metriche principali compatte
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         bid_str = f"{float(bid_live):.2f}" if bid_live else "--"
         ask_str = f"{float(ask_live):.2f}" if ask_live else "--"
-        st.metric("🟡 Spot Gold Live", f"{bid_str} / {ask_str}")
+        st.markdown(
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>🟡 Spot Gold Live</div>"
+            f"<div style='color: #f8fafc; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{bid_str} / {ask_str}</div>"
+            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>Prezzo Bid / Ask IG</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
     with c2:
         if not is_attivo:
-            st.metric("🛡️ Stato Guardia", "🔴 INATTIVO", help="Il robot non è attivo e non effettua alcun ordine.")
+            st_text = "🔴 INATTIVO"
+            st_desc = "Robot fermo"
+            st_col = "#ef4444"
         elif stato_operativo == "ARMED_ROLLOVER":
-            st.metric("🛡️ Stato Guardia", "🟡 ARMATO (Rollover)", help="Pausa notturna prudenziale anti-spread (22:55 - 00:15). Operativo dalle 00:15.")
+            st_text = "🟡 ARMATO (Rollover)"
+            st_desc = "Pausa serale 22:55-00:15"
+            st_col = "#eab308"
         else:
-            st.metric("🛡️ Stato Guardia", "🟢 ATTIVO H24", help="Guardia attiva tick-by-tick a mercato.")
+            st_text = "🟢 ATTIVO H24"
+            st_desc = "Guardia a mercato"
+            st_col = "#22c55e"
+        st.markdown(
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>🛡️ Stato Guardia</div>"
+            f"<div style='color: {st_col}; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{st_text}</div>"
+            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>{st_desc}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
     with c3:
-        st.metric("⚖️ Delta Scoperto IG", f"{delta_calcolato} mini", f"+{tot_long} L / -{tot_short} S")
+        st.markdown(
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>⚖️ Delta Scoperto IG</div>"
+            f"<div style='color: #38bdf8; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{delta_calcolato} mini</div>"
+            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>+{tot_long} L / -{tot_short} S</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
     with c4:
         pnl_inc = stato.get("totale_incassato", 0.0)
-        pnl_col = "normal" if pnl_inc == 0 else ("inverse" if pnl_inc < 0 else "off")
-        st.metric("💰 Cash Incassato", f"{pnl_inc:+.2f} €", help="Totale liquidità netta incassata dai rimbalzi degli Short chiusi.")
+        pnl_col = "#94a3b8" if pnl_inc == 0 else ("#22c55e" if pnl_inc > 0 else "#ef4444")
+        st.markdown(
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>💰 Cash Incassato</div>"
+            f"<div style='color: {pnl_col}; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{pnl_inc:+.2f} €</div>"
+            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>Dai rimbalzi (+7 pip)</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
 
     st.markdown("<hr style='margin: 10px 0; border-color: #334155;'>", unsafe_allow_html=True)
 
@@ -317,40 +352,40 @@ def renderizza_tab_goldfinger(conto):
                     st_badge = st_code
                 
                 pz_tgt = f"{s.get('prezzo_target', 0):.2f}"
-                tab_rows += f"""
-                    <tr style='border-bottom: 1px solid #334155;'>
-                        <td style='padding: 6px; font-weight: bold;'>Scaglione {s.get('numero')}</td>
-                        <td style='padding: 6px; color: #f8fafc;'>{pz_tgt}</td>
-                        <td style='padding: 6px; color: #38bdf8; font-weight: bold;'>-{s.get('size')} mini</td>
-                        <td style='padding: 6px;'>{st_badge}</td>
-                    </tr>
-                """
+                tab_rows += (
+                    f"<tr style='border-bottom: 1px solid #334155;'>"
+                    f"<td style='padding: 6px; font-weight: bold;'>Scaglione {s.get('numero')}</td>"
+                    f"<td style='padding: 6px; color: #f8fafc;'>{pz_tgt}</td>"
+                    f"<td style='padding: 6px; color: #38bdf8; font-weight: bold;'>-{s.get('size')} mini</td>"
+                    f"<td style='padding: 6px;'>{st_badge}</td>"
+                    f"</tr>"
+                )
 
-            st.markdown(f"""
-                <table style='width: 100%; border-collapse: collapse; font-size: 0.85rem;'>
-                    <thead>
-                        <tr style='border-bottom: 2px solid #64748b; color: #94a3b8;'>
-                            <th style='text-align: left; padding: 6px;'>Scaglione</th>
-                            <th style='text-align: left; padding: 6px;'>Trigger Prezzo</th>
-                            <th style='text-align: left; padding: 6px;'>Size Short</th>
-                            <th style='text-align: left; padding: 6px;'>Stato</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {tab_rows}
-                    </tbody>
-                </table>
-            """, unsafe_allow_html=True)
+            html_table = (
+                "<table style='width: 100%; border-collapse: collapse; font-size: 0.85rem;'>"
+                "<thead>"
+                "<tr style='border-bottom: 2px solid #64748b; color: #94a3b8;'>"
+                "<th style='text-align: left; padding: 6px;'>Scaglione</th>"
+                "<th style='text-align: left; padding: 6px;'>Trigger Prezzo</th>"
+                "<th style='text-align: left; padding: 6px;'>Size Short</th>"
+                "<th style='text-align: left; padding: 6px;'>Stato</th>"
+                "</tr>"
+                "</thead>"
+                f"<tbody>{tab_rows}</tbody>"
+                "</table>"
+            )
+            st.markdown(html_table, unsafe_allow_html=True)
             
             min_disc = stato.get("minimo_discesa")
             if min_disc is not None:
                 sgancio = round(min_disc + 7.0, 2)
-                st.markdown(f"""
-                    <div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 0.82rem;'>
-                        📉 <b>Minimo Discesa Corrente:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span> &nbsp;|&nbsp; 
-                        💥 <b>Soglia Chiusura Rimbalzo (+7 pip):</b> <span style='color: #FFD700; font-weight: bold;'>{sgancio:.2f}</span>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 0.82rem;'>"
+                    f"📉 <b>Minimo Discesa Corrente:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span> &nbsp;|&nbsp; "
+                    f"💥 <b>Soglia Chiusura Rimbalzo (+7 pip):</b> <span style='color: #FFD700; font-weight: bold;'>{sgancio:.2f}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
         else:
             st.info("Imposta il Prezzo del Livello 1 a sinistra per visualizzare l'anteprima della scaletta.")
 
@@ -363,34 +398,33 @@ def renderizza_tab_goldfinger(conto):
             for op in reversed(storico[-30:]):
                 pnl = op.get("pnl", 0.0)
                 pnl_c = "#22c55e" if pnl >= 0 else "#ef4444"
-                r_html += f"""
-                    <tr style='border-bottom: 1px solid #1e293b;'>
-                        <td style='padding: 5px; color: #94a3b8;'>{op.get('data')}</td>
-                        <td style='padding: 5px;'>Scaglione {op.get('scaglione')}</td>
-                        <td style='padding: 5px;'>{op.get('size')} mini</td>
-                        <td style='padding: 5px;'>{op.get('open'):.2f}</td>
-                        <td style='padding: 5px;'>{op.get('close'):.2f}</td>
-                        <td style='padding: 5px; color: {pnl_c}; font-weight: bold;'>{pnl:+.2f} €</td>
-                        <td style='padding: 5px; color: #94a3b8;'>{op.get('motivo')}</td>
-                    </tr>
-                """
-            st.markdown(f"""
-                <table style='width: 100%; border-collapse: collapse; font-size: 0.82rem;'>
-                    <thead>
-                        <tr style='border-bottom: 2px solid #475569; color: #94a3b8;'>
-                            <th style='text-align: left; padding: 5px;'>Data</th>
-                            <th style='text-align: left; padding: 5px;'>Scaglione</th>
-                            <th style='text-align: left; padding: 5px;'>Size</th>
-                            <th style='text-align: left; padding: 5px;'>Open</th>
-                            <th style='text-align: left; padding: 5px;'>Close</th>
-                            <th style='text-align: left; padding: 5px;'>PnL Netto</th>
-                            <th style='text-align: left; padding: 5px;'>Evento</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {r_html}
-                    </tbody>
-                </table>
-            """, unsafe_allow_html=True)
+                r_html += (
+                    f"<tr style='border-bottom: 1px solid #1e293b;'>"
+                    f"<td style='padding: 5px; color: #94a3b8;'>{op.get('data')}</td>"
+                    f"<td style='padding: 5px;'>Scaglione {op.get('scaglione')}</td>"
+                    f"<td style='padding: 5px;'>{op.get('size')} mini</td>"
+                    f"<td style='padding: 5px;'>{op.get('open'):.2f}</td>"
+                    f"<td style='padding: 5px;'>{op.get('close'):.2f}</td>"
+                    f"<td style='padding: 5px; color: {pnl_c}; font-weight: bold;'>{pnl:+.2f} €</td>"
+                    f"<td style='padding: 5px; color: #94a3b8;'>{op.get('motivo')}</td>"
+                    f"</tr>"
+                )
+            html_hist = (
+                "<table style='width: 100%; border-collapse: collapse; font-size: 0.82rem;'>"
+                "<thead>"
+                "<tr style='border-bottom: 2px solid #475569; color: #94a3b8;'>"
+                "<th style='text-align: left; padding: 5px;'>Data</th>"
+                "<th style='text-align: left; padding: 5px;'>Scaglione</th>"
+                "<th style='text-align: left; padding: 5px;'>Size</th>"
+                "<th style='text-align: left; padding: 5px;'>Open</th>"
+                "<th style='text-align: left; padding: 5px;'>Close</th>"
+                "<th style='text-align: left; padding: 5px;'>PnL Netto</th>"
+                "<th style='text-align: left; padding: 5px;'>Evento</th>"
+                "</tr>"
+                "</thead>"
+                f"<tbody>{r_html}</tbody>"
+                "</table>"
+            )
+            st.markdown(html_hist, unsafe_allow_html=True)
         else:
             st.caption("Nessuna operazione ancora chiusa in questa sessione.")
