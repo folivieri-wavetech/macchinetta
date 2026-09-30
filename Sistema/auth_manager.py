@@ -107,7 +107,7 @@ get_guest_accounts = get_owner_accounts
 def leggi_credenziali_env(nome_conto):
     """Legge le credenziali IG dal file .env del conto."""
     env_file = os.path.join(ROOT_DIR, nome_conto, ".env")
-    creds = {"username": "", "password": "", "api_key": ""}
+    creds = {"username": "", "password": "", "api_key": "", "account_id": ""}
     if os.path.exists(env_file):
         try:
             with open(env_file, "r", encoding="utf-8") as f:
@@ -119,11 +119,13 @@ def leggi_credenziali_env(nome_conto):
                         creds["password"] = line.split("=", 1)[1].strip()
                     elif line.startswith("IG_API_KEY="):
                         creds["api_key"] = line.split("=", 1)[1].strip()
+                    elif line.startswith("IG_ACCOUNT_ID="):
+                        creds["account_id"] = line.split("=", 1)[1].strip()
         except Exception:
             pass
     return creds
 
-def inizializza_cartella_conto(nome_conto, ig_username, ig_password, ig_api_key, tipo_conto="DEMO"):
+def inizializza_cartella_conto(nome_conto, ig_username, ig_password, ig_api_key, tipo_conto="DEMO", ig_account_id=""):
     """Crea la cartella conto con il relativo file .env e i file operativi iniziali."""
     cartella = os.path.join(ROOT_DIR, nome_conto)
     os.makedirs(cartella, exist_ok=True)
@@ -131,21 +133,34 @@ def inizializza_cartella_conto(nome_conto, ig_username, ig_password, ig_api_key,
     # 1. File .env
     env_path = os.path.join(cartella, ".env")
     tipo_ig = "REAL" if tipo_conto.upper() == "REALE" else "DEMO"
+    acc_id_line = f"IG_ACCOUNT_ID={ig_account_id.strip()}\n" if ig_account_id else ""
     env_content = (
         f"IG_USERNAME={ig_username.strip()}\n"
         f"IG_PASSWORD={ig_password.strip()}\n"
         f"IG_API_KEY={ig_api_key.strip()}\n"
+        f"{acc_id_line}"
         f"NTFY_TOPIC=Macchinetta_Alert\n"
         f"IG_ACCOUNT_TYPE={tipo_ig}\n"
     )
     with open(env_path, "w", encoding="utf-8") as f:
         f.write(env_content)
         
-    # 2. File memoria_parametri.json se non esiste
+    # 2. File memoria_parametri.json se non esiste (se possibile copia template esistente es. DANY_DEMO)
     memoria_path = os.path.join(cartella, "memoria_parametri.json")
     if not os.path.exists(memoria_path):
-        with open(memoria_path, "w", encoding="utf-8") as f:
-            json.dump({}, f, indent=4)
+        tpl_path = os.path.join(ROOT_DIR, "DANY_DEMO", "memoria_parametri.json")
+        if not os.path.exists(tpl_path):
+            tpl_path = os.path.join(ROOT_DIR, "FIORDOK_DEMO", "memoria_parametri.json")
+        if os.path.exists(tpl_path):
+            try:
+                import shutil
+                shutil.copyfile(tpl_path, memoria_path)
+            except Exception:
+                with open(memoria_path, "w", encoding="utf-8") as f:
+                    json.dump({}, f, indent=4)
+        else:
+            with open(memoria_path, "w", encoding="utf-8") as f:
+                json.dump({}, f, indent=4)
             
     # 3. File storico_operazioni.csv se non esiste
     storico_path = os.path.join(cartella, "storico_operazioni.csv")
@@ -177,6 +192,28 @@ def inizializza_cartella_conto(nome_conto, ig_username, ig_password, ig_api_key,
             json.dump(stato_init, f, indent=4)
             
     return True
+
+def crea_nuovo_conto(nome_conto, ig_username, ig_password, ig_api_key, ig_account_id="", tipo_conto="REALE"):
+    """Censisce e crea un nuovo conto IG ordinario/istituzionale con le relative credenziali e cartella."""
+    nome = (nome_conto or "").strip().upper()
+    if not nome:
+        return False, "Nome conto non valido."
+        
+    tipo_up = tipo_conto.upper()
+    # Se il nome non termina già con _DEMO o _REALE, lo aggiungiamo
+    if not (nome.endswith("_DEMO") or nome.endswith("_REALE")):
+        nome = f"{nome}_{tipo_up}"
+        
+    u = (ig_username or "").strip()
+    p = (ig_password or "").strip()
+    k = (ig_api_key or "").strip()
+    acc_id = (ig_account_id or "").strip()
+    
+    if not (u and p and k):
+        return False, "Username, Password e API Key di IG sono obbligatori."
+        
+    inizializza_cartella_conto(nome, u, p, k, tipo_conto=tipo_up, ig_account_id=acc_id)
+    return True, f"Conto '{nome}' creato con successo!"
 
 def aggiungi_utente(username, password, ruolo="VIEWER", conti_autorizzati=None):
     if conti_autorizzati is None:

@@ -2533,25 +2533,8 @@ else:
                     return ":gray[0,00 €]"
 
             vista_side = st.session_state.get("vista_sidebar", "CONTO")
-            if conti_reali:
-                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #ff4b4b; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔴 CONTI REALI</p>", unsafe_allow_html=True)
-                for cr in conti_reali:
-                    nome_cr_clean = cr.replace("_REALE", "")
-                    st_cr = leggi_stato_sistema(cr)
-                    cap_cr = formatta_eur(st_cr.get('saldo', '0'))
-                    dd_cr = get_dd_tag_conto(st_cr)
-                    is_sel = (cr == conto_attivo and vista_side == "CONTO")
-                    tempo_conn = get_tempo_connessione(cr, st_cr)
-                    salute = get_stato_salute(cr)
-                    label_cr = f"🔴 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}"
-                    if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
-                        st.session_state.conto_selezionato = cr
-                        st.session_state.vista_sidebar = "CONTO"
-                        st.rerun()
-                st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
-                
             if conti_demo:
-                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #1E88E5; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #38bdf8; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
                 for cd in conti_demo:
                     nome_cd_clean = cd.replace("_DEMO", "")
                     st_cd = leggi_stato_sistema(cd)
@@ -2560,15 +2543,32 @@ else:
                     is_sel = (cd == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
-                    label_cd = f"🔵 {nome_cd_clean} :orange[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}"
+                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cd
+                        st.session_state.vista_sidebar = "CONTO"
+                        st.rerun()
+                st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
+                
+            if conti_reali:
+                st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #FFD700; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🟡 CONTI REALI</p>", unsafe_allow_html=True)
+                for cr in conti_reali:
+                    nome_cr_clean = cr.replace("_REALE", "")
+                    st_cr = leggi_stato_sistema(cr)
+                    cap_cr = formatta_eur(st_cr.get('saldo', '0'))
+                    dd_cr = get_dd_tag_conto(st_cr)
+                    is_sel = (cr == conto_attivo and vista_side == "CONTO")
+                    tempo_conn = get_tempo_connessione(cr, st_cr)
+                    salute = get_stato_salute(cr)
+                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}"
+                    if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
+                        st.session_state.conto_selezionato = cr
                         st.session_state.vista_sidebar = "CONTO"
                         st.rerun()
                             
         renderizza_sidebar_conti()
                         
-        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
         if st.button("🚪 Logout", key="btn_logout_side", use_container_width=True):
             st.session_state.logged_in = False
             st.rerun()
@@ -2625,14 +2625,14 @@ else:
                     sign_pct = "+" if diff_pct > 0 else ""
                     pct_str = f" {sign_pct}{diff_pct:.2f}%"
                         
-                    delta_html = f"<div style='font-size: 0.82rem; font-weight: bold; color: {col_diff}; margin-top: 1px;'>({sign_diff}{diff_eur_str}{pct_str})</div>"
+                    delta_html = f"<div style='font-size: 0.72rem; font-weight: bold; color: {col_diff}; margin-top: 1px;'>({sign_diff}{diff_eur_str}{pct_str})</div>"
                 except Exception:
                     pass
 
-            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 4px;'>Capitale Totale</div><div style='font-size: 1.05rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>{delta_html}", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Utilizzato</div><div style='font-size: 1.05rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Margine Residuo</div><div style='font-size: 1.05rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.80rem; color: #aaa; margin-top: 6px;'>Drawdown (P/L)</div><div style='font-size: 1.05rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.70rem; color: #94a3b8; margin-top: 2px;'>Capitale Totale</div><div style='font-size: 0.88rem; font-weight: bold; color: #FFD700;'>{val_capitale} €</div>{delta_html}", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.70rem; color: #94a3b8; margin-top: 3px;'>Margine Utilizzato</div><div style='font-size: 0.88rem; font-weight: bold; color: #ef4444;'>{val_margine} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.70rem; color: #94a3b8; margin-top: 3px;'>Margine Residuo</div><div style='font-size: 0.88rem; font-weight: bold; color: #4ade80;'>{val_residuo} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.70rem; color: #94a3b8; margin-top: 3px;'>Drawdown (P/L)</div><div style='font-size: 0.88rem; font-weight: bold; color: {col_dd};'>{val_dd} €</div>", unsafe_allow_html=True)
 
         renderizza_sidebar_stats()
 
@@ -6085,6 +6085,41 @@ else:
                                 st.rerun()
                             else:
                                 st.error(msg)
+
+            with st.expander("💼 Nuovo Conto IG", expanded=False):
+                st.markdown("##### Configurazione Nuovo Conto IG")
+                st.caption("Inserisci le credenziali API IG per attivare un nuovo conto (es. **DANY_REALE**). Verrà creata la cartella protetta con la configurazione operativa.")
+                
+                col_nc1, col_nc2 = st.columns(2)
+                with col_nc1:
+                    nuovo_conto_nome = st.text_input("Nome Conto", placeholder="es. DANY_REALE", key="inp_nuovo_conto_nome")
+                    nuovo_conto_tipo = st.selectbox("Tipo Conto", ["REALE", "DEMO"], index=0, key="sel_nuovo_conto_tipo")
+                    nuovo_conto_user = st.text_input("IG Username", key="inp_nuovo_conto_user")
+                with col_nc2:
+                    nuovo_conto_pwd = st.text_input("IG Password", type="password", key="inp_nuovo_conto_pwd")
+                    nuovo_conto_key = st.text_input("IG API Key", key="inp_nuovo_conto_key")
+                    nuovo_conto_acc_id = st.text_input("IG Account ID (Opzionale)", placeholder="es. XXXXX", key="inp_nuovo_conto_acc_id")
+                    
+                if st.button("🚀 Salva Nuovo Conto", key="btn_crea_nuovo_conto", type="primary", use_container_width=True):
+                    if not nuovo_conto_nome.strip():
+                        st.error("Specificare il nome del conto.")
+                    elif not (nuovo_conto_user.strip() and nuovo_conto_pwd.strip() and nuovo_conto_key.strip()):
+                        st.error("Username, Password e API Key di IG sono obbligatori.")
+                    else:
+                        ok_nc, msg_nc = auth_manager.crea_nuovo_conto(
+                            nome_conto=nuovo_conto_nome,
+                            ig_username=nuovo_conto_user,
+                            ig_password=nuovo_conto_pwd,
+                            ig_api_key=nuovo_conto_key,
+                            ig_account_id=nuovo_conto_acc_id,
+                            tipo_conto=nuovo_conto_tipo
+                        )
+                        if ok_nc:
+                            st.success(msg_nc)
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error(msg_nc)
             
             st.markdown("### Elenco Utenti")
             utenti = auth_manager.get_tutti_utenti()
