@@ -255,6 +255,10 @@ def renderizza_tab_goldfinger(conto):
     is_attivo = cfg.get("attivo", False)
     stato_operativo = stato.get("stato_operativo", "IDLE")
 
+    ruolo = st.session_state.get("ruolo", "VIEWER")
+    is_operativo = (ruolo in ["MANAGER", "REGISTA", "OWNER", "GUEST"])
+    help_gf_viewer = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+
     st.markdown("""
         <div style='display: flex; align-items: center; justify-content: space-between; margin-top: -10px; margin-bottom: 12px;'>
             <div>
@@ -385,26 +389,33 @@ def renderizza_tab_goldfinger(conto):
                 step=1.0,
                 format="%.2f",
                 key=f"input_{ss_key}",
+                disabled=(is_attivo or not is_operativo),
                 help="Prezzo a cui scatterà il primo scaglione SHORT a mercato."
             )
         with col_btn_sugg:
             if sugg_lvl is not None:
-                if st.button(f"🎯 Usa {sugg_lvl:.2f}", key=f"btn_sugg_{conto}", use_container_width=True, help="Applica il prezzo chirurgico consigliato al Livello 1"):
+                if st.button(f"🎯 Usa {sugg_lvl:.2f}", key=f"btn_sugg_{conto}", use_container_width=True, disabled=(is_attivo or not is_operativo), help=help_gf_viewer or "Applica il prezzo chirurgico consigliato al Livello 1"):
+                    if not is_operativo:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
                     st.session_state[ss_key] = float(sugg_lvl)
                     st.rerun()
 
         cp, cs = st.columns(2)
         with cp:
-            passo = st.number_input("Passo Scaglioni (pip)", min_value=1.0, max_value=50.0, value=float(cfg.get("passo_pip", 6.0)), step=1.0)
+            passo = st.number_input("Passo Scaglioni (pip)", min_value=1.0, max_value=50.0, value=float(cfg.get("passo_pip", 6.0)), step=1.0, disabled=(is_attivo or not is_operativo))
         with cs:
-            size_u = st.number_input("Size Tranche (Interi)", min_value=1, max_value=20, value=int(cfg.get("size_scaglione", 3)), step=1)
+            size_u = st.number_input("Size Tranche (Interi)", min_value=1, max_value=20, value=int(cfg.get("size_scaglione", 3)), step=1, disabled=(is_attivo or not is_operativo))
 
-        delta_input = st.number_input("Delta Contratti da Coprire", min_value=1, max_value=100, value=int(delta_calcolato if delta_calcolato > 0 else 15), step=1)
+        delta_input = st.number_input("Delta Contratti da Coprire", min_value=1, max_value=100, value=int(delta_calcolato if delta_calcolato > 0 else 15), step=1, disabled=(is_attivo or not is_operativo))
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
         if not is_attivo:
-            if st.button("🚀 AVVIA GOLDFINGER", type="primary", use_container_width=True):
+            if st.button("🚀 AVVIA GOLDFINGER", type="primary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                if not is_operativo:
+                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                    st.rerun()
                 # Blocco anti-errore
                 if pz_l1 <= 0:
                     st.error("🛑 ERRORE DI SICUREZZA: Devi inserire un prezzo valido per il Livello 1 prima di avviare!")
@@ -438,7 +449,10 @@ def renderizza_tab_goldfinger(conto):
             aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE")]
 
             if len(aperti_att) == 0 and sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
-                if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="primary", use_container_width=True):
+                if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                    if not is_operativo:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
                     if bid_live and float(sugg_lvl) >= float(bid_live):
                         st.error(f"🛑 ERRORE DI SICUREZZA: Il livello chirurgico ({sugg_lvl:.2f}) non è inferiore al prezzo live ({float(bid_live):.2f})!")
                     else:
@@ -463,7 +477,10 @@ def renderizza_tab_goldfinger(conto):
             elif len(aperti_att) > 0:
                 st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} scaglioni aperti. Fermare con STOP per riarmare da zero.")
 
-            if st.button("🛑 STOP GOLDFINGER", type="secondary", use_container_width=True):
+            if st.button("🛑 STOP GOLDFINGER", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                if not is_operativo:
+                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                    st.rerun()
                 new_cfg = cfg.copy()
                 new_cfg["attivo"] = False
                 new_cfg["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")

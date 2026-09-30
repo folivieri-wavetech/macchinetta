@@ -547,6 +547,9 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("<div class='btn-start-hyper btn-compact-hyper'>", unsafe_allow_html=True)
         help_start = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
         if st.button("🟢 AVVIA 10M", key=f"btn_start_m5_{btn_sfx}", disabled=(trading_on or not is_operativo), help=help_start, use_container_width=True):
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
             st.session_state["hyper_target_subtab"] = "5m"
             engine.set_trading(True)
             st.rerun()
@@ -560,6 +563,9 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("<div class='btn-stop-hyper btn-compact-hyper'>", unsafe_allow_html=True)
         help_stop = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
         if st.button("🔴 STOP 10M", key=f"btn_stop_m5_{btn_sfx}", disabled=((not trading_on) or (not is_operativo)), help=help_stop, use_container_width=True):
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
             st.session_state["hyper_target_subtab"] = "5m"
             engine.set_trading(False)
             st.rerun()
@@ -576,6 +582,9 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("<div class='btn-manual-long btn-compact-hyper'>", unsafe_allow_html=True)
         help_m_long = f"Apre a mercato reale una posizione Core LONG da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente"))
         if st.button("🟢 LONG Manuale", key=f"btn_man_long_{btn_sfx}", disabled=(not can_manual), help=help_m_long, use_container_width=True):
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
             st.session_state["hyper_target_subtab"] = "5m"
             if hasattr(engine, "manual_entry_core"):
                 res = engine.manual_entry_core("LONG")
@@ -590,6 +599,9 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         st.markdown("<div class='btn-manual-short btn-compact-hyper'>", unsafe_allow_html=True)
         help_m_short = f"Apre a mercato reale una posizione Core SHORT da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente"))
         if st.button("🔴 SHORT Manuale", key=f"btn_man_short_{btn_sfx}", disabled=(not can_manual), help=help_m_short, use_container_width=True):
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
             st.session_state["hyper_target_subtab"] = "5m"
             if hasattr(engine, "manual_entry_core"):
                 res = engine.manual_entry_core("SHORT")

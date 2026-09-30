@@ -1228,9 +1228,15 @@ def dialog_sync_start(conto_partenza, nome_strumento):
             st.rerun()
         return
 
+    ruolo_d = st.session_state.get("ruolo", "VIEWER")
+    is_op_d = (ruolo_d in ["MANAGER", "REGISTA", "OWNER", "GUEST"])
+
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
-        if st.button("⚡ CONFERMA AVVIO SINCRONO", type="primary", use_container_width=True, key=f"sync_conf_{nome_strumento}"):
+        if st.button("⚡ CONFERMA AVVIO SINCRONO", type="primary", use_container_width=True, key=f"sync_conf_{nome_strumento}", disabled=(not is_op_d), help="Disabilitato: profilo Viewer non operativo" if not is_op_d else None):
+            if not is_op_d:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
             full_mem_l = carica_memoria(conto_l)
             full_mem_s = carica_memoria(conto_s)
             
@@ -1362,9 +1368,17 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
     with col_info_r:
         st.markdown(f"**🛡️ Parametri Range ({conto_r}):**\n- Direzione: **{dir_range}**\n- TP: **{tp_r}** | OPP: **{opp_r}**\n- DTS: **{dts_r}** | Size: **{sz_r}**")
         
+    ruolo_dt = st.session_state.get("ruolo", "VIEWER")
+    is_op_dt = (ruolo_dt in ["MANAGER", "REGISTA", "OWNER", "GUEST"])
+    dis_btn_multi = blocco_multiconto or (not is_op_dt)
+    help_btn_multi = "Disabilitato: profilo Viewer non operativo" if not is_op_dt else None
+
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
-        if st.button("⚡ CONFERMA AVVIO MULTICONTO", type="primary", use_container_width=True, key=f"synct_conf_{nome_strumento}", disabled=blocco_multiconto):
+        if st.button("⚡ CONFERMA AVVIO MULTICONTO", type="primary", use_container_width=True, key=f"synct_conf_{nome_strumento}", disabled=dis_btn_multi, help=help_btn_multi):
+            if not is_op_dt:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
             if blocco_multiconto:
                 st.rerun()
             full_mem_t = carica_memoria(conto_t)
@@ -1469,16 +1483,22 @@ def dialog_sync(conto_selezionato, nome_strumento):
         lim_pos = p.get('_calc_limit')
         stop_pos = p.get('_calc_stop')
         
+        ruolo_pos = st.session_state.get("ruolo", "VIEWER")
+        is_op_pos = (ruolo_pos in ["MANAGER", "REGISTA", "OWNER", "GUEST"])
+        
         with st.container(border=True):
             st.markdown(f"**Posizione {dir_pos}** &nbsp;&nbsp;|&nbsp;&nbsp; Size: `{size_pos}` &nbsp;&nbsp;|&nbsp;&nbsp; Entry: `{lvl_pos}`")
             c1, c2, c3 = st.columns([2, 2, 1])
             with c1:
-                new_tp = st.number_input("Take Profit", value=float(lim_pos) if lim_pos else 0.0, format=f"%.{dec}f", step=step_val, key=f"{conto_selezionato}_pos_tp_{deal_id}")
+                new_tp = st.number_input("Take Profit", value=float(lim_pos) if lim_pos else 0.0, format=f"%.{dec}f", step=step_val, key=f"{conto_selezionato}_pos_tp_{deal_id}", disabled=(not is_op_pos))
             with c2:
-                new_sl = st.number_input("Stop Loss", value=float(stop_pos) if stop_pos else 0.0, format=f"%.{dec}f", step=step_val, key=f"{conto_selezionato}_pos_sl_{deal_id}")
+                new_sl = st.number_input("Stop Loss", value=float(stop_pos) if stop_pos else 0.0, format=f"%.{dec}f", step=step_val, key=f"{conto_selezionato}_pos_sl_{deal_id}", disabled=(not is_op_pos))
             with c3:
                 st.write("")
-                if st.button("💾 Invia a IG", key=f"{conto_selezionato}_btn_pos_{deal_id}", width="stretch"):
+                if st.button("💾 Invia a IG", key=f"{conto_selezionato}_btn_pos_{deal_id}", width="stretch", disabled=(not is_op_pos), help="Disabilitato: profilo Viewer non operativo" if not is_op_pos else None):
+                    if not is_op_pos:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
                     payload = {}
                     if new_tp > 0:
                         payload["limitLevel"] = formatta_numero(new_tp, dec)
@@ -2461,8 +2481,16 @@ else:
     conto_selezionato = st.session_state.conto_selezionato
     is_reale = "_REALE" in conto_selezionato.upper()
 
+    ruolo = st.session_state.get("ruolo", "VIEWER")
+    is_manager = (ruolo in ["MANAGER", "REGISTA"])
+    is_owner = (ruolo in ["OWNER", "GUEST"])
+    is_viewer = (ruolo == "VIEWER")
+    is_operativo = (is_manager or is_owner)
+    is_regista = is_manager
+    mostra_tipo = is_operativo
+
     with st.sidebar:
-        cur_r = st.session_state.get('ruolo', 'VIEWER')
+        cur_r = ruolo
         st.markdown(f"### 👤 Utente: {st.session_state.user} (`{cur_r}`)")
         
         conti_reali = [c for c in conti_disponibili if "_REALE" in c.upper()]
@@ -2606,6 +2634,8 @@ else:
                 step=500.0,
                 format="%.2f",
                 key=f"side_inv_input_{conto_selezionato}",
+                disabled=(not is_operativo),
+                help="Disabilitato: profilo Viewer non operativo" if not is_operativo else None,
                 on_change=salva_inv_side
             )
 
@@ -3442,11 +3472,11 @@ else:
                             tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
                             tf_keys = list(tf_map.keys())
                             idx = tf_keys.index(tf_val) if tf_val in tf_keys else 0
-                            st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}")
+                            st.selectbox("Timeframe", tf_keys, index=idx, format_func=lambda x: tf_map[x], key=f"tf_{conto_selezionato}_{nome}", disabled=(not is_operativo))
                         with c_r2:
-                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, format="%d", key=f"sz_{conto_selezionato}_{nome}")
+                            st.number_input("Entry Size", value=int(size_val), min_value=1, step=1, format="%d", key=f"sz_{conto_selezionato}_{nome}", disabled=(not is_operativo))
                         with c_r3:
-                            trig_input_str = st.text_input("Prezzo Trigger", value=trig_default, placeholder=trig_placeholder, key=f"trig_px_{conto_selezionato}_{nome}", help="Prezzo per stop virtuale a chiusura candela. Vuoto = ingresso a mercato immediato.")
+                            trig_input_str = st.text_input("Prezzo Trigger", value=trig_default, placeholder=trig_placeholder, key=f"trig_px_{conto_selezionato}_{nome}", help="Prezzo per stop virtuale a chiusura candela. Vuoto = ingresso a mercato immediato.", disabled=(not is_operativo))
 
                         # Parsing dinamico input trigger
                         trig_input_clean = str(trig_input_str or "").strip().replace(",", ".")
@@ -3463,6 +3493,9 @@ else:
                         with col_salva:
                             help_save_t = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
                             if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_save_t):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 up_save = {
                                     **dati_salvati,
                                     "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
@@ -3483,9 +3516,9 @@ else:
                         
                         c_r3_sub, c_r4_sub = st.columns(2)
                         with c_r3_sub:
-                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, format="%d", key=f"szm_{conto_selezionato}_{nome}")
+                            st.number_input("Size Max", value=int(size_max_val), min_value=1, step=1, format="%d", key=f"szm_{conto_selezionato}_{nome}", disabled=(not is_operativo))
                         with c_r4_sub:
-                            st.number_input("Scala", value=int(scala_val), min_value=1, step=1, format="%d", key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento")
+                            st.number_input("Scala", value=int(scala_val), min_value=1, step=1, format="%d", key=f"sc_{conto_selezionato}_{nome}", help="Size di ciascun incremento", disabled=(not is_operativo))
                         
                         err_key = f"err_trend_{conto_selezionato}_{nome}"
                         if err_key in st.session_state and st.session_state[err_key]:
@@ -3494,7 +3527,11 @@ else:
                         msg_err_trend = dati_salvati.get("msg_manuale") or ("Errore avvio Trend" if dati_salvati.get("errore_avvio") else "")
                         if msg_err_trend and not stato_attivo and not is_trig_attivo:
                             st.error(f"🛑 **Allarme/Blocco Rilevato:** {msg_err_trend}")
-                            if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_T_{conto_selezionato}_{nome}", width="stretch"):
+                            help_rst_err_t = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                            if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_T_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_rst_err_t):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.session_state[err_key] = ""
@@ -3530,7 +3567,11 @@ else:
                                     f"</div>",
                                     unsafe_allow_html=True
                                 )
-                                if st.button(f"❌ ANNULLA TRIGGER {nome}", key=f"CAN_TRIG_{conto_selezionato}_{nome}", on_click=_cb_annulla_trigger, args=(conto_selezionato, nome), width="stretch"):
+                                help_can_trig = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                                if st.button(f"❌ ANNULLA TRIGGER {nome}", key=f"CAN_TRIG_{conto_selezionato}_{nome}", on_click=_cb_annulla_trigger, args=(conto_selezionato, nome), width="stretch", disabled=(not is_operativo), help=help_can_trig):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {
                                         **dati_salvati,
                                         "trigger_start_attivo": False,
@@ -3563,6 +3604,9 @@ else:
                                     if is_hyper_exclusive:
                                         help_l = "Operatività disabilitata: strumento riservato ad HYPER."
                                         dis_l = True
+                                    elif not is_operativo:
+                                        help_l = "Disabilitato: profilo Viewer non operativo."
+                                        dis_l = True
                                     elif has_trigger_input:
                                         h1_extra_l = " e 5 < Distanza KJ < 25 pip" if tf_badge == "H1" else ""
                                         help_l = f"Programma ingresso LONG a chiusura candela {tf_badge} quando Close >= {trig_px_val:.{dec}f}, Close >= Kijun{h1_extra_l}"
@@ -3582,6 +3626,9 @@ else:
 
                                     btn_l_label = "🎯 PROGRAMMA TRIGGER LONG" if has_trigger_input else "🚀 AVVIA LONG"
                                     if st.button(btn_l_label, key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=dis_l, help=help_l):
+                                        if not is_operativo:
+                                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                            st.rerun()
                                         if is_hyper_exclusive:
                                             st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                             st.rerun()
@@ -3665,6 +3712,9 @@ else:
                                     if is_hyper_exclusive:
                                         help_s = "Operatività disabilitata: strumento riservato ad HYPER."
                                         dis_s = True
+                                    elif not is_operativo:
+                                        help_s = "Disabilitato: profilo Viewer non operativo."
+                                        dis_s = True
                                     elif has_trigger_input:
                                         h1_extra_s = " e 5 < Distanza KJ < 25 pip" if tf_badge == "H1" else ""
                                         help_s = f"Programma ingresso SHORT a chiusura candela {tf_badge} quando Close <= {trig_px_val:.{dec}f}, Close <= Kijun{h1_extra_s}"
@@ -3684,6 +3734,9 @@ else:
 
                                     btn_s_label = "🎯 PROGRAMMA TRIGGER SHORT" if has_trigger_input else "🚀 AVVIA SHORT"
                                     if st.button(btn_s_label, key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=dis_s, help=help_s):
+                                        if not is_operativo:
+                                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                            st.rerun()
                                         if is_hyper_exclusive:
                                             st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                             st.rerun()
@@ -3763,7 +3816,12 @@ else:
                                             st.session_state.target_tab = "Trend"
                                             st.rerun()
 
-                                if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=is_hyper_exclusive, help="Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else None):
+                                dis_sync_t_btn = is_hyper_exclusive or (not is_operativo)
+                                help_sync_t_btn = "Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else None)
+                                if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=dis_sync_t_btn, help=help_sync_t_btn):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     st.session_state[f"sync_trend_open_{nome}"] = True
                                     st.rerun()
                                 
@@ -3775,6 +3833,9 @@ else:
                                 is_stop_dis = is_roll or is_wkd or (not is_operativo)
                                 stop_help = "Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Chiusura/STOP disabilitato fino alle 00:15." if is_roll else ("Chiusura/STOP disabilitato nel Weekend." if is_wkd else None))
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch", disabled=is_stop_dis, help=stop_help):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     if is_roll:
                                         st.session_state[err_key] = "🛑 Chiusura/STOP disabilitato fino alle 00:15."
                                         st.rerun()
@@ -4294,7 +4355,11 @@ else:
                             _render_trades_table_trend(t_filtered, f"Nessuna operazione registrata per {s}.")
 
                 with st.expander("⚙️ Gestione Archivio Operazioni Trend"):
-                    if st.button("🗑️ Azzera Archivio Operazioni Trend", key=f"btn_clear_trend_trades_{conto_selezionato}"):
+                    help_clear_trades = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                    if st.button("🗑️ Azzera Archivio Operazioni Trend", key=f"btn_clear_trend_trades_{conto_selezionato}", disabled=(not is_operativo), help=help_clear_trades):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
                         azzera_trades_trend(conto_selezionato)
                         st.success("Archivio operazioni Trend azzerato!")
                         st.rerun()
@@ -4323,7 +4388,11 @@ else:
                     st.markdown("<h1 style='color: #FFD700; margin-top: -15px; white-space: nowrap;'>⚙️ Dashboard Trading Range</h1>", unsafe_allow_html=True)
                 with col_btn_restart:
                     st.write("") 
-                    if st.button("🔄 RESTART VM", help="Elimina il token attuale e forza il rinnovo della sessione IG", width="stretch", key=f"RESTART_{conto_selezionato}"):
+                    help_rst_vm = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Elimina il token attuale e forza il rinnovo della sessione IG"
+                    if st.button("🔄 RESTART VM", help=help_rst_vm, width="stretch", key=f"RESTART_{conto_selezionato}", disabled=(not is_operativo)):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
                         path_token = os.path.join(conto_selezionato, FILE_TOKEN)
                         if os.path.exists(path_token): os.remove(path_token) 
                         st.rerun()
@@ -4404,7 +4473,11 @@ else:
                                 st.rerun() 
                             
                         with col_pulisci:
-                            if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help="Forza pulizia su IG e resetta a zero", width="stretch"):
+                            help_cln = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Forza pulizia su IG e resetta a zero"
+                            if st.button("🧹 Pulisci DB", key=f"CLN_{conto_selezionato}_{nome}", help=help_cln, width="stretch", disabled=(not is_operativo)):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 memoria_attuale[nome] = {**dati_salvati, "comando_reset": True, "custom_override": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
@@ -4432,22 +4505,26 @@ else:
                         alert_falso = dati_salvati.get("alert_falso_allarme")
                         if alert_falso:
                             st.error(f"🛑 **{alert_falso}**")
-                            if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}"):
+                            if st.button("✅ OK, Ho capito", key=f"ACK_{conto_selezionato}_{nome}", disabled=(not is_operativo)):
                                 memoria_attuale[nome] = {**dati_salvati, "alert_falso_allarme": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
                     
                         c_in1, c_in2 = st.columns(2)
-                        with c_in1: tp = st.number_input("TP", value=int(tp_val), min_value=80, step=20, format="%d", key=f"{conto_selezionato}_{nome}_tp")
-                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_opp")
+                        with c_in1: tp = st.number_input("TP", value=int(tp_val), min_value=80, step=20, format="%d", key=f"{conto_selezionato}_{nome}_tp", disabled=(not is_operativo))
+                        with c_in2: opp = st.number_input("OPP", value=int(opp_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_opp", disabled=(not is_operativo))
                         
                         c_in3, c_in4 = st.columns(2)
-                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_dts")
-                        with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size")
+                        with c_in3: dts = st.number_input("DTS", value=int(dts_val), min_value=1, step=5, format="%d", key=f"{conto_selezionato}_{nome}_dts", disabled=(not is_operativo))
+                        with c_in4: size = st.number_input("Size", value=int(dati_salvati.get("size", size_default)), min_value=1, step=1, format="%d", key=f"{conto_selezionato}_{nome}_size", disabled=(not is_operativo))
                     
                         if is_sospeso_wk:
                             st.warning("🌴 **MACCHINA IN SOSPENSIONE WEEKEND.** Le funzioni generali sono bloccate per proteggere la memoria. Clicca Riprendi per sbloccare la console e piazzare i Satelliti.")
-                            if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                            help_wk_r = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                            if st.button("▶️ RIPRENDI", key=f"WK_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_wk_r):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 memoria_attuale[nome] = {**dati_salvati, "comando_riprendi": True, "comando_weekend": False, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                 salva_memoria(conto_selezionato, memoria_attuale)
                                 st.rerun()
@@ -4455,12 +4532,20 @@ else:
                             st.warning("⚠️ STRUMENTO IN MANUALE. Gestiscilo su IG.")
                             col_m1, col_m2 = st.columns(2, vertical_alignment="center")
                             with col_m1:
-                                if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch"):
+                                help_riatt = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                                if st.button("🛰️ RIATTIVA AUTO (Fase 2)", key=f"RIATT_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_riatt):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {**dati_salvati, "comando_riattiva_fase2": True, "msg_manuale": "", "sospeso_weekend": False}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with col_m2:
-                                if st.button("🔄 Restart Fase 1", key=f"RES_{conto_selezionato}_{nome}", width="stretch"):
+                                help_res = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                                if st.button("🔄 Restart Fase 1", key=f"RES_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_res):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
@@ -4470,7 +4555,11 @@ else:
                             msg_err = dati_salvati.get("msg_manuale") or ("Errore avvio" if dati_salvati.get("errore_avvio") else ("Errore ripristino" if dati_salvati.get("errore_ripristino") else ""))
                             if msg_err:
                                 st.error(f"🛑 **Allarme/Sospensione Rilevata:** {msg_err}")
-                                if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_{conto_selezionato}_{nome}", width="stretch"):
+                                help_rst_err = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                                if st.button("🗑️ RICONOSCI & RESETTA ALLARME", key=f"RST_ERR_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_rst_err):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False, "errore_ripristino": False, "alert_falso_allarme": False}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
@@ -4491,6 +4580,9 @@ else:
                             col_l, col_s = st.columns(2)
                             with col_l:
                                 if st.button("🚀AVVIA LONG", key=f"L_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     if is_roll_r:
                                         st.error("🛑 Avvio disabilitato fino alle 00:15.")
                                         st.rerun()
@@ -4502,6 +4594,9 @@ else:
                                     st.rerun()
                             with col_s:
                                 if st.button("🚀AVVIA SHORT", key=f"S_{conto_selezionato}_{nome}", width="stretch", disabled=dis_btn_range, help=help_range):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     if is_roll_r:
                                         st.error("🛑 Avvio disabilitato fino alle 00:15.")
                                         st.rerun()
@@ -4512,6 +4607,9 @@ else:
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             if st.button("⚖️ AVVIO SINCRONO MULTICONTO", key=f"SYNC_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=dis_btn_range, help=help_range):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 st.session_state[f"sync_open_{nome}"] = True
                                 st.rerun()
                             
@@ -4522,6 +4620,9 @@ else:
                             with c_stop:
                                 help_stop_r = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Chiude tutto e resetta a zero"
                                 if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help=help_stop_r, disabled=(not is_operativo), width="stretch"):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     pl = prezzi_live.get(nome, "")
                                     vecchio_wip = dati_salvati.get("storico_wip", [])
                                     vecchio_wip.append(f"[{now_it().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
@@ -4530,12 +4631,18 @@ else:
                                     st.rerun()
                             with c_man:
                                 if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help="Disabilitato: profilo Viewer non operativo" if not is_operativo else None):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     memoria_attuale[nome] = {**dati_salvati, "comando_manuale": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_wk:
                                 if "FASE_2" in stato_corrente:
                                     if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help="Disabilitato: profilo Viewer non operativo" if not is_operativo else None):
+                                        if not is_operativo:
+                                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                            st.rerun()
                                         memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                         salva_memoria(conto_selezionato, memoria_attuale)
                                         st.rerun()
@@ -4544,7 +4651,8 @@ else:
                                 else:
                                     st.success("✔️ OK")
                             with c_sync:
-                                if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch"):
+                                help_sync_r = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                                if st.button("🔄 SYNC", key=f"SYNC_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_sync_r):
                                     dialog_sync(conto_selezionato, nome)
 
                         if not modalita_manuale:
@@ -5167,35 +5275,57 @@ else:
                                 colA, colB, colC = st.columns(3)
                             
                                 trap_type = "LIMIT" if cmd_data["tipo"] == "STOP" else "STOP"
+                                help_res_v = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
                                 
                                 with colA:
-                                    if st.button(f"1️⃣ Tattica: {trap_type} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, help="Piazza la trappola attendendo il rimbalzo del mercato."):
+                                    if st.button(f"1️⃣ Tattica: {trap_type} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, disabled=(not is_operativo), help=help_res_v or "Piazza la trappola attendendo il rimbalzo del mercato."):
+                                        if not is_operativo:
+                                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                            st.rerun()
                                         cmd_trap = cmd_data.copy()
                                         cmd_trap["tipo"] = trap_type
                                         cmd_trap["etichetta"] += " (LIMIT TATTICO)"
                                         piazza_restore(conto_selezionato, r_nome, cmd_trap)
                                 with colB:
-                                    if st.button(f"2️⃣ Copertura: MERCATO a {prezzo_live}", use_container_width=True, help="Copri la posizione istantaneamente al prezzo di adesso."):
+                                    if st.button(f"2️⃣ Copertura: MERCATO a {prezzo_live}", use_container_width=True, disabled=(not is_operativo), help=help_res_v or "Copri la posizione istantaneamente al prezzo di adesso."):
+                                        if not is_operativo:
+                                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                            st.rerun()
                                         cmd_mkt = cmd_data.copy()
                                         cmd_mkt["azione"] = "MERCATO"
                                         cmd_mkt["etichetta"] += " (FORZATURA MERCATO)"
                                         piazza_restore(conto_selezionato, r_nome, cmd_mkt)
                                 with colC:
-                                    if st.button(f"3️⃣ Forza: {cmd_data['tipo']} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, help="Tenta di inviare la richiesta originale a IG."):
+                                    if st.button(f"3️⃣ Forza: {cmd_data['tipo']} a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, disabled=(not is_operativo), help=help_res_v or "Tenta di inviare la richiesta originale a IG."):
+                                        if not is_operativo:
+                                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                            st.rerun()
                                         piazza_restore(conto_selezionato, r_nome, cmd_data)
                             else:
                                 st.success(f"🟢 **Condizioni nei parametri.** Il livello {formatta_numero(cmd_data['livello'], dec)} è piazzabile in sicurezza senza incorrere in rifiuti di IG.")
-                                if st.button(f"🚀 Invia Ordine a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, type="primary"):
+                                help_res_v = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                                if st.button(f"🚀 Invia Ordine a {formatta_numero(cmd_data['livello'], dec)}", use_container_width=True, type="primary", disabled=(not is_operativo), help=help_res_v):
+                                    if not is_operativo:
+                                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                        st.rerun()
                                     piazza_restore(conto_selezionato, r_nome, cmd_data)
                         elif cmd_data["azione"] == "SAT1_OCO":
                             st.markdown(f"**Ordini da Inviare:** `BUY` a {formatta_numero(cmd_data['lvl_l'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; `SELL` a {formatta_numero(cmd_data['lvl_s'], dec)} &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}`")
                             st.success("🟢 **Ordini Simultanei Pronti.** I livelli teorici sono stati calcolati in base alla strategia in corso.")
-                            if st.button("🚀 Invia Entrambi gli Ordini (OCO SAT1)", use_container_width=True, type="primary"):
+                            help_res_v = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                            if st.button("🚀 Invia Entrambi gli Ordini (OCO SAT1)", use_container_width=True, type="primary", disabled=(not is_operativo), help=help_res_v):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 piazza_restore(conto_selezionato, r_nome, cmd_data)
 
                         else: # MERCATO (Es. Ticket o SAT2)
                             st.markdown(f"**Direzione:** `{cmd_data.get('dir', 'N/D')}` &nbsp;&nbsp;|&nbsp;&nbsp; **Size:** `{cmd_data['size']}` &nbsp;&nbsp;|&nbsp;&nbsp; **Azione Reale:** `INGRESSO A MERCATO`")
-                            if st.button(f"🚀 Entra a MERCATO adesso (Prezzo Live: {prezzo_live})", use_container_width=True, type="primary"):
+                            help_res_v = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                            if st.button(f"🚀 Entra a MERCATO adesso (Prezzo Live: {prezzo_live})", use_container_width=True, type="primary", disabled=(not is_operativo), help=help_res_v):
+                                if not is_operativo:
+                                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                                    st.rerun()
                                 piazza_restore(conto_selezionato, r_nome, cmd_data)
 
     if tab_statistiche is not None:
@@ -5250,8 +5380,11 @@ else:
                     prima_data_str = prima_data_db.strftime('%d/%m/%Y') if prima_data_db else "inizio"
                     max_date = datetime.today().date() - timedelta(days=1)
                 
-                    data_archiviazione = st.date_input(f"Archivia tutte le operazioni dal giorno {prima_data_str} al giorno (incluso):", value=max_date, max_value=max_date, format="DD/MM/YYYY", key="archivia_date")
-                    if st.button("🗄️ Archivia Ora", type="primary"):
+                    help_arch = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                    if st.button("🗄️ Archivia Ora", type="primary", disabled=(not is_operativo), help=help_arch):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
                         try:
                             df_arch = pd.read_csv(path_storico)
                             df_arch['Data_Op'] = pd.to_datetime(df_arch['Data'], format='%Y-%m-%d %H:%M:%S').dt.date
@@ -5880,7 +6013,11 @@ else:
                 if st.button("❌ Annulla", key="cancel_reset_rep", use_container_width=True):
                     st.rerun()
             with btn_c2:
-                if st.button("🗑️ Elimina Record", type="primary", key="confirm_reset_rep", use_container_width=True, disabled=(num_del == 0)):
+                help_del_rep = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                if st.button("🗑️ Elimina Record", type="primary", key="confirm_reset_rep", use_container_width=True, disabled=(num_del == 0 or not is_operativo), help=help_del_rep):
+                    if not is_operativo:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
                     df_rimasti = df_rep.loc[~m_del].drop(columns=['Data_dt', 'Capitale_Num', 'Diff_Giorno'], errors='ignore')
                     df_rimasti.to_csv(f_rep, index=False)
                     st.success(f"✅ {num_del} record eliminati con successo!")
@@ -5907,7 +6044,11 @@ else:
                     a_data = st.date_input("A data", value=datetime.today().date(), key=f"rep_a_data_{conto_selezionato}")
                 with c3:
                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                    if st.button("🗑️ Reset DB", key=f"btn_open_reset_db_{conto_selezionato}", use_container_width=True, help="Elimina un intervallo di date dal DB del report"):
+                    help_rst_db = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Elimina un intervallo di date dal DB del report"
+                    if st.button("🗑️ Reset DB", key=f"btn_open_reset_db_{conto_selezionato}", use_container_width=True, disabled=(not is_operativo), help=help_rst_db):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
                         dialog_reset_db_report(file_report, min_date, max_date, df_report)
                 
                 prefs_tab = carica_preferenze(conto_selezionato)
