@@ -80,6 +80,7 @@ class HyperUS500Engine:
 
     def __init__(self, account_dir: str = None):
         self.account_dir = account_dir
+        self.epic = EPIC_US500
         self.lock = threading.RLock()
         self.running = True
         self.ls_connected = False

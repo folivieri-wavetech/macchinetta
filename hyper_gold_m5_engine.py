@@ -189,6 +189,7 @@ class HyperGoldM5Engine:
 
     def __init__(self, account_dir: str = None):
         self.account_dir = account_dir
+        self.epic = EPIC_GOLD
         self.lock = threading.RLock()
         self.running = True
         self.ls_connected = False
@@ -408,6 +409,9 @@ class HyperGoldM5Engine:
                     logger.info("🛑 [WEEKEND SAFEGUARD] Spot Gold: weekend in corso, trading forzato a DA AVVIARE.")
             self.use_core_trailing = False
             self.position = d.get("position")
+            if self.position and not self.use_core_trailing:
+                self.position["ts_active"] = False
+                self.position["ts_price"] = None
             self.increments = d.get("increments", [])
             self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
             self.trades = d.get("trades", [])
@@ -937,7 +941,7 @@ class HyperGoldM5Engine:
                         reason=reason,
                         time_open=inc.get("open_time", time_str),
                         label=f"Inc {mode} Spot Gold 10M",
-                        epic=self.epic
+                        epic=EPIC_GOLD
                     )
                 except Exception as ex_rec:
                     logger.warning(f"Errore registrazione trade incremento: {ex_rec}")
@@ -1003,7 +1007,7 @@ class HyperGoldM5Engine:
                                 reason=reason,
                                 time_open=pos_to_close.get("open_time", time_str),
                                 label="Core Spot Gold 10M",
-                                epic=self.epic
+                                epic=EPIC_GOLD
                             )
                         except Exception as ex_rec:
                             logger.warning(f"Errore registrazione core trade: {ex_rec}")
@@ -1070,7 +1074,7 @@ class HyperGoldM5Engine:
                                 reason=reason,
                                 time_open=inc.get("open_time", time_str),
                                 label=f"Inc {inc.get('mode', 'BANCOMAT')} Spot Gold 10M",
-                                epic=self.epic
+                                epic=EPIC_GOLD
                             )
                         except Exception as ex_rec:
                             logger.warning(f"Errore registrazione trade incremento: {ex_rec}")
@@ -1370,6 +1374,14 @@ class HyperGoldM5Engine:
                         elif target_ts < prev_ts:
                             inc["ts_price"] = target_ts
                             logger.info(f"[{time_str}] 📉 [TS DINAMICO KJ CRICCHETTO SCENDE] Inc #{inc.get('id')} TS scende da {prev_ts:.2f} a {target_ts:.2f} (Close {closed_close:.2f} + 10p)")
+
+                    # Clamping di sicurezza: se la Core ha un Trailing Stop attivo, il TS dell'incremento non può essere più permissivo
+                    if getattr(self, "use_core_trailing", False) and self.position and self.position.get("ts_active") and self.position.get("ts_price") is not None:
+                        core_ts = self.position["ts_price"]
+                        if direction == "LONG" and inc.get("ts_price") is not None and inc["ts_price"] < core_ts:
+                            inc["ts_price"] = core_ts
+                        elif direction == "SHORT" and inc.get("ts_price") is not None and inc["ts_price"] > core_ts:
+                            inc["ts_price"] = core_ts
 
                 self.save_state()
 

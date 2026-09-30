@@ -541,10 +541,12 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     """, unsafe_allow_html=True)
 
     # Pulsanti di Controllo Motore 10M (AVVIA / STOP)
+    is_operativo = st.session_state.get("ruolo", "VIEWER") in ["MANAGER", "REGISTA", "OWNER", "GUEST"]
     c_b1, c_b2 = st.columns(2)
     with c_b1:
         st.markdown("<div class='btn-start-hyper btn-compact-hyper'>", unsafe_allow_html=True)
-        if st.button("🟢 AVVIA 10M", key=f"btn_start_m5_{btn_sfx}", disabled=trading_on, use_container_width=True):
+        help_start = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+        if st.button("🟢 AVVIA 10M", key=f"btn_start_m5_{btn_sfx}", disabled=(trading_on or not is_operativo), help=help_start, use_container_width=True):
             st.session_state["hyper_target_subtab"] = "5m"
             engine.set_trading(True)
             st.rerun()
@@ -556,7 +558,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
     with c_b2:
         st.markdown("<div class='btn-stop-hyper btn-compact-hyper'>", unsafe_allow_html=True)
-        if st.button("🔴 STOP 10M", key=f"btn_stop_m5_{btn_sfx}", disabled=(not trading_on), use_container_width=True):
+        help_stop = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+        if st.button("🔴 STOP 10M", key=f"btn_stop_m5_{btn_sfx}", disabled=((not trading_on) or (not is_operativo)), help=help_stop, use_container_width=True):
             st.session_state["hyper_target_subtab"] = "5m"
             engine.set_trading(False)
             st.rerun()
@@ -566,12 +569,12 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     # Pulsanti di Avvio Manuale Core (LONG / SHORT)
     # Condizione: Motore Hyper avviato E strumento FLAT (nessuna posizione e nessun incremento)
     is_flat = (pos is None) and (len(increments) == 0)
-    can_manual = trading_on and is_flat
+    can_manual = trading_on and is_flat and is_operativo
 
     c_m1, c_m2 = st.columns(2)
     with c_m1:
         st.markdown("<div class='btn-manual-long btn-compact-hyper'>", unsafe_allow_html=True)
-        help_m_long = f"Apre a mercato reale una posizione Core LONG da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente")
+        help_m_long = f"Apre a mercato reale una posizione Core LONG da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente"))
         if st.button("🟢 LONG Manuale", key=f"btn_man_long_{btn_sfx}", disabled=(not can_manual), help=help_m_long, use_container_width=True):
             st.session_state["hyper_target_subtab"] = "5m"
             if hasattr(engine, "manual_entry_core"):
@@ -585,7 +588,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
     with c_m2:
         st.markdown("<div class='btn-manual-short btn-compact-hyper'>", unsafe_allow_html=True)
-        help_m_short = f"Apre a mercato reale una posizione Core SHORT da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente")
+        help_m_short = f"Apre a mercato reale una posizione Core SHORT da {core_c}c su {instr_name}" if can_manual else ("Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Disabilitato: richiede Motore Avviato e strumento FLAT" if not trading_on else "Disabilitato: posizione già presente"))
         if st.button("🔴 SHORT Manuale", key=f"btn_man_short_{btn_sfx}", disabled=(not can_manual), help=help_m_short, use_container_width=True):
             st.session_state["hyper_target_subtab"] = "5m"
             if hasattr(engine, "manual_entry_core"):
@@ -609,7 +612,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         
         # Gestione TS Core: Verde se attivo, KJ Parac. se Core governata da Kijun (libera da TS)
         core_has_ts = getattr(engine, "use_core_trailing", False)
-        ts_is_active = pos.get("ts_active", False) and pos.get("ts_price") is not None
+        ts_is_active = core_has_ts and pos.get("ts_active", False) and pos.get("ts_price") is not None
         if ts_is_active:
             ts_val = pos["ts_price"]
             ts_core_cell = f"<span style='color: #22c55e; font-weight: 700;'>{ts_val:.2f}</span>"
@@ -739,7 +742,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     # Tasto Azzera Storico Operazioni (spostato in basso)
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
     st.markdown("<div class='btn-azzera-hyper'>", unsafe_allow_html=True)
-    if st.button(f"🔄 Azzera Storico Operazioni ({instr_name})", key=f"btn_clr_trades_m5_{btn_sfx}", help=f"Azzera lo storico delle operazioni chiuse e il P&L di sessione per {instr_name}", use_container_width=True):
+    help_clr = f"Azzera lo storico delle operazioni chiuse e il P&L di sessione per {instr_name}" if is_operativo else "Disabilitato: profilo Viewer non operativo"
+    if st.button(f"🔄 Azzera Storico Operazioni ({instr_name})", key=f"btn_clr_trades_m5_{btn_sfx}", disabled=(not is_operativo), help=help_clr, use_container_width=True):
         st.session_state["hyper_target_subtab"] = "5m"
         order_mgr.clear_trades_history(epic=epic_filter)
         if hasattr(engine, "clear_session_trades"):
@@ -1199,7 +1203,8 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         if trades_active:
             c_cl1, c_cl2 = st.columns([3, 1])
             with c_cl2:
-                if st.button("🗑️ Azzera Archivio Sintesi", key="btn_clear_sintesi"):
+                is_op_sintesi = st.session_state.get("ruolo", "VIEWER") in ["MANAGER", "REGISTA", "OWNER", "GUEST"]
+                if st.button("🗑️ Azzera Archivio Sintesi", key="btn_clear_sintesi", disabled=(not is_op_sintesi), help="Disabilitato: profilo Viewer non operativo" if not is_op_sintesi else None):
                     st.session_state["hyper_target_subtab"] = "sintesi"
                     mgr.clear_trades_history()
                     try:

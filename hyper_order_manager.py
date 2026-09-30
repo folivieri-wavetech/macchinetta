@@ -548,6 +548,8 @@ class HyperOrderManager:
                 }
 
                 history = self.get_trades_history()
+                if deal_id and deal_id != "--":
+                    history = [h for h in history if h.get("deal_id") != deal_id]
                 history.insert(0, trade_item)
                 # Mantieni ultimi 1000 trade
                 history = history[:1000]
@@ -557,56 +559,195 @@ class HyperOrderManager:
             except Exception as e:
                 logger.error(f"Errore salvataggio trade history in {self.history_file}: {e}")
 
+    def _reconcile_from_engines_state(self, current_history: list) -> tuple[list, bool]:
+        """Riconciliazione automatica trasparente (Self-Healing):
+        Se un trade con esito CLOSE è presente nello stato locale di un motore M5
+        (hyper_gold_m5_state.json o hyper_us500_m5_state.json) ma non è in hyper_trades_history.json,
+        viene importato istantaneamente con attribuzione certa dello strumento."""
+        import re
+        modified = False
+        known_deals = set()
+        for t in current_history:
+            d_id = t.get("deal_id")
+            if d_id and d_id != "--":
+                known_deals.add(d_id)
+
+        now_str = now_it().strftime("%Y-%m-%d %H:%M:%S")
+        today_date = now_str[:10]
+
+        # 1. Controllo Spot Gold M5
+        gold_state_file = os.path.join(self.account_dir, "hyper_gold_m5_state.json")
+        if os.path.exists(gold_state_file):
+            try:
+                with open(gold_state_file, "r", encoding="utf-8") as gf:
+                    g_data = json.load(gf)
+                    for t in g_data.get("trades", []):
+                        act = str(t.get("action", ""))
+                        if "CLOSE" in act:
+                            rsn = str(t.get("reason", ""))
+                            # Cerca eventuale Deal ID
+                            m_deal = re.search(r"Deal\s+([A-Z0-9]+)", rsn) or re.search(r"\b(DIAAA[A-Z0-9]+)\b", rsn)
+                            deal_id = m_deal.group(1) if m_deal else "--"
+                            if deal_id != "--" and deal_id in known_deals:
+                                continue
+
+                            direction = "LONG" if "LONG" in act else ("SHORT" if "SHORT" in act else "LONG")
+                            open_px = float(t.get("open_price") or 0.0)
+                            close_px = float(t.get("close_price") or 0.0)
+                            pnl_eur = float(t.get("pnl") or 0.0)
+                            contracts = float(t.get("contracts") or 5.0)
+                            time_val = str(t.get("time", ""))
+                            time_close = f"{today_date} {time_val}" if (len(time_val) <= 8 and ":" in time_val) else (time_val or now_str)
+
+                            # Modalità incremento o core
+                            lbl = "Spot Gold 10M"
+                            if "INC" in act:
+                                mode = "RUNNER" if "RUNNER" in act else "BANCOMAT"
+                                lbl = f"Inc {mode} Spot Gold 10M"
+                            elif "CORE" in act:
+                                lbl = "Core Spot Gold 10M"
+
+                            trade_recovered = {
+                                "id": str(int(time.time() * 1000)),
+                                "time_open": time_close,
+                                "time_close": time_close,
+                                "tf": "10M",
+                                "epic": EPIC_GOLD,
+                                "direction": direction,
+                                "contracts": contracts,
+                                "open_price": round(open_px, 2),
+                                "close_price": round(close_px, 2),
+                                "pips": round((close_px - open_px) if direction == "LONG" else (open_px - close_px), 2) if (open_px and close_px) else 0.0,
+                                "pnl_eur": round(pnl_eur, 2),
+                                "deal_id": deal_id,
+                                "label": lbl,
+                                "reason": rsn or "Chiusura riconciliata da motore Spot Gold"
+                            }
+                            current_history.insert(0, trade_recovered)
+                            if deal_id != "--":
+                                known_deals.add(deal_id)
+                            modified = True
+            except Exception as e_g:
+                logger.warning(f"Errore auto-riconciliazione Gold: {e_g}")
+
+        # 2. Controllo US500 M5
+        us500_state_file = os.path.join(self.account_dir, "hyper_us500_m5_state.json")
+        if os.path.exists(us500_state_file):
+            try:
+                with open(us500_state_file, "r", encoding="utf-8") as uf:
+                    u_data = json.load(uf)
+                    for t in u_data.get("trades", []):
+                        act = str(t.get("action", ""))
+                        if "CLOSE" in act:
+                            rsn = str(t.get("reason", ""))
+                            m_deal = re.search(r"Deal\s+([A-Z0-9]+)", rsn) or re.search(r"\b(DIAAA[A-Z0-9]+)\b", rsn)
+                            deal_id = m_deal.group(1) if m_deal else "--"
+                            if deal_id != "--" and deal_id in known_deals:
+                                continue
+
+                            direction = "LONG" if "LONG" in act else ("SHORT" if "SHORT" in act else "LONG")
+                            open_px = float(t.get("open_price") or 0.0)
+                            close_px = float(t.get("close_price") or 0.0)
+                            pnl_eur = float(t.get("pnl") or 0.0)
+                            contracts = float(t.get("contracts") or 5.0)
+                            time_val = str(t.get("time", ""))
+                            time_close = f"{today_date} {time_val}" if (len(time_val) <= 8 and ":" in time_val) else (time_val or now_str)
+
+                            lbl = "US500 10M"
+                            if "INC" in act:
+                                mode = "RUNNER" if "RUNNER" in act else "BANCOMAT"
+                                lbl = f"Inc {mode} US500 10M"
+                            elif "CORE" in act:
+                                lbl = "Core US500 10M"
+
+                            trade_recovered = {
+                                "id": str(int(time.time() * 1000)),
+                                "time_open": time_close,
+                                "time_close": time_close,
+                                "tf": "10M",
+                                "epic": "IX.D.SPTRD.IBE.IP",
+                                "direction": direction,
+                                "contracts": contracts,
+                                "open_price": round(open_px, 2),
+                                "close_price": round(close_px, 2),
+                                "pips": round((close_px - open_px) if direction == "LONG" else (open_px - close_px), 2) if (open_px and close_px) else 0.0,
+                                "pnl_eur": round(pnl_eur, 2),
+                                "deal_id": deal_id,
+                                "label": lbl,
+                                "reason": rsn or "Chiusura riconciliata da motore US500"
+                            }
+                            current_history.insert(0, trade_recovered)
+                            if deal_id != "--":
+                                known_deals.add(deal_id)
+                            modified = True
+            except Exception as e_u:
+                logger.warning(f"Errore auto-riconciliazione US500: {e_u}")
+
+        return current_history, modified
+
     def get_trades_history(self, tf: str = None, epic: str = None) -> list:
         """Restituisce la lista dei trade conclusi registrati, opzionalmente filtrati per TF ed Epic."""
-        if not os.path.exists(self.history_file):
-            return []
+        data = []
+        if os.path.exists(self.history_file):
+            try:
+                with open(self.history_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if not isinstance(data, list):
+                        data = []
+            except Exception:
+                data = []
+
+        # Auto-riconciliazione con i motori live per non perdere mai alcuna chiusura
         try:
-            with open(self.history_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if not isinstance(data, list):
-                    return []
-                res = []
-                import re
-                for t in data:
-                    if isinstance(t, dict):
-                        ep = str(t.get("epic", "")).upper()
-                        lbl = str(t.get("label", "")).upper()
-                        rsn = str(t.get("reason", "")).upper()
+            data, was_mod = self._reconcile_from_engines_state(data)
+            if was_mod:
+                with open(self.history_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+        except Exception:
+            pass
 
-                        # Identificazione deterministica basata ESCLUSIVAMENTE sull'EPIC (e label come fallback)
-                        # ZERO confronti di prezzo.
-                        if "SPTRD" in ep or "US500" in ep or "SPX" in ep or ("US500" in lbl and "GOLD" not in ep and "GOLD" not in lbl):
-                            t["epic"] = "IX.D.SPTRD.IBE.IP"
-                            if "US500" not in lbl:
-                                t["label"] = f"{t.get('label', '')} US500".strip()
-                        elif any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl or "ORO" in lbl:
-                            t["epic"] = EPIC_GOLD
-                            if "US500" in t.get("label", ""):
-                                t["label"] = t["label"].replace("US500", "Spot Gold").replace("  ", " ").strip()
+        try:
+            res = []
+            import re
+            for t in data:
+                if isinstance(t, dict):
+                    ep = str(t.get("epic", "")).upper()
+                    lbl = str(t.get("label", "")).upper()
+                    rsn = str(t.get("reason", "")).upper()
 
-                        reason_str = str(t.get("reason", "") or "")
-                        if reason_str:
-                            reason_str = reason_str.replace("Paracadute KJ Intracandela", "Paracadute KJ")
-                            reason_str = reason_str.replace(
-                                "Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT",
-                                "Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT."
-                            )
-                            reason_str = reason_str.replace("Candela Segnale KJ Confermata:", "Candela Segnale KJ :")
-                            reason_str = re.sub(r"\s*\((?:Minimo|Massimo)\s*[-+]\s*\d+p\)", "", reason_str)
-                            t["reason"] = reason_str
-                        res.append(t)
-                if tf:
-                    res = [t for t in res if t.get("tf") == tf]
-                if epic:
-                    ep_filter = epic.upper()
-                    if "SPTRD" in ep_filter or "US500" in ep_filter:
-                        res = [t for t in res if "SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper()]
-                    elif any(k in ep_filter for k in ("CFEGOLD", "CFDGOLD", "GOLD")):
-                        res = [t for t in res if any(k in str(t.get("epic", "")).upper() for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in str(t.get("label", "")).upper()]
-                    else:
-                        res = [t for t in res if str(t.get("epic", "")).upper() == ep_filter]
-                return res
+                    # Identificazione deterministica basata ESCLUSIVAMENTE sull'EPIC (e label come fallback)
+                    # ZERO confronti di prezzo.
+                    if "SPTRD" in ep or "US500" in ep or "SPX" in ep or ("US500" in lbl and "GOLD" not in ep and "GOLD" not in lbl):
+                        t["epic"] = "IX.D.SPTRD.IBE.IP"
+                        if "US500" not in lbl:
+                            t["label"] = f"{t.get('label', '')} US500".strip()
+                    elif any(k in ep for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in lbl or "ORO" in lbl:
+                        t["epic"] = EPIC_GOLD
+                        if "US500" in t.get("label", ""):
+                            t["label"] = t["label"].replace("US500", "Spot Gold").replace("  ", " ").strip()
+
+                    reason_str = str(t.get("reason", "") or "")
+                    if reason_str:
+                        reason_str = reason_str.replace("Paracadute KJ Intracandela", "Paracadute KJ")
+                        reason_str = reason_str.replace(
+                            "Rollover Notturno Gold (22:44 - 00:15) ➔ Chiusura automatica anticipata di sicurezza a FLAT",
+                            "Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT."
+                        )
+                        reason_str = reason_str.replace("Candela Segnale KJ Confermata:", "Candela Segnale KJ :")
+                        reason_str = re.sub(r"\s*\((?:Minimo|Massimo)\s*[-+]\s*\d+p\)", "", reason_str)
+                        t["reason"] = reason_str
+                    res.append(t)
+            if tf:
+                res = [t for t in res if t.get("tf") == tf]
+            if epic:
+                ep_filter = epic.upper()
+                if "SPTRD" in ep_filter or "US500" in ep_filter:
+                    res = [t for t in res if "SPTRD" in str(t.get("epic", "")).upper() or "US500" in str(t.get("label", "")).upper()]
+                elif any(k in ep_filter for k in ("CFEGOLD", "CFDGOLD", "GOLD")):
+                    res = [t for t in res if any(k in str(t.get("epic", "")).upper() for k in ("CFEGOLD", "CFDGOLD", "GOLD")) or "GOLD" in str(t.get("label", "")).upper()]
+                else:
+                    res = [t for t in res if str(t.get("epic", "")).upper() == ep_filter]
+            return res
         except Exception:
             return []
 

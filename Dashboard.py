@@ -98,12 +98,22 @@ if DEV_MODE:
 
 # --- FUNZIONI HELPER MULTI-CONTO ---
 def get_accounts():
-    """Scansiona la root e trova tutte le cartelle conto valide."""
+    """Scansiona la root e trova tutte le cartelle conto valide filtrando per ruolo."""
     tutti = [d for d in os.listdir() if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
     if hasattr(st, "session_state") and getattr(st.session_state, "logged_in", False):
-        if not st.session_state.get("tutti_i_conti", False):
+        ruolo = st.session_state.get("ruolo", "VIEWER")
+        owner_accounts = auth_manager.get_owner_accounts()
+        if ruolo in ["OWNER", "GUEST"]:
+            # OWNER vede solo ed esclusivamente i propri conti autorizzati
             autorizzati = st.session_state.get("conti_autorizzati", [])
             tutti = [c for c in tutti if c in autorizzati]
+        elif ruolo in ["MANAGER", "REGISTA"]:
+            # Il MANAGER vede tutti i conti ordinari/istituzionali, escludendo quelli degli Owner
+            tutti = [c for c in tutti if c not in owner_accounts]
+        else:
+            # VIEWER vede solo i suoi conti autorizzati (e mai i conti Owner)
+            autorizzati = st.session_state.get("conti_autorizzati", [])
+            tutti = [c for c in tutti if c in autorizzati and c not in owner_accounts]
     return tutti
 
 def formatta_numero(valore, dec):
@@ -1140,7 +1150,7 @@ def salva_cache_ultimi_kj(conto, cache):
 @st.dialog("Configurazione Avvio Sincrono Multiconto", width="large")
 
 def dialog_sync_start(conto_partenza, nome_strumento):
-    conti_disponibili = [d for d in os.listdir(".") if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
+    conti_disponibili = get_accounts()
     if len(conti_disponibili) < 2:
         st.error("⚠️ Sono necessari almeno due conti (Demo o Reali) per utilizzare l'Avvio Sincrono Multiconto.")
         return
@@ -1240,7 +1250,7 @@ def dialog_sync_start(conto_partenza, nome_strumento):
 
 @st.dialog("Configurazione Avvio Multiconto (Trend + Range)", width="large")
 def dialog_sync_start_trend(conto_partenza, nome_strumento):
-    conti_disponibili = [d for d in os.listdir(".") if os.path.isdir(d) and (d.endswith("_DEMO") or d.endswith("_REALE"))]
+    conti_disponibili = get_accounts()
     if len(conti_disponibili) < 2:
         st.error("⚠️ Sono necessari almeno due conti (Demo o Reali) per utilizzare l'Avvio Multiconto.")
         return
@@ -2452,7 +2462,8 @@ else:
     is_reale = "_REALE" in conto_selezionato.upper()
 
     with st.sidebar:
-        st.markdown(f"### 👤 Utente: {st.session_state.user}")
+        cur_r = st.session_state.get('ruolo', 'VIEWER')
+        st.markdown(f"### 👤 Utente: {st.session_state.user} (`{cur_r}`)")
         
         conti_reali = [c for c in conti_disponibili if "_REALE" in c.upper()]
         conti_demo = [c for c in conti_disponibili if "_REALE" not in c.upper()]
@@ -2694,7 +2705,12 @@ else:
             st.rerun()
 
     ruolo = st.session_state.get("ruolo", "VIEWER")
-    is_regista = (ruolo == "REGISTA")
+    is_manager = (ruolo in ["MANAGER", "REGISTA"])
+    is_owner = (ruolo in ["OWNER", "GUEST"])
+    is_viewer = (ruolo == "VIEWER")
+    is_operativo = (is_manager or is_owner)
+    is_regista = is_manager  # Retrocompatibilità interna
+    mostra_tipo = is_operativo
 
     st.markdown("""
         <style>
@@ -2925,7 +2941,7 @@ else:
                 gruppi_pos[key].append(p)
             
             # Intestazioni centrate e bianche
-            th_tipo_pos = "<th style='text-align: center; color: white;'><u>TIPO</u></th>" if is_regista else ""
+            th_tipo_pos = "<th style='text-align: center; color: white;'><u>TIPO</u></th>" if mostra_tipo else ""
             html_pos = f"<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>APERTURA</u></th><th style='text-align: center; color: white;'><u>ULTIMO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th>{th_tipo_pos}<th style='text-align: center; color: white;'><u>P/L (EUR)</u></th></tr></thead>\n<tbody>\n"
             
             totale_pnl_portafoglio = 0.0
@@ -3064,7 +3080,7 @@ else:
                 else:
                     td_mercato = ""
 
-                td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span></td>" if is_regista else ""
+                td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span></td>" if mostra_tipo else ""
                 
                 # Se è posizione singola (es. solo Core, senza incrementi), ricava la data/ora di apertura da visualizzare sotto il livello (senza sottolineatura)
                 data_master_str = ""
@@ -3203,11 +3219,11 @@ else:
                         is_last_subrow = (idx == len(posizioni_render) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span></td>" if is_regista else ""
+                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span></td>" if mostra_tipo else ""
                         html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span class='entry-date' style='font-size: 0.75rem; color: #888; text-decoration: none !important; display: inline-block;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
-            empty_tds = "<td></td><td></td><td></td><td></td><td></td><td></td>" if is_regista else "<td></td><td></td><td></td><td></td><td></td>"
+            empty_tds = "<td></td><td></td><td></td><td></td><td></td><td></td>" if mostra_tipo else "<td></td><td></td><td></td><td></td><td></td>"
             html_pos += f"<tr class='ig-row' style='background-color: rgba(255,255,255,0.05); border-top: 2px solid #888;'><td class='col-mercato' style='font-weight: normal;'>Totale</td>{empty_tds}<td class='{totale_class}' style='font-size: 1rem;'>{totale_pnl_portafoglio:.0f} €</td></tr>\n</tbody></table></div>"
             
             if not pos_data: html_pos = "<h4 style='margin-top: 20px; text-align: center;'><u>Posizioni Aperte</u></h4><p style='color: #888; font-style: italic; text-align: center;'>Nessuna posizione aperta al momento.</p>"
@@ -3215,7 +3231,7 @@ else:
             st.html(html_pos)
             
             # --- ELABORAZIONE ORDINI PENDENTI ---
-            th_tipo_ord = "<th style='text-align: center; color: white;'><u>TIPO</u></th>" if is_regista else ""
+            th_tipo_ord = "<th style='text-align: center; color: white;'><u>TIPO</u></th>" if mostra_tipo else ""
             html_ord = f"<h4 style='margin-top: 40px; text-align: center;'><u>Ordini di Apertura</u></h4>\n<div class='table-responsive'>\n<table class='ig-table'>\n<thead><tr><th style='text-align: left; color: #888; padding-left: 15px;'><u>MERCATO</u></th><th style='text-align: center; color: white;'><u>SIZE</u></th><th style='text-align: center; color: white;'><u>LIVELLO</u></th><th style='text-align: center; color: white;'><u>STOP</u></th><th style='text-align: center; color: white;'><u>LIMITE</u></th>{th_tipo_ord}</tr></thead>\n<tbody>\n"
             
             # Ordino i pendenti per nome e poi per size
@@ -3272,7 +3288,7 @@ else:
                 else:
                     td_mercato_ord = ""
                 
-                td_tipo_ord = f"<td><span class='{size_class}' style='font-weight: normal;'>{ruolo_ord}</span></td>" if is_regista else ""
+                td_tipo_ord = f"<td><span class='{size_class}' style='font-weight: normal;'>{ruolo_ord}</span></td>" if mostra_tipo else ""
                 html_ord += f"<tr class='ig-row' style='{row_style}'>{td_mercato_ord}<td class='{size_class}'>{sign}{sz:g}</td><td class='{size_class}'>{formatta_numero(lvl, dec)}</td><td>{s_str}</td><td>{l_str}</td>{td_tipo_ord}</tr>\n"
                 
             html_ord += "</tbody></table></div>"
@@ -3434,7 +3450,8 @@ else:
                             has_trigger_input = False
 
                         with col_salva:
-                            if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch"):
+                            help_save_t = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
+                            if st.button("💾 Salva", key=f"SAVE_T_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help=help_save_t):
                                 up_save = {
                                     **dati_salvati,
                                     "timeframe": st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val),
@@ -3744,8 +3761,8 @@ else:
                         else:
                             c_stop, c_info = st.columns([1, 3], vertical_alignment="center")
                             with c_stop:
-                                is_stop_dis = is_roll or is_wkd
-                                stop_help = "Chiusura/STOP disabilitato fino alle 00:15." if is_roll else ("Chiusura/STOP disabilitato nel Weekend." if is_wkd else None)
+                                is_stop_dis = is_roll or is_wkd or (not is_operativo)
+                                stop_help = "Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Chiusura/STOP disabilitato fino alle 00:15." if is_roll else ("Chiusura/STOP disabilitato nel Weekend." if is_wkd else None))
                                 if st.button("⏹️ STOP", key=f"TSTOP_{conto_selezionato}_{nome}", width="stretch", disabled=is_stop_dis, help=stop_help):
                                     if is_roll:
                                         st.session_state[err_key] = "🛑 Chiusura/STOP disabilitato fino alle 00:15."
@@ -4361,7 +4378,8 @@ else:
                             st.markdown(f"<div style='font-size: 0.8rem; color: #888; margin-top: -2px; margin-bottom: 5px;'>{tipo} &nbsp;•&nbsp; {bid_ask_str}</div>", unsafe_allow_html=True)
                         
                         with col_salva:
-                            if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help="Conferma e salva TP, OPP, DTS e Size", width="stretch"):
+                            help_save_range = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Conferma e salva TP, OPP, DTS e Size"
+                            if st.button("💾 Salva", key=f"SAVE_{conto_selezionato}_{nome}", help=help_save_range, disabled=(not is_operativo), width="stretch"):
                                 memoria_attuale[nome] = {
                                     **dati_salvati, 
                                     "tp": st.session_state.get(f"{conto_selezionato}_{nome}_tp", tp_val), 
@@ -4456,8 +4474,8 @@ else:
                             elif is_wkd_r:
                                 st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
 
-                            dis_btn_range = is_hyper_exclusive or is_roll_r or is_wkd_r
-                            help_range = "Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None))
+                            dis_btn_range = is_hyper_exclusive or is_roll_r or is_wkd_r or (not is_operativo)
+                            help_range = "Disabilitato: profilo Viewer non operativo." if not is_operativo else ("Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None)))
 
                             col_l, col_s = st.columns(2)
                             with col_l:
@@ -4491,7 +4509,8 @@ else:
                         else:
                             c_stop, c_man, c_wk, c_sync = st.columns([1.7, 2.3, 2.3, 1.7], vertical_alignment="center")
                             with c_stop:
-                                if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help="Chiude tutto e resetta a zero", width="stretch"):
+                                help_stop_r = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Chiude tutto e resetta a zero"
+                                if st.button("⏹️ STOP", key=f"STOP_{conto_selezionato}_{nome}", help=help_stop_r, disabled=(not is_operativo), width="stretch"):
                                     pl = prezzi_live.get(nome, "")
                                     vecchio_wip = dati_salvati.get("storico_wip", [])
                                     vecchio_wip.append(f"[{now_it().strftime('%d/%m %H:%M:%S')}] 🛑 Tasto STOP premuto. Macchinetta spenta.")
@@ -4499,13 +4518,13 @@ else:
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_man:
-                                if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch"):
+                                if st.button("👤 MANUALE", key=f"MAN_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help="Disabilitato: profilo Viewer non operativo" if not is_operativo else None):
                                     memoria_attuale[nome] = {**dati_salvati, "comando_manuale": True, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_wk:
                                 if "FASE_2" in stato_corrente:
-                                    if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch"):
+                                    if st.button("🌴 WEEKEND", key=f"WK_{conto_selezionato}_{nome}", width="stretch", disabled=(not is_operativo), help="Disabilitato: profilo Viewer non operativo" if not is_operativo else None):
                                         memoria_attuale[nome] = {**dati_salvati, "comando_weekend": True, "msg_weekend": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                         salva_memoria(conto_selezionato, memoria_attuale)
                                         st.rerun()
@@ -4876,24 +4895,27 @@ else:
                             sign_e = "+" if pnl_eur > 0 else ""
                             st.markdown(f"<div style='font-size: 1.15rem; font-weight: bold; color: {pnl_col};'>{sign_e}{formatta_eur(pnl_eur)} €</div>", unsafe_allow_html=True)
                         with col7:
-                            with st.popover("❌ Chiudi", use_container_width=True):
-                                st.markdown(f"<div style='font-size: 0.85rem; margin-bottom: 8px;'>Confermi la chiusura a mercato?<br><b>{nome}</b> {dir_tag} <b>{sz_int}c</b></div>", unsafe_allow_html=True)
-                                if st.button("Conferma Chiusura", key=f"btn_close_p_{deal_id}", type="primary", use_container_width=True):
-                                    with st.spinner("Chiusura IG in corso..."):
-                                        ok_c, msg_c, pnl_c = chiudi_singola_posizione_ig(
-                                            conto=conto_selezionato,
-                                            deal_id=deal_id,
-                                            nome_strumento=nome,
-                                            direction_open=dir_pos,
-                                            size=sz,
-                                            ruolo_label=role_clean
-                                        )
-                                        if ok_c:
-                                            st.toast(f"✅ {msg_c}", icon="🎉")
-                                            time.sleep(0.8)
-                                            st.rerun()
-                                        else:
-                                            st.error(f"❌ {msg_c}")
+                            if is_operativo:
+                                with st.popover("❌ Chiudi", use_container_width=True):
+                                    st.markdown(f"<div style='font-size: 0.85rem; margin-bottom: 8px;'>Confermi la chiusura a mercato?<br><b>{nome}</b> {dir_tag} <b>{sz_int}c</b></div>", unsafe_allow_html=True)
+                                    if st.button("Conferma Chiusura", key=f"btn_close_p_{deal_id}", type="primary", use_container_width=True):
+                                        with st.spinner("Chiusura IG in corso..."):
+                                            ok_c, msg_c, pnl_c = chiudi_singola_posizione_ig(
+                                                conto=conto_selezionato,
+                                                deal_id=deal_id,
+                                                nome_strumento=nome,
+                                                direction_open=dir_pos,
+                                                size=sz,
+                                                ruolo_label=role_clean
+                                            )
+                                            if ok_c:
+                                                st.toast(f"✅ {msg_c}", icon="🎉")
+                                                time.sleep(0.8)
+                                                st.rerun()
+                                            else:
+                                                st.error(f"❌ {msg_c}")
+                            else:
+                                st.button("❌ Chiudi", key=f"btn_close_dis_{deal_id}", disabled=True, help="Disabilitato: profilo Viewer non operativo", use_container_width=True)
             renderizza_tab_posizioni()
 
     if tab_restore is not None:
@@ -5979,36 +6001,198 @@ else:
     if tab_autorizzazioni is not None:
         with tab_autorizzazioni:
             st.markdown("## 🔐 Gestione Autorizzazioni")
-            st.write("Solo il Regista ha accesso a questa sezione. Qui puoi gestire gli account Viewer e assegnare i conti visibili.")
+            st.write("Solo il Manager ha accesso a questa sezione. Qui puoi gestire gli account Manager, Viewer e i clienti esterni **Owner**.")
             
+            owner_accounts = auth_manager.get_owner_accounts()
+            cartelle_ordinarie = [c for c in os.listdir() if os.path.isdir(c) and (c.endswith("_DEMO") or c.endswith("_REALE")) and c not in owner_accounts]
+
             with st.expander("➕ Aggiungi Nuovo Utente", expanded=False):
-                with st.form("form_nuovo_utente"):
-                    n_user = st.text_input("Nickname (Username)")
-                    n_ruolo = st.selectbox("Ruolo", ["VIEWER", "REGISTA"])
-                    tutti_i_folders_disp = [c for c in os.listdir() if os.path.isdir(c) and (c.endswith("_DEMO") or c.endswith("_REALE"))]
-                    n_conti = st.multiselect("Conti Visibili", tutti_i_folders_disp)
-                    st.info("La password iniziale sarà impostata in automatico a 'init'. L'utente dovrà cambiarla al primo accesso.")
-                    if st.form_submit_button("Crea Utente"):
-                        if n_user:
-                            ok, msg = auth_manager.aggiungi_utente(n_user, "init", n_ruolo, n_conti)
-                            if ok: 
-                                st.success(msg)
-                            else: 
-                                st.error(msg)
+                n_ruolo = st.selectbox("Ruolo da Creare", ["OWNER", "VIEWER", "MANAGER"], key="nuovo_ruolo_select")
+                n_user = st.text_input("Nickname (Username)", key="nuovo_user_nick")
+                
+                if n_ruolo == "OWNER":
+                    st.markdown("##### 🔑 Credenziali IG (Conto OWNER Esterno)")
+                    st.caption("Configura le credenziali API IG per il conto Demo e/o Reale dell'Owner. Verranno create automaticamente le cartelle conto isolate.")
+                    
+                    col_d, col_r = st.columns(2)
+                    with col_d:
+                        st.markdown("**🧪 Conto DEMO**")
+                        abilita_d = st.checkbox("Abilita Conto DEMO", value=True, key="new_o_chk_d")
+                        u_d = st.text_input("IG Username (Demo)", key="new_o_u_d") if abilita_d else ""
+                        p_d = st.text_input("IG Password (Demo)", type="password", key="new_o_p_d") if abilita_d else ""
+                        k_d = st.text_input("IG API Key (Demo)", key="new_o_k_d") if abilita_d else ""
+                    
+                    with col_r:
+                        st.markdown("**💼 Conto REALE**")
+                        abilita_r = st.checkbox("Abilita Conto REALE", value=False, key="new_o_chk_r")
+                        u_r = st.text_input("IG Username (Reale)", key="new_o_u_r") if abilita_r else ""
+                        p_r = st.text_input("IG Password (Reale)", type="password", key="new_o_p_r") if abilita_r else ""
+                        k_r = st.text_input("IG API Key (Reale)", key="new_o_k_r") if abilita_r else ""
+                        
+                    st.info("La password iniziale sarà impostata in automatico a 'init'. L'Owner la cambierà al suo primo accesso.")
+                    if st.button("🚀 Crea Utente OWNER", key="btn_crea_owner", type="primary", use_container_width=True):
+                        if not n_user:
+                            st.error("Inserire il Nickname dell'utente.")
+                        elif not (abilita_d or abilita_r):
+                            st.error("Selezionare almeno un conto da abilitare (DEMO e/o REALE).")
                         else:
-                            st.error("Inserire l'username.")
+                            c_demo = {"attivo": abilita_d, "username": u_d, "password": p_d, "api_key": k_d} if abilita_d else None
+                            c_reale = {"attivo": abilita_r, "username": u_r, "password": p_r, "api_key": k_r} if abilita_r else None
+                            ok, msg = auth_manager.aggiungi_owner(n_user, credenziali_demo=c_demo, credenziali_reale=c_reale)
+                            if ok:
+                                st.success(msg)
+                                time.sleep(0.5)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                                
+                elif n_ruolo == "VIEWER":
+                    st.markdown("##### 📌 Conti Abilitati in Consultazione (Flag)")
+                    st.caption("Spunta i conti istituzionali/ordinari che questo Viewer potrà visualizzare:")
+                    cols_nv = st.columns(min(len(cartelle_ordinarie), 4) or 1)
+                    n_conti = []
+                    for idx_c, acc in enumerate(cartelle_ordinarie):
+                        with cols_nv[idx_c % len(cols_nv)]:
+                            if st.checkbox(acc, value=True, key=f"new_v_chk_{acc}"):
+                                n_conti.append(acc)
+                                
+                    st.info("La password iniziale sarà impostata in automatico a 'init'. L'utente dovrà cambiarla al primo accesso.")
+                    if st.button("➕ Crea Utente VIEWER", key="btn_crea_viewer", type="primary", use_container_width=True):
+                        if not n_user:
+                            st.error("Inserire il Nickname dell'utente.")
+                        elif not n_conti:
+                            st.error("Selezionare almeno un conto da abilitare per il Viewer.")
+                        else:
+                            ok, msg = auth_manager.aggiungi_utente(n_user, "init", "VIEWER", n_conti)
+                            if ok:
+                                st.success(msg)
+                                time.sleep(0.5)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                                
+                elif n_ruolo == "MANAGER":
+                    st.info("L'utente MANAGER ha piena supervisione su tutti i conti istituzionali/ordinari.")
+                    st.info("La password iniziale sarà impostata in automatico a 'init'. L'utente dovrà cambiarla al primo accesso.")
+                    if st.button("👑 Crea Utente MANAGER", key="btn_crea_manager", type="primary", use_container_width=True):
+                        if not n_user:
+                            st.error("Inserire il Nickname dell'utente.")
+                        else:
+                            ok, msg = auth_manager.aggiungi_utente(n_user, "init", "MANAGER", [])
+                            if ok:
+                                st.success(msg)
+                                time.sleep(0.5)
+                                st.rerun()
+                            else:
+                                st.error(msg)
             
             st.markdown("### Elenco Utenti")
             utenti = auth_manager.get_tutti_utenti()
             tutti_i_folders = [c for c in os.listdir() if os.path.isdir(c) and (c.endswith("_DEMO") or c.endswith("_REALE"))]
+            cartelle_ordinarie = [c for c in tutti_i_folders if c not in owner_accounts]
             
             for u, d in utenti.items():
+                ruolo_u = d.get('ruolo', 'VIEWER')
                 with st.container(border=True):
-                    st.markdown(f"**👤 {u}** | Ruolo: `{d.get('ruolo')}`")
-                    
-                    if d.get('ruolo') != "REGISTA":
-                        sel_conti = st.multiselect(f"Conti visibili per {u}", tutti_i_folders, default=[c for c in d.get("conti_autorizzati", []) if c in tutti_i_folders], key=f"conti_{u}")
+                    if ruolo_u in ["OWNER", "GUEST"]:
+                        st.markdown(f"**👤 {u}** | Ruolo: :violet-background[**OWNER**] *(Cliente esterno autonomo)*")
+                        conti_owner = d.get("conti_autorizzati", [])
+                        badge_conti = " ".join([f"`{c}`" for c in conti_owner]) if conti_owner else "_Nessun conto configurato_"
+                        st.markdown(f"**Conti Associati:** {badge_conti}")
                         
+                        col1, col2, col3, col4 = st.columns([1.2, 1, 1, 1])
+                        with col1:
+                            with st.popover("🔑 Chiavi API IG", use_container_width=True):
+                                st.markdown(f"#### Gestione Credenziali IG: **{u}**")
+                                creds = d.get("credenziali_ig", {})
+                                
+                                # Pre-fill Demo
+                                demo_in_creds = creds.get("DEMO", {})
+                                demo_acc_name = f"{u.upper()}_DEMO"
+                                env_d = auth_manager.leggi_credenziali_env(demo_acc_name)
+                                cur_u_d = demo_in_creds.get("username") or env_d.get("username", "")
+                                cur_p_d = demo_in_creds.get("password") or env_d.get("password", "")
+                                cur_k_d = demo_in_creds.get("api_key") or env_d.get("api_key", "")
+                                demo_active_init = demo_acc_name in conti_owner or bool(cur_u_d or cur_k_d)
+                                
+                                st.markdown("##### 🧪 Conto DEMO")
+                                chk_d = st.checkbox("Conto DEMO attivo", value=demo_active_init, key=f"o_chk_d_{u}")
+                                inp_u_d = st.text_input("IG Username", value=cur_u_d, key=f"o_u_d_{u}")
+                                inp_p_d = st.text_input("IG Password", value=cur_p_d, type="password", key=f"o_p_d_{u}")
+                                inp_k_d = st.text_input("IG API Key", value=cur_k_d, key=f"o_k_d_{u}")
+                                
+                                st.divider()
+                                
+                                # Pre-fill Reale
+                                reale_in_creds = creds.get("REALE", {})
+                                reale_acc_name = f"{u.upper()}_REALE"
+                                env_r = auth_manager.leggi_credenziali_env(reale_acc_name)
+                                cur_u_r = reale_in_creds.get("username") or env_r.get("username", "")
+                                cur_p_r = reale_in_creds.get("password") or env_r.get("password", "")
+                                cur_k_r = reale_in_creds.get("api_key") or env_r.get("api_key", "")
+                                reale_active_init = reale_acc_name in conti_owner or bool(cur_u_r or cur_k_r)
+                                
+                                st.markdown("##### 💼 Conto REALE")
+                                chk_r = st.checkbox("Conto REALE attivo", value=reale_active_init, key=f"o_chk_r_{u}")
+                                inp_u_r = st.text_input("IG Username", value=cur_u_r, key=f"o_u_r_{u}")
+                                inp_p_r = st.text_input("IG Password", value=cur_p_r, type="password", key=f"o_p_r_{u}")
+                                inp_k_r = st.text_input("IG API Key", value=cur_k_r, key=f"o_k_r_{u}")
+                                
+                                if st.button("💾 Salva Credenziali IG", key=f"o_save_btn_{u}", type="primary", use_container_width=True):
+                                    errs = []
+                                    if chk_d:
+                                        ok_d, msg_d = auth_manager.aggiorna_credenziali_owner(u, "DEMO", inp_u_d, inp_p_d, inp_k_d, attivo=True)
+                                        if not ok_d: errs.append(msg_d)
+                                    else:
+                                        auth_manager.aggiorna_credenziali_owner(u, "DEMO", "", "", "", attivo=False)
+                                    if chk_r:
+                                        ok_r, msg_r = auth_manager.aggiorna_credenziali_owner(u, "REALE", inp_u_r, inp_p_r, inp_k_r, attivo=True)
+                                        if not ok_r: errs.append(msg_r)
+                                    else:
+                                        auth_manager.aggiorna_credenziali_owner(u, "REALE", "", "", "", attivo=False)
+                                        
+                                    if errs:
+                                        st.error(" | ".join(errs))
+                                    else:
+                                        st.success(f"Credenziali aggiornate per {u}!")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                        with col2:
+                            with st.popover("✏️ Modifica Nick", use_container_width=True):
+                                new_nick = st.text_input("Nuovo Nickname", value=u, key=f"nick_input_o_{u}")
+                                if st.button("Conferma Nick", key=f"btn_nick_o_{u}", use_container_width=True):
+                                    if new_nick and new_nick.strip() != u:
+                                        ok, msg = auth_manager.rinomina_utente(u, new_nick.strip())
+                                        if ok:
+                                            st.success(msg)
+                                            st.rerun()
+                                        else:
+                                            st.error(msg)
+                        with col3:
+                            if st.button("🔑 Reset Password", key=f"reset_o_{u}", use_container_width=True):
+                                auth_manager.modifica_password(u, "init")
+                                st.success(f"Password per {u} resettata a 'init'.")
+                        with col4:
+                            if st.button("🗑️ Elimina Owner", key=f"del_o_{u}", use_container_width=True):
+                                ok, msg = auth_manager.elimina_utente(u)
+                                if ok:
+                                    st.success(msg)
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+                    
+                    elif ruolo_u == "VIEWER":
+                        st.markdown(f"**👤 {u}** | Ruolo: :blue-background[**VIEWER**]")
+                        st.markdown("**Conti visibili abilitati (spunta o deseleziona i flag):**")
+                        
+                        cols_chk = st.columns(min(len(cartelle_ordinarie), 4) or 1)
+                        sel_conti = []
+                        for idx_c, acc in enumerate(cartelle_ordinarie):
+                            is_chk = acc in d.get("conti_autorizzati", [])
+                            with cols_chk[idx_c % len(cols_chk)]:
+                                if st.checkbox(acc, value=is_chk, key=f"chk_v_{u}_{acc}"):
+                                    sel_conti.append(acc)
+                                    
                         col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
                         with col1:
                             if st.button("💾 Salva Permessi", key=f"salva_{u}", use_container_width=True):
@@ -6034,14 +6218,21 @@ else:
                         with col4:
                             if st.button("🗑️ Elimina", key=f"del_{u}", use_container_width=True):
                                 ok, msg = auth_manager.elimina_utente(u)
-                                if ok: st.success(msg)
-                                else: st.error(msg)
+                                if ok:
+                                    st.success(msg)
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+                                    
                     else:
+                        # MANAGER
+                        st.markdown(f"**👤 {u}** | Ruolo: :red-background[**MANAGER**]")
+                        st.caption("Supervisione globale su tutti i conti aziendali/istituzionali.")
                         col1, col2, col3 = st.columns([1, 1, 1])
                         with col1:
                             with st.popover("✏️ Modifica Nick", use_container_width=True):
-                                new_nick = st.text_input("Nuovo Nickname", value=u, key=f"nick_input_reg_{u}")
-                                if st.button("Conferma Nick", key=f"btn_nick_reg_{u}", use_container_width=True):
+                                new_nick = st.text_input("Nuovo Nickname", value=u, key=f"nick_input_mgr_{u}")
+                                if st.button("Conferma Nick", key=f"btn_nick_mgr_{u}", use_container_width=True):
                                     if new_nick and new_nick.strip() != u:
                                         ok, msg = auth_manager.rinomina_utente(u, new_nick.strip())
                                         if ok:
@@ -6052,13 +6243,16 @@ else:
                                         else:
                                             st.error(msg)
                         with col2:
-                            if st.button("🔑 Reset Password", key=f"reset_reg_{u}", use_container_width=True):
+                            if st.button("🔑 Reset Password", key=f"reset_mgr_{u}", use_container_width=True):
                                 auth_manager.modifica_password(u, "init")
                                 st.success(f"Password per {u} resettata a 'init'.")
                         with col3:
-                            if st.button("🗑️ Elimina Regista", key=f"del_reg_{u}", use_container_width=True):
+                            if st.button("🗑️ Elimina Manager", key=f"del_mgr_{u}", use_container_width=True):
                                 ok, msg = auth_manager.elimina_utente(u)
-                                if ok: st.success(msg)
-                                else: st.error(msg)
+                                if ok:
+                                    st.success(msg)
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
 
     # --- TAB SIMULATORE ---

@@ -1,6 +1,6 @@
 {
     "Marco": {
-        "ruolo": "REGISTA",
+        "ruolo": "MANAGER",
         "password_hash": "scrypt:32768:8:1$KoKoZTdz87GmN38q$3ddb8f7c46e5cca66444b33f4e247870852c414d07abf2c967dca4b49a90fa9e3747013c7a664c8f00db7a9eb3a5804a9a6de6a1a5258a7917407d1d17bdef3b",
         "tutti_i_conti": true,
         "conti_autorizzati": []
