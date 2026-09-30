@@ -354,6 +354,25 @@ class GoldfingerEngine:
             print_log(f"🚀 GOLDFINGER AVVIATO: Livello 1 @ {pz_start:.2f}, Passo {passo} pip, Delta {delta} contratti ({len(self.stato['scaglioni'])} scaglioni).")
             invia_notifica("AVVIO GOLDFINGER", f"Guardia avviata: Livello 1 a {pz_start:.2f}, Delta {delta} contratti.", "rocket")
 
+        # 2b. GESTIONE AGGIORNAMENTO LIVELLO A CALDO (se non ci sono posizioni aperte)
+        if self.stato.get("attivo") and is_attivo_ui:
+            cfg_pz1 = config_ui.get("livello_1_prezzo")
+            stato_pz1 = self.stato.get("livello_1_prezzo")
+            if cfg_pz1 and stato_pz1 and abs(float(cfg_pz1) - float(stato_pz1)) > 0.01:
+                scaglioni_curr = self.stato.get("scaglioni", [])
+                aperti_curr = [s for s in scaglioni_curr if s.get("stato") in ("APERTO", "PROTETTO_BE")]
+                if not aperti_curr:
+                    passo_c = float(config_ui.get("passo_pip", self.stato.get("passo_pip", 6.0)))
+                    sz_c = int(config_ui.get("size_scaglione", self.stato.get("size_scaglione", 3)))
+                    delta_c = int(config_ui.get("delta_totale", self.stato.get("delta_totale", 15)))
+                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 spostato da {stato_pz1:.2f} a {float(cfg_pz1):.2f}")
+                    self.stato["livello_1_prezzo"] = float(cfg_pz1)
+                    self.stato["scaglioni"] = self.calcola_scaglioni_interi(float(cfg_pz1), passo_c, sz_c, delta_c)
+                    self.stato["minimo_discesa"] = None
+                    self.stato["minimo_precedente"] = None
+                    self.salva_stato()
+                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 a {float(cfg_pz1):.2f}", "arrows_counterclockwise")
+
         # 3. VERIFICA FINESTRA ROLLOVER
         if self.is_in_rollover():
             if self.stato.get("stato_operativo") != "ARMED_ROLLOVER":

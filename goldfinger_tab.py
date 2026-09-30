@@ -144,6 +144,29 @@ def calcola_livello_chirurgico_gold(conto, px_live=None):
         round(l9, 2) if l9 is not None else None
     )
 
+def calcola_scaglioni_interi(pz_start, passo, size_unit, delta_tot):
+    if delta_tot <= 0 or pz_start is None or pz_start <= 0:
+        return []
+    num_scaglioni = max(1, int(delta_tot) // int(size_unit))
+    sizes = [int(size_unit)] * num_scaglioni
+    residuo = int(delta_tot) - sum(sizes)
+    if residuo > 0:
+        sizes[-1] += int(residuo)
+    scaglioni = []
+    for i, sz in enumerate(sizes):
+        pz_lvl = round(pz_start - (i * passo), 2)
+        scaglioni.append({
+            "numero": i + 1,
+            "prezzo_target": pz_lvl,
+            "size": int(sz),
+            "stato": "IN_ATTESA",
+            "deal_id": None,
+            "open_price": None,
+            "sl_price": None,
+            "opened_at": None
+        })
+    return scaglioni
+
 def scrivi_json_sicuro(path, dati):
     try:
         tmp = f"{path}.tmp.{os.getpid()}"
@@ -409,6 +432,37 @@ def renderizza_tab_goldfinger(conto):
                 "</div>",
                 unsafe_allow_html=True
             )
+
+            # Hot-Update a Chirurgico (se nessuna posizione è già aperta a mercato)
+            scaglioni_att = stato.get("scaglioni", [])
+            aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE")]
+
+            if len(aperti_att) == 0 and sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
+                if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="primary", use_container_width=True):
+                    if bid_live and float(sugg_lvl) >= float(bid_live):
+                        st.error(f"🛑 ERRORE DI SICUREZZA: Il livello chirurgico ({sugg_lvl:.2f}) non è inferiore al prezzo live ({float(bid_live):.2f})!")
+                    else:
+                        new_cfg = cfg.copy()
+                        new_cfg["livello_1_prezzo"] = float(sugg_lvl)
+                        new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                        scrivi_json_sicuro(paths["config"], new_cfg)
+
+                        new_stato = stato.copy()
+                        new_stato["livello_1_prezzo"] = float(sugg_lvl)
+                        new_stato["scaglioni"] = calcola_scaglioni_interi(
+                            float(sugg_lvl),
+                            float(cfg.get("passo_pip", passo)),
+                            int(cfg.get("size_scaglione", size_u)),
+                            int(cfg.get("delta_totale", delta_input))
+                        )
+                        scrivi_json_sicuro(paths["stato"], new_stato)
+                        st.session_state[ss_key] = float(sugg_lvl)
+                        st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con scaglioni ricalcolati!")
+                        time.sleep(0.5)
+                        st.rerun()
+            elif len(aperti_att) > 0:
+                st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} scaglioni aperti. Fermare con STOP per riarmare da zero.")
+
             if st.button("🛑 STOP GOLDFINGER", type="secondary", use_container_width=True):
                 new_cfg = cfg.copy()
                 new_cfg["attivo"] = False
