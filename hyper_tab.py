@@ -620,7 +620,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     if pos:
         dir_pos = pos["direction"]
         dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
-        dir_badge = f"<span style='color: {dir_col}; font-weight: 700;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
+        dir_badge = f"<span style='color: {dir_col}; font-weight: 700; font-size: 0.72rem; white-space: nowrap;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
         
         # Gestione TS Core: Verde se attivo, KJ Parac. se Core governata da Kijun (libera da TS)
         core_has_ts = getattr(engine, "use_core_trailing", False)
@@ -718,13 +718,28 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             lbl_inc = f"➕ Run #{idx}" if mode_inc == "RUNNER" else f"➕ Inc #{idx}"
             p_rows.append(
                 f"<tr>"
-                f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600;'>{lbl_inc}</span></td>"
+                f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 600; font-size: 0.71rem; white-space: nowrap;'>{lbl_inc}</span></td>"
                 f"<td style='text-align: center;'>{time_inc_cell}</td>"
                 f"<td style='text-align: center;'>{size_inc_cell}</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
                 f"<td style='text-align: center;'>{ts_inc_cell}</td>"
                 f"<td style='text-align: center;'>{tp_cell}</td>"
                 f"<td style='text-align: center; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
+                f"</tr>"
+            )
+
+        # Riempi con righe segnaposto vuote fino a max_inc (3) per garantire sempre 6 righe fisse (Header + Core + 3 Incr + TOT)
+        num_incs = len(increments)
+        for empty_idx in range(num_incs + 1, max_inc + 1):
+            p_rows.append(
+                f"<tr style='opacity: 0.38;'>"
+                f"<td style='text-align: center;'><span style='color: #64748b; font-size: 0.71rem; font-weight: 500; white-space: nowrap;'>➕ Run #{empty_idx}</span></td>"
+                f"<td style='text-align: center; color: #475569; font-size: 0.72rem;'>--</td>"
+                f"<td style='text-align: center; color: #475569;'>--</td>"
+                f"<td style='text-align: center; color: #475569;'>--</td>"
+                f"<td style='text-align: center;'></td>"
+                f"<td style='text-align: center;'></td>"
+                f"<td style='text-align: center; color: #475569; font-size: 0.72rem;'>--</td>"
                 f"</tr>"
             )
 
@@ -749,13 +764,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <table class='table-compact-hyper'>
             <thead>
                 <tr>
-                    <th style='text-align: center; width: 16%;'>Pos</th>
-                    <th style='text-align: center; width: 14%;'>Time</th>
-                    <th style='text-align: center; width: 10%;'>Size</th>
-                    <th style='text-align: center; width: 16%;'>Open</th>
-                    <th style='text-align: center; width: 13%;'>TS</th>
-                    <th style='text-align: center; width: 13%;'>TP</th>
-                    <th style='text-align: center; width: 18%;'>P&L</th>
+                    <th style='text-align: center; width: 16%; font-size: 0.73rem;'>Pos</th>
+                    <th style='text-align: center; width: 14%; font-size: 0.73rem;'>Time</th>
+                    <th style='text-align: center; width: 10%; font-size: 0.73rem;'>Size</th>
+                    <th style='text-align: center; width: 16%; font-size: 0.73rem;'>Open</th>
+                    <th style='text-align: center; width: 13%; font-size: 0.73rem;'>TS</th>
+                    <th style='text-align: center; width: 13%; font-size: 0.73rem;'>TP</th>
+                    <th style='text-align: center; width: 18%; font-size: 0.73rem;'>P&L</th>
                 </tr>
             </thead>
             <tbody>{''.join(p_rows)}</tbody>
