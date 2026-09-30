@@ -304,6 +304,8 @@ def renderizza_tab_goldfinger(conto):
     with col_ctrl:
         st.markdown("<h4 style='color: #38bdf8; margin-bottom: 8px;'>⚙️ Parametri di Ingresso</h4>", unsafe_allow_html=True)
         
+        saved_pz1 = float(cfg.get("livello_1_prezzo") or 0.0)
+        
         # Calcolo Livello Chirurgico Consigliato (Minimi H1 sotto il live con offset -5 pip, sempre ricalcolato anche a guardia già partita)
         sugg_lvl, rif_val, min_stru_val, rif_tipo, l55_val, l21_val, l9_val = calcola_livello_chirurgico_gold(conto, px_live=bid_live)
         
@@ -315,9 +317,9 @@ def renderizza_tab_goldfinger(conto):
             # Badge di confronto se il robot è già attivo a mercato
             confronto_armato_html = ""
             if is_attivo and saved_pz1 > 0:
-                diff_pts = sugg_lvl - float(saved_pz1)
+                diff_pts = sugg_lvl - saved_pz1
                 diff_sign = f"+{diff_pts:.2f}" if diff_pts >= 0 else f"{diff_pts:.2f}"
-                confronto_armato_html = f"<span style='color: #94a3b8; font-size: 0.74rem; font-weight: 500; margin-left: 10px;'>(In esecuzione @ <b style='color: #facc15;'>{float(saved_pz1):.2f}</b> • Delta: {diff_sign} pip)</span>"
+                confronto_armato_html = f"<span style='color: #94a3b8; font-size: 0.74rem; font-weight: 500; margin-left: 10px;'>(In esecuzione @ <b style='color: #facc15;'>{saved_pz1:.2f}</b> • Delta: {diff_sign} pip)</span>"
             
             st.markdown(f"""
                 <div style='background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;'>
@@ -336,7 +338,6 @@ def renderizza_tab_goldfinger(conto):
 
         # Prezzo Livello 1 (Obbligatorio)
         def_pz1 = float(bid_live) if bid_live else 0.0
-        saved_pz1 = cfg.get("livello_1_prezzo") or 0.0
         
         ss_key = f"gf_pz1_{conto}"
         val_default = st.session_state.get(ss_key)
