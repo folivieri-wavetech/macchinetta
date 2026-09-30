@@ -379,6 +379,11 @@ def renderizza_tab_goldfinger(conto):
             else:
                 val_default = 0.0
 
+        # Controllo posizioni già a mercato per sblocco modifiche a caldo
+        scaglioni_att = stato.get("scaglioni", [])
+        aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE")]
+        has_aperti = len(aperti_att) > 0
+
         col_inp, col_btn_sugg = st.columns([7, 5], vertical_alignment="bottom")
         with col_inp:
             pz_l1 = st.number_input(
@@ -389,12 +394,12 @@ def renderizza_tab_goldfinger(conto):
                 step=1.0,
                 format="%.2f",
                 key=f"input_{ss_key}",
-                disabled=(is_attivo or not is_operativo),
-                help="Prezzo a cui scatterà il primo scaglione SHORT a mercato."
+                disabled=(has_aperti or not is_operativo),
+                help="Prezzo a cui scatterà il primo scaglione SHORT a mercato. Modificabile a caldo finché non ci sono posizioni aperte."
             )
         with col_btn_sugg:
             if sugg_lvl is not None:
-                if st.button(f"🎯 Usa {sugg_lvl:.2f}", key=f"btn_sugg_{conto}", use_container_width=True, disabled=(is_attivo or not is_operativo), help=help_gf_viewer or "Applica il prezzo chirurgico consigliato al Livello 1"):
+                if st.button(f"🎯 Usa {sugg_lvl:.2f}", key=f"btn_sugg_{conto}", use_container_width=True, disabled=(has_aperti or not is_operativo), help=help_gf_viewer or "Applica il prezzo chirurgico consigliato al Livello 1"):
                     if not is_operativo:
                         st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                         st.rerun()
@@ -444,37 +449,66 @@ def renderizza_tab_goldfinger(conto):
                 unsafe_allow_html=True
             )
 
-            # Hot-Update a Chirurgico (se nessuna posizione è già aperta a mercato)
-            scaglioni_att = stato.get("scaglioni", [])
-            aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE")]
+            # Hot-Update a caldo (se nessuna posizione è già aperta a mercato)
+            if not has_aperti:
+                # 1. Modifica manuale del campo Livello 1
+                if abs(float(pz_l1) - float(saved_pz1)) > 0.01:
+                    if st.button(f"💾 Salva Nuovo Livello 1 @ {pz_l1:.2f}", key=f"btn_aggiorna_man_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
+                        if bid_live and float(pz_l1) >= float(bid_live):
+                            st.error(f"🛑 ERRORE DI SICUREZZA: Il nuovo Livello 1 ({pz_l1:.2f}) deve essere RIGOROSAMENTE INFERIORE al prezzo live ({float(bid_live):.2f})!")
+                        elif bid_live and (float(bid_live) - float(pz_l1)) > 200:
+                            st.error(f"🛑 ERRORE: Il nuovo Livello 1 ({pz_l1:.2f}) è troppo distante dal prezzo attuale ({float(bid_live):.2f}). Verifica il valore!")
+                        else:
+                            new_cfg = cfg.copy()
+                            new_cfg["livello_1_prezzo"] = float(pz_l1)
+                            new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                            scrivi_json_sicuro(paths["config"], new_cfg)
 
-            if len(aperti_att) == 0 and sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
-                if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
-                    if not is_operativo:
-                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                        st.rerun()
-                    if bid_live and float(sugg_lvl) >= float(bid_live):
-                        st.error(f"🛑 ERRORE DI SICUREZZA: Il livello chirurgico ({sugg_lvl:.2f}) non è inferiore al prezzo live ({float(bid_live):.2f})!")
-                    else:
-                        new_cfg = cfg.copy()
-                        new_cfg["livello_1_prezzo"] = float(sugg_lvl)
-                        new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                        scrivi_json_sicuro(paths["config"], new_cfg)
+                            new_stato = stato.copy()
+                            new_stato["livello_1_prezzo"] = float(pz_l1)
+                            new_stato["scaglioni"] = calcola_scaglioni_interi(
+                                float(pz_l1),
+                                float(cfg.get("passo_pip", passo)),
+                                int(cfg.get("size_scaglione", size_u)),
+                                int(cfg.get("delta_totale", delta_input))
+                            )
+                            scrivi_json_sicuro(paths["stato"], new_stato)
+                            st.session_state[ss_key] = float(pz_l1)
+                            st.success(f"✅ Guardia aggiornata a caldo: Livello 1 spostato a {pz_l1:.2f} con scaglioni ricalcolati!")
+                            time.sleep(0.5)
+                            st.rerun()
 
-                        new_stato = stato.copy()
-                        new_stato["livello_1_prezzo"] = float(sugg_lvl)
-                        new_stato["scaglioni"] = calcola_scaglioni_interi(
-                            float(sugg_lvl),
-                            float(cfg.get("passo_pip", passo)),
-                            int(cfg.get("size_scaglione", size_u)),
-                            int(cfg.get("delta_totale", delta_input))
-                        )
-                        scrivi_json_sicuro(paths["stato"], new_stato)
-                        st.session_state[ss_key] = float(sugg_lvl)
-                        st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con scaglioni ricalcolati!")
-                        time.sleep(0.5)
-                        st.rerun()
-            elif len(aperti_att) > 0:
+                # 2. Scorciatoia diretta per aggiornare con un click al Chirurgico Consigliato
+                if sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
+                    if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
+                        if bid_live and float(sugg_lvl) >= float(bid_live):
+                            st.error(f"🛑 ERRORE DI SICUREZZA: Il livello chirurgico ({sugg_lvl:.2f}) non è inferiore al prezzo live ({float(bid_live):.2f})!")
+                        else:
+                            new_cfg = cfg.copy()
+                            new_cfg["livello_1_prezzo"] = float(sugg_lvl)
+                            new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                            scrivi_json_sicuro(paths["config"], new_cfg)
+
+                            new_stato = stato.copy()
+                            new_stato["livello_1_prezzo"] = float(sugg_lvl)
+                            new_stato["scaglioni"] = calcola_scaglioni_interi(
+                                float(sugg_lvl),
+                                float(cfg.get("passo_pip", passo)),
+                                int(cfg.get("size_scaglione", size_u)),
+                                int(cfg.get("delta_totale", delta_input))
+                            )
+                            scrivi_json_sicuro(paths["stato"], new_stato)
+                            st.session_state[ss_key] = float(sugg_lvl)
+                            st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con scaglioni ricalcolati!")
+                            time.sleep(0.5)
+                            st.rerun()
+            else:
                 st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} scaglioni aperti. Fermare con STOP per riarmare da zero.")
 
             if st.button("🛑 STOP GOLDFINGER", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
