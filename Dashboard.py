@@ -3867,6 +3867,7 @@ else:
                                                 elif not pos_c_mem and pos_i_mem:
                                                     is_core = False
                                                 
+                                                label_tipo = "Core " if is_core else "Incr. "
                                                 msg_stop = f"[{ora_str}] 🛑 STOP MANUALE {label_tipo}{px_str} [PnL: {sign_p}{pnl_it:.0f} €]"
                                                 storico.append(msg_stop)
                                                 try:

@@ -776,7 +776,9 @@ class HyperUS500M5Engine:
     def _execute_entry_increment(self, direction: str, exec_price: float, time_str: str, mode: str = "BANCOMAT"):
         """Apre a mercato reale su IG un incremento a 4 contratti.
         - Se mode='BANCOMAT': imposta Limit Order (TP fisso a +10 pt)
-        - Se mode='RUNNER': nessun TP fisso, profitto corre con Trailing Stop Virtuale"""
+        - Se mode='RUNNER': nessun TP fisso, Trailing Stop Immediato:
+            Per LONG: min(KJ + 10.0, Entry - 5.0)
+            Per SHORT: max(KJ - 10.0, Entry + 5.0)"""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             if mode == "BANCOMAT":
@@ -799,6 +801,22 @@ class HyperUS500M5Engine:
                 deal_id = res.get("deal_id")
                 real_open = float(res.get("level") or exec_price)
                 with self.lock:
+                    if mode == "RUNNER":
+                        kj_ref = self.kj55 if self.kj55 is not None else (real_open - 10.0 if direction == "LONG" else real_open + 10.0)
+                        if direction == "LONG":
+                            raw_ts = round(kj_ref + 10.0, 2)
+                            safe_ts = round(real_open - 5.0, 2)
+                            init_ts = min(raw_ts, safe_ts)
+                        else:
+                            raw_ts = round(kj_ref - 10.0, 2)
+                            safe_ts = round(real_open + 5.0, 2)
+                            init_ts = max(raw_ts, safe_ts)
+                        ts_act = True
+                        ts_px = init_ts
+                    else:
+                        ts_act = False
+                        ts_px = None
+
                     new_inc = {
                         "id": int(time.time() * 1000),
                         "deal_id": deal_id,
@@ -809,13 +827,14 @@ class HyperUS500M5Engine:
                         "tp_price": tp_px,
                         "open_time": res.get("time") or time_str,
                         "mode": mode,
-                        "ts_active": False,
-                        "ts_price": None,
+                        "born_mode": mode,
+                        "ts_active": ts_act,
+                        "ts_price": ts_px,
                         "peak_price": real_open
                     }
                     self.increments.append(new_inc)
                     tot_c = CORE_CONTRACTS + sum(i["contracts"] for i in self.increments)
-                    tp_desc = f"TP: {tp_px:.2f} pt" if tp_px else "Runner No-TP (TS attivo)"
+                    tp_desc = f"TP: {tp_px:.2f} pt" if tp_px else f"Runner No-TP (TS Immediato: {ts_px:.2f} pt)"
                     self.trades.insert(0, {
                         "time": time_str,
                         "action": f"➕ OPEN REAL IG INC {mode} US500 {direction} (+{INC_CONTRACTS}c, Tot: {tot_c}c)",
@@ -1239,9 +1258,12 @@ class HyperUS500M5Engine:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 
     def _update_increments_dynamic_mode(self, dist_kj: float, closed_close: float, time_str: str):
-        """A fine candela M10, valuta dinamicamente gli incrementi già aperti in base alla distanza da KJ:
-        1. Se dist_kj > 10 pt: i Bancomat passano a RUNNER (rimozione TP su IG e attivazione TS Dinamico KJ Close +- 10p con cricchetto)
-        2. Se dist_kj <= 10 pt: i Runner tornano BANCOMAT (ripristino TP a +10 pt dall'ingresso, nessun TS ravvicinato)"""
+        """A fine candela M10, valuta dinamicamente gli incrementi attivi:
+        1. Se dist_kj > 10 pt: i Bancomat passano a RUNNER (rimozione TP su IG, attivazione TS con cricchetto).
+           Una volta RUNNER, un incremento NON torna MAI più a Bancomat.
+        2. Per tutti i RUNNER (nati Runner o promossi): aggiornamento TS a cricchetto (Ratchet):
+           - LONG: il TS sale se (Close - 10p) > TS precedente, non scende MAI.
+           - SHORT: il TS scende se (Close + 10p) < TS precedente, non sale MAI."""
         with self.lock:
             active_incs = [i for i in self.increments if not i.get("closing")]
             if not active_incs:
@@ -1249,22 +1271,24 @@ class HyperUS500M5Engine:
 
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
 
-            # Caso 1: Distanza > 10 pt -> Regime RUNNER (TS Dinamico KJ Close +- 10p)
+            # Promozione Bancomat a RUNNER se dist_kj > 10 pt
             if dist_kj > RUNNER_THRESHOLD_KJ_DIST:
                 for inc in active_incs:
-                    direction = inc["direction"]
-                    deal_id = inc.get("deal_id")
-
-                    # Se era BANCOMAT, converti in RUNNER e rimuovi TP su broker IG
                     if inc.get("mode") == "BANCOMAT" or inc.get("tp_price") is not None:
+                        deal_id = inc.get("deal_id")
                         old_tp = inc.get("tp_price")
                         inc["mode"] = "RUNNER"
                         inc["tp_price"] = None
-                        logger.info(f"[{time_str}] 🚀 [PROMOZIONE RUNNER] Deal {deal_id} convertito in RUNNER (dist KJ {dist_kj:.1f}p > 10p). Rimozione TP {old_tp} su IG.")
+                        logger.info(f"[{time_str}] 🚀 [PROMOZIONE RUNNER] Deal {deal_id} convertito permanentemente in RUNNER (dist KJ {dist_kj:.1f}p > 10p). Rimozione TP {old_tp} su IG.")
                         if deal_id:
                             threading.Thread(target=order_mgr.remove_limit_order, args=(deal_id, "Promozione Runner US500"), daemon=True).start()
 
-                    # Calcolo TS Dinamico Kijun a fine candela (Close - 10p per LONG, Close + 10p per SHORT)
+            # Aggiornamento Ratchet Trailing Stop per tutti i RUNNER attivi (non retrocedono mai a Bancomat)
+            for inc in active_incs:
+                if inc.get("mode") == "RUNNER":
+                    direction = inc["direction"]
+                    deal_id = inc.get("deal_id")
+
                     if direction == "LONG":
                         target_ts = round(closed_close - 10.0, 2)
                         prev_ts = inc.get("ts_price")
@@ -1286,7 +1310,7 @@ class HyperUS500M5Engine:
                             inc["ts_price"] = target_ts
                             logger.info(f"[{time_str}] 📉 [TS DINAMICO KJ CRICCHETTO SCENDE] Inc #{inc.get('id')} TS scende da {prev_ts:.2f} a {target_ts:.2f} (Close {closed_close:.2f} + 10p)")
 
-                    # Clamping di sicurezza: se la Core ha un Trailing Stop attivo, il TS dell'incremento non può essere più permissivo
+                    # Clamping di sicurezza con la Core se presente e con Trailing attivo
                     if getattr(self, "use_core_trailing", False) and self.position and self.position.get("ts_active") and self.position.get("ts_price") is not None:
                         core_ts = self.position["ts_price"]
                         if direction == "LONG" and inc.get("ts_price") is not None and inc["ts_price"] < core_ts:
@@ -1294,27 +1318,7 @@ class HyperUS500M5Engine:
                         elif direction == "SHORT" and inc.get("ts_price") is not None and inc["ts_price"] > core_ts:
                             inc["ts_price"] = core_ts
 
-                self.save_state()
-
-            # Caso 2: Distanza <= 10 pt -> Rientro in Regime BANCOMAT (ripristino TP a +10 pt dall'ingresso)
-            else:
-                for inc in active_incs:
-                    if inc.get("mode") == "RUNNER":
-                        deal_id = inc.get("deal_id")
-                        direction = inc["direction"]
-                        open_px = inc["open_price"]
-                        tp_px = round(open_px + self.inc_tp_pips if direction == "LONG" else open_px - self.inc_tp_pips, 2)
-
-                        inc["mode"] = "BANCOMAT"
-                        inc["tp_price"] = tp_px
-                        inc["ts_active"] = False
-                        inc["ts_price"] = None
-
-                        logger.info(f"[{time_str}] 🔄 [RITORNO BANCOMAT] Inc #{inc.get('id')} rientrato in zona Bancomat (dist KJ {dist_kj:.1f}p <= 10p). Ripristinato TP a {tp_px:.2f} (+{self.inc_tp_pips:.0f}p).")
-                        if deal_id:
-                            threading.Thread(target=order_mgr.set_limit_order, args=(deal_id, tp_px, "Ripristino TP Bancomat US500"), daemon=True).start()
-
-                self.save_state()
+            self.save_state()
 
     def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
         prev_close = closed_candle["close"]
