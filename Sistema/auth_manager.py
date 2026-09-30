@@ -212,6 +212,10 @@ def crea_nuovo_conto(nome_conto, ig_username, ig_password, ig_api_key, ig_accoun
     if not (u and p and k):
         return False, "Username, Password e API Key di IG sono obbligatori."
         
+    cartella = os.path.join(ROOT_DIR, nome)
+    if os.path.exists(cartella):
+        return False, f"Il conto '{nome}' esiste già a sistema. Operazione annullata per evitare sovrascritture."
+        
     inizializza_cartella_conto(nome, u, p, k, tipo_conto=tipo_up, ig_account_id=acc_id)
     
     # Se è stato indicato un utente a cui associarlo automaticamente:

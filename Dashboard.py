@@ -6096,15 +6096,35 @@ else:
                 col_nc1, col_nc2 = st.columns(2)
                 with col_nc1:
                     nuovo_conto_nome = st.text_input("Nome Conto", placeholder="es. DANY_REALE", key="inp_nuovo_conto_nome")
-                    nuovo_conto_tipo = st.selectbox("Tipo Conto", ["REALE", "DEMO"], index=0, key="sel_nuovo_conto_tipo")
                     nuovo_conto_associa = st.selectbox("👤 Associa all'Utente", utenti_opt, index=idx_sel, key="sel_nuovo_conto_associa")
-                    nuovo_conto_user = st.text_input("IG Username", key="inp_nuovo_conto_user")
                 with col_nc2:
+                    nuovo_conto_tipo = st.selectbox("Tipo Conto", ["REALE", "DEMO"], index=0, key="sel_nuovo_conto_tipo")
+                    nuovo_conto_acc_id = st.text_input("IG Account ID (Opzionale)", placeholder="FWLIT", key="inp_nuovo_conto_acc_id")
+                
+                col_creds1, col_creds2 = st.columns(2)
+                with col_creds1:
+                    nuovo_conto_user = st.text_input("IG Username", key="inp_nuovo_conto_user")
+                with col_creds2:
                     nuovo_conto_pwd = st.text_input("IG Password", type="password", key="inp_nuovo_conto_pwd")
-                    nuovo_conto_key = st.text_input("IG API Key", key="inp_nuovo_conto_key")
-                    nuovo_conto_acc_id = st.text_input("IG Account ID (Opzionale)", placeholder="es. XXXXX", key="inp_nuovo_conto_acc_id")
+                
+                nuovo_conto_key = st.text_input("IG API Key", key="inp_nuovo_conto_key")
                     
-                if st.button("🚀 Salva Nuovo Conto", key="btn_crea_nuovo_conto", type="primary", use_container_width=True):
+                nome_effettivo = (nuovo_conto_nome or "").strip().upper()
+                if nome_effettivo and not (nome_effettivo.endswith("_DEMO") or nome_effettivo.endswith("_REALE")):
+                    nome_effettivo = f"{nome_effettivo}_{nuovo_conto_tipo.upper()}"
+                
+                cartella_esiste = bool(nome_effettivo and os.path.exists(nome_effettivo))
+                appena_creato = bool(st.session_state.get("ultimo_conto_creato") == nome_effettivo and nome_effettivo)
+                
+                if appena_creato:
+                    st.success(f"✅ Conto **{nome_effettivo}** creato e registrato con successo! Salvataggio completato e disabilitato per evitare duplicazioni.")
+                elif cartella_esiste:
+                    st.info(f"ℹ️ Il conto **{nome_effettivo}** risulta già esistente a sistema. Salvataggio disabilitato.")
+                
+                disabilita_salva = cartella_esiste or appena_creato
+                label_bottone = "✅ Conto già salvato a sistema" if disabilita_salva else "🚀 Salva Nuovo Conto"
+                    
+                if st.button(label_bottone, key="btn_crea_nuovo_conto", type="primary" if not disabilita_salva else "secondary", disabled=disabilita_salva, use_container_width=True):
                     if not nuovo_conto_nome.strip():
                         st.error("Specificare il nome del conto.")
                     elif not (nuovo_conto_user.strip() and nuovo_conto_pwd.strip() and nuovo_conto_key.strip()):
@@ -6120,6 +6140,7 @@ else:
                             associa_a_utente=nuovo_conto_associa
                         )
                         if ok_nc:
+                            st.session_state["ultimo_conto_creato"] = nome_effettivo
                             st.success(msg_nc)
                             time.sleep(0.5)
                             st.rerun()
