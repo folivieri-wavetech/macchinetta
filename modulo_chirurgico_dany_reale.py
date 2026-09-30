@@ -193,11 +193,28 @@ class ModuloChirurgicoDanyReale:
                 return
                 
         ultimo_log_hb = 0
+        # Avvio thread dedicato per il motore Goldfinger
+        try:
+            import threading
+            from goldfinger_engine import GoldfingerEngine
+            gf_engine = GoldfingerEngine()
+            th_gf = threading.Thread(target=gf_engine.avvia_loop, daemon=True, name="GoldfingerThread")
+            th_gf.start()
+            print_log("🧵 Thread Goldfinger Engine avviato con successo in background.")
+        except Exception as e_th:
+            print_log(f"⚠️ Impossibile avviare thread Goldfinger: {e_th}")
         while True:
             try:
-                # Rinnovo proattivo del token ogni 45 minuti (la sessione IG scade dopo 1h)
-                if (time.time() - self.t_login) > 2700:
-                    print_log("🔄 Rinnovo proattivo sessione IG...")
+                # Rinnovo preventivo automatico a 70 ore (standard granitico identico a Motore.py per tutti i conti)
+                richiede_rinnovo = False
+                if not os.path.exists(TOKEN_FILE):
+                    richiede_rinnovo = True
+                else:
+                    tempo_creazione = os.path.getmtime(TOKEN_FILE)
+                    if (time.time() - tempo_creazione) > (70 * 3600):
+                        print_log("⚠️ Sessione vicina alle 72h: Rinnovo automatico preventivo del Token IG (regola 70 ore).")
+                        richiede_rinnovo = True
+                if richiede_rinnovo:
                     self.login()
                     
                 self.aggiorna_saldo()

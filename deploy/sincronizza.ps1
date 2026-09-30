@@ -83,6 +83,12 @@ try {
     if (Test-Path "modulo_chirurgico_dany_reale.py") {
         & $KUBECTL --kubeconfig=$KUBECONFIG cp modulo_chirurgico_dany_reale.py "macchinetta/${POD_DASH}:/data/modulo_chirurgico_dany_reale.py"
     }
+    if (Test-Path "goldfinger_engine.py") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp goldfinger_engine.py "macchinetta/${POD_DASH}:/data/goldfinger_engine.py"
+    }
+    if (Test-Path "goldfinger_tab.py") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp goldfinger_tab.py "macchinetta/${POD_DASH}:/data/goldfinger_tab.py"
+    }
     Get-ChildItem -Path "macchinetta_trend" -File | ForEach-Object {
         $fname = $_.Name
         & $KUBECTL --kubeconfig=$KUBECONFIG cp "macchinetta_trend/$fname" "macchinetta/${POD_DASH}:/data/macchinetta_trend/$fname"

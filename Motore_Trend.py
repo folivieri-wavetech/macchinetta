@@ -1815,7 +1815,7 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                         trade_dict={
                             "time_close": now_it().strftime("%Y-%m-%d %H:%M:%S"),
                             "instrument": nome,
-                            "direction": ev.get("direction", dir_t),
+                            "direction": ev.get("direction") or getattr(engine, "current_direction", "FLAT"),
                             "contracts": float(sz),
                             "open_price": float(ev.get("entry_price", 0.0) or 0.0),
                             "close_price": float(close_px) if (close_px is not None and isinstance(close_px, (int, float))) else 0.0,
@@ -2322,8 +2322,10 @@ def esegui_ciclo_trend():
                     pos_ordinate = sorted(pos_ig_strum, key=lambda x: x.get('position', {}).get('createdDate', ''))
                     p_core_ig = pos_ordinate[0].get('position', {})
                     dir_core_str = "LONG" if p_core_ig.get('direction') == "BUY" else "SHORT"
-                    lvl_core_val = float(p_core_ig.get('level', 0.0))
-                    sz_core_val = float(p_core_ig.get('size', size_i))
+                    raw_lvl_c = p_core_ig.get('openLevel') or p_core_ig.get('level')
+                    lvl_core_val = float(raw_lvl_c) if (raw_lvl_c is not None and float(raw_lvl_c) > 0) else float(px_live if (px_live and isinstance(px_live, (int, float))) else 0.0)
+                    raw_sz_c = p_core_ig.get('dealSize') or p_core_ig.get('size')
+                    sz_core_val = float(raw_sz_c) if raw_sz_c is not None else float(size_i)
                     deal_id_core = p_core_ig.get('dealId')
                     
                     pos_obj = Position(lvl_core_val, sz_core_val, "core", dir_core_str)
@@ -2337,8 +2339,10 @@ def esegui_ciclo_trend():
                     for p_inc_ig in pos_ordinate[1:]:
                         pi = p_inc_ig.get('position', {})
                         dir_i_str = "LONG" if pi.get('direction') == "BUY" else "SHORT"
-                        lvl_i_val = float(pi.get('level', 0.0))
-                        sz_i_val = float(pi.get('size', 1.0))
+                        raw_lvl_i = pi.get('openLevel') or pi.get('level')
+                        lvl_i_val = float(raw_lvl_i) if (raw_lvl_i is not None and float(raw_lvl_i) > 0) else float(px_live if (px_live and isinstance(px_live, (int, float))) else 0.0)
+                        raw_sz_i = pi.get('dealSize') or pi.get('size')
+                        sz_i_val = float(raw_sz_i) if raw_sz_i is not None else 1.0
                         deal_id_i = pi.get('dealId')
                         pos_i_obj = Position(lvl_i_val, sz_i_val, "increment", dir_i_str)
                         pos_i_obj.ticket = deal_id_i
@@ -2393,8 +2397,10 @@ def esegui_ciclo_trend():
                         if t_id and t_id != deal_id_core and t_id not in ticket_engine_incr:
                             pi = p_ig.get('position', {})
                             dir_i_str = "LONG" if pi.get('direction') == "BUY" else "SHORT"
-                            lvl_i_val = float(pi.get('level') or pi.get('openLevel') or 0.0)
-                            sz_i_val = float(pi.get('size', 1.0))
+                            raw_lvl_i = pi.get('openLevel') or pi.get('level')
+                            lvl_i_val = float(raw_lvl_i) if (raw_lvl_i is not None and float(raw_lvl_i) > 0) else float(px_live if (px_live and isinstance(px_live, (int, float))) else 0.0)
+                            raw_sz_i = pi.get('dealSize') or pi.get('size')
+                            sz_i_val = float(raw_sz_i) if raw_sz_i is not None else 1.0
                             pos_i_obj = Position(lvl_i_val, sz_i_val, "increment", dir_i_str)
                             pos_i_obj.ticket = t_id
                             engine.pm.increments.append(pos_i_obj)

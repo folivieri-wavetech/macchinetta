@@ -2784,12 +2784,23 @@ else:
         </style>
     """, unsafe_allow_html=True)
 
+    mostra_goldfinger = (conto_selezionato == "DANY_REALE")
+    tab_goldfinger = None
+
     if is_regista:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-        tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        if mostra_goldfinger:
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        else:
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
-        tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
-        tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
+        if mostra_goldfinger:
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
+        else:
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
         tab_restore = tab_posizioni = tab_console = tab_autorizzazioni = tab_statistiche = None
 
 
@@ -4764,6 +4775,14 @@ else:
         with tab_hyper:
             import hyper_tab
             hyper_tab.render_hyper_tab(conto_selezionato=conto_selezionato)
+
+    if tab_goldfinger is not None:
+        with tab_goldfinger:
+            try:
+                import goldfinger_tab
+                goldfinger_tab.renderizza_tab_goldfinger(conto=conto_selezionato)
+            except Exception as e_gf:
+                st.error(f"Errore caricamento Goldfinger: {e_gf}")
 
     if tab_posizioni is not None:
         with tab_posizioni:
