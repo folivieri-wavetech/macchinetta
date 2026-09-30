@@ -170,104 +170,9 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            # 0. Trailing Stop Estensione Trend H1 / H4 / D1: Distanza Prezzo - Kijun >= tp_kj_threshold pip a chiusura candela
-            tf_val = str(self.config.get("timeframe", "HOUR")).upper()
-            is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
-            is_h4 = ("HOUR_4" in tf_val or "H4" in tf_val)
-            is_d1 = ("DAY" in tf_val or "D1" in tf_val)
-            dist_kj_pips = (c_close - kj) / pip_val
-            nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
-
-            if is_d1:
-                # Regola D1: attivazione > 150 pip da Kijun, trailing stop a 75 pip dietro il Close
-                default_tp_d1 = 150
-                tp_kj_threshold = float(self.config.get("tp_kj_distance_d1") or default_tp_d1)
-                trail_pips = 75
-                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
-                ext_tf_label = "D1"
-            elif is_h4:
-                # Regola H4: attivazione > 120 pip da Kijun, trailing stop a 60 pip dietro il Close
-                default_tp_h4 = 120
-                tp_kj_threshold = float(self.config.get("tp_kj_distance_h4") or default_tp_h4)
-                trail_pips = 60
-                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
-                ext_tf_label = "H4"
-            elif is_h1:
-                default_tp_h1 = 100
-                tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
-                trail_pips = 30
-                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
-                ext_tf_label = "H1"
-            else:
-                apply_trailing_ext = False
-                tp_kj_threshold = 999999
-                trail_pips = 0
-                ext_tf_label = ""
-
-            candidati_sl_long = []
-            
-            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip),
-            # siamo in piena zona di respiro Kijun: l'eventuale Trailing Stop Core viene disattivato
-            # e la Core torna ad essere gestita unicamente dalla Kijun naturale.
-            if is_h1 and dist_kj_pips <= 40:
-                if self.trailing_sl_core is not None:
-                    self.trailing_sl_core = None
-                    events.append({
-                        "type": "trailing_core_cleared",
-                        "direction": "LONG",
-                        "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": "Prezzo in zona respiro Kijun H1 (<= 40p)"
-                    })
-            else:
-                if apply_trailing_ext:
-                    candidati_sl_long.append((c_close - (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
-
-                # Controllo ulteriore H1: solo se la forbice KJ-TK è molto ampia (> 100 pip), TS a TK - 10 pip
-                if is_h1:
-                    dist_kj_tk_pips = (tk - kj) / pip_val
-                    if dist_kj_tk_pips > 100:
-                        sl_tk = tk - (10 * pip_val)
-                        candidati_sl_long.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 100p -> TK-10p)"))
-
-            if candidati_sl_long:
-                # Per LONG si sceglie il livello di stop più alto (più protettivo)
-                candidati_sl_long.sort(key=lambda x: x[0], reverse=True)
-                nuovo_sl, used_trail_pips, used_reason = candidati_sl_long[0]
-                if self.trailing_sl_core is None:
-                    self.trailing_sl_core = nuovo_sl
-                    events.append({
-                        "type": "trailing_core_updated",
-                        "direction": "LONG",
-                        "stop_level": nuovo_sl,
-                        "trail_pips": used_trail_pips,
-                        "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Attivazione Trailing Core {used_reason}"
-                    })
-                elif nuovo_sl > self.trailing_sl_core:
-                    self.trailing_sl_core = nuovo_sl
-                    events.append({
-                        "type": "trailing_core_updated",
-                        "direction": "LONG",
-                        "stop_level": nuovo_sl,
-                        "trail_pips": used_trail_pips,
-                        "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Rettifica Trailing Core {used_reason} a {nuovo_sl:.5f}"
-                    })
-
-            # 1. Chiusura Trailing SL Core a fine candela se attivo
-            if self.trailing_sl_core is not None and c_close < self.trailing_sl_core:
-                self.trailing_sl_core = None
-                self.trailing_sl_incr = None
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                events.extend(self.pm.close_all_increments(exec_price))
-                ev = self.pm.close_core(exec_price)
-                if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_below_trailing_sl_core", "new_direction": "FLAT", "price": exec_price})
-                self.current_direction = "FLAT"
-                self.retracement_start_price = None
-            elif c_close < kj:
-                # 2. Chiusura sotto Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Minimo - 5 pip
+            # Nessun Trailing SL sulla Core: la Core corre libera ed è protetta unicamente da Kijun e Candela Segnale
+            if c_close < kj:
+                # Chiusura sotto Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Minimo - 5 pip
                 stop_livello = closed_candle.low - (5 * pip_val)
                 if self.signal_candle_active and self.signal_stop_price is not None:
                     self.signal_stop_price = min(self.signal_stop_price, stop_livello)
@@ -282,21 +187,11 @@ class CoreEngine:
                     "kj": kj
                 })
             else:
-                # 3. c_close >= kj: prezzo rientrato sopra Kijun, eventuale Candela Segnale azzerata
+                # c_close >= kj: prezzo rientrato sopra Kijun, eventuale Candela Segnale azzerata
                 self.signal_candle_active = False
                 self.signal_stop_price = None
 
             if self.current_direction == "LONG":
-                # Aggiornamento Trailing SL Core da Close (se core_trailing_pips è attivo)
-
-                if core_trailing_pips is not None:
-                    dist_kj = c_close - kj
-                    if dist_kj >= (core_trailing_pips * pip_val):
-                        nuovo_sl_core = c_close - (core_trailing_pips * pip_val)
-                        if self.trailing_sl_core is None:
-                            self.trailing_sl_core = nuovo_sl_core
-                        else:
-                            self.trailing_sl_core = max(self.trailing_sl_core, nuovo_sl_core)
 
                 # Gestione Stop Loss Incrementi: Candela Segnale TK (se forbice TK-KJ > soglia)
                 max_forbice_pips = self._get_max_kj_tk_threshold_pips()
@@ -391,104 +286,9 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            # 0. Trailing Stop Estensione Trend H1 / H4 / D1: Distanza Kijun - Prezzo >= tp_kj_threshold pip a chiusura candela
-            tf_val = str(self.config.get("timeframe", "HOUR")).upper()
-            is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
-            is_h4 = ("HOUR_4" in tf_val or "H4" in tf_val)
-            is_d1 = ("DAY" in tf_val or "D1" in tf_val)
-            dist_kj_pips = (kj - c_close) / pip_val
-            nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).upper()
-
-            if is_d1:
-                # Regola D1: attivazione > 150 pip da Kijun, trailing stop a 75 pip dietro il Close
-                default_tp_d1 = 150
-                tp_kj_threshold = float(self.config.get("tp_kj_distance_d1") or default_tp_d1)
-                trail_pips = 75
-                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
-                ext_tf_label = "D1"
-            elif is_h4:
-                # Regola H4: attivazione > 120 pip da Kijun, trailing stop a 60 pip dietro il Close
-                default_tp_h4 = 120
-                tp_kj_threshold = float(self.config.get("tp_kj_distance_h4") or default_tp_h4)
-                trail_pips = 60
-                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
-                ext_tf_label = "H4"
-            elif is_h1:
-                default_tp_h1 = 100
-                tp_kj_threshold = float(self.config.get("tp_kj_distance_h1") or default_tp_h1)
-                trail_pips = 30
-                apply_trailing_ext = (dist_kj_pips >= tp_kj_threshold)
-                ext_tf_label = "H1"
-            else:
-                apply_trailing_ext = False
-                tp_kj_threshold = 999999
-                trail_pips = 0
-                ext_tf_label = ""
-
-            candidati_sl_short = []
-            
-            # Se siamo su H1 e il prezzo è vicino a Kijun (distanza <= 40 pip),
-            # siamo in piena zona di respiro Kijun: l'eventuale Trailing Stop Core viene disattivato
-            # e la Core torna ad essere gestita unicamente dalla Kijun naturale.
-            if is_h1 and dist_kj_pips <= 40:
-                if self.trailing_sl_core is not None:
-                    self.trailing_sl_core = None
-                    events.append({
-                        "type": "trailing_core_cleared",
-                        "direction": "SHORT",
-                        "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": "Prezzo in zona respiro Kijun H1 (<= 40p)"
-                    })
-            else:
-                if apply_trailing_ext:
-                    candidati_sl_short.append((c_close + (trail_pips * pip_val), trail_pips, f"Estensione {ext_tf_label} (+{int(dist_kj_pips)}p >= {int(tp_kj_threshold)}p)"))
-
-                # Controllo ulteriore H1: solo se la forbice KJ-TK è molto ampia (> 100 pip), TS a TK + 10 pip
-                if is_h1:
-                    dist_kj_tk_pips = (kj - tk) / pip_val
-                    if dist_kj_tk_pips > 100:
-                        sl_tk = tk + (10 * pip_val)
-                        candidati_sl_short.append((sl_tk, 10, f"Forbice KJ-TK H1 (+{int(dist_kj_tk_pips)}p > 100p -> TK+10p)"))
-
-            if candidati_sl_short:
-                # Per SHORT si sceglie il livello di stop più basso (più protettivo)
-                candidati_sl_short.sort(key=lambda x: x[0])
-                nuovo_sl, used_trail_pips, used_reason = candidati_sl_short[0]
-                if self.trailing_sl_core is None:
-                    self.trailing_sl_core = nuovo_sl
-                    events.append({
-                        "type": "trailing_core_updated",
-                        "direction": "SHORT",
-                        "stop_level": nuovo_sl,
-                        "trail_pips": used_trail_pips,
-                        "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Attivazione Trailing Core {used_reason}"
-                    })
-                elif nuovo_sl < self.trailing_sl_core:
-                    self.trailing_sl_core = nuovo_sl
-                    events.append({
-                        "type": "trailing_core_updated",
-                        "direction": "SHORT",
-                        "stop_level": nuovo_sl,
-                        "trail_pips": used_trail_pips,
-                        "dist_kj_pips": round(dist_kj_pips, 1),
-                        "reason": f"Rettifica Trailing Core {used_reason} a {nuovo_sl:.5f}"
-                    })
-
-            # 1. Chiusura Trailing SL Core a fine candela se attivo
-            if self.trailing_sl_core is not None and c_close > self.trailing_sl_core:
-                self.trailing_sl_core = None
-                self.trailing_sl_incr = None
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                events.extend(self.pm.close_all_increments(exec_price))
-                ev = self.pm.close_core(exec_price)
-                if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "close_above_trailing_sl_core", "new_direction": "FLAT", "price": exec_price})
-                self.current_direction = "FLAT"
-                self.retracement_start_price = None
-            elif c_close > kj:
-                # 2. Chiusura sopra Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Massimo + 5 pip
+            # Nessun Trailing SL sulla Core: la Core corre libera ed è protetta unicamente da Kijun e Candela Segnale
+            if c_close > kj:
+                # Chiusura sopra Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Massimo + 5 pip
                 stop_livello = closed_candle.high + (5 * pip_val)
                 if self.signal_candle_active and self.signal_stop_price is not None:
                     self.signal_stop_price = max(self.signal_stop_price, stop_livello)
@@ -503,21 +303,11 @@ class CoreEngine:
                     "kj": kj
                 })
             else:
-                # 3. c_close <= kj: prezzo rientrato sotto Kijun, eventuale Candela Segnale azzerata
+                # c_close <= kj: prezzo rientrato sotto Kijun, eventuale Candela Segnale azzerata
                 self.signal_candle_active = False
                 self.signal_stop_price = None
 
             if self.current_direction == "SHORT":
-                # Aggiornamento Trailing SL Core da Close (se core_trailing_pips è attivo)
-
-                if core_trailing_pips is not None:
-                    dist_kj = kj - c_close
-                    if dist_kj >= (core_trailing_pips * pip_val):
-                        nuovo_sl_core = c_close + (core_trailing_pips * pip_val)
-                        if self.trailing_sl_core is None:
-                            self.trailing_sl_core = nuovo_sl_core
-                        else:
-                            self.trailing_sl_core = min(self.trailing_sl_core, nuovo_sl_core)
 
                 # Gestione Stop Loss Incrementi: Candela Segnale TK (se forbice TK-KJ > soglia)
                 max_forbice_pips = self._get_max_kj_tk_threshold_pips()
@@ -691,17 +481,9 @@ class CoreEngine:
         sl_core_pips = 15
 
         if self.current_direction == "LONG":
-            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 40 pip)
-            if is_h1:
-                dist_kj_live = (current_price - kj) / pip_val
-                if dist_kj_live <= 40 and self.trailing_sl_core is not None:
-                    self.trailing_sl_core = None
-
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip (40p per Oil) o Trailing SL Core
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip
             sl_core_base = kj - (sl_core_pips * pip_val)
-            effective_sl_core = max(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
-            if current_price <= (effective_sl_core + 1e-7):
-                reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
+            if current_price <= (sl_core_base + 1e-7):
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
@@ -711,7 +493,7 @@ class CoreEngine:
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT", "price": current_price})
+                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 return events
@@ -826,17 +608,9 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # Disattivazione TS Core H1 se prezzo in zona respiro Kijun (<= 40 pip)
-            if is_h1:
-                dist_kj_live = (kj - current_price) / pip_val
-                if dist_kj_live <= 40 and self.trailing_sl_core is not None:
-                    self.trailing_sl_core = None
-
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip (40p per Oil) o Trailing SL Core
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip
             sl_core_base = kj + (sl_core_pips * pip_val)
-            effective_sl_core = min(sl_core_base, self.trailing_sl_core) if self.trailing_sl_core is not None else sl_core_base
-            if current_price >= (effective_sl_core - 1e-7):
-                reason = "live_stop_trailing_core" if (self.trailing_sl_core is not None and effective_sl_core == self.trailing_sl_core) else "live_stop_kj"
+            if current_price >= (sl_core_base - 1e-7):
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
                 self.signal_candle_active = False
@@ -846,7 +620,7 @@ class CoreEngine:
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": reason, "new_direction": "FLAT", "price": current_price})
+                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 return events

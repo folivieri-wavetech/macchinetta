@@ -3398,9 +3398,7 @@ else:
                                 symb_comp = "&gt;" if px_live > current_kj else ("&lt;" if px_live < current_kj else "=")
                                 dir_comp = "LONG" if px_live > current_kj else ("SHORT" if px_live < current_kj else "NEUTRO")
                                 st.markdown(f"<div style='font-size: 0.82rem; color: #FFA500; margin-bottom: 4px; white-space: nowrap;'>🟡 <b>Prezzo Live ({px_live:.{dec}f}) {symb_comp} Kijun ({current_kj:.{dec}f}): Direzione {dir_comp}</b></div>", unsafe_allow_html=True)
-                            if tf_val == "HOUR":
-                                tp_kj_h1_val = int(CONFIG_STRUMENTI.get(nome, {}).get("tp_kj_distance_h1", 100))
-                                st.markdown(f"<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🎯 <b>TP Estensione H1:</b> Distanza Prezzo-KJ &ge; {tp_kj_h1_val} pip ➔ FLAT</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.76rem; color: #38bdf8; margin-bottom: 6px;'>🛡️ <b>Gestione Core {tf_badge}:</b> Paracadute Kijun &amp; Candela Segnale (Core libera da TS)</div>", unsafe_allow_html=True)
                             
                         # Lettura campo Prezzo Trigger
                         trig_val_saved = dati_salvati.get("trigger_start_prezzo")
