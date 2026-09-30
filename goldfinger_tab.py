@@ -277,7 +277,7 @@ def renderizza_tab_goldfinger(conto):
         st.markdown(
             f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
             f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>🟡 Spot Gold Live</div>"
-            f"<div style='color: #f8fafc; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{bid_str} / {ask_str}</div>"
+            f"<div style='font-size: 1.05rem; font-weight: 700; margin-top: 3px;'><span style='color: #fa8072;'>{bid_str}</span> <span style='color: #64748b; font-size: 0.90rem;'>/</span> <span style='color: #22c55e;'>{ask_str}</span></div>"
             f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>{info_sub}</div>"
             f"</div>",
             unsafe_allow_html=True

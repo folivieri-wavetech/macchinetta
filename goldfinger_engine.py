@@ -495,6 +495,7 @@ class GoldfingerEngine:
                         "pnl": pnl,
                         "motivo": "SL_FALSO_ALLARME"
                     })
+                    invia_notifica("STOP LOSS FALSO ALLARME", f"Scaglione {sc_unica['numero']} ({sc_unica['size']} mini) chiuso a {lvl_c:.2f}. PnL: {pnl:+.2f} €", "warning")
                     self.salva_stato()
 
     def avvia_loop(self):
