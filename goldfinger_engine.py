@@ -65,6 +65,9 @@ class GoldfingerEngine:
         self.cfg = dotenv_values(ENV_FILE)
         self.api_key = self.cfg.get("IG_API_KEY")
         self.target_account_id = self.cfg.get("IG_ACCOUNT_ID", "DUACG").strip()
+        self.ultimo_tentativo_ordine = 0
+        self.ultimo_fallback_markets = 0
+        self.cache_prezzo_live = (None, None)
         self.carica_stato()
 
     def carica_token(self):
@@ -166,19 +169,59 @@ class GoldfingerEngine:
         return scaglioni
 
     def ottieni_prezzo_live_gold(self):
-        # 1. Prova da stato_sistema.json se aggiornato di recente (< 10s)
+        # 1. Prova da stato_sistema.json di DANY_REALE se recente (< 15s)
         if os.path.exists(STATO_FILE):
             try:
-                if (time.time() - os.path.getmtime(STATO_FILE)) < 15:
+                if (time.time() - os.path.getmtime(STATO_FILE)) < 20:
                     with open(STATO_FILE, "r", encoding="utf-8") as f:
                         d_st = json.load(f)
                         p_ba = d_st.get("prezzi_bid_ask", {}).get("Spot Gold")
                         if p_ba and "bid" in p_ba and "ask" in p_ba:
-                            return float(p_ba["bid"]), float(p_ba["ask"])
+                            self.cache_prezzo_live = (float(p_ba["bid"]), float(p_ba["ask"]))
+                            return self.cache_prezzo_live
             except Exception:
                 pass
-        
-        # 2. Fallback chiamata diretta /markets
+
+        # 2. Prova da posizioni_aperte.json di DANY_REALE se presente Spot Gold
+        if os.path.exists(POSIZIONI_FILE):
+            try:
+                if (time.time() - os.path.getmtime(POSIZIONI_FILE)) < 20:
+                    with open(POSIZIONI_FILE, "r", encoding="utf-8") as f:
+                        pos_arr = json.load(f)
+                        for p in pos_arr:
+                            if "GOLD" in str(p.get("instrument", "")).upper() or "CFDGOLD" in str(p.get("epic", "")).upper():
+                                b_val, o_val = p.get("bid"), p.get("offer")
+                                if b_val and o_val:
+                                    self.cache_prezzo_live = (float(b_val), float(o_val))
+                                    return self.cache_prezzo_live
+            except Exception:
+                pass
+
+        # 3. Prova dai feed streaming Lightstreamer degli altri conti condivisi (zero API IG)
+        for c_demo in ["FIORDOK_DEMO", "BONGIOLO_DEMO", "DANY_DEMO"]:
+            cand_paths = [
+                os.path.join(ROOT_DIR, c_demo, "stato_sistema.json"),
+                os.path.join("/data", c_demo, "stato_sistema.json"),
+            ]
+            for cp in cand_paths:
+                if os.path.exists(cp):
+                    try:
+                        if (time.time() - os.path.getmtime(cp)) < 20:
+                            with open(cp, "r", encoding="utf-8") as f_demo:
+                                d_demo = json.load(f_demo)
+                                p_ba = d_demo.get("prezzi_bid_ask", {}).get("Spot Gold")
+                                if p_ba and "bid" in p_ba and "ask" in p_ba:
+                                    self.cache_prezzo_live = (float(p_ba["bid"]), float(p_ba["ask"]))
+                                    return self.cache_prezzo_live
+                    except Exception:
+                        pass
+
+        # 4. Fallback a chiamata diretta /markets (MASSIMA PROTEZIONE ANTI-FLOOD: max 1 volta ogni 5 secondi!)
+        now_t = time.time()
+        if (now_t - self.ultimo_fallback_markets) < 5.0:
+            return self.cache_prezzo_live
+            
+        self.ultimo_fallback_markets = now_t
         headers = self.get_auth_headers("3")
         try:
             r = requests.get(f"{BASE_URL}/markets/{EPIC_GOLD}", headers=headers, timeout=5)
@@ -187,12 +230,23 @@ class GoldfingerEngine:
                 bid = snap.get("bid")
                 offer = snap.get("offer")
                 if bid and offer:
-                    return float(bid), float(offer)
+                    self.cache_prezzo_live = (float(bid), float(offer))
+                    return self.cache_prezzo_live
+            elif r.status_code == 401:
+                print_log("🔄 Token non valido su /markets: ricarico credenziali...")
+                self.carica_token()
         except Exception:
             pass
-        return None, None
+            
+        return self.cache_prezzo_live
 
     def apri_short_mercato(self, size):
+        now_t = time.time()
+        if (now_t - self.ultimo_tentativo_ordine) < 3.0:
+            # Salvaguardia anti-flood: rispetta almeno 3 secondi tra ordini consecutivi
+            return False, None, None
+        self.ultimo_tentativo_ordine = now_t
+
         headers = self.get_auth_headers("2")
         payload = {
             "epic": EPIC_GOLD,
@@ -418,16 +472,20 @@ class GoldfingerEngine:
 
     def avvia_loop(self):
         print_log(f"🚀 Modulo Goldfinger Engine avviato in ascolto permanente per {self.target_account_id}...")
+        consecutive_errors = 0
         while True:
             try:
                 self.ciclo_operativo()
+                consecutive_errors = 0
                 time.sleep(1.5)
             except KeyboardInterrupt:
                 print_log("🛑 Goldfinger Engine interrotto.")
                 break
             except Exception as e:
-                print_log(f"⚠️ Errore imprevisto nel ciclo Goldfinger: {e}")
-                time.sleep(2)
+                consecutive_errors += 1
+                backoff = min(30, 5 * consecutive_errors)
+                print_log(f"⚠️ Errore imprevisto nel ciclo Goldfinger ({consecutive_errors}° anomalia): {e}. Ripristino automatico e pausa di sicurezza di {backoff}s prima di riprendere...")
+                time.sleep(backoff)
 
 if __name__ == "__main__":
     engine = GoldfingerEngine()

@@ -37,6 +37,76 @@ def leggi_json_sicuro(path):
             return {}
     return {}
 
+def calcola_livello_chirurgico_gold(conto, px_live=None):
+    """
+    Calcola il livello chirurgico di partenza Short analizzando l'intera struttura delle 55 candele H1:
+    - Asse di equilibrio: TK21 H1 (21 ore).
+    - Pavimento dinamico (clustering): confronta i minimi a 9h, 21h e 55h. Se il minimo a 55h è vicino
+      a quello delle 21h (entro 12 pip), assume il minimo a 55h come vero fondo; altrimenti usa il minimo a 21h.
+    - Zero chiamate IG (solo file locali).
+    """
+    candidates = [
+        os.path.join(ROOT_DIR, conto, "candele_Spot_Gold_HOUR.json"),
+        os.path.join("/data", conto, "candele_Spot_Gold_HOUR.json"),
+        os.path.join(ROOT_DIR, "candele_Spot_Gold_HOUR.json"),
+        os.path.join("/data", "candele_Spot_Gold_HOUR.json"),
+        os.path.join(ROOT_DIR, "FIORDOK_DEMO", "candele_Spot_Gold_HOUR.json"),
+        os.path.join("/data", "FIORDOK_DEMO", "candele_Spot_Gold_HOUR.json"),
+        os.path.join(ROOT_DIR, "DANY_DEMO", "candele_Spot_Gold_HOUR.json"),
+        os.path.join("/data", "DANY_DEMO", "candele_Spot_Gold_HOUR.json"),
+    ]
+    candele = []
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if isinstance(d, list) and len(d) >= 21:
+                        candele = d
+                        break
+            except Exception:
+                pass
+                
+    if not candele or len(candele) < 21:
+        return None, None, None, None, None, None, None
+        
+    # Finestra 55 ore
+    candele_55 = candele[-55:] if len(candele) >= 55 else candele
+    lows_55 = [float(c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')) for c in candele_55 if (c.get('lowPrice') or c.get('low'))]
+    l55 = min(lows_55) if lows_55 else 0.0
+
+    # Finestra 21 ore
+    candele_21 = candele[-21:]
+    highs_21 = [float(c.get('highPrice', {}).get('bid') or c.get('highPrice', {}).get('ask') or c.get('high')) for c in candele_21 if (c.get('highPrice') or c.get('high'))]
+    lows_21 = [float(c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')) for c in candele_21 if (c.get('lowPrice') or c.get('low'))]
+    if not highs_21 or not lows_21:
+        return None, None, None, None, None, None, None
+    h21 = max(highs_21)
+    l21 = min(lows_21)
+    tk21 = (h21 + l21) / 2.0
+
+    # Finestra 9 ore
+    candele_9 = candele[-9:]
+    lows_9 = [float(c.get('lowPrice', {}).get('bid') or c.get('lowPrice', {}).get('ask') or c.get('low')) for c in candele_9 if (c.get('lowPrice') or c.get('low'))]
+    l9 = min(lows_9) if lows_9 else l21
+
+    # Clustering intelligente dei Minimi:
+    # Se il minimo a 55h dista meno di 12 pip dal minimo a 21h, il vero supporto solido è L55.
+    # Se invece L55 è più lontano di 12 pip, il floor di riferimento operativo è L21.
+    if (l21 - l55) <= 12.0:
+        min_strutturale = l55
+    else:
+        min_strutturale = l21
+
+    # Calcolo sintetico del Livello Chirurgico Consigliato:
+    if px_live and float(px_live) > tk21:
+        suggerito = round(tk21, 2)
+    else:
+        # Ponderazione concordata: 60% Floor strutturale selezionato + 40% TK21
+        suggerito = round((min_strutturale * 0.60) + (tk21 * 0.40), 2)
+
+    return suggerito, round(tk21, 2), round(min_strutturale, 2), round(h21, 2), round(l55, 2), round(l21, 2), round(l9, 2)
+
 def scrivi_json_sicuro(path, dati):
     try:
         tmp = f"{path}.tmp.{os.getpid()}"
@@ -120,19 +190,55 @@ def renderizza_tab_goldfinger(conto):
     with col_ctrl:
         st.markdown("<h4 style='color: #38bdf8; margin-bottom: 8px;'>⚙️ Parametri di Ingresso</h4>", unsafe_allow_html=True)
         
+        # Calcolo Livello Chirurgico Consigliato (TK21 H1 + Minimi Multi-Orizzonte 9h/21h/55h)
+        sugg_lvl, tk21_val, min_stru_val, h21_val, l55_val, l21_val, l9_val = calcola_livello_chirurgico_gold(conto, px_live=bid_live)
+        
+        if sugg_lvl is not None:
+            st.markdown(f"""
+                <div style='background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                        <span style='color: #38bdf8; font-weight: 700; font-size: 0.84rem;'>🎯 LIVELLO CHIRURGICO CONSIGLIATO:</span>
+                        <span style='color: #FFD700; font-weight: 800; font-size: 1.15rem;'>{sugg_lvl:.2f}</span>
+                    </div>
+                    <div style='color: #94a3b8; font-size: 0.74rem; margin-top: 4px;'>
+                        Struttura H1: <b>TK21: {tk21_val:.2f}</b> | <b>Floor Operativo: {min_stru_val:.2f}</b> (Min55: {l55_val:.2f}, Min21: {l21_val:.2f}, Min9: {l9_val:.2f}) | <b>Max21: {h21_val:.2f}</b>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
         # Prezzo Livello 1 (Obbligatorio)
         def_pz1 = float(bid_live) if bid_live else 0.0
         saved_pz1 = cfg.get("livello_1_prezzo") or 0.0
         
-        pz_l1 = st.number_input(
-            "🎯 Prezzo Livello 1 (Partenza Discesa)",
-            min_value=0.0,
-            max_value=10000.0,
-            value=float(saved_pz1) if saved_pz1 > 0 else (float(round(def_pz1 - 5.0, 2)) if def_pz1 > 0 else 0.0),
-            step=1.0,
-            format="%.2f",
-            help="Prezzo a cui scatterà il primo scaglione SHORT a mercato."
-        )
+        ss_key = f"gf_pz1_{conto}"
+        val_default = st.session_state.get(ss_key)
+        if val_default is None:
+            if saved_pz1 > 0:
+                val_default = float(saved_pz1)
+            elif sugg_lvl is not None:
+                val_default = float(sugg_lvl)
+            elif def_pz1 > 0:
+                val_default = float(round(def_pz1 - 5.0, 2))
+            else:
+                val_default = 0.0
+
+        col_inp, col_btn_sugg = st.columns([7, 5], vertical_alignment="bottom")
+        with col_inp:
+            pz_l1 = st.number_input(
+                "🎯 Prezzo Livello 1 (Partenza)",
+                min_value=0.0,
+                max_value=10000.0,
+                value=float(val_default),
+                step=1.0,
+                format="%.2f",
+                key=f"input_{ss_key}",
+                help="Prezzo a cui scatterà il primo scaglione SHORT a mercato."
+            )
+        with col_btn_sugg:
+            if sugg_lvl is not None:
+                if st.button(f"🎯 Usa {sugg_lvl:.2f}", key=f"btn_sugg_{conto}", use_container_width=True, help="Applica il prezzo chirurgico consigliato al Livello 1"):
+                    st.session_state[ss_key] = float(sugg_lvl)
+                    st.rerun()
 
         cp, cs = st.columns(2)
         with cp:

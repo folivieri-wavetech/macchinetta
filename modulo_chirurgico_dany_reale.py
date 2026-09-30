@@ -56,6 +56,9 @@ class ModuloChirurgicoDanyReale:
         self.xst = None
         self.t_login = 0
         self.session_start = time.time()
+        self.ultimo_gold_bid_ask = None
+        self.gf_engine = None
+        self.th_gf = None
         
     def login(self):
         h = {
@@ -129,6 +132,10 @@ class ModuloChirurgicoDanyReale:
                     dur_sec = int(time.time() - self.session_start)
                     dur_str = f"{dur_sec // 3600}h {(dur_sec % 3600) // 60}m"
                     
+                    prezzi_ba = {}
+                    if self.ultimo_gold_bid_ask:
+                        prezzi_ba["Spot Gold"] = self.ultimo_gold_bid_ask
+                        
                     stato = {
                         "saldo": saldo,
                         "disponibile": disp,
@@ -139,7 +146,7 @@ class ModuloChirurgicoDanyReale:
                         "ultimo_aggiornamento": now_it().strftime("%H:%M:%S"),
                         "prezzi_live": {},
                         "distanze_minime": {},
-                        "prezzi_bid_ask": {}
+                        "prezzi_bid_ask": prezzi_ba
                     }
                     
                     tmp_st = f"{STATO_FILE}.tmp.{os.getpid()}"
@@ -163,15 +170,24 @@ class ModuloChirurgicoDanyReale:
                 for item in pos_list:
                     m = item.get("market", {})
                     p = item.get("position", {})
+                    inst_name = str(m.get("instrumentName", ""))
+                    epic_code = str(m.get("epic", ""))
+                    bid_p = m.get("bid")
+                    offer_p = m.get("offer")
+                    
+                    if "GOLD" in inst_name.upper() or "CFDGOLD" in epic_code.upper():
+                        if bid_p and offer_p:
+                            self.ultimo_gold_bid_ask = {"bid": float(bid_p), "ask": float(offer_p)}
+
                     posizioni_salvate.append({
                         "dealId": p.get("dealId"),
-                        "instrument": m.get("instrumentName"),
-                        "epic": m.get("epic"),
+                        "instrument": inst_name,
+                        "epic": epic_code,
                         "direction": p.get("direction"),
-                        "size": p.get("size"),
-                        "openLevel": p.get("level"),
-                        "bid": m.get("bid"),
-                        "offer": m.get("offer"),
+                        "size": p.get("dealSize") or p.get("size"),
+                        "openLevel": p.get("openLevel") or p.get("level"),
+                        "bid": bid_p,
+                        "offer": offer_p,
                         "upl": p.get("upl"),
                         "currency": p.get("currency")
                     })
@@ -184,28 +200,49 @@ class ModuloChirurgicoDanyReale:
             print_log(f"⚠️ Eccezione lettura posizioni: {e}")
             return False
 
-    def avvia_loop(self):
-        print_log(f"🚀 Modulo Chirurgico DANY_REALE avviato per conto {self.target_account_id}")
-        if not self.login():
-            print_log("❌ Login iniziale fallito. Riprovo tra 10 secondi...")
-            time.sleep(10)
-            if not self.login():
-                return
-                
-        ultimo_log_hb = 0
-        # Avvio thread dedicato per il motore Goldfinger
+    def avvia_gf_thread(self):
         try:
             import threading
             from goldfinger_engine import GoldfingerEngine
-            gf_engine = GoldfingerEngine()
-            th_gf = threading.Thread(target=gf_engine.avvia_loop, daemon=True, name="GoldfingerThread")
-            th_gf.start()
+            self.gf_engine = GoldfingerEngine()
+            self.th_gf = threading.Thread(target=self.gf_engine.avvia_loop, daemon=True, name="GoldfingerThread")
+            self.th_gf.start()
             print_log("🧵 Thread Goldfinger Engine avviato con successo in background.")
+            return True
         except Exception as e_th:
             print_log(f"⚠️ Impossibile avviare thread Goldfinger: {e_th}")
+            return False
+
+    def avvia_loop(self):
+        print_log(f"🚀 Modulo Chirurgico DANY_REALE avviato per conto {self.target_account_id}")
+        
+        # Tentativo login iniziale con retry persistente prudente
+        while not self.login():
+            print_log("❌ Login iniziale fallito. Attesa prudente di 30 secondi prima di riprovare...")
+            time.sleep(30)
+                
+        ultimo_log_hb = 0
+        # Avvio iniziale thread dedicato per il motore Goldfinger
+        self.avvia_gf_thread()
+        
         while True:
             try:
-                # Rinnovo preventivo automatico a 70 ore (standard granitico identico a Motore.py per tutti i conti)
+                # 1. Watchdog: verifica che il thread Goldfinger sia costantemente attivo
+                if self.th_gf is None or not self.th_gf.is_alive():
+                    cfg_path = os.path.join(CONTO_DIR, "config_goldfinger.json")
+                    cfg_gf = {}
+                    if os.path.exists(cfg_path):
+                        try:
+                            with open(cfg_path, "r", encoding="utf-8") as f_cfg:
+                                cfg_gf = json.load(f_cfg)
+                        except Exception:
+                            pass
+                    if cfg_gf.get("attivo", False):
+                        print_log("🛡️ Watchdog: Rilevato thread Goldfinger terminato inaspettatamente (errore di rete o IG). Riavvio automatico prudente tra 5 secondi...")
+                        time.sleep(5)
+                        self.avvia_gf_thread()
+
+                # 2. Rinnovo preventivo automatico a 70 ore (standard granitico identico a Motore.py per tutti i conti)
                 richiede_rinnovo = False
                 if not os.path.exists(TOKEN_FILE):
                     richiede_rinnovo = True
