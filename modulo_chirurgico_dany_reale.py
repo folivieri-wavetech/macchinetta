@@ -60,6 +60,44 @@ class ModuloChirurgicoDanyReale:
         self.gf_engine = None
         self.th_gf = None
         
+    def calcola_durata_sessione(self):
+        if not os.path.exists(TOKEN_FILE):
+            return "0h 00m"
+        tempo_creazione = os.path.getmtime(TOKEN_FILE)
+        durata = now_it() - datetime.datetime.fromtimestamp(tempo_creazione, TZ_ITALIA)
+        ore = int(durata.total_seconds() // 3600)
+        minuti = int((durata.total_seconds() % 3600) // 60)
+        return f"{ore}h {minuti:02d}m"
+
+    def verifica_token_ig(self):
+        if not os.path.exists(TOKEN_FILE):
+            return self.login()
+            
+        tempo_creazione = os.path.getmtime(TOKEN_FILE)
+        if (time.time() - tempo_creazione) > (70 * 3600):
+            print_log("⚠️ Token sul disco vicino alle 72h (> 70h): eseguo rinnovo completo...")
+            return self.login()
+
+        try:
+            with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            self.cst = d.get("CST")
+            self.xst = d.get("X-SECURITY-TOKEN")
+            if not self.cst or not self.xst:
+                return self.login()
+
+            # Test rapido validità sessione esistente
+            r = requests.get(f"{BASE_URL}/accounts", headers=self.get_auth_headers("1"), timeout=8)
+            if r.status_code == 200:
+                print_log(f"✅ Sessione IG Reale persistente ripristinata dal token (Durata: {self.calcola_durata_sessione()}).")
+                return True
+            else:
+                print_log("🔄 Token persistente scaduto su IG (HTTP 401): eseguo nuovo login...")
+                return self.login()
+        except Exception as e:
+            print_log(f"⚠️ Errore verifica token persistente: {e}, procedo con login...")
+            return self.login()
+
     def login(self):
         h = {
             "X-IG-API-KEY": self.api_key,
@@ -129,8 +167,7 @@ class ModuloChirurgicoDanyReale:
                     marg = str(bal.get("deposit", 0.0))
                     dd = str(bal.get("profitLoss", 0.0))
                     
-                    dur_sec = int(time.time() - self.session_start)
-                    dur_str = f"{dur_sec // 3600}h {(dur_sec % 3600) // 60}m"
+                    dur_str = self.calcola_durata_sessione()
                     
                     prezzi_ba = {}
                     if self.ultimo_gold_bid_ask:
@@ -216,9 +253,9 @@ class ModuloChirurgicoDanyReale:
     def avvia_loop(self):
         print_log(f"🚀 Modulo Chirurgico DANY_REALE avviato per conto {self.target_account_id}")
         
-        # Tentativo login iniziale con retry persistente prudente
-        while not self.login():
-            print_log("❌ Login iniziale fallito. Attesa prudente di 30 secondi prima di riprovare...")
+        # Ripristino token persistente o login iniziale con retry
+        while not self.verifica_token_ig():
+            print_log("❌ Autenticazione iniziale fallita. Attesa prudente di 30 secondi prima di riprovare...")
             time.sleep(30)
                 
         ultimo_log_hb = 0
