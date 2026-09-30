@@ -476,10 +476,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
     if sig_act and sig_px is not None:
         sig_card_val = f"<span style='color: #fb923c; font-weight: 800;'>{sig_px:.2f}</span>"
-        sig_card_sub = "<div class='micro-sub-hyper' style='color: #f97316; font-size: 0.60rem;'>Stop Attivo</div>"
     else:
         sig_card_val = "<span style='color: #475569;'>--</span>"
-        sig_card_sub = ""
 
     st.markdown(f"""
     <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 7px;'>
@@ -498,7 +496,6 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <div class='micro-card-hyper'>
             <div class='micro-label-hyper'>CANDELA SEGNALE</div>
             <div class='micro-val-hyper' style='font-family: monospace;'>{sig_card_val}</div>
-            {sig_card_sub}
         </div>
     </div>
     """, unsafe_allow_html=True)
