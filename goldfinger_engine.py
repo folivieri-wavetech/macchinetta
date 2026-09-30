@@ -334,6 +334,14 @@ class GoldfingerEngine:
                     json.dump(config_ui, f, indent=4)
                 return
 
+            bid_curr, _ = self.ottieni_prezzo_live_gold()
+            if bid_curr and pz_start >= bid_curr:
+                print_log(f"🛑 Blocco Sicurezza Goldfinger: Livello 1 ({pz_start:.2f}) >= Prezzo Live Bid ({bid_curr:.2f}). Avvio annullato: per uno Short a scendere il livello deve essere SOTTO il mercato.")
+                config_ui["attivo"] = False
+                with open(CONFIG_GOLDFINGER_FILE, "w", encoding="utf-8") as f:
+                    json.dump(config_ui, f, indent=4)
+                return
+
             self.stato["attivo"] = True
             self.stato["livello_1_prezzo"] = pz_start
             self.stato["passo_pip"] = passo
