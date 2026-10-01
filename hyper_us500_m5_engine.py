@@ -676,43 +676,99 @@ class HyperUS500M5Engine:
             self._evaluate_traffic_lights(time_str)
             self._manage_open_position(mid, time_str)
 
+    def _get_ig_credentials(self):
+        user, pwd, api_key = None, None, None
+        candidates = []
+        if getattr(self, "account_dir", None):
+            candidates.append(os.path.join(self.account_dir, ".env"))
+        candidates.append(".env")
+        for p in candidates:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
+                            elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
+                            elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
+                    if user and pwd and api_key:
+                        return user, pwd, api_key
+                except Exception:
+                    pass
+        user = os.getenv("IG_USERNAME")
+        pwd = os.getenv("IG_PASSWORD")
+        api_key = os.getenv("IG_API_KEY")
+        return user, pwd, api_key
+
     def _run_streaming_loop(self):
+        """Thread di ascolto streaming Lightstreamer IG."""
         while self.running:
             try:
-                order_mgr = HyperOrderManager.get_instance(self.account_dir)
-                if not order_mgr._ensure_session():
+                if is_us500_feed_suspended():
+                    with self.lock:
+                        self.ls_connected = False
+                    time.sleep(20)
+                    continue
+
+                user, pwd, api_key = self._get_ig_credentials()
+                if not user or not pwd or not api_key:
                     time.sleep(5)
                     continue
 
-                from lightstreamer_client import LightstreamerSubscription
-                ls_client = getattr(order_mgr, "_ls_client", None)
-                if not ls_client:
-                    from lightstreamer_client import LightstreamerClient
-                    ls_client = LightstreamerClient(order_mgr.base_url, order_mgr.cst, order_mgr.xst, order_mgr.api_key)
-                    order_mgr._ls_client = ls_client
-                    ls_client.connect()
+                url_session = "https://demo-api.ig.com/gateway/deal/session"
+                h_session = {
+                    "X-IG-API-KEY": api_key,
+                    "Version": "2",
+                    "Accept": "application/json; charset=UTF-8",
+                    "Content-Type": "application/json; charset=UTF-8"
+                }
+                payload = {"identifier": user, "password": pwd}
+                r = requests.post(url_session, headers=h_session, json=payload, timeout=10)
+                if r.status_code != 200:
+                    time.sleep(10)
+                    continue
+
+                cst = r.headers.get("CST")
+                xst = r.headers.get("X-SECURITY-TOKEN")
+                d_resp = r.json()
+                endpoint = d_resp.get("lightstreamerEndpoint")
+                account_id = d_resp.get("currentAccountId")
+
+                from lightstreamer_client import LightstreamerClient, LightstreamerSubscription
+                ls_client = LightstreamerClient(account_id, f"CST-{cst}|XST-{xst}", endpoint)
+                ls_client.connect()
+                with self.lock:
+                    self.ls_connected = True
 
                 def on_tick(item_update):
-                    self.ls_connected = True
-                    bid_s = item_update.get("BID") or item_update.get("bid")
-                    ask_s = item_update.get("OFFER") or item_update.get("offer") or item_update.get("ask")
+                    vals = item_update.get("values", {})
+                    bid_s = vals.get("BID")
+                    ask_s = vals.get("OFR") or vals.get("OFFER")
+                    t_str = now_it().strftime("%H:%M:%S")
                     if bid_s and ask_s:
                         try:
-                            self._process_tick(float(bid_s), float(ask_s), now_it().strftime("%H:%M:%S"))
-                        except Exception:
-                            pass
+                            b = float(bid_s)
+                            a = float(ask_s)
+                            self._process_tick(b, a, t_str)
+                        except Exception as e:
+                            logger.error(f"Errore _process_tick US500 M5: {e}")
 
-                sub_item = f"MARKET:{EPIC_US500}"
-                sub = LightstreamerSubscription(mode="MERGE", items=[sub_item], fields=["BID", "OFFER", "UPDATE_TIME"])
+                sub = LightstreamerSubscription(
+                    mode="DISTINCT",
+                    items=[f"CHART:{EPIC_US500}:TICK"],
+                    fields=["BID", "OFR", "UTM"]
+                )
                 sub.addlistener(on_tick)
                 ls_client.subscribe(sub)
-                logger.info(f"✅ Sottoscrizione Lightstreamer M5 attiva su {sub_item}")
+                logger.info(f"✅ Sottoscrizione Lightstreamer M5 attiva su CHART:{EPIC_US500}:TICK")
 
-                while self.running and ls_client.is_connected():
+                while self.running and self.ls_connected:
                     time.sleep(2)
 
             except Exception as e:
-                self.ls_connected = False
+                logger.warning(f"Errore connessione Lightstreamer US500: {e}")
+                with self.lock:
+                    self.ls_connected = False
                 time.sleep(5)
 
     def _run_rollover_watchdog(self):
