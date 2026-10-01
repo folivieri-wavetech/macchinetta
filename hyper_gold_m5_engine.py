@@ -10,6 +10,11 @@ import logging
 from hyper_order_manager import HyperOrderManager, TZ_ITALIA, now_it
 
 logger = logging.getLogger("HyperGoldM5Engine")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(asctime)s] [HYPER_GOLD_M5] %(message)s", "%H:%M:%S"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 # Disabilita controllo revoca Windows su Lightstreamer Demo (evita timeout WinError 10060)
 try:
@@ -19,154 +24,59 @@ except Exception:
 
 EPIC_GOLD = "CS.D.CFEGOLD.CBE.IP"
 CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
-WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M5 = 275 min = ~4.58 ore)
-WARMUP_BARS_TK = 55     # Retrocompatibilità
 STATE_FILE = "hyper_gold_m5_state.json"
 
-def aggregate_candles_to_5m(candles):
-    """Aggrega una lista di candele a 5 Minuti (300s boundary) da candele esistenti"""
-    if not candles:
-        return []
-    buckets = {}
-    for c in candles:
-        b_target = int(c["boundary"] // CANDLE_SECONDS) * CANDLE_SECONDS
-        if b_target not in buckets:
-            buckets[b_target] = []
-        buckets[b_target].append(c)
+# Parametri Operativi Apex Swing M5
+CORE_CONTRACTS = 6          # Totale 6 contratti (3 Bancomat + 3 Runner)
+BANCOMAT_CONTRACTS = 3      # 3 contratti Bancomat (TP1 rapido a R:R 1:1 o 20 pip)
+RUNNER_CONTRACTS = 3        # 3 contratti Runner (Trailing Stop strutturale sui minimi/massimi crescenti)
 
-    aggregated = []
-    for b_target in sorted(buckets.keys()):
-        group = buckets[b_target]
-        op = group[0]["open"]
-        hi = max(x["high"] for x in group)
-        lo = min(x["low"] for x in group)
-        cl = group[-1]["close"]
-        t_str = datetime.datetime.fromtimestamp(b_target, TZ_ITALIA).strftime("%H:%M:%S")
-        aggregated.append({
-            "boundary": b_target,
-            "time": t_str,
-            "open": op,
-            "high": hi,
-            "low": lo,
-            "close": cl
-        })
-    return aggregated
-
-# Alias per retrocompatibilità
-aggregate_candles_to_10m = aggregate_candles_to_5m
-
-# Parametri Strategia: S&R Puro KJ55 a Doppia Velocità (Core + Incrementi Bancomat/Runner + Trailing Stop M5)
-CORE_CONTRACTS = 6          # Size iniziale Core: 6 contratti
-CORE_TS_TRIGGER_PIPS = 10.0 # Attivazione Trailing Stop Core: a +10 pip di guadagno
-CORE_TS_LOCK_PIPS = 6.0     # Lock profit iniziale Core: +6 pip garantiti (+36.00 € con 6 contratti)
-CORE_TS_STEP_PIPS = 2.0     # Avanzamento a scatti Core: di 2 in 2 pip
-INC_CONTRACTS = 4           # Incrementi: 4 contratti ciascuno
-MAX_INCREMENTS = 3          # Max 3 incrementi complessivi a mercato (totale max 18c con Core: 6+4+4+4)
-
-# Regime 1: "Bancomat" (Distanza da KJ <= 10 pip)
-BANCOMAT_MAX_DIST_KJ = 10.0 # Soglia max per regime Bancomat: <= 10 pip da KJ
-INC_TP_PIPS = 5.0           # TP incrementi Bancomat: 5 pip (+20.00 € a incremento con 4 contratti)
-
-# Regime 2: "Runner / Bancomat Esteso" (Distanza da KJ > 10 pip)
-RUNNER_THRESHOLD_KJ_DIST = 10.0 # Soglia spartiacque Bancomat (<= 10p) vs Runner (> 10p)
-MAX_RUNNER_INCREMENTS = 3       # Max 3 incrementi Runner contemporanei
-MIN_DIST_RUNNER_PIPS = 4.0      # Distanza minima di progressione a gradini tra incrementi Runner (>= 4 pip)
-RUNNER_TP_PIPS = 12.0           # TP Bancomat Esteso Runner: 12 pip (+60.00 € con 5 contratti)
-RUNNER_BE_TRIGGER_PIPS = 6.0    # Attivazione Break-Even: a +6 pip di guadagno blocca a BE
-RUNNER_BE_LOCK_PIPS = 1.0       # Lock Break-Even garantito (+1 pip protetto)
-
-# Protezioni di sicurezza
-PARACADUTE_KJ_PIPS = 6.0       # Paracadute KJ Intracandela: Stop emergenza live a KJ +- 6 pip
-CANDELA_SEGNALE_OFFSET_PIPS = 3.0 # Candela Segnale M5: Stop confermato su rottura Massimo/Minimo +- 3 pip
-CORE_MIN_KJ_DIST_PIPS = 2.0    # Minima distanza Prezzo - KJ per ingresso Core M5: >= 2 pip (stacco da KJ)
-CORE_MAX_KJ_DIST_PIPS = 6.0    # Massima distanza Prezzo - KJ per ingresso Core M5: <= 6 pip (coerente con Paracadute)
-KJ_TOLERANCE_PIPS = 5.0
-MIN_DIST_INCR_PIPS = 4.0
-
-# Parametri legacy per retrocompatibilità
-KJ_TK_MIN_FORBICE_PIPS = 0.0
-TK_FILTER_PIPS = 0.0
-CORE_REENTRY_KJ_DIST_PIPS = 2.0
+TP1_DEFAULT_PIPS = 20.0     # Take Profit Bancomat fisso/garantito: +20 pip (+60.00 €)
+SL_BUFFER_PIPS = 3.0        # Cuscinetto oltre il pivot strutturale: 3 pip
+SL_MIN_PIPS = 10.0          # Stop Loss minimo di protezione: 10 pip
+SL_MAX_PIPS = 35.0          # Stop Loss massimo invalicabile (cap di sicurezza): 35 pip
+BE_EXTRA_LOCK_PIPS = 1.0    # Lock sopra il breakeven a protezione spread (+1 pip)
 
 # Orari Sospensione Gold:
-# 1. Chiusura Feed IG Spot Gold (Session break COMEX dalle 23:00 alle 00:00)
 GOLD_FEED_SUSPEND_START_HOUR = 23
 GOLD_FEED_SUSPEND_START_MIN = 0
-
-# 2. Congelamento Operatività / Ordini (Dalle 22:44 alle 00:15 per rollover e spread)
 GOLD_TRADE_SUSPEND_START_HOUR = 22
 GOLD_TRADE_SUSPEND_START_MIN = 44
 GOLD_TRADE_SUSPEND_END_HOUR = 0
 GOLD_TRADE_SUSPEND_END_MIN = 15
 
 def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True durante la chiusura reale del mercato Gold (pausa tecnica COMEX 23:00 - 00:00):
-    - Weekend: da venerdì sera ore 23:00 fino alla domenica sera ore 21:58.
-    - Notturno feriale (Lun-Gio): dalle 23:00:00 alle 23:59:59 (dalle 00:00 il feed riapre per candele M5)."""
-    if dt is None:
-        dt = now_it()
+    if dt is None: dt = now_it()
     wd = dt.weekday()
     t = dt.time()
-    # Weekend: da venerdì 23:00 a domenica 21:58
     if wd == 4 and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
         return True
     if wd == 5:
         return True
     if wd == 6 and t < datetime.time(21, 58, 0):
         return True
-    # Notturno feriale Lun-Gio (23:00 - 23:59:59)
     if wd in (0, 1, 2, 3) and t >= datetime.time(GOLD_FEED_SUSPEND_START_HOUR, GOLD_FEED_SUSPEND_START_MIN, 0):
         return True
     return False
 
-def is_gold_rollover_window(dt: datetime.datetime = None) -> bool:
-    """Restituisce True SOLO nella finestra operativa utile di chiusura anticipata a FLAT (22:44:00 - 22:44:55),
-    sia il venerdì prima del freeze del weekend sia nelle notti feriali Lun-Gio prima del rollover.
-    Evita di inviare ordini a mercati chiusi durante il weekend o dopo le 23:00."""
-    if dt is None:
-        dt = now_it()
-    wd = dt.weekday()
-    t = dt.time()
-    t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0) # 22:44:00
-    t_end = datetime.time(22, 44, 55)
-    # Venerdì sera: 22:44:00 - 22:44:55
-    if wd == 4 and t_start <= t <= t_end:
-        return True
-    # Lun-Gio notte: 22:44:00 - 22:44:55
-    if wd in (0, 1, 2, 3) and t_start <= t <= t_end:
-        return True
-    return False
-
 def is_gold_trading_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True se l'operatività/apertura ordini è congelata a FLAT:
-    - Notte feriale per rollover (22:44 - 00:15)
-    - Weekend: dal venerdì sera alle 22:44 fino alla domenica sera alle 21:58."""
-    if dt is None:
-        dt = now_it()
+    if dt is None: dt = now_it()
     wd = dt.weekday()
     t = dt.time()
-    # Weekend: venerdì sera dalle 22:44 fino alla domenica sera alle 21:58
     if wd == 4 and t >= datetime.time(22, 44, 0):
         return True
     if wd == 5:
         return True
     if wd == 6 and t < datetime.time(21, 58, 0):
         return True
-    # Rollover infrasettimanale (Lun-Gio notte)
     t_start = datetime.time(GOLD_TRADE_SUSPEND_START_HOUR, GOLD_TRADE_SUSPEND_START_MIN, 0)
     t_end = datetime.time(GOLD_TRADE_SUSPEND_END_HOUR, GOLD_TRADE_SUSPEND_END_MIN, 0)
     return t >= t_start or t < t_end
 
 def is_gold_entry_suspended(dt: datetime.datetime = None) -> bool:
-    """Restituisce True se l'apertura di nuove posizioni (Core e Incrementi M5) è sospesa:
-    1. Venerdì sera dalle 22:14:00 in poi e per tutto il weekend fino alla riapertura di domenica sera (21:58),
-       lasciando 30 minuti di respiro (fino alle 22:44) alle posizioni a mercato per svilupparsi e chiudersi fisiologicamente.
-    2. Durante il normale congelamento notturno di trading (22:44 - 00:15)."""
-    if dt is None:
-        dt = now_it()
+    if dt is None: dt = now_it()
     wd = dt.weekday()
     t = dt.time()
-    # Blocco ingressi pre-weekend (Venerdì dalle 22:14, Sabato, Domenica fino alle 21:58)
     if wd == 4 and t >= datetime.time(22, 14, 0):
         return True
     if wd == 5:
@@ -175,9 +85,46 @@ def is_gold_entry_suspended(dt: datetime.datetime = None) -> bool:
         return True
     return is_gold_trading_suspended(dt)
 
-def is_gold_market_suspended(dt: datetime.datetime = None) -> bool:
-    """Alias retrocompatibile per lo stato operatività congelata"""
-    return is_gold_trading_suspended(dt)
+# ==============================================================================
+# ALGORITMI PRICE ACTION & INDICATORI APEX SWING M5
+# ==============================================================================
+
+def calculate_ema(values, period):
+    if not values or len(values) < period:
+        return None
+    k = 2.0 / (period + 1)
+    ema = sum(values[:period]) / period
+    for v in values[period:]:
+        ema = v * k + ema * (1.0 - k)
+    return ema
+
+def calculate_atr(candles, period=14):
+    if not candles or len(candles) < period + 1:
+        return 15.0  # Fallback ragionevole per Gold M5 (15 pip)
+    trs = []
+    for i in range(1, len(candles)):
+        h = candles[i]["high"]
+        l = candles[i]["low"]
+        prev_c = candles[i - 1]["close"]
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        trs.append(tr)
+    return sum(trs[-period:]) / float(period)
+
+def find_swings(candles, left=2, right=1):
+    """Individua i Pivot High e Pivot Low sulle candele M5."""
+    high_pivots = []
+    low_pivots = []
+    n = len(candles)
+    for i in range(left, n - right):
+        h = candles[i]["high"]
+        l = candles[i]["low"]
+        is_high = all(candles[i - j]["high"] <= h for j in range(1, left + 1)) and all(candles[i + j]["high"] <= h for j in range(1, right + 1))
+        is_low = all(candles[i - j]["low"] >= l for j in range(1, left + 1)) and all(candles[i + j]["low"] >= l for j in range(1, right + 1))
+        if is_high:
+            high_pivots.append({"index": i, "time": candles[i].get("time", ""), "price": h})
+        if is_low:
+            low_pivots.append({"index": i, "time": candles[i].get("time", ""), "price": l})
+    return high_pivots, low_pivots
 
 class HyperGoldM5Engine:
     _instances = {}
@@ -214,323 +161,79 @@ class HyperGoldM5Engine:
         self.curr_close = None
         self.curr_bar_start_t = None
 
-        # Storico barre concluse M5 (ultime 500)
+        # Storico barre concluse M5
         self.candles = []
-        self.kj55 = None
-        self.tk233 = None
-        self.tk144 = None  # Retrocompatibilità (punta a tk233)
+
+        # Semaforo a 4 Lucette (Stato Real-Time)
+        self.traffic_light = {
+            "l1_structure": {"status": False, "dir": "NEUTRAL", "desc": "Analisi Swings in corso..."},
+            "l2_trigger": {"status": False, "dir": "NEUTRAL", "desc": "In attesa di breakout..."},
+            "l3_volatility": {"status": False, "desc": "Calcolo volatilità..."},
+            "l4_momentum": {"status": False, "dir": "NEUTRAL", "desc": "Calcolo EMA Flow..."},
+            "direction": "NEUTRAL",
+            "all_green": False,
+            "last_pivot_high": None,
+            "last_pivot_low": None,
+            "atr": 15.0,
+            "ema8": None,
+            "ema21": None
+        }
 
         # Portafoglio e Trading
         self.initial_balance = 10000.0
         self.balance = 10000.0
-        self.point_value = 1.0   # 1 EUR per punto/pip per contratto
+        self.point_value = 1.0   # 1 EUR per pip su Gold
         self.num_contracts = CORE_CONTRACTS
         self.trading_enabled = False
-        self.use_core_trailing = False   # Core libera da Trailing Stop: governata al 100% da Kijun naturale e Candela Segnale
 
-        # Posizione Core: None (FLAT) o {"direction": "LONG"/"SHORT", "open_price": float, "contracts": 5, "tp_price": float, "open_time": str}
+        # Posizione Aperta (Bancomat + Runner)
+        # Formato: {"direction": "LONG"/"SHORT", "open_price": float, "contracts": 6,
+        #           "deal_id_bancomat": str, "deal_id_runner": str, "tp1_price": float,
+        #           "sl_price": float, "open_time": str, "tp1_hit": bool, "runner_sl": float}
         self.position = None
 
-        # Incrementi aperti: lista di {"id": int, "direction": str, "open_price": float, "contracts": 3, "tp_price": float, "open_time": str}
+        # Retrocompatibilità interfaccia dashboard
         self.increments = []
-        self.inc_tp_pips = INC_TP_PIPS
-        self.runner_tp_pips = RUNNER_TP_PIPS
-        self.runner_be_trigger_pips = RUNNER_BE_TRIGGER_PIPS
-        self.runner_be_lock_pips = RUNNER_BE_LOCK_PIPS
-
-        # Candela Segnale KJ: Stop confermato su rottura Massimo/Minimo
-        self.signal_candle_active = False
-        self.signal_stop_price = None
-        self.signal_ref_price = None
-
-        # Storico eseguiti e stato ultimo ciclo TS
         self.trades = []
         self.last_ts_cycle = None
-
-        # Tracciamento Regime e Taglio KJ (Opzione B: Ingresso su Taglio Puro, no pullback)
-        self.last_regime = None
-        self.regime_traded = True
-
-        # Flag controllo esecuzione ordini reali IG (evita collisioni e ordini multipli)
         self.entry_in_progress = False
         self.closing_in_progress = False
 
-        # 1. Carica eventuale stato persistito
+        # 1. Carica stato persistente
         self.load_state()
 
-        # 2. Sincronizzazione candele M5 contigue direttamente da IG REST all'avvio (elimina buchi da riavvii)
-        self._fetch_historical_m5_bars_from_ig()
+        # 2. Sincronizzazione candele M5 da IG REST o cache locale all'avvio
+        self._load_initial_m5_candles()
 
         # 3. Avvia thread di streaming Lightstreamer in background
         self.stream_thread = threading.Thread(target=self._run_streaming_loop, daemon=True)
         self.stream_thread.start()
 
-        # 4. Avvia watchdog indipendente per chiusura proattiva rollover / pre-weekend alle 22:44 (non dipende da Lightstreamer)
+        # 4. Avvia watchdog rollover
         self.watchdog_thread = threading.Thread(target=self._run_rollover_watchdog, daemon=True)
         self.watchdog_thread.start()
 
-        # 5. Avvia riconciliazione asincrona posizioni con IG (ripulisce deal già chiusi a server spento)
-        threading.Thread(target=self._reconcile_open_positions_with_ig, daemon=True).start()
-
-    def _get_ig_credentials(self):
-        user, pwd, api_key = None, None, None
-        candidates = []
-        if getattr(self, "account_dir", None):
-            candidates.append(os.path.join(self.account_dir, ".env"))
-        candidates.append(".env")
-        for p in candidates:
-            if os.path.exists(p):
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        for line in f:
-                            line = line.strip()
-                            if line.startswith("IG_USERNAME="): user = line.split("=", 1)[1]
-                            elif line.startswith("IG_PASSWORD="): pwd = line.split("=", 1)[1]
-                            elif line.startswith("IG_API_KEY="): api_key = line.split("=", 1)[1]
-                    if user and pwd and api_key:
-                        break
-                except Exception:
-                    pass
-        return user, pwd, api_key
-
-    def _fetch_historical_m5_bars_from_ig(self):
-        """Caricamento e aggregazione a 5M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
-        now_ts = now_it().timestamp()
-
-        # 1. Verifica se candele già fresche e complete (senza buchi interni > 10 min)
-        with self.lock:
-            if len(self.candles) >= WARMUP_BARS_KJ:
-                last_b = self.candles[-1].get("boundary", 0)
-                sub_tail = self.candles[-WARMUP_BARS_KJ:]
-                has_internal_gap = any((sub_tail[i+1].get("boundary", 0) - sub_tail[i].get("boundary", 0)) > 600 for i in range(len(sub_tail)-1))
-                if not has_internal_gap and ((now_ts - last_b) <= 600 or is_gold_feed_suspended()):
-                    self.candles = aggregate_candles_to_5m(self.candles)[-500:]
-                    self._recalculate_indicators()
-                    self.save_state()
-                    return
-
-        # 2. Cerca file orario locale per colmare qualsiasi gap senza chiamate a IG
-        hourly_candidates = [
-            "candele_Spot_Gold_HOUR.json",
-            os.path.join("/data", "candele_Spot_Gold_HOUR.json"),
-            os.path.join(self.account_dir or "", "candele_Spot_Gold_HOUR.json"),
-            os.path.join("..", "candele_Spot_Gold_HOUR.json"),
-        ]
-        derived_5m = []
-        for h_path in hourly_candidates:
-            if os.path.exists(h_path):
-                try:
-                    with open(h_path, "r", encoding="utf-8") as f:
-                        h_bars = json.load(f)
-                    if isinstance(h_bars, list) and h_bars:
-                        for hb in h_bars[-72:]:
-                            t_str = hb.get("snapshotTime", "")
-                            if not t_str:
-                                continue
-                            dt_hb = datetime.datetime.strptime(t_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc).astimezone(TZ_ITALIA)
-                            base_b = int(dt_hb.timestamp())
-                            op = float(hb["openPrice"]["bid"])
-                            hi = float(hb["highPrice"]["bid"])
-                            lo = float(hb["lowPrice"]["bid"])
-                            cl = float(hb["closePrice"]["bid"])
-                            for i in range(12):
-                                b = base_b + i * CANDLE_SECONDS
-                                t_str_it = datetime.datetime.fromtimestamp(b, TZ_ITALIA).strftime("%H:%M:%S")
-                                derived_5m.append({
-                                    "boundary": b,
-                                    "time": t_str_it,
-                                    "open": op,
-                                    "high": hi,
-                                    "low": lo,
-                                    "close": cl
-                                })
-                        if derived_5m:
-                            break
-                except Exception as e_h:
-                    logger.warning(f"Errore lettura file orario {h_path}: {e_h}")
-
-        with self.lock:
-            merged_map = {}
-            for b in derived_5m:
-                merged_map[b["boundary"]] = b
-            for b in self.candles:
-                merged_map[b["boundary"]] = b
-
-            if len(merged_map) >= WARMUP_BARS_KJ:
-                self.candles = [merged_map[k] for k in sorted(merged_map.keys())][-500:]
-                self._recalculate_indicators()
-                self.save_state()
-                logger.info(f"✅ [HYPER GOLD 5M] Riallineate {len(self.candles)} barre 5M con cache oraria locale (KJ55: {self.kj55}, ZERO chiamate IG).")
-                return
-
-        # 3. Fallback su file candele alternativi se presenti
-        central_file = "candele_Spot_Gold_M5.json"
-        candidates = [central_file, STATE_FILE]
-        if getattr(self, "account_dir", None):
-            candidates.append(os.path.join(self.account_dir, STATE_FILE))
-            candidates.append(os.path.join("/data", self.account_dir, STATE_FILE))
-        candidates.extend([
-            os.path.join("DANY_DEMO", STATE_FILE),
-            os.path.join("FIORDOK_DEMO", STATE_FILE),
-            os.path.join("BONGIOLO_DEMO", STATE_FILE),
-            os.path.join("/data", "DANY_DEMO", STATE_FILE),
-            os.path.join("/data", "FIORDOK_DEMO", STATE_FILE),
-        ])
-
-        for fpath in candidates:
-            if os.path.exists(fpath):
-                try:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        d = json.load(f)
-                    c_list = d if isinstance(d, list) else d.get("candles", [])
-                    if len(c_list) >= 55:
-                        with self.lock:
-                            self.candles = aggregate_candles_to_5m(c_list)[-500:]
-                            self._recalculate_indicators()
-                            self.save_state()
-                        logger.info(f"✅ [HYPER GOLD 5M] Caricate {len(self.candles)} barre 5M aggregate da file locale {fpath} (ZERO chiamate IG).")
-                        return
-                except Exception:
-                    pass
-
-    def _recalculate_indicators(self):
-        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M5.
-        Allineato agli standard di mercato (TradingView / IG Charts):
-        prende le ultime 54 candele chiuse + gli estremi della candela corrente in formazione."""
-        n = len(self.candles)
-        if n >= (WARMUP_BARS_KJ - 1):
-            sub_kj = self.candles[-(WARMUP_BARS_KJ - 1):]
-            highs = [c["high"] for c in sub_kj]
-            lows = [c["low"] for c in sub_kj]
-
-            # Includi la barra live in corso
-            curr_h = getattr(self, "curr_high", None)
-            curr_l = getattr(self, "curr_low", None)
-            if curr_h is not None and curr_l is not None:
-                highs.append(curr_h)
-                lows.append(curr_l)
-            elif n >= WARMUP_BARS_KJ:
-                highs.append(self.candles[-WARMUP_BARS_KJ]["high"])
-                lows.append(self.candles[-WARMUP_BARS_KJ]["low"])
-
-            max_h_kj = max(highs)
-            min_l_kj = min(lows)
-            self.kj55 = round((max_h_kj + min_l_kj) / 2.0, 2)
-            if self.candles:
-                self.candles[-1]["kj55"] = self.kj55
-        elif n == WARMUP_BARS_KJ:
-            sub_kj = self.candles[-WARMUP_BARS_KJ:]
-            max_h_kj = max(c["high"] for c in sub_kj)
-            min_l_kj = min(c["low"] for c in sub_kj)
-            self.kj55 = round((max_h_kj + min_l_kj) / 2.0, 2)
-            if self.candles:
-                self.candles[-1]["kj55"] = self.kj55
-        else:
-            self.kj55 = None
-
-        self.tk233 = None
-        self.tk144 = None
-
     def _get_state_file(self):
-        if getattr(self, "account_dir", None):
+        if self.account_dir:
             return os.path.join(self.account_dir, STATE_FILE)
         return STATE_FILE
 
     def load_state(self):
         st_file = self._get_state_file()
-        if not os.path.exists(st_file):
-            legacy_file = st_file.replace("hyper_gold_m5_state.json", "hyper_gold_m1_state.json")
-            if os.path.exists(legacy_file):
-                st_file = legacy_file
-            else:
-                return
-        d = None
-        for _ in range(5):
+        if os.path.exists(st_file):
             try:
-                with open(st_file, "r", encoding="utf-8", errors="ignore") as f:
-                    text = f.read()
-                if not text.strip():
-                    return
-                try:
-                    d = json.loads(text)
-                except Exception:
-                    # Decodifica il primo blocco JSON valido se ci sono dati residui
-                    d, _ = json.JSONDecoder().raw_decode(text)
-                if d and isinstance(d, dict):
-                    break
-            except Exception:
-                time.sleep(0.05)
-
-        if not d or not isinstance(d, dict):
-            return
-
-        with self.lock:
-            self.balance = float(d.get("balance", 10000.0))
-            self.trading_enabled = bool(d.get("trading_enabled", False))
-            # Salvaguardia weekend: se il server riparte nel weekend (da venerdì 23:05 a domenica 21:58), forza DA AVVIARE
-            _now = now_it()
-            _wd = _now.weekday()
-            _t = _now.time()
-            if (_wd == 4 and _t >= datetime.time(23, 5)) or (_wd == 5) or (_wd == 6 and _t < datetime.time(21, 58)):
-                if self.trading_enabled:
-                    self.trading_enabled = False
-                    logger.info("🛑 [WEEKEND SAFEGUARD] Spot Gold: weekend in corso, trading forzato a DA AVVIARE.")
-            self.use_core_trailing = False
-            self.position = d.get("position")
-            if self.position and not self.use_core_trailing:
-                self.position["ts_active"] = False
-                self.position["ts_price"] = None
-            self.increments = d.get("increments", [])
-            self.inc_tp_pips = float(d.get("inc_tp_pips", INC_TP_PIPS))
-            self.trades = d.get("trades", [])
-            self.last_ts_cycle = d.get("last_ts_cycle")
-            self.last_regime = d.get("last_regime", None)
-            self.regime_traded = bool(d.get("regime_traded", True))
-            raw_c = d.get("candles", [])
-            self.candles = aggregate_candles_to_5m(raw_c) if raw_c else []
-            if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 300):
-                self.candles = []
-            self.signal_candle_active = bool(d.get("signal_candle_active", False))
-            self.signal_stop_price = d.get("signal_stop_price")
-            self.signal_ref_price = d.get("signal_ref_price")
-            if not self.position:
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_ref_price = None
-            self._recalculate_indicators()
-
-    def _reconcile_open_positions_with_ig(self):
-        """Verifica all'avvio che le posizioni/incrementi registrati esistano ancora realmente su IG.
-        Se un deal è già stato chiuso (es. per TP o chiusura manuale a server spento), lo ripulisce dallo stato."""
-        try:
-            time.sleep(3.0) # Attendi connessione sessione
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            changed = False
-            with self.lock:
-                if self.position and self.position.get("deal_id"):
-                    deal_c = self.position["deal_id"]
-                    if not order_mgr.is_deal_open(deal_c):
-                        logger.info(f"ℹ️ [RECONCILE GOLD] Posizione Core {deal_c} non più presente su IG. Stato locale allineato a FLAT.")
-                        self.position = None
-                        self.signal_candle_active = False
-                        self.signal_stop_price = None
-                        self.signal_ref_price = None
-                        changed = True
-
-                valid_incs = []
-                for inc in self.increments:
-                    deal_i = inc.get("deal_id")
-                    if deal_i and not order_mgr.is_deal_open(deal_i):
-                        logger.info(f"ℹ️ [RECONCILE GOLD] Incremento {deal_i} non più presente su IG. Rimosso dallo stato locale.")
-                        changed = True
-                    else:
-                        valid_incs.append(inc)
-                self.increments = valid_incs
-
-                if changed:
-                    self.save_state()
-        except Exception as e:
-            logger.warning(f"Errore riconciliazione posizioni Gold con IG all'avvio: {e}")
+                with open(st_file, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    self.balance = float(d.get("balance", self.initial_balance))
+                    self.trading_enabled = bool(d.get("trading_enabled", False))
+                    self.position = d.get("position")
+                    self.trades = d.get("trades", [])
+                    if "candles" in d and isinstance(d["candles"], list):
+                        self.candles = d["candles"][-500:]
+                    if "traffic_light" in d:
+                        self.traffic_light.update(d["traffic_light"])
+            except Exception as e:
+                logger.warning(f"Errore caricamento stato {st_file}: {e}")
 
     def save_state(self):
         st_file = self._get_state_file()
@@ -538,20 +241,12 @@ class HyperGoldM5Engine:
             d = {
                 "balance": self.balance,
                 "trading_enabled": self.trading_enabled,
-                "use_core_trailing": True,
                 "position": self.position,
-                "increments": self.increments,
-                "inc_tp_pips": self.inc_tp_pips,
-                "signal_candle_active": getattr(self, "signal_candle_active", False),
-                "signal_stop_price": getattr(self, "signal_stop_price", None),
-                "signal_ref_price": getattr(self, "signal_ref_price", None),
+                "increments": [],
+                "traffic_light": self.traffic_light,
                 "trades": self.trades[-100:],
-                "last_ts_cycle": self.last_ts_cycle,
-                "last_regime": getattr(self, "last_regime", None),
-                "regime_traded": getattr(self, "regime_traded", True),
                 "candles": self.candles[-500:]
             }
-            # Scrittura diretta con truncate e retry per compatibilità Windows
             for _ in range(5):
                 try:
                     with open(st_file, "w", encoding="utf-8") as f:
@@ -561,1156 +256,546 @@ class HyperGoldM5Engine:
                 except Exception:
                     time.sleep(0.05)
 
+    def _load_initial_m5_candles(self):
+        """Carica storico M5 locale."""
+        candidates = [
+            f"candele_Spot_Gold_MINUTE_5.json",
+            os.path.join(self.account_dir or "", "candele_Spot_Gold_MINUTE_5.json"),
+            os.path.join("Logs_e_Cache", "candele_Spot_Gold_MINUTE_5.json")
+        ]
+        for p in candidates:
+            if p and os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, list) and len(data) >= 20:
+                            conv = []
+                            for c in data:
+                                o = c.get("openPrice", {}).get("bid") or c.get("open")
+                                h = c.get("highPrice", {}).get("bid") or c.get("high")
+                                l = c.get("lowPrice", {}).get("bid") or c.get("low")
+                                cl = c.get("closePrice", {}).get("bid") or c.get("close")
+                                t_s = c.get("snapshotTime", "")[11:19]
+                                if all(x is not None for x in (o, h, l, cl)):
+                                    conv.append({"time": t_s, "open": float(o), "high": float(h), "low": float(l), "close": float(cl)})
+                            if conv:
+                                self.candles = conv[-500:]
+                                logger.info(f"Caricate {len(self.candles)} candele M5 iniziali per Spot Gold.")
+                                self._evaluate_traffic_lights(now_it().strftime("%H:%M:%S"))
+                                return
+                except Exception:
+                    pass
+
+    def set_trading(self, enabled: bool):
+        with self.lock:
+            self.trading_enabled = enabled
+            logger.info(f"🚦 [COMANDO UTENTE] Trading Hyper M5 impostato a: {'🟢 AVVIATO' if enabled else '🔴 STOP'}")
+            if not enabled and self.position:
+                exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                t_str = now_it().strftime("%H:%M:%S")
+                self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura a FLAT")
+            self.save_state()
+
     def reset_portfolio(self):
         with self.lock:
             self.balance = self.initial_balance
             self.position = None
-            self.increments = []
             self.trades = []
             self.save_state()
 
     def clear_session_trades(self):
         with self.lock:
             self.trades = []
-            self.last_ts_cycle = None
             self.save_state()
 
-    def set_use_core_trailing(self, enabled: bool):
-        with self.lock:
-            self.use_core_trailing = enabled
-            self.save_state()
+    # ==============================================================================
+    # MOTORE DI VALUTAZIONE: LE 4 LUCETTE (SEMAFORO APEX)
+    # ==============================================================================
 
-    def set_trading(self, enabled: bool):
-        with self.lock:
-            self.trading_enabled = enabled
-            if not enabled:
-                # Quando l'utente preme STOP TRADING, chiude immediatamente tutte le posizioni aperte a FLAT
-                if self.position or self.increments:
-                    exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                    t_str = now_it().strftime("%H:%M:%S")
-                    self._close_all_to_flat(exec_px, t_str, reason="🛑 STOP TRADING Manuale Utente ➔ Chiusura immediata di tutte le posizioni a FLAT")
-            self.save_state()
+    def _evaluate_traffic_lights(self, time_str: str):
+        """Valuta in tempo reale le 4 Lucette di Confluenza su M5."""
+        if len(self.candles) < 20:
+            return
 
-    def manual_entry_core(self, direction: str) -> dict:
-        """Avvio manuale discrezionale della posizione Core 5M (6 contratti)."""
-        norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
-        with self.lock:
-            if not self.trading_enabled:
-                return {"success": False, "error": "Motore non avviato (trading disabilitato)"}
-            if self.position is not None or len(self.increments) > 0:
-                return {"success": False, "error": "Posizione già aperta (strumento non FLAT)"}
-            if getattr(self, "entry_in_progress", False):
-                return {"success": False, "error": "Operazione di ingresso già in corso"}
+        recent_candles = self.candles[-35:]
+        closes = [c["close"] for c in recent_candles]
+        curr_c = recent_candles[-1]
 
-            self.entry_in_progress = True
-            self.regime_traded = True
-            self.signal_candle_active = False
-            self.signal_stop_price = None
-            self.signal_ref_price = None
-            self.save_state()
+        # 1. Calcolo Indicatori di Supporto
+        atr = calculate_atr(recent_candles, period=14)
+        ema8 = calculate_ema(closes, period=8)
+        ema21 = calculate_ema(closes, period=21)
+        prev_ema8 = calculate_ema(closes[:-1], period=8)
 
-        exec_price = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-        time_str = now_it().strftime("%H:%M:%S")
+        # 2. Calcolo Swings Strutturali (Williams Fractals)
+        high_pivots, low_pivots = find_swings(recent_candles, left=2, right=1)
+        last_ph = high_pivots[-1]["price"] if high_pivots else None
+        prev_ph = high_pivots[-2]["price"] if len(high_pivots) >= 2 else None
+        last_pl = low_pivots[-1]["price"] if low_pivots else None
+        prev_pl = low_pivots[-2]["price"] if len(low_pivots) >= 2 else None
+
+        # -------------------------------------------------------------
+        # LUCETTA 1: STRUTTURA DI MERCATO (HH/HL vs LH/LL)
+        # -------------------------------------------------------------
+        l1_long = False
+        l1_short = False
+        l1_desc = "Struttura laterale / Neutra"
+
+        if last_ph and prev_ph and last_pl and prev_pl:
+            if last_ph > prev_ph and last_pl > prev_pl:
+                l1_long = True
+                l1_desc = f"Rialzista: HH {last_ph:.1f} > {prev_ph:.1f} | HL {last_pl:.1f} > {prev_pl:.1f}"
+            elif last_ph < prev_ph and last_pl < prev_pl:
+                l1_short = True
+                l1_desc = f"Ribassista: LH {last_ph:.1f} < {prev_ph:.1f} | LL {last_pl:.1f} < {prev_pl:.1f}"
+            elif last_ph > prev_ph:
+                l1_long = True
+                l1_desc = f"Setup HH {last_ph:.1f} > {prev_ph:.1f} (Pressione Bull)"
+            elif last_pl < prev_pl:
+                l1_short = True
+                l1_desc = f"Setup LL {last_pl:.1f} < {prev_pl:.1f} (Pressione Bear)"
+
+        # -------------------------------------------------------------
+        # LUCETTA 2: TRIGGER / BREAKOUT CON BODY DOMINANCE
+        # -------------------------------------------------------------
+        l2_long = False
+        l2_short = False
+        l2_desc = "In attesa di rottura o candela d'impulso"
+
+        live_px = self.live_mid or curr_c["close"]
+        body = abs(curr_c["close"] - curr_c["open"])
+        c_range = max(curr_c["high"] - curr_c["low"], 0.01)
+        body_ratio = body / c_range
+
+        # LONG: Rottura del Pivot High oppure rimbalzo deciso con candela verde (Body > 50%)
+        if last_ph and (live_px > last_ph or (curr_c["close"] > curr_c["open"] and body_ratio >= 0.50 and l1_long)):
+            l2_long = True
+            l2_desc = f"Breakout/Impulso Long: {live_px:.1f} sopra Pivot {last_ph:.1f} (Body {int(body_ratio*100)}%)"
+
+        # SHORT: Rottura del Pivot Low oppure respinta con candela rossa (Body > 50%)
+        if last_pl and (live_px < last_pl or (curr_c["close"] < curr_c["open"] and body_ratio >= 0.50 and l1_short)):
+            l2_short = True
+            l2_desc = f"Breakdown/Impulso Short: {live_px:.1f} sotto Pivot {last_pl:.1f} (Body {int(body_ratio*100)}%)"
+
+        # -------------------------------------------------------------
+        # LUCETTA 3: VOLATILITY GATE (ANTI-TRITACARNE)
+        # -------------------------------------------------------------
+        # La candela corrente (o le ultime 2) deve mostrare range >= 50% dell'ATR
+        l3_ok = False
+        recent_max_range = max(c["high"] - c["low"] for c in recent_candles[-2:])
+        min_required_range = max(atr * 0.50, 4.0)
+
+        if recent_max_range >= min_required_range:
+            l3_ok = True
+            l3_desc = f"Volatilità Attiva: Range {recent_max_range:.1f}p >= soglia {min_required_range:.1f}p (ATR: {atr:.1f}p)"
+        else:
+            l3_desc = f"Fase Compressa/Morta: Range {recent_max_range:.1f}p < soglia {min_required_range:.1f}p (Stand-by)"
+
+        # -------------------------------------------------------------
+        # LUCETTA 4: MOMENTUM & FLOW (EMA 8 / EMA 21)
+        # -------------------------------------------------------------
+        l4_long = False
+        l4_short = False
+        l4_desc = "Medie piatte o incrociate"
+
+        if ema8 is not None and ema21 is not None and prev_ema8 is not None:
+            if ema8 > ema21:
+                l4_long = True
+                l4_desc = f"Flusso Rialzista: EMA8 ({ema8:.1f}) > EMA21 ({ema21:.1f})"
+            elif ema8 < ema21:
+                l4_short = True
+                l4_desc = f"Flusso Ribassista: EMA8 ({ema8:.1f}) < EMA21 ({ema21:.1f})"
+
+        # SINTESI DELLE CONFLUENZE
+        all_green_long = l1_long and l2_long and l3_ok and l4_long
+        all_green_short = l1_short and l2_short and l3_ok and l4_short
+
+        detected_dir = "LONG" if all_green_long else ("SHORT" if all_green_short else "NEUTRAL")
+        all_green = all_green_long or all_green_short
+
+        self.traffic_light = {
+            "l1_structure": {"status": l1_long or l1_short, "dir": "LONG" if l1_long else ("SHORT" if l1_short else "NEUTRAL"), "desc": l1_desc},
+            "l2_trigger": {"status": l2_long or l2_short, "dir": "LONG" if l2_long else ("SHORT" if l2_short else "NEUTRAL"), "desc": l2_desc},
+            "l3_volatility": {"status": l3_ok, "desc": l3_desc},
+            "l4_momentum": {"status": l4_long or l4_short, "dir": "LONG" if l4_long else ("SHORT" if l4_short else "NEUTRAL"), "desc": l4_desc},
+            "direction": detected_dir,
+            "all_green": all_green,
+            "last_pivot_high": last_ph,
+            "last_pivot_low": last_pl,
+            "atr": round(atr, 1),
+            "ema8": round(ema8, 2) if ema8 else None,
+            "ema21": round(ema21, 2) if ema21 else None
+        }
+
+        # SE IL TRADING E' ABILITATO E SIAMO FLAT, CONTROLLA INGRESSO AUTOMATICO
+        if self.trading_enabled and self.position is None and not self.entry_in_progress:
+            if not is_gold_entry_suspended():
+                if all_green_long:
+                    self._trigger_entry("LONG", live_px, time_str, last_pl, last_ph)
+                elif all_green_short:
+                    self._trigger_entry("SHORT", live_px, time_str, last_ph, last_pl)
+
+    def _trigger_entry(self, direction: str, live_px: float, time_str: str, pivot_sl: float, pivot_opp: float):
+        """Innesca l'ingresso a mercato quando tutte le 4 luci sono verdi."""
+        self.entry_in_progress = True
+        logger.info(f"[{time_str}] 🚀 [SEMAFORO VERDE 4/4] Innesco ingresso {direction} a {live_px:.2f}!")
+
+        # Calcolo Stop Loss Strutturale Adattivo
+        if direction == "LONG":
+            sl_raw = (pivot_sl - SL_BUFFER_PIPS) if pivot_sl else (live_px - 20.0)
+            sl_dist = live_px - sl_raw
+            sl_dist = max(SL_MIN_PIPS, min(sl_dist, SL_MAX_PIPS))
+            final_sl = round(live_px - sl_dist, 2)
+            final_tp1 = round(live_px + TP1_DEFAULT_PIPS, 2)
+        else:
+            sl_raw = (pivot_sl + SL_BUFFER_PIPS) if pivot_sl else (live_px + 20.0)
+            sl_dist = sl_raw - live_px
+            sl_dist = max(SL_MIN_PIPS, min(sl_dist, SL_MAX_PIPS))
+            final_sl = round(live_px + sl_dist, 2)
+            final_tp1 = round(live_px - TP1_DEFAULT_PIPS, 2)
 
         threading.Thread(
-            target=self._execute_entry_core,
-            args=(norm_dir, exec_price, time_str),
+            target=self._execute_apex_entry,
+            args=(direction, live_px, final_sl, final_tp1, time_str),
             daemon=True
         ).start()
-        return {"success": True, "message": f"Avvio Core {norm_dir} inviato a mercato"}
 
-    def _run_rollover_watchdog(self):
-        """Watchdog temporale indipendente: garantisce la chiusura automatica a FLAT
-        nella finestra utile (22:44:00 - 22:44:55) prima del freeze del feed e del weekend,
-        anche in assenza di tick live da Lightstreamer, e disattiva il trading al venerdì sera (23:05)."""
-        last_friday_disarmed_date = None
-        while self.running:
-            try:
-                time.sleep(2)
-                now = now_it()
-                wd = now.weekday()
-                t = now.time()
-                today_str = now.strftime("%Y-%m-%d")
+    def _execute_apex_entry(self, direction: str, exec_price: float, sl_price: float, tp1_price: float, time_str: str):
+        """Apre a mercato la posizione divisa in 3c Bancomat + 3c Runner."""
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+        try:
+            logger.info(f"[{time_str}] 📤 Invio a IG: {direction} {CORE_CONTRACTS} contratti (3c Bancomat TP {tp1_price:.2f} + 3c Runner SL {sl_price:.2f})")
 
-                # 1. Chiusura proattiva a FLAT a 22:44 (rollover e pre-weekend)
-                if is_gold_rollover_window(now):
-                    with self.lock:
-                        has_pos = (self.position is not None or len(self.increments) > 0)
-                        mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                    if has_pos and not getattr(self, "closing_in_progress", False):
-                        t_str = now.strftime("%H:%M:%S")
-                        self._close_all_to_flat(mid_px, t_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
+            # 1. Apertura Bancomat (3 contratti con TP1 nativo su IG)
+            res_banc = order_mgr.open_market_deal(
+                direction=direction,
+                size=BANCOMAT_CONTRACTS,
+                limit_level=tp1_price,
+                stop_level=sl_price,
+                label=f"Apex Bancomat Spot Gold ({direction})",
+                epic=EPIC_GOLD
+            )
 
-                # 2. Venerdì sera alle 23:05: Disattivazione automatica per il weekend (stato 'DA AVVIARE')
-                if wd == 4 and t >= datetime.time(23, 5):
-                    if last_friday_disarmed_date != today_str:
-                        last_friday_disarmed_date = today_str
-                        if self.trading_enabled:
-                            with self.lock:
-                                self.trading_enabled = False
-                                self.save_state()
-                            logger.info(f"🛑 [WEEKEND SHUTDOWN] Venerdì ore {t.strftime('%H:%M:%S')}: Trading Spot Gold disattivato automaticamente per il weekend. Stato impostato su DA AVVIARE.")
-                            try:
-                                order_mgr.send_notification(
-                                    "🛑 SPOT GOLD 5M: WEEKEND SHUTDOWN",
-                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore Spot Gold 5M disattivato e reimpostato su DA AVVIARE.",
-                                    "pause_button"
-                                )
-                            except Exception:
-                                pass
-            except Exception as e:
-                logger.error(f"Errore watchdog rollover Gold: {e}")
+            # 2. Apertura Runner (3 contratti con Stop Loss protettivo su IG)
+            res_run = order_mgr.open_market_deal(
+                direction=direction,
+                size=RUNNER_CONTRACTS,
+                limit_level=None,
+                stop_level=sl_price,
+                label=f"Apex Runner Spot Gold ({direction})",
+                epic=EPIC_GOLD
+            )
 
-    def _run_streaming_loop(self):
-        while self.running:
-            try:
-                # Durante la pausa tecnica effettiva del feed Gold (23:00 - 00:00) NON effettuiamo chiamate API né login.
-                # Dalle 00:00 in poi lo streaming è attivo per aggiornare le candele e ricalcolare KJ55!
-                if is_gold_feed_suspended():
-                    with self.lock:
-                        self.ls_connected = False
-                    time.sleep(20)
-                    continue
+            deal_id_banc = res_banc.get("deal_id") if res_banc.get("success") else None
+            deal_id_run = res_run.get("deal_id") if res_run.get("success") else None
+            real_open_px = res_banc.get("level") or res_run.get("level") or exec_price
 
-                user, pwd, api_key = self._get_ig_credentials()
-                if not user or not pwd or not api_key:
-                    time.sleep(5)
-                    continue
-
-                url_session = "https://demo-api.ig.com/gateway/deal/session"
-                h_session = {
-                    "X-IG-API-KEY": api_key,
-                    "Version": "2",
-                    "Accept": "application/json; charset=UTF-8",
-                    "Content-Type": "application/json; charset=UTF-8"
+            with self.lock:
+                self.position = {
+                    "direction": direction,
+                    "open_price": real_open_px,
+                    "contracts": CORE_CONTRACTS,
+                    "deal_id_bancomat": deal_id_banc,
+                    "deal_id_runner": deal_id_run,
+                    "tp1_price": tp1_price,
+                    "sl_price": sl_price,
+                    "runner_sl": sl_price,
+                    "tp1_hit": False,
+                    "open_time": time_str
                 }
-                payload = {"identifier": user, "password": pwd}
-                r = requests.post(url_session, headers=h_session, json=payload, timeout=10)
-                if r.status_code != 200:
-                    time.sleep(10)
-                    continue
+                self.entry_in_progress = False
+                self.save_state()
 
-                cst = r.headers.get("CST")
-                xst = r.headers.get("X-SECURITY-TOKEN")
-                d_resp = r.json()
-                endpoint = d_resp.get("lightstreamerEndpoint")
-                account_id = d_resp.get("currentAccountId")
+            order_mgr.send_notification(
+                f"🚀 APEX M5 INGRESSO: {direction}",
+                f"Aperto {direction} {CORE_CONTRACTS}c a {real_open_px:.2f} | SL: {sl_price:.2f} | TP1: {tp1_price:.2f}",
+                "rocket"
+            )
+            logger.info(f"[{time_str}] ✅ Posizione {direction} registrata: Deal Banc={deal_id_banc}, Deal Run={deal_id_run}")
 
-                from lightstreamer_client import LightstreamerClient, LightstreamerSubscription
-                ls_client = LightstreamerClient(account_id, f"CST-{cst}|XST-{xst}", endpoint)
-                ls_client.connect()
-                with self.lock:
-                    self.ls_connected = True
+        except Exception as e:
+            logger.error(f"Errore durante esecuzione ingresso Apex M5: {e}")
+            with self.lock:
+                self.entry_in_progress = False
+                self.save_state()
 
-                def on_tick(item_update):
-                    vals = item_update.get("values", {})
-                    bid_s = vals.get("BID")
-                    ask_s = vals.get("OFR") or vals.get("OFFER")
-                    # Orario locale italiano (Roma UTC+2/UTC+1) per storico ed eseguiti
-                    t_str = now_it().strftime("%H:%M:%S")
-                    if bid_s and ask_s:
-                        try:
-                            b = float(bid_s)
-                            a = float(ask_s)
-                            self._process_tick(b, a, t_str)
-                        except Exception as e:
-                            logger.error(f"Errore _process_tick Gold M5: {e}")
+    # ==============================================================================
+    # GESTIONE POSIZIONE APERTA (BANCOMAT, BREAKEVEN, RUNNER TRAILING)
+    # ==============================================================================
 
-                sub = LightstreamerSubscription(
-                    mode="DISTINCT",
-                    items=[f"CHART:{EPIC_GOLD}:TICK"],
-                    fields=["BID", "OFR", "UTM"]
-                )
-                sub.addlistener(on_tick)
-                ls_client.subscribe(sub)
-
-                while self.running and self.ls_connected:
-                    time.sleep(2)
-                    # Controllo proattivo chiusura Rollover solo nella finestra utile (22:44:00 - 22:44:55)
-                    if is_gold_rollover_window():
-                        with self.lock:
-                            has_pos = (self.position is not None or len(self.increments) > 0)
-                            mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                        if has_pos and not getattr(self, "closing_in_progress", False):
-                            t_str = now_it().strftime("%H:%M:%S")
-                            self._close_all_to_flat(mid_px, t_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
-                    if self.last_tick_time and (time.time() - self.last_tick_time) > 40:
-                        break
-
-            except Exception:
-                pass
-            finally:
-                with self.lock:
-                    self.ls_connected = False
-                time.sleep(5)
-
-    def _check_core_trailing_stop(self, current_price: float, time_str: str):
-        """Gestisce il Trailing Stop sulla posizione Core M5:
-        1. A +10 pip attiva il TS e piazza il lock a +6 pip garantiti (+30.00 €).
-        2. Segue il prezzo a scatti di 2 in 2 pip:
-           - A +12 pip: TS scatta a +8 pip garantiti (+40.00 €)
-           - A +14 pip: TS scatta a +10 pip garantiti (+50.00 €)
-           - A +16 pip: TS scatta a +12 pip garantiti (+60.00 €)
-        3. Quando il prezzo tocca il TS: chiude Core + tutti gli incrementi a FLAT,
-           imposta automaticamente trading_enabled = False (STOP TRADING) e salva il ciclo."""
-        if not self.position:
+    def _manage_open_position(self, current_price: float, time_str: str):
+        """Gestisce in continuo su ogni tick la posizione aperta."""
+        if not self.position or self.closing_in_progress:
             return
+
+        direction = self.position["direction"]
+        open_px = self.position["open_price"]
+        sl_px = self.position["sl_price"]
+        tp1_px = self.position["tp1_price"]
+        tp1_hit = self.position.get("tp1_hit", False)
+        runner_sl = self.position.get("runner_sl", sl_px)
+        deal_run = self.position.get("deal_id_runner")
+        deal_banc = self.position.get("deal_id_bancomat")
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+
+        # -------------------------------------------------------------
+        # 1. VERIFICA STOP LOSS STRUTTURALE GLOBALE (Se non ancora preso TP1)
+        # -------------------------------------------------------------
+        if not tp1_hit:
+            hit_sl = (current_price <= sl_px) if direction == "LONG" else (current_price >= sl_px)
+            if hit_sl:
+                logger.info(f"[{time_str}] 🛑 [STOP LOSS COLPITO] Prezzo {current_price:.2f} ha toccato SL {sl_px:.2f}!")
+                self._close_all_to_flat(current_price, time_str, reason=f"Stop Loss Strutturale ({sl_px:.2f})")
+                return
+
+        # -------------------------------------------------------------
+        # 2. VERIFICA HIT TP1 BANCOMAT (+ Spostamento a BREAKEVEN)
+        # -------------------------------------------------------------
+        if not tp1_hit:
+            hit_tp1 = (current_price >= tp1_px) if direction == "LONG" else (current_price <= tp1_px)
+            if hit_tp1:
+                logger.info(f"[{time_str}] 🎯 [TP1 BANCOMAT RAGGIUNTO] Prezzo {current_price:.2f} >= TP1 {tp1_px:.2f}!")
+                self.position["tp1_hit"] = True
+
+                # Sposta lo Stop Loss del Runner a BREAKEVEN (+1 pip protetto)
+                be_sl = round(open_px + BE_EXTRA_LOCK_PIPS if direction == "LONG" else open_px - BE_EXTRA_LOCK_PIPS, 2)
+                self.position["runner_sl"] = be_sl
+                self.position["contracts"] = RUNNER_CONTRACTS
+                self.save_state()
+
+                # Chiude Bancomat se ancora aperto su IG
+                if deal_banc:
+                    threading.Thread(
+                        target=order_mgr.close_market_deal,
+                        args=(deal_banc, direction, BANCOMAT_CONTRACTS, "TP1 Bancomat Incassato", "Hit TP1"),
+                        daemon=True
+                    ).start()
+
+                # Aggiorna lo stop del runner su IG a Breakeven
+                if deal_run:
+                    threading.Thread(
+                        target=order_mgr.set_stop_loss_order,
+                        args=(deal_run, be_sl, "Runner a Breakeven"),
+                        daemon=True
+                    ).start()
+
+                order_mgr.send_notification(
+                    "🎯 TP1 BANCOMAT INCASSATO!",
+                    f"Incassati +{TP1_DEFAULT_PIPS:.0f} pip! Runner spostato a BREAKEVEN ({be_sl:.2f}). Rischio ZERO!",
+                    "moneybag"
+                )
+                return
+
+        # -------------------------------------------------------------
+        # 3. TRAILING STOP STRUTTURALE SUL RUNNER (Dopo TP1)
+        # -------------------------------------------------------------
+        if tp1_hit:
+            # Verifica stop loss del runner
+            hit_runner_sl = (current_price <= runner_sl) if direction == "LONG" else (current_price >= runner_sl)
+            if hit_runner_sl:
+                logger.info(f"[{time_str}] 🏁 [RUNNER TRAILING HIT] Prezzo {current_price:.2f} ha toccato Trailing SL {runner_sl:.2f}!")
+                self._close_all_to_flat(current_price, time_str, reason=f"Trailing Stop Runner ({runner_sl:.2f})")
+                return
+
+            # Alza il Trailing SL del Runner se si forma un nuovo pivot a favore
+            last_pl = self.traffic_light.get("last_pivot_low")
+            last_ph = self.traffic_light.get("last_pivot_high")
+
+            if direction == "LONG" and last_pl:
+                new_sl = round(last_pl - SL_BUFFER_PIPS, 2)
+                if new_sl > runner_sl:
+                    logger.info(f"[{time_str}] 📈 [TRAILING RUNNER ALZATO] Nuovo Higher Low {last_pl:.2f}. Trailing SL alzato da {runner_sl:.2f} a {new_sl:.2f}")
+                    self.position["runner_sl"] = new_sl
+                    self.save_state()
+                    if deal_run:
+                        threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing HL"), daemon=True).start()
+
+            elif direction == "SHORT" and last_ph:
+                new_sl = round(last_ph + SL_BUFFER_PIPS, 2)
+                if new_sl < runner_sl:
+                    logger.info(f"[{time_str}] 📉 [TRAILING RUNNER ABBASSATO] Nuovo Lower High {last_ph:.2f}. Trailing SL abbassato da {runner_sl:.2f} a {new_sl:.2f}")
+                    self.position["runner_sl"] = new_sl
+                    self.save_state()
+                    if deal_run:
+                        threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing LH"), daemon=True).start()
+
+    def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
+        """Chiude tutte le posizioni a mercato e torna a FLAT."""
+        with self.lock:
+            if not self.position or self.closing_in_progress:
+                return
+            self.closing_in_progress = True
 
         pos = self.position
         direction = pos["direction"]
         open_px = pos["open_price"]
+        contracts = pos.get("contracts", CORE_CONTRACTS)
+        deal_run = pos.get("deal_id_runner")
+        deal_banc = pos.get("deal_id_bancomat")
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
 
-        # Calcolo pips attuali
-        if direction == "LONG":
-            profit_pips = round(current_price - open_px, 2)
-        else:
-            profit_pips = round(open_px - current_price, 2)
+        pnl_pts = (exec_price - open_px) if direction == "LONG" else (open_px - exec_price)
+        total_pnl = round(pnl_pts * self.point_value * contracts, 2)
 
-        # 1. Attivazione Trailing Stop al raggiungimento di +10 pip
-        if not pos.get("ts_active", False):
-            if profit_pips >= CORE_TS_TRIGGER_PIPS:
-                pos["ts_active"] = True
-                pos["peak_price"] = current_price
-                steps = int((profit_pips - CORE_TS_TRIGGER_PIPS) // CORE_TS_STEP_PIPS)
-                locked_pips = CORE_TS_LOCK_PIPS + (steps * CORE_TS_STEP_PIPS)
-                if direction == "LONG":
-                    pos["ts_price"] = round(open_px + locked_pips, 2)
-                else:
-                    pos["ts_price"] = round(open_px - locked_pips, 2)
+        logger.info(f"[{time_str}] 🛑 CHIUSURA A FLAT: {direction} {contracts}c a {exec_price:.2f} | PnL: {total_pnl:+.2f} € | Motivo: {reason}")
 
-                self.trades.insert(0, {
-                    "time": time_str,
-                    "action": f"🚀 TRAILING ATTIVATO {direction}",
-                    "open_price": open_px,
-                    "close_price": current_price,
-                    "contracts": pos["contracts"],
-                    "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
-                    "balance": round(self.balance, 2),
-                    "reason": f"Raggiunti +{profit_pips:.1f} pip @ {current_price:.2f} ➔ Lock +{locked_pips:.1f} pip @ {pos['ts_price']:.2f} (Step 2 pip)"
-                })
-                self.save_state()
-
-        # 2. Aggiornamento dinamico del Trailing (scatti di 2 in 2) e verifica tocco
-        if pos.get("ts_active", False):
-            peak_px = pos.get("peak_price", current_price)
-
-            if direction == "LONG":
-                # Nuovo picco massimo
-                if current_price > peak_px:
-                    pos["peak_price"] = current_price
-                    steps = int((profit_pips - CORE_TS_TRIGGER_PIPS) // CORE_TS_STEP_PIPS)
-                    locked_pips = CORE_TS_LOCK_PIPS + (steps * CORE_TS_STEP_PIPS)
-                    new_ts = round(open_px + locked_pips, 2)
-                    if new_ts > pos["ts_price"]:
-                        pos["ts_price"] = new_ts
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"📈 TS STEP UP (+{locked_pips:.1f} pip)",
-                            "open_price": open_px,
-                            "close_price": current_price,
-                            "contracts": pos["contracts"],
-                            "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
-                            "balance": round(self.balance, 2),
-                            "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS sale a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
-                        })
-                        self.save_state()
-
-                # Verifica tocco Trailing Stop (eseguito solo se distanza da KJ <= RUNNER_THRESHOLD_KJ_DIST)
-                if current_price <= pos["ts_price"]:
-                    dist_kj = abs(current_price - self.kj55) if self.kj55 is not None else 0.0
-                    if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
-                        self._close_cycle_trailing_hit(current_price, time_str)
-                    else:
-                        if not pos.get("ts_suspended_logged"):
-                            logger.info(f"[{time_str}] ⏸️ [TS CORE SOSPESO] Prezzo {current_price:.2f} <= TS {pos['ts_price']:.2f}, ma distanza da KJ è {dist_kj:.1f}p > {RUNNER_THRESHOLD_KJ_DIST:.0f}p. TS sospeso in regime di estensione.")
-                            pos["ts_suspended_logged"] = True
-                else:
-                    pos.pop("ts_suspended_logged", None)
-
-            else: # SHORT
-                # Nuovo picco minimo
-                if current_price < peak_px:
-                    pos["peak_price"] = current_price
-                    steps = int((profit_pips - CORE_TS_TRIGGER_PIPS) // CORE_TS_STEP_PIPS)
-                    locked_pips = CORE_TS_LOCK_PIPS + (steps * CORE_TS_STEP_PIPS)
-                    new_ts = round(open_px - locked_pips, 2)
-                    if new_ts < pos["ts_price"]:
-                        pos["ts_price"] = new_ts
-                        self.trades.insert(0, {
-                            "time": time_str,
-                            "action": f"📉 TS STEP DOWN (+{locked_pips:.1f} pip)",
-                            "open_price": open_px,
-                            "close_price": current_price,
-                            "contracts": pos["contracts"],
-                            "pnl": round(profit_pips * pos["contracts"] * self.point_value, 2),
-                            "balance": round(self.balance, 2),
-                            "reason": f"Nuovo picco {current_price:.2f} (+{profit_pips:.1f} pip) ➔ TS scende a {new_ts:.2f} (+{locked_pips:.1f} pip garantiti)"
-                        })
-                        self.save_state()
-
-                # Verifica tocco Trailing Stop (eseguito solo se distanza da KJ <= RUNNER_THRESHOLD_KJ_DIST)
-                if current_price >= pos["ts_price"]:
-                    dist_kj = abs(current_price - self.kj55) if self.kj55 is not None else 0.0
-                    if dist_kj <= RUNNER_THRESHOLD_KJ_DIST:
-                        self._close_cycle_trailing_hit(current_price, time_str)
-                    else:
-                        if not pos.get("ts_suspended_logged"):
-                            logger.info(f"[{time_str}] ⏸️ [TS CORE SOSPESO] Prezzo {current_price:.2f} >= TS {pos['ts_price']:.2f}, ma distanza da KJ è {dist_kj:.1f}p > {RUNNER_THRESHOLD_KJ_DIST:.0f}p. TS sospeso in regime di estensione.")
-                            pos["ts_suspended_logged"] = True
-                else:
-                    pos.pop("ts_suspended_logged", None)
-
-    def _execute_entry_core(self, direction: str, exec_price: float, time_str: str):
-        """Esegue l'apertura a mercato reale su IG della Core 5M (6 contratti)."""
-        try:
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            res = order_mgr.open_market_deal(
-                direction=direction,
-                size=CORE_CONTRACTS,
-                limit_level=None,
-                label="Core 5M"
-            )
-            if res.get("success"):
-                deal_id = res.get("deal_id")
-                real_open = float(res.get("level") or exec_price)
-                with self.lock:
-                    self.position = {
-                        "deal_id": deal_id,
-                        "deal_reference": res.get("deal_reference"),
-                        "direction": direction,
-                        "open_price": real_open,
-                        "contracts": CORE_CONTRACTS,
-                        "open_time": res.get("time") or time_str,
-                        "ts_active": False,
-                        "ts_price": None,
-                        "peak_price": real_open
-                    }
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": f"🚀 OPEN REAL IG {direction} ({CORE_CONTRACTS}c Core 5M)",
-                        "open_price": real_open,
-                        "close_price": None,
-                        "contracts": CORE_CONTRACTS,
-                        "pnl": 0.0,
-                        "balance": round(self.balance, 2),
-                        "reason": f"Ingresso IG Reale {direction} @ {real_open:.2f} € (Deal ID Core: {deal_id})"
-                    })
-                    self.save_state()
-                    order_mgr.send_notification(
-                        "🚀 OPEN CORE 5M: Spot Gold",
-                        f"[Spot Gold] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} €",
-                        "rocket"
-                    )
-        except Exception as e:
-            logger.error(f"Errore apertura Core 5M IG: {e}")
-        finally:
-            with self.lock:
-                self.entry_in_progress = False
-
-    def _execute_entry_increment(self, direction: str, exec_price: float, time_str: str, mode: str = "BANCOMAT"):
-        """Esegue l'apertura a mercato reale su IG di un incremento 5M (4 contratti):
-        - Se mode='BANCOMAT': imposta TP a +5p
-        - Se mode='RUNNER': nessun TP fisso, profitto corre con Trailing Stop Virtuale"""
-        try:
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            if mode == "BANCOMAT":
-                tp_px = round(exec_price + self.inc_tp_pips if direction == "LONG" else exec_price - self.inc_tp_pips, 2)
-                limit_lvl = tp_px
-                lbl_order = f"Inc. Bancomat Spot Gold 5M #{len(self.increments)+1}"
-            else:
-                tp_px = round(exec_price + self.runner_tp_pips if direction == "LONG" else exec_price - self.runner_tp_pips, 2)
-                limit_lvl = tp_px
-                lbl_order = f"Inc. Runner Spot Gold 5M #{len(self.increments)+1}"
-
-            res = order_mgr.open_market_deal(
-                direction=direction,
-                size=INC_CONTRACTS,
-                limit_level=limit_lvl,
-                label=lbl_order
-            )
-            if res.get("success"):
-                deal_id = res.get("deal_id")
-                real_open = float(res.get("level") or exec_price)
-                with self.lock:
-                    new_inc = {
-                        "id": int(time.time() * 1000),
-                        "deal_id": deal_id,
-                        "deal_reference": res.get("deal_reference"),
-                        "direction": direction,
-                        "open_price": real_open,
-                        "contracts": INC_CONTRACTS,
-                        "tp_price": tp_px,
-                        "mode": mode,
-                        "peak_price": real_open,
-                        "ts_active": False,
-                        "ts_price": None,
-                        "be_active": False,
-                        "be_price": None,
-                        "open_time": res.get("time") or time_str
-                    }
-                    self.increments.append(new_inc)
-                    tot_c = CORE_CONTRACTS + sum(i["contracts"] for i in self.increments)
-                    tp_desc = f"TP: {tp_px:.2f} € (+{self.runner_tp_pips if mode == 'RUNNER' else self.inc_tp_pips:.0f}p)"
-                    self.trades.insert(0, {
-                        "time": time_str,
-                        "action": f"➕ OPEN INC {mode} {direction} (+{INC_CONTRACTS}c, Tot: {tot_c}c)",
-                        "open_price": real_open,
-                        "close_price": None,
-                        "contracts": INC_CONTRACTS,
-                        "pnl": 0.0,
-                        "balance": round(self.balance, 2),
-                        "reason": f"Incremento {mode} 5M IG @ {real_open:.2f} € ({tp_desc}, Deal ID: {deal_id})"
-                    })
-                    self.save_state()
-                    order_mgr.send_notification(
-                        f"➕ INCREMENTO {mode} 5M: Spot Gold",
-                        f"[Spot Gold] Incremento {mode} #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} € ({tp_desc}, Tot: {tot_c}c)",
-                        "heavy_plus_sign"
-                    )
-        except Exception as e:
-            logger.error(f"Errore apertura incremento 5M IG: {e}")
-        finally:
-            with self.lock:
-                self.entry_in_progress = False
-
-    def _execute_close_increment(self, inc: dict, current_price: float, time_str: str, reason: str = None):
-        """Chiude a mercato reale un singolo incremento M5 (per TP Bancomat, Trailing Stop Runner, o Incasso Sicurezza)."""
-        try:
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            deal_id = inc.get("deal_id")
-            mode = inc.get("mode", "BANCOMAT")
-            if reason is None:
-                reason = f"TP Incremento (+{self.inc_tp_pips:.1f}p)"
-
-            res = order_mgr.close_market_deal(
-                deal_id=deal_id,
-                direction_open=inc["direction"],
-                size=inc["contracts"],
-                label=f"Chiusura Inc {mode} Spot Gold 5M",
-                reason_note=reason
-            )
-            profit = float(res.get("profit") or 0.0)
-            close_px = float(res.get("close_level") or current_price)
-            if profit == 0.0 and res.get("already_closed") and inc.get("tp_price"):
-                profit = round(abs(inc["open_price"] - inc["tp_price"]) * inc["contracts"] * self.point_value, 2)
-                close_px = inc["tp_price"]
-
-            with self.lock:
-                self.increments = [i for i in self.increments if i.get("deal_id") != deal_id and i.get("id") != inc.get("id")]
-                self.balance += profit
-
-                try:
-                    order_mgr.record_closed_trade(
-                        tf="5M",
-                        direction=inc["direction"],
-                        contracts=inc["contracts"],
-                        open_price=inc["open_price"],
-                        close_price=close_px,
-                        pnl_eur=profit,
-                        deal_id=deal_id,
-                        reason=reason,
-                        time_open=inc.get("open_time", time_str),
-                        label=f"Inc {mode} Spot Gold 5M",
-                        epic=EPIC_GOLD
-                    )
-                except Exception as ex_rec:
-                    logger.warning(f"Errore registrazione trade incremento: {ex_rec}")
-
-                self.trades.insert(0, {
-                    "time": time_str,
-                    "action": f"🎯 CLOSE INC {mode} {inc['direction']} ({profit:+.2f} €)",
-                    "open_price": inc["open_price"],
-                    "close_price": close_px,
-                    "contracts": inc["contracts"],
-                    "pnl": profit,
-                    "balance": round(self.balance, 2),
-                    "reason": f"Chiusura IG Deal {deal_id}: {reason} @ {close_px:.2f}"
-                })
-                self.save_state()
-                order_mgr.send_notification(
-                    f"🎯 CHIUSURA INC {mode} 5M: Spot Gold",
-                    f"[Spot Gold] Close Incr {mode} {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €] - Motivo: {reason}",
-                    "dart"
-                )
-        except Exception as e:
-            logger.error(f"Errore chiusura incremento 5M IG: {e}")
-
-    def _execute_close_all_flat(self, exec_price: float, time_str: str, reason: str):
-        """Chiude a mercato reale tutte le posizioni aperte su IG (Core + Incrementi 5M)."""
-        try:
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-            with self.lock:
-                pos_to_close = dict(self.position) if self.position else None
-                incs_to_close = [dict(i) for i in self.increments]
-                self.position = None
-                self.increments = []
-                self.save_state()
-
-            # 1. Chiudi Core se presente
-            if pos_to_close and pos_to_close.get("deal_id"):
-                try:
-                    deal_c = pos_to_close["deal_id"]
-                    res_c = order_mgr.close_market_deal(
-                        deal_id=deal_c,
-                        direction_open=pos_to_close["direction"],
-                        size=pos_to_close["contracts"],
-                        label="Chiusura Core Spot Gold 5M Flat",
-                        reason_note=reason
-                    )
-                    if not res_c.get("success") and not res_c.get("already_closed"):
-                        logger.warning(f"❌ Chiusura Core {deal_c} non riuscita su IG ({res_c.get('reason')}). Posizione mantenuta attiva.")
-                        with self.lock:
-                            self.position = pos_to_close
-                            self.save_state()
-                    else:
-                        prof_c = float(res_c.get("profit") or 0.0)
-                        cl_c = float(res_c.get("close_level") or exec_price)
-                        try:
-                            order_mgr.record_closed_trade(
-                                tf="5M",
-                                direction=pos_to_close["direction"],
-                                contracts=pos_to_close["contracts"],
-                                open_price=pos_to_close["open_price"],
-                                close_price=cl_c,
-                                pnl_eur=prof_c,
-                                deal_id=deal_c,
-                                reason=reason,
-                                time_open=pos_to_close.get("open_time", time_str),
-                                label="Core Spot Gold 5M",
-                                epic=EPIC_GOLD
-                            )
-                        except Exception as ex_rec:
-                            logger.warning(f"Errore registrazione core trade: {ex_rec}")
-                        with self.lock:
-                            self.balance += prof_c
-                            self.trades.insert(0, {
-                                "time": time_str,
-                                "action": f"CLOSE CORE 5M {pos_to_close['direction']} ({prof_c:+.2f} €)",
-                                "open_price": pos_to_close["open_price"],
-                                "close_price": cl_c,
-                                "contracts": pos_to_close["contracts"],
-                                "pnl": prof_c,
-                                "balance": round(self.balance, 2),
-                                "reason": reason
-                            })
-                            self.save_state()
-                        is_ts = "Trailing" in reason or "TS" in reason
-                        is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
-                        if is_ts:
-                            tag_cl = "dart"
-                            tit_cl = "🎯 TS HIT 5M: Spot Gold"
-                        elif is_rev:
-                            tag_cl = "warning"
-                            tit_cl = "🛑 REVERSAL 5M: Spot Gold"
-                        else:
-                            tag_cl = "octagonal_sign"
-                            tit_cl = "🛑 CHIUSURA FLAT 5M: Spot Gold"
-                        msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
-                        order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
-                except Exception as ex_c:
-                    logger.error(f"Errore chiusura Core Spot Gold: {ex_c}")
-                # Pausa prima degli incrementi
-                time.sleep(1.5)
-
-            # 2. Chiudi incrementi residui
-            for inc in incs_to_close:
-                try:
-                    deal_i = inc.get("deal_id")
-                    if deal_i:
-                        res_i = order_mgr.close_market_deal(
-                            deal_id=deal_i,
-                            direction_open=inc["direction"],
-                            size=inc["contracts"],
-                            label="Chiusura Inc Spot Gold 5M Flat",
-                            reason_note=reason
-                        )
-                        if not res_i.get("success") and not res_i.get("already_closed"):
-                            logger.warning(f"❌ Chiusura Inc {deal_i} non riuscita su IG ({res_i.get('reason')}). Incremento mantenuto attivo.")
-                            with self.lock:
-                                self.increments.append(inc)
-                                self.save_state()
-                            continue
-                        prof_i = float(res_i.get("profit") or 0.0)
-                        cl_i = float(res_i.get("close_level") or exec_price)
-                        try:
-                            order_mgr.record_closed_trade(
-                                tf="5M",
-                                direction=inc["direction"],
-                                contracts=inc["contracts"],
-                                open_price=inc["open_price"],
-                                close_price=cl_i,
-                                pnl_eur=prof_i,
-                                deal_id=deal_i,
-                                reason=reason,
-                                time_open=inc.get("open_time", time_str),
-                                label=f"Inc {inc.get('mode', 'BANCOMAT')} Spot Gold 5M",
-                                epic=EPIC_GOLD
-                            )
-                        except Exception as ex_rec:
-                            logger.warning(f"Errore registrazione trade incremento: {ex_rec}")
-                        with self.lock:
-                            self.balance += prof_i
-                            self.trades.insert(0, {
-                                "time": time_str,
-                                "action": f"CLOSE INC 5M {inc['direction']} ({prof_i:+.2f} €)",
-                                "open_price": inc["open_price"],
-                                "close_price": cl_i,
-                                "contracts": inc["contracts"],
-                                "pnl": prof_i,
-                                "balance": round(self.balance, 2),
-                                "reason": reason
-                            })
-                            self.save_state()
-                except Exception as ex_i:
-                    logger.error(f"Errore chiusura incremento Spot Gold {inc.get('deal_id')}: {ex_i}")
-                    order_mgr.send_notification(
-                        "🛑 CHIUSURA FLAT INC 5M: Spot Gold",
-                        f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {cl_i:.2f} € [PnL: {prof_i:+.2f} €]",
-                        "octagonal_sign"
-                    )
-                    # Pausa prudenziale tra incrementi
-                    time.sleep(1.5)
-
-            with self.lock:
-                self.save_state()
-        except Exception as e:
-            logger.error(f"Errore chiusura posizioni flat 5M IG: {e}")
-        finally:
-            with self.lock:
-                self.closing_in_progress = False
-
-    def _close_cycle_trailing_hit(self, current_price: float, time_str: str):
-        """Chiusura completa a FLAT all'entrata del Trailing Stop su 5M"""
-        if not self.position or getattr(self, "closing_in_progress", False):
-            return
-        self.closing_in_progress = True
-        threading.Thread(
-            target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"TS Spot Gold 5M @ {current_price:.2f}"),
-            daemon=True
-        ).start()
-
-    def _check_increments_management(self, current_price: float, time_str: str):
-        """Controlla tick-by-tick:
-        - Take Profit (+5 pip) per incrementi BANCOMAT
-        - Take Profit (+12 pip) e Protezione Break-Even (+1 pip a +6 pip di guadagno) per incrementi RUNNER"""
-        for inc in list(self.increments):
-            if inc.get("closing"):
-                continue
-
-            mode = inc.get("mode", "BANCOMAT")
-            direction = inc["direction"]
-            open_px = inc["open_price"]
-            profit_pips = round(current_price - open_px if direction == "LONG" else open_px - current_price, 2)
-
-            # 1. Regime BANCOMAT: controllo TP fisso a +5p
-            if mode == "BANCOMAT":
-                tp_val = inc.get("tp_price")
-                hit_tp = False
-                if direction == "LONG" and tp_val and current_price >= tp_val:
-                    hit_tp = True
-                elif direction == "SHORT" and tp_val and current_price <= tp_val:
-                    hit_tp = True
-
-                if hit_tp:
-                    inc["closing"] = True
-                    threading.Thread(
-                        target=self._execute_close_increment,
-                        args=(inc, current_price, time_str, f"TP Bancomat (+{self.inc_tp_pips:.1f}p)"),
-                        daemon=True
-                    ).start()
-
-            # 2. Regime RUNNER (Bancomat Esteso: TP +12p con Lock a BE +1p dopo +6p)
-            elif mode == "RUNNER":
-                # Controllo TP +12p (nel caso il broker non abbia eseguito il limit)
-                tp_val = inc.get("tp_price")
-                hit_tp = False
-                if direction == "LONG" and tp_val and current_price >= tp_val:
-                    hit_tp = True
-                elif direction == "SHORT" and tp_val and current_price <= tp_val:
-                    hit_tp = True
-
-                if hit_tp:
-                    inc["closing"] = True
-                    threading.Thread(
-                        target=self._execute_close_increment,
-                        args=(inc, current_price, time_str, f"TP Runner Esteso (+{self.runner_tp_pips:.1f}p)"),
-                        daemon=True
-                    ).start()
-                    continue
-
-                # Controllo attivazione Break-Even al raggiungimento di +6 pip
-                if not inc.get("be_active", False):
-                    if profit_pips >= self.runner_be_trigger_pips:
-                        inc["be_active"] = True
-                        if direction == "LONG":
-                            inc["be_price"] = round(open_px + self.runner_be_lock_pips, 2)
-                        else:
-                            inc["be_price"] = round(open_px - self.runner_be_lock_pips, 2)
-                        logger.info(f"[{time_str}] 🛡️ [RUNNER BE ATTIVATO] Inc #{inc.get('id')} tocca +{profit_pips:.1f}p: Stop protetto a BE (+{self.runner_be_lock_pips:.1f}p @ {inc['be_price']:.2f})")
-                        self.save_state()
-
-                # Verifica tocco Break-Even (chiusura a pareggio protetto +1 pip)
-                if inc.get("be_active") and inc.get("be_price") is not None:
-                    hit_be = False
-                    if direction == "LONG" and current_price <= inc["be_price"]:
-                        hit_be = True
-                    elif direction == "SHORT" and current_price >= inc["be_price"]:
-                        hit_be = True
-
-                    if hit_be:
-                        inc["closing"] = True
-                        threading.Thread(
-                            target=self._execute_close_increment,
-                            args=(inc, current_price, time_str, f"BE Runner Protetto (+{self.runner_be_lock_pips:.1f}p @ {current_price:.2f})"),
-                            daemon=True
-                        ).start()
-
-    def _check_runner_harvesting(self, current_price: float, time_str: str):
-        """Disattivato: nessun incasso forzato a mercato tick-by-tick per calo distanza da Kijun.
-        Gli incrementi sono gestiti dal TS Dinamico Kijun a fine candela o tornano Bancomat."""
-        pass
-
-    def _check_paracadute_kj(self, mid: float, time_str: str):
-        """Paracadute KJ Intracandela (Tick-by-Tick):
-        Se durante la candela M5 il prezzo sfonda la Kijun 55 oltre il paracadute (6 pip),
-        chiude immediatamente all'istante la Core e tutti gli incrementi a FLAT."""
-        if not self.position or self.kj55 is None:
-            return
-
-        pos_dir = self.position["direction"]
-        core_open_time = self.position.get("open_time", "??")
-        if pos_dir == "LONG":
-            threshold = round(self.kj55 - PARACADUTE_KJ_PIPS, 2)
-            if mid <= threshold:
-                self._close_all_to_flat(
-                    mid,
-                    time_str,
-                    reason=f"Paracadute KJ: Mid live {mid:.2f} <= (KJ {self.kj55:.2f} - {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT (Apertura Core: {core_open_time} {pos_dir})"
-                )
-        elif pos_dir == "SHORT":
-            threshold = round(self.kj55 + PARACADUTE_KJ_PIPS, 2)
-            if mid >= threshold:
-                self._close_all_to_flat(
-                    mid,
-                    time_str,
-                    reason=f"Paracadute KJ: Mid live {mid:.2f} >= (KJ {self.kj55:.2f} + {PARACADUTE_KJ_PIPS:.0f}p = {threshold:.2f}) ➔ FLAT (Apertura Core: {core_open_time} {pos_dir})"
-                )
-
-    def _check_candela_segnale_stop(self, mid: float, time_str: str):
-        """Verifica Stop Conferma Candela Segnale KJ (Tick-by-Tick):
-        Se una candela M5 precedente ha chiuso oltre KJ attivando la Candela Segnale,
-        ed il prezzo live rompe il livello confermato (Minimo - 5p per LONG, Massimo + 5p per SHORT),
-        chiude immediatamente all'istante la Core e tutti gli incrementi a FLAT."""
-        if not self.position or not self.signal_candle_active or self.signal_stop_price is None:
-            return
-
-        pos_dir = self.position["direction"]
-        if pos_dir == "LONG":
-            if mid <= self.signal_stop_price:
-                stop_val = self.signal_stop_price
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_ref_price = None
-                self._close_all_to_flat(
-                    mid,
-                    time_str,
-                    reason=f"Candela Segnale KJ : Mid live {mid:.2f} <= Stop {stop_val:.2f} ➔ FLAT"
-                )
-        elif pos_dir == "SHORT":
-            if mid >= self.signal_stop_price:
-                stop_val = self.signal_stop_price
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_ref_price = None
-                self._close_all_to_flat(
-                    mid,
-                    time_str,
-                    reason=f"Candela Segnale KJ : Mid live {mid:.2f} >= Stop {stop_val:.2f} ➔ FLAT"
-                )
-
-    def _process_tick(self, bid: float, ask: float, time_str: str):
-        now_t = time.time()
-        mid = round((bid + ask) / 2.0, 2)
-        boundary = int(now_t // CANDLE_SECONDS) * CANDLE_SECONDS
+        # Invia chiusura a IG
+        for deal_id, sz in [(deal_banc, BANCOMAT_CONTRACTS), (deal_run, RUNNER_CONTRACTS)]:
+            if deal_id:
+                threading.Thread(
+                    target=order_mgr.close_market_deal,
+                    args=(deal_id, direction, sz, f"Chiusura FLAT {reason}", reason),
+                    daemon=True
+                ).start()
 
         with self.lock:
-            self.total_ticks += 1
-            self.last_tick_time = now_t
+            self.balance = round(self.balance + total_pnl, 2)
+            self.trades.append({
+                "time_open": pos["open_time"],
+                "time_close": time_str,
+                "direction": direction,
+                "open_price": open_px,
+                "close_price": exec_price,
+                "contracts": contracts,
+                "pnl_eur": total_pnl,
+                "reason": reason,
+                "tf": "5M"
+            })
+            self.position = None
+            self.closing_in_progress = False
+            self.save_state()
+
+        order_mgr.send_notification(
+            f"🏁 APEX M5 CHIUSURA: {total_pnl:+.2f} €",
+            f"Trade chiuso: {total_pnl:+.2f} € a {exec_price:.2f} ({reason})",
+            "white_check_mark" if total_pnl >= 0 else "x"
+        )
+
+    # ==============================================================================
+    # GESTIONE STREAMING TICK & CANDLE BUILDER M5
+    # ==============================================================================
+
+    def _process_tick(self, bid: float, ask: float, time_str: str):
+        with self.lock:
             self.live_bid = bid
             self.live_ask = ask
-            self.live_mid = mid
+            self.live_mid = round((bid + ask) / 2.0, 2)
             self.live_time_str = time_str
+            self.total_ticks += 1
+            mid = self.live_mid
 
-            # Verifica finestra utile di chiusura rollover/pre-weekend Gold (22:44:00 - 22:44:55)
-            if is_gold_rollover_window():
-                if self.position or self.increments:
-                    self._close_all_to_flat(mid, time_str, reason="Rollover Gold (22:44 - 00:15) ➔ Chiusura automatica, stato FLAT.")
-            elif not is_gold_market_suspended():
-                # 1. Verifica Trailing Stop per la Core (Disattivato di default: Core governata unicamente da Kijun)
-                if self.trading_enabled and self.position and getattr(self, "use_core_trailing", False):
-                    self._check_core_trailing_stop(mid, time_str)
+            now_epoch = int(time.time())
+            boundary = (now_epoch // CANDLE_SECONDS) * CANDLE_SECONDS
 
-                # 2. Gestione Incrementi: Bancomat (TP +5p) e Runner (TS Dinamico Kijun Close +- 10p)
-                if self.trading_enabled and self.increments:
-                    self._check_increments_management(mid, time_str)
+            # Aggiornamento barra M5 corrente
+            if self.curr_boundary != boundary:
+                # Chiusura barra precedente
+                if self.curr_boundary is not None and self.curr_open is not None:
+                    closed_bar = {
+                        "time": self.curr_bar_start_t or time_str,
+                        "open": self.curr_open,
+                        "high": self.curr_high,
+                        "low": self.curr_low,
+                        "close": self.curr_close
+                    }
+                    self.candles.append(closed_bar)
+                    if len(self.candles) > 500:
+                        self.candles = self.candles[-500:]
 
-                # 3. Paracadute KJ Intracandela (6 pip): Chiusura istantanea di sicurezza a FLAT
-                if self.trading_enabled and self.position and self.kj55 is not None:
-                    self._check_paracadute_kj(mid, time_str)
-
-                # 4. Stop Conferma Candela Segnale KJ (5 pip): Chiusura a rottura confermata
-                if self.trading_enabled and self.position and self.signal_candle_active:
-                    self._check_candela_segnale_stop(mid, time_str)
-
-            # Inizializzazione prima barra M5
-            if self.curr_boundary is None:
+                # Nuova barra M5
                 self.curr_boundary = boundary
                 self.curr_open = mid
                 self.curr_high = mid
                 self.curr_low = mid
                 self.curr_close = mid
-                self.curr_bar_start_t = now_t
-                # Se il motore parte a più di 60s dall'inizio del boundary M5, la prima barra è parziale
-                self.curr_bar_is_partial = (now_t - boundary) > 60
-                if self.curr_bar_is_partial:
-                    logger.info(f"⏳ [CANDELA M5 PARZIALE AVVIATA] Spot Gold: motore avviato a metà barra (trascorsi {int(now_t - boundary)}s). La prima barra sarà di solo allineamento.")
-                return
-
-            if boundary == self.curr_boundary:
-                # Barra M5 corrente in formazione
-                new_extreme = False
-                if mid > self.curr_high:
-                    self.curr_high = mid
-                    new_extreme = True
-                if mid < self.curr_low:
-                    self.curr_low = mid
-                    new_extreme = True
+                self.curr_bar_start_t = time_str
+            else:
+                self.curr_high = max(self.curr_high, mid)
+                self.curr_low = min(self.curr_low, mid)
                 self.curr_close = mid
-                if new_extreme and self.kj55 is not None:
-                    self._recalculate_indicators()
-            else:
-                # Chiusura barra M5
-                closed_candle = {
-                    "boundary": self.curr_boundary,
-                    "time": datetime.datetime.fromtimestamp(self.curr_boundary, TZ_ITALIA).strftime("%H:%M:%S"),
-                    "open": self.curr_open,
-                    "high": self.curr_high,
-                    "low": self.curr_low,
-                    "close": self.curr_close
-                }
-                was_partial = getattr(self, "curr_bar_is_partial", False)
-                self.curr_bar_is_partial = False
 
-                self.candles.append(closed_candle)
-                if len(self.candles) > 500:
-                    self.candles = self.candles[-500:]
+            # 1. Valuta Semaforo 4 Lucette
+            self._evaluate_traffic_lights(time_str)
 
-                # Ricalcola KJ55 e TK144
-                self._recalculate_indicators()
+            # 2. Gestisci Posizione Aperta (SL, TP1, Trailing)
+            self._manage_open_position(mid, time_str)
 
-                # Apertura nuova candela M5
-                new_open = mid
-                self.curr_boundary = boundary
-                self.curr_open = new_open
-                self.curr_high = new_open
-                self.curr_low = new_open
-                self.curr_close = new_open
-                self.curr_bar_start_t = now_t
+    def _run_streaming_loop(self):
+        """Thread di ascolto streaming Lightstreamer IG."""
+        while self.running:
+            try:
+                order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                if not order_mgr._ensure_session():
+                    time.sleep(5)
+                    continue
 
-                self.save_state()
+                from lightstreamer_client import LightstreamerSubscription
+                ls_client = getattr(order_mgr, "_ls_client", None)
+                if not ls_client:
+                    from lightstreamer_client import LightstreamerClient
+                    ls_client = LightstreamerClient(order_mgr.base_url, order_mgr.cst, order_mgr.xst, order_mgr.api_key)
+                    order_mgr._ls_client = ls_client
+                    ls_client.connect()
 
-                market_suspended = is_gold_market_suspended()
-                if was_partial:
-                    logger.info(f"⏳ [PRIMA BARRA PARZIALE CONCLUSA] Spot Gold @ {time_str}: Kijun ricalcolata ({self.kj55}). Operatività attiva dalla prima candela interamente formata.")
-                elif self.trading_enabled and not market_suspended and self.kj55 is not None:
-                    self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
+                def on_tick(item_update):
+                    self.ls_connected = True
+                    bid_s = item_update.get("BID") or item_update.get("bid")
+                    ask_s = item_update.get("OFFER") or item_update.get("offer") or item_update.get("ask")
+                    if bid_s and ask_s:
+                        try:
+                            self._process_tick(float(bid_s), float(ask_s), now_it().strftime("%H:%M:%S"))
+                        except Exception:
+                            pass
 
-    def _update_increments_dynamic_mode(self, dist_kj: float, closed_close: float, time_str: str):
-        """A fine candela M5, valuta dinamicamente gli incrementi già aperti in base alla distanza da KJ:
-        1. Se dist_kj > 10 pip: i Bancomat passano a RUNNER (TP esteso da +5p a +12p con BE protetto a +6p)
-        2. Se dist_kj <= 10 pip: i Runner non ancora protetti a BE tornano BANCOMAT (ripristino TP a +5 pip dall'ingresso)"""
+                sub_item = f"MARKET:{EPIC_GOLD}"
+                sub = LightstreamerSubscription(mode="MERGE", items=[sub_item], fields=["BID", "OFFER", "UPDATE_TIME"])
+                sub.addlistener(on_tick)
+                ls_client.subscribe(sub)
+                logger.info(f"✅ Sottoscrizione Lightstreamer M5 attiva su {sub_item}")
+
+                while self.running and ls_client.is_connected():
+                    time.sleep(2)
+
+            except Exception as e:
+                self.ls_connected = False
+                time.sleep(5)
+
+    def _run_rollover_watchdog(self):
+        """Watchdog automatico per freeze rollover e weekend."""
+        while self.running:
+            try:
+                now_t = now_it()
+                if is_gold_trading_suspended(now_t):
+                    if self.position:
+                        exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                        self._close_all_to_flat(exec_px, now_t.strftime("%H:%M:%S"), reason="🌙 Chiusura Freeze Notturno / Rollover")
+            except Exception:
+                pass
+            time.sleep(10)
+
+    def manual_entry_core(self, direction: str) -> dict:
+        """Forzatura ingresso manuale dell'utente."""
+        norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
         with self.lock:
-            active_incs = [i for i in self.increments if not i.get("closing")]
-            if not active_incs:
-                return
-
-            order_mgr = HyperOrderManager.get_instance(self.account_dir)
-
-            # Caso 1: Distanza > 10 pip -> Regime RUNNER (TP Esteso a +12 pip)
-            if dist_kj > RUNNER_THRESHOLD_KJ_DIST:
-                for inc in active_incs:
-                    direction = inc["direction"]
-                    deal_id = inc.get("deal_id")
-                    open_px = inc["open_price"]
-
-                    # Se era BANCOMAT, converti in RUNNER ed estendi TP a +12 pip su broker IG
-                    if inc.get("mode") == "BANCOMAT":
-                        new_tp = round(open_px + self.runner_tp_pips if direction == "LONG" else open_px - self.runner_tp_pips, 2)
-                        inc["mode"] = "RUNNER"
-                        inc["tp_price"] = new_tp
-                        logger.info(f"[{time_str}] 🚀 [PROMOZIONE RUNNER] Deal {deal_id} convertito in RUNNER (dist KJ {dist_kj:.1f}p > 10p). Estensione TP a {new_tp:.2f} (+{self.runner_tp_pips:.0f}p) su IG.")
-                        if deal_id:
-                            threading.Thread(target=order_mgr.set_limit_order, args=(deal_id, new_tp, "Promozione Runner Spot Gold"), daemon=True).start()
-
-                self.save_state()
-
-            # Caso 2: Distanza <= 10 pip -> Rientro in Regime BANCOMAT (se non già protetto a BE)
-            else:
-                for inc in active_incs:
-                    if inc.get("mode") == "RUNNER" and not inc.get("be_active"):
-                        deal_id = inc.get("deal_id")
-                        direction = inc["direction"]
-                        open_px = inc["open_price"]
-                        tp_px = round(open_px + self.inc_tp_pips if direction == "LONG" else open_px - self.inc_tp_pips, 2)
-
-                        inc["mode"] = "BANCOMAT"
-                        inc["tp_price"] = tp_px
-
-                        logger.info(f"[{time_str}] 🔄 [RITORNO BANCOMAT] Inc #{inc.get('id')} rientrato in zona Bancomat (dist KJ {dist_kj:.1f}p <= 10p). Ripristinato TP a {tp_px:.2f} (+{self.inc_tp_pips:.0f}p).")
-                        if deal_id:
-                            threading.Thread(target=order_mgr.set_limit_order, args=(deal_id, tp_px, "Ripristino TP Bancomat Spot Gold"), daemon=True).start()
-
-                self.save_state()
-
-    def _evaluate_pure_sr_strategy(self, closed_candle: dict, kj: float, exec_price: float, time_str: str):
-        prev_close = closed_candle["close"]
-        prev_open = closed_candle["open"]
-        entry_allowed = not is_gold_entry_suspended()
-
-        # Determinazione del regime della candela appena chiusa
-        if prev_close > kj:
-            current_regime = "LONG"
-        elif prev_close < kj:
-            current_regime = "SHORT"
-        else:
-            current_regime = self.last_regime
-
-        # Rilevamento Taglio (Cross) KJ55
-        if self.last_regime is not None and current_regime is not None and current_regime != self.last_regime:
-            logger.info(f"⚡ [TAGLIO KJ 5M] Spot Gold: cambio regime da {self.last_regime} a {current_regime} (Close={prev_close:.2f}, KJ={kj:.2f})")
-            self.last_regime = current_regime
-            self.regime_traded = False
-            self.save_state()
-        elif self.last_regime is None and current_regime is not None:
-            # BLINDATURA DI SICUREZZA ALL'AVVIO:
-            # All'avvio senza stato pregresso, aggancia il regime attuale ma forza SEMPRE regime_traded = True.
-            # Non azzarda mai ingressi a freddo su trend preesistenti. Si opera SOLO su tagli confermati in diretta.
-            self.last_regime = current_regime
-            self.regime_traded = True
-            logger.info(f"🔄 [BOOTSTRAP KJ 5M] Spot Gold: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
-            self.save_state()
-
-        # AGGIORNAMENTO DINAMICO INCREMENTI A FINE CANDELA (OPZIONE 1):
-        # - Se dist_kj > 10 pip: promuovi i Bancomat a RUNNER (rimozione TP su IG a broker e attivo Trailing Stop)
-        # - Se dist_kj <= 10 pip: incasso di sicurezza a mercato per tutti i Runner
-        dist_kj_candle = abs(prev_close - kj)
-        self._update_increments_dynamic_mode(dist_kj_candle, prev_close, time_str)
-
-        # =============================================================
-        # 1. MERCATO SOPRA KJ55 (BULLISH)
-        # =============================================================
-        if current_regime == "LONG":
-            if self.position is None:
-                if not self.regime_traded:
-                    if not entry_allowed:
-                        print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core LONG sospesa prima del weekend.")
-                        return
-                    dist_kj = round(exec_price - kj, 2)
-                    if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
-                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                            self.entry_in_progress = True
-                            self.regime_traded = True
-                            self.signal_candle_active = False
-                            self.signal_stop_price = None
-                            self.signal_ref_price = None
-                            self.save_state()
-                            threading.Thread(
-                                target=self._execute_entry_core,
-                                args=("LONG", exec_price, time_str),
-                                daemon=True
-                            ).start()
-                    else:
-                        print(f"[{time_str}] ⏸️ [TAGLIO LONG] Distacco Prezzo-KJ insufficiente ({dist_kj:.2f}p < min {CORE_MIN_KJ_DIST_PIPS:.1f}p). Attendo conferma.")
-                else:
-                    print(f"[{time_str}] ⏸️ [ATTESA TAGLIO LONG] Mercato sopra KJ {kj:.2f} ma trend già avviato (nessun taglio). In attesa del prossimo taglio da sotto a sopra.")
-            elif self.position and self.position["direction"] == "LONG":
-                # Core già LONG: azzera eventuale Candela Segnale e valuta incremento
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_ref_price = None
-
-                # Assioma Granitico: Incremento SEMPRE e SOLO su ritracciamento (candela chiusa ROSSA)
-                is_retracement = prev_close < prev_open
-                if not entry_allowed and is_retracement:
-                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Incremento LONG sospesa prima del weekend.")
-                elif is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                    dist_kj = abs(exec_price - kj)
-                    active_incs = [i for i in self.increments if not i.get("closing")]
-                    tot_incs = len(active_incs)
-
-                    if tot_incs < MAX_INCREMENTS:
-                        # 1. Regime BANCOMAT (distanza da KJ <= 10.0 pip): max 1 incremento con TP rapido a +5p
-                        if dist_kj <= BANCOMAT_MAX_DIST_KJ:
-                            has_bancomat = any(i.get("mode", "BANCOMAT") == "BANCOMAT" for i in active_incs)
-                            troppo_vicino = any(abs(exec_price - i["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for i in active_incs)
-                            if not has_bancomat and not troppo_vicino:
-                                self.entry_in_progress = True
-                                threading.Thread(
-                                    target=self._execute_entry_increment,
-                                    args=("LONG", exec_price, time_str, "BANCOMAT"),
-                                    daemon=True
-                                ).start()
-
-                        # 2. Regime RUNNER (distanza da KJ > 10.0 pip): piramidazione di trend, max 3 runner contemporanei con Trailing Stop
-                        else:
-                            runner_incs = [i for i in active_incs if i.get("mode") == "RUNNER"]
-                            troppo_vicino_runner = any(abs(exec_price - i["open_price"]) < (MIN_DIST_RUNNER_PIPS - 1e-7) for i in active_incs)
-                            if len(runner_incs) < MAX_RUNNER_INCREMENTS and not troppo_vicino_runner:
-                                self.entry_in_progress = True
-                                threading.Thread(
-                                    target=self._execute_entry_increment,
-                                    args=("LONG", exec_price, time_str, "RUNNER"),
-                                    daemon=True
-                                ).start()
-            elif self.position and self.position["direction"] == "SHORT":
-                # Chiusura candela sopra KJ mentre siamo SHORT: Candela Segnale rialzista!
-                stop_livello = round(closed_candle["high"] + CANDELA_SEGNALE_OFFSET_PIPS, 2)
-                if self.signal_candle_active and self.signal_stop_price is not None:
-                    if stop_livello > self.signal_stop_price:
-                        self.signal_stop_price = stop_livello
-                        self.signal_ref_price = closed_candle["high"]
-                else:
-                    self.signal_candle_active = True
-                    self.signal_stop_price = stop_livello
-                    self.signal_ref_price = closed_candle["high"]
-                self.save_state()
-
-        # =============================================================
-        # 2. MERCATO SOTTO KJ55 (BEARISH)
-        # =============================================================
-        elif current_regime == "SHORT":
-            if self.position is None:
-                if not self.regime_traded:
-                    if not entry_allowed:
-                        print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Core SHORT sospesa prima del weekend.")
-                        return
-                    dist_kj = round(kj - exec_price, 2)
-                    if dist_kj >= CORE_MIN_KJ_DIST_PIPS:
-                        if not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                            self.entry_in_progress = True
-                            self.regime_traded = True
-                            self.signal_candle_active = False
-                            self.signal_stop_price = None
-                            self.signal_ref_price = None
-                            self.save_state()
-                            threading.Thread(
-                                target=self._execute_entry_core,
-                                args=("SHORT", exec_price, time_str),
-                                daemon=True
-                            ).start()
-                    else:
-                        print(f"[{time_str}] ⏸️ [TAGLIO SHORT] Distacco Prezzo-KJ insufficiente ({dist_kj:.2f}p < min {CORE_MIN_KJ_DIST_PIPS:.1f}p). Attendo conferma.")
-                else:
-                    print(f"[{time_str}] ⏸️ [ATTESA TAGLIO SHORT] Mercato sotto KJ {kj:.2f} ma trend già avviato (nessun taglio). In attesa del prossimo taglio da sopra a sotto.")
-            elif self.position and self.position["direction"] == "SHORT":
-                # Core già SHORT: azzera eventuale Candela Segnale e valuta incremento
-                self.signal_candle_active = False
-                self.signal_stop_price = None
-                self.signal_ref_price = None
-
-                # Assioma Granitico: Incremento SEMPRE e SOLO su ritracciamento (candela chiusa VERDE)
-                is_retracement = prev_close > prev_open
-                if not entry_allowed and is_retracement:
-                    print(f"[{time_str}] ⏸️ [PRE-WEEKEND CUTOFF] Venerdì >= 22:14: Apertura Incremento SHORT sospesa prima del weekend.")
-                elif is_retracement and not getattr(self, "entry_in_progress", False) and not getattr(self, "closing_in_progress", False):
-                    dist_kj = abs(exec_price - kj)
-                    active_incs = [i for i in self.increments if not i.get("closing")]
-                    tot_incs = len(active_incs)
-
-                    if tot_incs < MAX_INCREMENTS:
-                        # 1. Regime BANCOMAT (distanza da KJ <= 10.0 pip): max 1 incremento con TP rapido a +5p
-                        if dist_kj <= BANCOMAT_MAX_DIST_KJ:
-                            has_bancomat = any(i.get("mode", "BANCOMAT") == "BANCOMAT" for i in active_incs)
-                            troppo_vicino = any(abs(exec_price - i["open_price"]) < (MIN_DIST_INCR_PIPS - 1e-7) for i in active_incs)
-                            if not has_bancomat and not troppo_vicino:
-                                self.entry_in_progress = True
-                                threading.Thread(
-                                    target=self._execute_entry_increment,
-                                    args=("SHORT", exec_price, time_str, "BANCOMAT"),
-                                    daemon=True
-                                ).start()
-
-                        # 2. Regime RUNNER (distanza da KJ > 10.0 pip): piramidazione di trend, max 3 runner contemporanei con Trailing Stop
-                        else:
-                            runner_incs = [i for i in active_incs if i.get("mode") == "RUNNER"]
-                            troppo_vicino_runner = any(abs(exec_price - i["open_price"]) < (MIN_DIST_RUNNER_PIPS - 1e-7) for i in active_incs)
-                            if len(runner_incs) < MAX_RUNNER_INCREMENTS and not troppo_vicino_runner:
-                                self.entry_in_progress = True
-                                threading.Thread(
-                                    target=self._execute_entry_increment,
-                                    args=("SHORT", exec_price, time_str, "RUNNER"),
-                                    daemon=True
-                                ).start()
-            elif self.position and self.position["direction"] == "LONG":
-                # Chiusura candela sotto KJ mentre siamo LONG: Candela Segnale ribassista!
-                stop_livello = round(closed_candle["low"] - CANDELA_SEGNALE_OFFSET_PIPS, 2)
-                if self.signal_candle_active and self.signal_stop_price is not None:
-                    if stop_livello < self.signal_stop_price:
-                        self.signal_stop_price = stop_livello
-                        self.signal_ref_price = closed_candle["low"]
-                else:
-                    self.signal_candle_active = True
-                    self.signal_stop_price = stop_livello
-                    self.signal_ref_price = closed_candle["low"]
-                self.save_state()
-
-    def _evaluate_unidirectional_strategy(self, closed_candle: dict, kj: float, tk: float, exec_price: float, time_str: str):
-        """Metodo di compatibilità legacy"""
-        self._evaluate_pure_sr_strategy(closed_candle, kj, exec_price, time_str)
-
-    def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
-        """Chiude la Core e tutti gli incrementi tornando a FLAT su IG tramite chiamate a mercato reali"""
-        if getattr(self, "closing_in_progress", False):
-            return
-        self.signal_candle_active = False
-        self.signal_stop_price = None
-        self.signal_ref_price = None
-        if self.position or self.increments:
-            self.closing_in_progress = True
-            threading.Thread(
-                target=self._execute_close_all_flat,
-                args=(exec_price, time_str, reason),
-                daemon=True
-            ).start()
+            if self.position is not None:
+                return {"success": False, "error": "Posizione già aperta a mercato"}
+            live_px = self.live_mid or (self.candles[-1]["close"] if self.candles else 0.0)
+            t_str = now_it().strftime("%H:%M:%S")
+            last_ph = self.traffic_light.get("last_pivot_high")
+            last_pl = self.traffic_light.get("last_pivot_low")
+            self._trigger_entry(norm_dir, live_px, t_str, last_pl if norm_dir == "LONG" else last_ph, None)
+            return {"success": True, "direction": norm_dir, "price": live_px}
 
     def get_floating_pnl(self):
         with self.lock:
-            if self.live_mid is None:
+            if not self.position or self.live_mid is None:
                 return 0.0
-            tot = 0.0
-            if self.position:
-                if self.position["direction"] == "LONG":
-                    tot += (self.live_mid - self.position["open_price"]) * self.position["contracts"] * self.point_value
-                else:
-                    tot += (self.position["open_price"] - self.live_mid) * self.position["contracts"] * self.point_value
-
-            for inc in self.increments:
-                if inc["direction"] == "LONG":
-                    tot += (self.live_mid - inc["open_price"]) * inc["contracts"] * self.point_value
-                else:
-                    tot += (inc["open_price"] - self.live_mid) * inc["contracts"] * self.point_value
-
-            return round(tot, 2)
+            direction = self.position["direction"]
+            open_px = self.position["open_price"]
+            contracts = self.position.get("contracts", CORE_CONTRACTS)
+            pnl_pts = (self.live_mid - open_px) if direction == "LONG" else (open_px - self.live_mid)
+            return round(pnl_pts * self.point_value * contracts, 2)
 
     def get_total_contracts(self):
         with self.lock:
-            c = 0
-            if self.position:
-                c += self.position.get("contracts", CORE_CONTRACTS)
-            for inc in self.increments:
-                c += inc.get("contracts", INC_CONTRACTS)
-            return c
-
-# Alias di retrocompatibilità
-HyperGoldM1Engine = HyperGoldM5Engine
+            return self.position.get("contracts", 0) if self.position else 0

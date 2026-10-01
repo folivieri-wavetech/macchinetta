@@ -430,18 +430,15 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         is_conn = engine.ls_connected
         live_mid = engine.live_mid
         total_ticks = engine.total_ticks
+        kj = engine.kj55
         pos = engine.position
-        increments = list(getattr(engine, "increments", []))
+        increments = list(engine.increments)
         total_contracts = (pos.get("contracts", core_c) + sum(i.get("contracts", inc_c) for i in increments)) if pos else 0
         trading_on = engine.trading_enabled
         curr_bar_t = engine.curr_bar_start_t
-        struct = getattr(engine, "current_structure", "NEUTRAL")
-        p_high = getattr(engine, "last_pivot_high", None)
-        p_low = getattr(engine, "last_pivot_low", None)
-        atr_val = getattr(engine, "atr14", 0.0)
-        ema8_val = getattr(engine, "ema8", None)
-        ema21_val = getattr(engine, "ema21", None)
-        semaforo = getattr(engine, "semaforo", {})
+        sig_act = getattr(engine, "signal_candle_active", False)
+        sig_px = getattr(engine, "signal_stop_price", None)
+        sig_ref = getattr(engine, "signal_ref_price", None)
 
     float_pnl = engine.get_floating_pnl()
     history_inst = [t for t in order_mgr.get_trades_history(epic=epic_filter) if t.get("tf") in ("10M", "5M")]
@@ -479,86 +476,33 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     </div>
     """, unsafe_allow_html=True)
 
-    # 4 Micro cards: Prezzo, Struttura M5, Swing Pivot e Volatilità ATR
+    # 4 Micro cards: Prezzo, KJ, Distanza e Candela Segnale
     px_str = f"{live_mid:.2f}" if live_mid else "--"
-    if struct == "BULLISH":
-        struct_card_val = "<span style='color: #22c55e; font-weight: 800;'>HH / HL (BULL)</span>"
-    elif struct == "BEARISH":
-        struct_card_val = "<span style='color: #ef4444; font-weight: 800;'>LH / LL (BEAR)</span>"
-    else:
-        struct_card_val = "<span style='color: #94a3b8; font-weight: 600;'>NEUTRAL</span>"
+    kj_str = f"{kj:.2f}" if kj else "--"
+    dist_str = f"{abs(live_mid - kj):.2f}{unit_lbl}" if (live_mid and kj) else "--"
 
-    if p_high is not None and p_low is not None:
-        swing_str = f"H:{p_high:.1f} L:{p_low:.1f}"
-    elif p_high is not None:
-        swing_str = f"H:{p_high:.1f}"
-    elif p_low is not None:
-        swing_str = f"L:{p_low:.1f}"
+    if sig_act and sig_px is not None:
+        sig_card_val = f"<span style='color: #fb923c; font-weight: 800;'>{sig_px:.2f}</span>"
     else:
-        swing_str = "--"
-
-    atr_str = f"{atr_val:.1f}{unit_lbl}" if atr_val > 0 else "--"
+        sig_card_val = "<span style='color: #475569;'>--</span>"
 
     st.markdown(f"""
-    <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 5px;'>
+    <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 7px;'>
         <div class='micro-card-hyper'>
             <div class='micro-label-hyper'>MID LIVE</div>
             <div class='micro-val-hyper' style='color: #22c55e;'>{px_str}</div>
         </div>
         <div class='micro-card-hyper'>
-            <div class='micro-label-hyper'>STRUTTURA M5</div>
-            <div class='micro-val-hyper' style='font-size: 0.72rem;'>{struct_card_val}</div>
+            <div class='micro-label-hyper'>KJ 55 (S&R)</div>
+            <div class='micro-val-hyper' style='color: #FFD700;'>{kj_str}</div>
         </div>
         <div class='micro-card-hyper'>
-            <div class='micro-label-hyper'>SWING PIVOT</div>
-            <div class='micro-val-hyper' style='color: #38bdf8; font-size: 0.70rem;'>{swing_str}</div>
+            <div class='micro-label-hyper'>DISTANZA</div>
+            <div class='micro-val-hyper' style='color: #38bdf8;'>{dist_str}</div>
         </div>
         <div class='micro-card-hyper'>
-            <div class='micro-label-hyper'>VOLATILITÀ ATR</div>
-            <div class='micro-val-hyper' style='color: #f59e0b;'>{atr_str}</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Semaforo Confluenza M5 (4 Lucette)
-    sem_l1 = semaforo.get("L1_structure", False)
-    sem_l2 = semaforo.get("L2_trigger", False)
-    sem_l3 = semaforo.get("L3_volatility", False)
-    sem_l4 = semaforo.get("L4_momentum", False)
-    sem_bias = semaforo.get("bias", "NEUTRAL")
-    lights_on = sum([1 for l in [sem_l1, sem_l2, sem_l3, sem_l4] if l])
-
-    if pos:
-        sem_badge = f"<span style='color: #38bdf8; font-weight: 800;'>IN TRADE ({pos.get('direction', '')})</span>"
-    elif lights_on == 4:
-        col_b = "#22c55e" if sem_bias == "LONG" else "#ef4444"
-        sem_badge = f"<span style='color: {col_b}; font-weight: 800;'>🟢 4/4 PRONTO ({sem_bias})</span>"
-    elif lights_on >= 2:
-        sem_badge = f"<span style='color: #facc15; font-weight: 700;'>🟡 {lights_on}/4 ATTESA ({sem_bias})</span>"
-    else:
-        sem_badge = f"<span style='color: #94a3b8; font-weight: 600;'>⚪ {lights_on}/4 SCANSIONE</span>"
-
-    def _b_light(on, title):
-        if on:
-            return f"<div style='background: rgba(34, 197, 94, 0.18); border: 1px solid #22c55e; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #22c55e; font-weight: 700; font-size: 0.67rem;'>🟢 {title}</span></div>"
-        return f"<div style='background: rgba(51, 65, 85, 0.25); border: 1px solid #334155; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #64748b; font-weight: 600; font-size: 0.67rem;'>⚪ {title}</span></div>"
-
-    b_l1 = _b_light(sem_l1, "L1 Struttura")
-    b_l2 = _b_light(sem_l2, "L2 Trigger")
-    b_l3 = _b_light(sem_l3, "L3 ATR")
-    b_l4 = _b_light(sem_l4, "L4 Flow EMA")
-
-    st.markdown(f"""
-    <div style='background: rgba(15, 23, 42, 0.55); border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; margin-bottom: 7px;'>
-        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;'>
-            <span style='font-size: 0.72rem; font-weight: 700; color: #cbd5e1;'>🚦 SEMAFORO CONFLUENZA:</span>
-            {sem_badge}
-        </div>
-        <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;'>
-            {b_l1}
-            {b_l2}
-            {b_l3}
-            {b_l4}
+            <div class='micro-label-hyper'>CANDELA SEGNALE</div>
+            <div class='micro-val-hyper' style='font-family: monospace;'>{sig_card_val}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -670,8 +614,42 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     if pos:
         dir_pos = pos["direction"]
         dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
-        dir_badge = f"<span style='color: {dir_col}; font-weight: 700; font-size: 0.72rem; white-space: nowrap;'>{'🟢' if dir_pos == 'LONG' else '🔴'} {dir_pos}</span>"
+        dir_badge = f"<span style='color: {dir_col}; font-weight: 700; font-size: 0.72rem; white-space: nowrap;'>{'🟢' if dir_pos == 'LONG' else '🔴'} Core</span>"
+        
+        # Gestione TS Core: Verde se attivo, KJ Parac. se Core governata da Kijun (libera da TS)
+        core_has_ts = getattr(engine, "use_core_trailing", False)
+        ts_is_active = core_has_ts and pos.get("ts_active", False) and pos.get("ts_price") is not None
+        if ts_is_active:
+            ts_val = pos["ts_price"]
+            ts_core_cell = f"<span style='color: #22c55e; font-weight: 700;'>{ts_val:.2f}</span>"
+        elif core_has_ts:
+            ts_target = round((pos["open_price"] + ts_trig) if dir_pos == "LONG" else (pos["open_price"] - ts_trig), 2)
+            ts_core_cell = f"<span style='color: #fa8072; font-weight: 600;'>{ts_target:.2f}</span>"
+        else:
+            # Core governata da Kijun: mostra il valore numerico live della Kijun (o dello stop Candela Segnale se attiva)
+            if sig_act and sig_px is not None:
+                ts_core_cell = f"<span style='color: #FFD700; font-weight: 700;' title='Stop Candela Segnale KJ'>{sig_px:.2f}</span>"
+            elif kj is not None:
+                ts_core_cell = f"<span style='color: #FFD700; font-weight: 700;' title='Livello Kijun 55'>{kj:.2f}</span>"
+            else:
+                ts_core_cell = "<span style='color: #FFD700; font-weight: 700;'>--</span>"
 
+        if live_mid is not None:
+            core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
+            core_pnl_val = round(core_diff * pos.get("contracts", core_c) * 1.0, 2)
+        else:
+            core_pnl_val = 0.0
+
+        col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
+        sign_core = "+" if core_pnl_val >= 0 else ""
+
+        # Formattazione Size Core (+size verde per LONG, -size salmone per SHORT, senza 'c')
+        core_c_val = pos.get('contracts', core_c)
+        sign_c_size = "+" if dir_pos == "LONG" else "-"
+        col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
+        size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}</span>"
+
+        # Helper orario apertura formato HH:MM:SS
         def _fmt_open_t(t_raw):
             if not t_raw:
                 return "--:--:--"
@@ -685,118 +663,87 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         core_t_str = _fmt_open_t(pos.get("open_time"))
         time_core_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{core_t_str}</span>"
 
-        p_rows = []
+        p_rows = [
+            f"<tr>"
+            f"<td style='text-align: center;'>{dir_badge}</td>"
+            f"<td style='text-align: center;'>{time_core_cell}</td>"
+            f"<td style='text-align: center;'>{size_core_cell}</td>"
+            f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
+            f"<td style='text-align: center;'>{ts_core_cell}</td>"
+            f"<td style='text-align: center;'></td>"
+            f"<td style='text-align: center; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
+            f"</tr>"
+        ]
 
-        # Nuova Logica Apex Swing (Split Bancomat 3c + Runner 3c)
-        if "bancomat_contracts" in pos or "runner_contracts" in pos:
-            bco_c = pos.get("bancomat_contracts", 3)
-            run_c = pos.get("runner_contracts", 3)
-            bco_closed = pos.get("bancomat_closed", False)
-            tp_bco = pos.get("tp_bancomat")
-            sl_bco = pos.get("sl_price")
-            run_sl = pos.get("runner_sl")
-            run_be = pos.get("runner_be_active", False)
-
-            # 1. Riga BANCOMAT
-            if bco_closed:
-                p_rows.append(
-                    f"<tr style='opacity: 0.7;'>"
-                    f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 700; font-size: 0.71rem;'>💰 Bancomat</span></td>"
-                    f"<td style='text-align: center;'>{time_core_cell}</td>"
-                    f"<td style='text-align: center;'><span style='color: #64748b;'>0c</span></td>"
-                    f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                    f"<td style='text-align: center; color: #64748b;'>--</td>"
-                    f"<td style='text-align: center; color: #22c55e; font-weight: 700;'>{tp_bco:.2f}</td>"
-                    f"<td style='text-align: center; color: #22c55e; font-weight: 800;'>✅ INCASSATO</td>"
-                    f"</tr>"
-                )
-            else:
-                if live_mid is not None:
-                    b_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                    b_pnl = round(b_diff * bco_c * 1.0, 2)
-                else:
-                    b_pnl = 0.0
-                col_bp = "#22c55e" if b_pnl >= 0 else "#ef4444"
-                sign_bp = "+" if b_pnl >= 0 else ""
-                tp_str = f"<span style='color: #22c55e; font-weight: 700;'>{tp_bco:.2f}</span>" if tp_bco else "--"
-                sl_str = f"<span style='color: #fa8072; font-weight: 600;'>{sl_bco:.2f}</span>" if sl_bco else "--"
-                sign_c_size = "+" if dir_pos == "LONG" else "-"
-                col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
-                p_rows.append(
-                    f"<tr>"
-                    f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 700; font-size: 0.71rem;'>💰 Bancomat</span></td>"
-                    f"<td style='text-align: center;'>{time_core_cell}</td>"
-                    f"<td style='text-align: center;'><span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{bco_c}</span></td>"
-                    f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                    f"<td style='text-align: center;'>{sl_str}</td>"
-                    f"<td style='text-align: center;'>{tp_str}</td>"
-                    f"<td style='text-align: center; color: {col_bp}; font-weight: 700;'>{sign_bp}{b_pnl:,.2f} €</td>"
-                    f"</tr>"
-                )
-
-            # 2. Riga RUNNER
+        for idx, inc in enumerate(increments, 1):
             if live_mid is not None:
-                r_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                r_pnl = round(r_diff * run_c * 1.0, 2)
+                inc_diff = (live_mid - inc["open_price"]) if inc["direction"] == "LONG" else (inc["open_price"] - live_mid)
+                inc_pnl_val = round(inc_diff * inc.get("contracts", inc_c) * 1.0, 2)
             else:
-                r_pnl = 0.0
-            col_rp = "#22c55e" if r_pnl >= 0 else "#ef4444"
-            sign_rp = "+" if r_pnl >= 0 else ""
-            if run_be:
-                ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Break-Even Protetto'>BE {run_sl:.2f}</span>"
-            elif run_sl is not None:
-                ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Trailing Strutturale'>{run_sl:.2f}</span>"
-            else:
-                ts_runner_cell = "<span style='color: #64748b;'>--</span>"
+                inc_pnl_val = 0.0
 
-            sign_r_size = "+" if dir_pos == "LONG" else "-"
-            col_r_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
+            col_inc_pnl = "#22c55e" if inc_pnl_val >= 0 else "#ef4444"
+            sign_inc = "+" if inc_pnl_val >= 0 else ""
+            mode_inc = inc.get("mode", "BANCOMAT")
+            tp_val = inc.get("tp_price")
+            ts_val = inc.get("ts_price")
+            if tp_val is not None:
+                tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>"
+            else:
+                tp_cell = "<span style='color: #64748b;'>-</span>"
+
+            be_act = inc.get("be_active", False)
+            be_val = inc.get("be_price")
+            if be_act and be_val is not None:
+                ts_inc_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Break-Even Protetto'>BE {be_val:.2f}</span>"
+            elif ts_val is not None:
+                ts_inc_cell = f"<span style='color: #38bdf8; font-weight: 700;'>{ts_val:.2f}</span>"
+            elif mode_inc == "RUNNER":
+                ts_inc_cell = f"<span style='color: #94a3b8; font-size: 0.68rem;'>BE @+{runner_be_trig:.0f}{unit_lbl}</span>"
+            else:
+                ts_inc_cell = ""
+
+            # Formattazione Size Incremento (senza 'c')
+            inc_dir = inc.get("direction", dir_pos)
+            inc_c_val = inc.get('contracts', inc_c)
+            sign_i_size = "+" if inc_dir == "LONG" else "-"
+            col_i_size = "#22c55e" if inc_dir == "LONG" else "#fa8072"
+            size_inc_cell = f"<span style='color: {col_i_size}; font-weight: 700;'>{sign_i_size}{inc_c_val}</span>"
+
+            inc_t_str = _fmt_open_t(inc.get("open_time"))
+            time_inc_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{inc_t_str}</span>"
+
+            if mode_inc == "RUNNER":
+                lbl_inc = f"➕ Run #{idx}"
+                col_lbl = "#38bdf8"
+            else:
+                lbl_inc = f"➕ Bco #{idx}"
+                col_lbl = "#f59e0b"
+
             p_rows.append(
                 f"<tr>"
-                f"<td style='text-align: center;'><span style='color: #38bdf8; font-weight: 700; font-size: 0.71rem;'>🚀 Runner</span></td>"
-                f"<td style='text-align: center;'>{time_core_cell}</td>"
-                f"<td style='text-align: center;'><span style='color: {col_r_size}; font-weight: 700;'>{sign_r_size}{run_c}</span></td>"
-                f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                f"<td style='text-align: center;'>{ts_runner_cell}</td>"
-                f"<td style='text-align: center;'><span style='color: #38bdf8; font-size: 0.69rem;'>Trailing M5</span></td>"
-                f"<td style='text-align: center; color: {col_rp}; font-weight: 700;'>{sign_rp}{r_pnl:,.2f} €</td>"
+                f"<td style='text-align: center;'><span style='color: {col_lbl}; font-weight: 600; font-size: 0.71rem; white-space: nowrap;'>{lbl_inc}</span></td>"
+                f"<td style='text-align: center;'>{time_inc_cell}</td>"
+                f"<td style='text-align: center;'>{size_inc_cell}</td>"
+                f"<td style='text-align: center; font-weight: 600;'>{inc['open_price']:.2f}</td>"
+                f"<td style='text-align: center;'>{ts_inc_cell}</td>"
+                f"<td style='text-align: center;'>{tp_cell}</td>"
+                f"<td style='text-align: center; color: {col_inc_pnl}; font-weight: 700;'>{sign_inc}{inc_pnl_val:,.2f} €</td>"
                 f"</tr>"
             )
 
-            # Riga vuota decorativa per allineamento
+        # Riempi con righe segnaposto vuote fino a max_inc (3) per garantire sempre 6 righe fisse (Header + Core + 3 Incr + TOT)
+        num_incs = len(increments)
+        for empty_idx in range(num_incs + 1, max_inc + 1):
             p_rows.append(
-                f"<tr style='opacity: 0.35;'>"
-                f"<td style='text-align: center;'><span style='color: #64748b; font-size: 0.71rem;'>➕ Riserva</span></td>"
-                f"<td style='text-align: center; color: #475569;'>--</td>"
+                f"<tr style='opacity: 0.38;'>"
+                f"<td style='text-align: center;'><span style='color: #64748b; font-size: 0.71rem; font-weight: 500; white-space: nowrap;'>➕ Run #{empty_idx}</span></td>"
+                f"<td style='text-align: center; color: #475569; font-size: 0.72rem;'>--</td>"
                 f"<td style='text-align: center; color: #475569;'>--</td>"
                 f"<td style='text-align: center; color: #475569;'>--</td>"
                 f"<td style='text-align: center;'></td>"
                 f"<td style='text-align: center;'></td>"
                 f"<td style='text-align: center; color: #475569; font-size: 0.72rem;'>--</td>"
-                f"</tr>"
-            )
-        else:
-            # Fallback generico
-            if live_mid is not None:
-                core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                core_pnl_val = round(core_diff * pos.get("contracts", core_c) * 1.0, 2)
-            else:
-                core_pnl_val = 0.0
-            col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
-            sign_core = "+" if core_pnl_val >= 0 else ""
-            core_c_val = pos.get('contracts', core_c)
-            sign_c_size = "+" if dir_pos == "LONG" else "-"
-            col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
-            size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}</span>"
-            p_rows.append(
-                f"<tr>"
-                f"<td style='text-align: center;'>{dir_badge}</td>"
-                f"<td style='text-align: center;'>{time_core_cell}</td>"
-                f"<td style='text-align: center;'>{size_core_cell}</td>"
-                f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                f"<td style='text-align: center;'>--</td>"
-                f"<td style='text-align: center;'></td>"
-                f"<td style='text-align: center; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
                 f"</tr>"
             )
 
@@ -825,7 +772,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                     <th style='text-align: center; width: 14%; font-size: 0.73rem;'>Time</th>
                     <th style='text-align: center; width: 10%; font-size: 0.73rem;'>Size</th>
                     <th style='text-align: center; width: 16%; font-size: 0.73rem;'>Open</th>
-                    <th style='text-align: center; width: 13%; font-size: 0.73rem;'>TS / SL</th>
+                    <th style='text-align: center; width: 13%; font-size: 0.73rem;'>TS</th>
                     <th style='text-align: center; width: 13%; font-size: 0.73rem;'>TP</th>
                     <th style='text-align: center; width: 18%; font-size: 0.73rem;'>P&L</th>
                 </tr>
@@ -834,19 +781,19 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         </table>
         """, unsafe_allow_html=True)
     else:
-        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.76rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat - In attesa del Semaforo 4/4)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.76rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat)</div>", unsafe_allow_html=True)
+
+
 
     # Expander Regole 5M
-    with st.expander(f"⚙️ Assetto & Regole Apex Swing M5 {instr_name}", expanded=False):
-        tp_bco_pts = 20 if instr_type == 'GOLD' else 4
+    with st.expander(f"⚙️ Assetto & Regole 5M {instr_name}", expanded=False):
         st.markdown(f"""
         <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.70rem; line-height: 1.4;'>
-            <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Architettura Apex Swing M5 ({instr_name}):</div>
-            <div>• <b>Semaforo 4 Confluenze</b>: L1 Struttura (HH/HL o LH/LL) • L2 Trigger (Breakout/Pullback M5) • L3 Volatilità ATR • L4 Momentum EMA</div>
-            <div>• <b>Taglia Posizione</b>: 6 Contratti totali (Split 3 Bancomat + 3 Runner)</div>
-            <div>• <b>Bancomat (3c)</b>: Take Profit a +{tp_bco_pts}{unit_lbl}. All'incasso scatta istantaneo il Break-Even protetto sul Runner</div>
-            <div>• <b>Runner (3c)</b>: Trailing Stop dinamico agganciato ai nuovi Pivot confermati della struttura M5</div>
-            <div>• <b>Stop Loss Iniziale</b>: Strutturale sotto/sopra l'ultimo Pivot Swing protetto</div>
+            <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name} (5M):</div>
+            <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su <b>Taglio KJ55</b> (stacco Prezzo - KJ &ge; {2 if instr_type == 'GOLD' else 3}{unit_lbl})</div>
+            <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, Bancomat Esteso TP +{runner_tp:.0f}{unit_lbl} con BE +{runner_be_lock:.0f}{unit_lbl} a +{runner_be_trig:.0f}{unit_lbl})</div>
+            <div>• <b>Gestione Core</b>: Libera da TS (governata al 100% da Kijun &amp; Candela Segnale)</div>
+            <div>• <b>Protezioni</b>: Paracadute &plusmn;{parachute_p:.0f}{unit_lbl} • Candela Segnale &plusmn;{sig_offset:.0f}{unit_lbl}</div>
         </div>
         """, unsafe_allow_html=True)
 
