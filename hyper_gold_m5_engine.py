@@ -37,6 +37,16 @@ SL_MIN_PIPS = 10.0          # Stop Loss minimo di protezione: 10 pip
 SL_MAX_PIPS = 35.0          # Stop Loss massimo invalicabile (cap di sicurezza): 35 pip
 BE_EXTRA_LOCK_PIPS = 1.0    # Lock sopra il breakeven a protezione spread (+1 pip)
 
+# Costanti di compatibilità per UI dashboard (hyper_tab)
+WARMUP_BARS_KJ = 55
+WARMUP_BARS_TK = 21
+CORE_TS_TRIGGER_PIPS = 20.0
+INC_CONTRACTS = 3
+MAX_INCREMENTS = 3
+INC_TP_PIPS = 10.0
+CANDELA_SEGNALE_OFFSET_PIPS = 5.0
+TK_FILTER_PIPS = 50.0
+
 # Orari Sospensione Gold:
 GOLD_FEED_SUSPEND_START_HOUR = 23
 GOLD_FEED_SUSPEND_START_MIN = 0

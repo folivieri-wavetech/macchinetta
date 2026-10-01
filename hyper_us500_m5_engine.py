@@ -37,6 +37,10 @@ SL_MIN_PTS = 2.0            # Stop Loss minimo di protezione: 2.0 pt
 SL_MAX_PTS = 6.0            # Stop Loss massimo invalicabile (cap di sicurezza): 6.0 pt
 BE_EXTRA_LOCK_PTS = 0.5     # Lock sopra il breakeven a protezione spread (+0.5 pt)
 
+# Costanti di compatibilità per UI dashboard (hyper_tab)
+INC_CONTRACTS = 3
+MAX_INCREMENTS = 3
+
 # Orari Sospensione US 500
 def is_us500_feed_suspended(dt: datetime.datetime = None) -> bool:
     if dt is None: dt = now_it()
