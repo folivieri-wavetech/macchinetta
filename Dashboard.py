@@ -2471,10 +2471,14 @@ if not st.session_state.logged_in:
                     st.error("Le password non coincidono o sono vuote.")
     else:
         st.title("🔐 Fiordok Trading")
-        st.subheader("Accedi al pannello di controllo")
         ultimo_acc = carica_ultimo_utente()
+        lista_utenti = list(auth_manager.get_tutti_utenti().keys())
         with st.form("login_form"):
-            user = st.text_input("Account", value=ultimo_acc)
+            if lista_utenti:
+                idx_default = lista_utenti.index(ultimo_acc) if ultimo_acc in lista_utenti else 0
+                user = st.selectbox("Account", options=lista_utenti, index=idx_default)
+            else:
+                user = st.text_input("Account", value=ultimo_acc)
             pw = st.text_input("Password", type="password")
             if st.form_submit_button("Accedi"):
                 res = auth_manager.verifica_login(user, pw)
