@@ -504,21 +504,23 @@ def renderizza_tab_goldfinger(conto):
 
     with col_ladder:
         if is_attivo:
-            c_title, c_stop = st.columns([65, 35], vertical_alignment="center")
+            c_title, c_stop = st.columns([77, 23], vertical_alignment="center")
             with c_title:
-                st.markdown("<h4 style='color: #FFD700; margin: 0;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='color: #FFD700; margin: 0; white-space: nowrap; font-size: 1.05rem;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
             with c_stop:
                 st.markdown("""
                     <style>
                     div.btn-stop-compact button {
-                        height: 32px !important;
-                        min-height: 32px !important;
-                        padding: 0px 8px !important;
-                        font-size: 0.78rem !important;
+                        height: 26px !important;
+                        min-height: 26px !important;
+                        padding: 0px 6px !important;
+                        font-size: 0.70rem !important;
                         font-weight: 700 !important;
                         border: 1px solid #ef4444 !important;
                         color: #f87171 !important;
                         background: rgba(239, 68, 68, 0.08) !important;
+                        white-space: nowrap !important;
+                        border-radius: 4px !important;
                     }
                     div.btn-stop-compact button:hover {
                         background: rgba(239, 68, 68, 0.25) !important;
@@ -541,7 +543,7 @@ def renderizza_tab_goldfinger(conto):
                 st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px; font-size: 1.05rem;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
         
         scaglioni = stato.get("scaglioni", [])
         if not scaglioni and pz_l1 > 0:
