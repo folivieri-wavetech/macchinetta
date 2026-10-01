@@ -1129,9 +1129,13 @@ def carica_hull_trend_dash(conto=None):
     if conto:
         candidates.append(os.path.join(conto, HULL_TREND_FILE))
         candidates.append(os.path.join("..", conto, HULL_TREND_FILE))
+        candidates.append(os.path.join("/data", conto, HULL_TREND_FILE))
     for c_alt in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_REALE", "DANY_REALE", "BONGIOLO_REALE", "Logs_e_Cache", "."]:
         candidates.append(os.path.join(c_alt, HULL_TREND_FILE))
         candidates.append(os.path.join("..", c_alt, HULL_TREND_FILE))
+        candidates.append(os.path.join("/data", c_alt, HULL_TREND_FILE))
+    candidates.append(os.path.join("/data", HULL_TREND_FILE))
+    candidates.append(HULL_TREND_FILE)
     for p in candidates:
         if os.path.exists(p):
             try:

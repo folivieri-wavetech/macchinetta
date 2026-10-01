@@ -97,6 +97,19 @@ try {
         $fname = $_.Name
         & $KUBECTL --kubeconfig=$KUBECONFIG cp "Sistema/$fname" "macchinetta/${POD_DASH}:/data/Sistema/$fname"
     }
+    if (Test-Path "hull_trend.json") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp "hull_trend.json" "macchinetta/${POD_DASH}:/data/hull_trend.json"
+        foreach ($acc in @("FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "Logs_e_Cache")) {
+            & $KUBECTL --kubeconfig=$KUBECONFIG cp "hull_trend.json" "macchinetta/${POD_DASH}:/data/$acc/hull_trend.json"
+        }
+    }
+    Get-ChildItem -Path "." -Filter "candele_*_HOUR.json" | ForEach-Object {
+        $cname = $_.Name
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp "$cname" "macchinetta/${POD_DASH}:/data/$cname"
+        foreach ($acc in @("FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "Logs_e_Cache")) {
+            & $KUBECTL --kubeconfig=$KUBECONFIG cp "$cname" "macchinetta/${POD_DASH}:/data/$acc/$cname"
+        }
+    }
     Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
 } finally {
     Pop-Location
