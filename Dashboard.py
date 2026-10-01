@@ -6,6 +6,7 @@ import json
 import os
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 import time
+import threading
 import pandas as pd
 import requests
 import re
@@ -95,6 +96,28 @@ DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
 st.set_page_config(page_title="Macchinetta IG", layout="wide", initial_sidebar_state="expanded")
 if DEV_MODE:
     st.error("⚠️ **MODALITÀ SVILUPPO (DEV_MODE) ATTIVA** - I motori stanno scrivendo messaggi fittizi. Le connessioni API a IG sono sospese.")
+
+# --- AVVIO AUTOMATICO BACKGROUND DAEMON HYPER M5 / M10 H24 ---
+_hyper_init_started = False
+_hyper_init_lock = threading.Lock()
+
+def _avvia_hyper_h24_background():
+    global _hyper_init_started
+    with _hyper_init_lock:
+        if not _hyper_init_started:
+            _hyper_init_started = True
+            def _worker():
+                try:
+                    time.sleep(1.0)
+                    from hyper_gold_m5_engine import HyperGoldM5Engine
+                    from hyper_us500_m5_engine import HyperUS500M5Engine
+                    HyperGoldM5Engine.get_instance("DANY_DEMO")
+                    HyperUS500M5Engine.get_instance("DANY_DEMO")
+                except Exception:
+                    pass
+            threading.Thread(target=_worker, daemon=True, name="HyperH24InitThread").start()
+
+_avvia_hyper_h24_background()
 
 # --- FUNZIONI HELPER MULTI-CONTO ---
 def get_accounts():

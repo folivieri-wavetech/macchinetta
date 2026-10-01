@@ -117,6 +117,8 @@ Write-Host "==========================================" -ForegroundColor Cyan
 $health = curl.exe -k -s -o /dev/null -w "%{http_code}" https://macchinetta.wavetech.it/_stcore/health
 if ($health -eq "200") {
     Write-Host "Dashboard attiva e raggiungibile con successo (HTTP 200) su https://macchinetta.wavetech.it" -ForegroundColor Green
+    # Risveglio immediato sessione Dashboard per avvio background thread e streaming Hyper H24
+    & curl.exe -k -s -o /dev/null https://macchinetta.wavetech.it/
 } else {
     Write-Host "Health check ha restituito HTTP $health (attendi qualche secondo)." -ForegroundColor Yellow
 }

@@ -271,14 +271,74 @@ class HyperUS500M5Engine:
         return user, pwd, api_key
 
     def _fetch_historical_m5_bars_from_ig(self):
-        """Caricamento e aggregazione a 10M da cache/stato locale (ZERO chiamate IG REST)"""
+        """Caricamento e aggregazione a 10M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
+        now_ts = now_it().timestamp()
+
+        # 1. Verifica se candele già fresche e complete (senza buchi > 20 min)
         with self.lock:
             if len(self.candles) >= WARMUP_BARS_KJ:
-                self.candles = aggregate_candles_to_10m(self.candles)[-500:]
+                last_b = self.candles[-1].get("boundary", 0)
+                if (now_ts - last_b) <= 1200 or is_us500_feed_suspended():
+                    self.candles = aggregate_candles_to_10m(self.candles)[-500:]
+                    self._recalculate_indicators()
+                    self.save_state()
+                    return
+
+        # 2. Cerca file orario locale per colmare qualsiasi gap senza chiamate a IG
+        hourly_candidates = [
+            "candele_US_500_Cash_HOUR.json",
+            os.path.join("/data", "candele_US_500_Cash_HOUR.json"),
+            os.path.join(self.account_dir or "", "candele_US_500_Cash_HOUR.json"),
+            os.path.join("..", "candele_US_500_Cash_HOUR.json"),
+        ]
+        derived_10m = []
+        for h_path in hourly_candidates:
+            if os.path.exists(h_path):
+                try:
+                    with open(h_path, "r", encoding="utf-8") as f:
+                        h_bars = json.load(f)
+                    if isinstance(h_bars, list) and h_bars:
+                        for hb in h_bars[-72:]:
+                            t_str = hb.get("snapshotTime", "")
+                            if not t_str:
+                                continue
+                            dt_hb = datetime.datetime.strptime(t_str, "%Y/%m/%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc).astimezone(TZ_ITALIA)
+                            base_b = int(dt_hb.timestamp())
+                            op = float(hb["openPrice"]["bid"])
+                            hi = float(hb["highPrice"]["bid"])
+                            lo = float(hb["lowPrice"]["bid"])
+                            cl = float(hb["closePrice"]["bid"])
+                            for i in range(6):
+                                b = base_b + i * CANDLE_SECONDS
+                                t_str_it = datetime.datetime.fromtimestamp(b, TZ_ITALIA).strftime("%H:%M:%S")
+                                derived_10m.append({
+                                    "boundary": b,
+                                    "time": t_str_it,
+                                    "open": op,
+                                    "high": hi,
+                                    "low": lo,
+                                    "close": cl
+                                })
+                        if derived_10m:
+                            break
+                except Exception as e_h:
+                    logger.warning(f"Errore lettura file orario {h_path}: {e_h}")
+
+        with self.lock:
+            merged_map = {}
+            for b in derived_10m:
+                merged_map[b["boundary"]] = b
+            for b in self.candles:
+                merged_map[b["boundary"]] = b
+
+            if len(merged_map) >= WARMUP_BARS_KJ:
+                self.candles = [merged_map[k] for k in sorted(merged_map.keys())][-500:]
                 self._recalculate_indicators()
                 self.save_state()
+                logger.info(f"✅ [HYPER US500 10M] Riallineate {len(self.candles)} barre 10M con cache oraria locale (KJ55: {self.kj55}, ZERO chiamate IG).")
                 return
 
+        # 3. Fallback su file candele alternativi se presenti
         central_file = "candele_Spot_US500_M5.json"
         candidates = [central_file, STATE_FILE]
         if getattr(self, "account_dir", None):
@@ -290,7 +350,6 @@ class HyperUS500M5Engine:
             os.path.join("BONGIOLO_DEMO", STATE_FILE),
             os.path.join("/data", "DANY_DEMO", STATE_FILE),
             os.path.join("/data", "FIORDOK_DEMO", STATE_FILE),
-            "candele_US_500_Cash_HOUR.json"
         ])
 
         for fpath in candidates:
@@ -304,7 +363,7 @@ class HyperUS500M5Engine:
                             self.candles = aggregate_candles_to_10m(c_list)[-500:]
                             self._recalculate_indicators()
                             self.save_state()
-                        print(f"✅ [HYPER US500 10M] Caricate {len(self.candles)} barre 10M aggregate da file locale {fpath} (ZERO chiamate IG).")
+                        logger.info(f"✅ [HYPER US500 10M] Caricate {len(self.candles)} barre 10M aggregate da file locale {fpath} (ZERO chiamate IG).")
                         return
                 except Exception:
                     pass
