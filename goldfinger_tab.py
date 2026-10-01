@@ -504,46 +504,79 @@ def renderizza_tab_goldfinger(conto):
 
     with col_ladder:
         if is_attivo:
-            c_title, c_stop = st.columns([77, 23], vertical_alignment="center")
-            with c_title:
-                st.markdown("<h4 style='color: #FFD700; margin: 0; white-space: nowrap; font-size: 1.05rem;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
-            with c_stop:
-                st.markdown("""
-                    <style>
-                    div.btn-stop-compact button {
-                        height: 26px !important;
-                        min-height: 26px !important;
-                        padding: 0px 6px !important;
-                        font-size: 0.70rem !important;
-                        font-weight: 700 !important;
-                        border: 1px solid #ef4444 !important;
-                        color: #f87171 !important;
-                        background: rgba(239, 68, 68, 0.08) !important;
-                        white-space: nowrap !important;
-                        border-radius: 4px !important;
-                    }
-                    div.btn-stop-compact button:hover {
-                        background: rgba(239, 68, 68, 0.25) !important;
-                        color: #ffffff !important;
-                    }
-                    </style>
-                """, unsafe_allow_html=True)
-                st.markdown("<div class='btn-stop-compact'>", unsafe_allow_html=True)
-                if st.button("🛑 STOP GOLDFINGER", key=f"btn_stop_gf_{conto}", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
-                    if not is_operativo:
-                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+            st.markdown("""
+                <style>
+                div[class*="st-key-gf_header_row"] div[data-testid="stHorizontalBlock"] {
+                    align-items: center !important;
+                    gap: 12px !important;
+                    justify-content: flex-start !important;
+                    flex-wrap: nowrap !important;
+                }
+                div[class*="st-key-gf_header_row"] div[data-testid="stColumn"]:first-child {
+                    flex: 0 0 auto !important;
+                    width: auto !important;
+                    min-width: auto !important;
+                }
+                div[class*="st-key-gf_header_row"] div[data-testid="stColumn"]:last-child {
+                    flex: 0 0 auto !important;
+                    width: auto !important;
+                    min-width: auto !important;
+                }
+                div[class*="st-key-btn_stop_gf_"] {
+                    display: inline-flex !important;
+                    width: auto !important;
+                    margin: 0 !important;
+                }
+                div[class*="st-key-btn_stop_gf_"] button {
+                    height: 24px !important;
+                    min-height: 24px !important;
+                    max-height: 24px !important;
+                    padding: 0px 8px !important;
+                    border: 1px solid #ef4444 !important;
+                    background: rgba(239, 68, 68, 0.12) !important;
+                    border-radius: 4px !important;
+                    width: auto !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                }
+                div[class*="st-key-btn_stop_gf_"] button:hover {
+                    background: rgba(239, 68, 68, 0.28) !important;
+                    border-color: #f87171 !important;
+                }
+                div[class*="st-key-btn_stop_gf_"] button p {
+                    font-size: 0.65rem !important;
+                    font-weight: 700 !important;
+                    color: #f87171 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    line-height: 1 !important;
+                    white-space: nowrap !important;
+                }
+                div[class*="st-key-btn_stop_gf_"] button:hover p {
+                    color: #ffffff !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            with st.container(key="gf_header_row"):
+                c_title, c_stop = st.columns([1, 1], vertical_alignment="center")
+                with c_title:
+                    st.markdown("<h4 style='color: #FFD700; margin: 0; white-space: nowrap;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
+                with c_stop:
+                    if st.button("🛑 STOP GOLDFINGER", key=f"btn_stop_gf_{conto}", type="secondary", use_container_width=False, disabled=(not is_operativo), help=help_gf_viewer):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
+                        new_cfg = cfg.copy()
+                        new_cfg["attivo"] = False
+                        new_cfg["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                        scrivi_json_sicuro(paths["config"], new_cfg)
+                        st.info("🛑 GOLDFINGER ARRESTATO. Le posizioni aperte rimangono intatte sotto gestione manuale.")
+                        time.sleep(0.5)
                         st.rerun()
-                    new_cfg = cfg.copy()
-                    new_cfg["attivo"] = False
-                    new_cfg["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                    scrivi_json_sicuro(paths["config"], new_cfg)
-                    st.info("🛑 GOLDFINGER ARRESTATO. Le posizioni aperte rimangono intatte sotto gestione manuale.")
-                    time.sleep(0.5)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px; font-size: 1.05rem;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
         
         scaglioni = stato.get("scaglioni", [])
         if not scaglioni and pz_l1 > 0:
