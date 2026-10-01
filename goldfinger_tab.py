@@ -275,7 +275,7 @@ def renderizza_tab_goldfinger(conto):
         ask_str = f"{float(ask_live):.2f}" if ask_live else "--"
         info_sub = f"IG Live • {ora_agg}" if ora_agg else "Prezzo Bid / Ask IG"
         st.markdown(
-            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px; text-align: center;'>"
             f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>🟡 Spot Gold Live</div>"
             f"<div style='font-size: 1.05rem; font-weight: 700; margin-top: 3px;'><span style='color: #fa8072;'>{bid_str}</span> <span style='color: #64748b; font-size: 0.90rem;'>/</span> <span style='color: #22c55e;'>{ask_str}</span></div>"
             f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>{info_sub}</div>"
@@ -296,7 +296,7 @@ def renderizza_tab_goldfinger(conto):
             st_desc = "Guardia a mercato"
             st_col = "#22c55e"
         st.markdown(
-            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px; text-align: center;'>"
             f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>🛡️ Stato Guardia</div>"
             f"<div style='color: {st_col}; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{st_text}</div>"
             f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>{st_desc}</div>"
@@ -305,10 +305,10 @@ def renderizza_tab_goldfinger(conto):
         )
     with c3:
         st.markdown(
-            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
-            f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>⚖️ Delta Scoperto IG</div>"
-            f"<div style='color: #38bdf8; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{delta_calcolato} mini</div>"
-            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>+{tot_long} L / -{tot_short} S</div>"
+            f"<div style='background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 6px; padding: 8px 12px; min-height: 64px; text-align: center;'>"
+            f"<div style='color: #7dd3fc; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;'>⚖️ Delta Scoperto IG</div>"
+            f"<div style='color: #38bdf8; font-size: 1.25rem; font-weight: 800; margin-top: 2px;'>{delta_calcolato} mini</div>"
+            f"<div style='color: #94a3b8; font-size: 0.72rem; margin-top: 2px;'><span style='color: #4ade80; font-weight: 600;'>+{tot_long} L</span> <span style='color: #64748b;'>/</span> <span style='color: #f87171; font-weight: 600;'>-{tot_short} S</span></div>"
             f"</div>",
             unsafe_allow_html=True
         )
@@ -316,7 +316,7 @@ def renderizza_tab_goldfinger(conto):
         pnl_inc = stato.get("totale_incassato", 0.0)
         pnl_col = "#94a3b8" if pnl_inc == 0 else ("#22c55e" if pnl_inc > 0 else "#ef4444")
         st.markdown(
-            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px;'>"
+            f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px; text-align: center;'>"
             f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>💰 Cash Incassato</div>"
             f"<div style='color: {pnl_col}; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{pnl_inc:+.2f} €</div>"
             f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>Dai rimbalzi (+7 pip)</div>"
@@ -344,7 +344,7 @@ def renderizza_tab_goldfinger(conto):
             # Badge di confronto se il robot è già attivo a mercato
             confronto_armato_html = ""
             if is_attivo and saved_pz1 > 0:
-                diff_pts = sugg_lvl - saved_pz1
+                diff_pts = saved_pz1 - sugg_lvl
                 diff_sign = f"+{diff_pts:.2f}" if diff_pts >= 0 else f"{diff_pts:.2f}"
                 confronto_armato_html = f"<span style='color: #94a3b8; font-size: 0.74rem; font-weight: 500;'>(In esecuzione @ <b style='color: #facc15;'>{saved_pz1:.2f}</b> • Delta: {diff_sign} pip)</span>"
             
