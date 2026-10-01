@@ -69,6 +69,7 @@ FILE_TOKEN = "token_ig.json"
 FILE_STORICO = "storico_operazioni.csv"
 CONSOLE_LOG_FILE = "console_live.log"
 STATO_SISTEMA = "stato_sistema.json"
+TIMEOUT_STATO_SISTEMA_SEC = 120
 import Sistema.auth_manager as auth_manager
 
 # --- VOCABOLARIO ---
@@ -2526,7 +2527,7 @@ else:
             def get_tempo_connessione(acc, st_acc):
                 motore_attivo = False
                 path_stato = os.path.join(acc, STATO_SISTEMA)
-                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60:
+                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < TIMEOUT_STATO_SISTEMA_SEC:
                     motore_attivo = True
 
                 durata_str = "--"
@@ -4708,7 +4709,7 @@ else:
                 motore_attivo = False
                 path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
                 if os.path.exists(path_stato):
-                    if (time.time() - os.path.getmtime(path_stato)) < 60: motore_attivo = True
+                    if (time.time() - os.path.getmtime(path_stato)) < TIMEOUT_STATO_SISTEMA_SEC: motore_attivo = True
             
                 badge_motore = "🟢 Connesso" if motore_attivo else "🔴 Offline"
                 saldo_val = formatta_eur(stato_sys.get('saldo', '0'))
@@ -5542,7 +5543,7 @@ else:
 
                 motore_attivo = False
                 path_stato = os.path.join(conto_selezionato, STATO_SISTEMA)
-                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < 60:
+                if os.path.exists(path_stato) and (time.time() - os.path.getmtime(path_stato)) < TIMEOUT_STATO_SISTEMA_SEC:
                     motore_attivo = True
                 stato = leggi_stato_sistema(conto_selezionato)
 
