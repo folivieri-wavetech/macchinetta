@@ -240,7 +240,7 @@ class GoldfingerEngine:
             
         return self.cache_prezzo_live
 
-    def apri_short_mercato(self, size):
+    def apri_short_mercato(self, size, numero_scaglione=None):
         now_t = time.time()
         if (now_t - self.ultimo_tentativo_ordine) < 3.0:
             # Salvaguardia anti-flood: rispetta almeno 3 secondi tra ordini consecutivi
@@ -258,27 +258,45 @@ class GoldfingerEngine:
             "forceOpen": "true",
             "currencyCode": VALUTA_GOLD
         }
+        lbl_sc = f" [Scaglione {numero_scaglione}]" if numero_scaglione else ""
         try:
             r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=payload, timeout=8)
             if r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
-                time.sleep(1.2)
-                # Verifica conferma
-                r_conf = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=self.get_auth_headers("1"), timeout=8)
-                if r_conf.status_code == 200:
-                    c_data = r_conf.json()
-                    deal_status = c_data.get("dealStatus")
-                    if deal_status == "ACCEPTED":
-                        deal_id = c_data.get("dealId")
-                        level = float(c_data.get("level", 0.0))
-                        print_log(f"✅ Eseguito SHORT a mercato: {size} contratti @ {level:.2f} [ID: {deal_id}]")
-                        return True, deal_id, level
-                    else:
-                        print_log(f"⚠️ Ordine SHORT rifiutato da IG: {c_data.get('reason')}")
+                print_log(f"📤 Ordine SHORT inviato a IG{lbl_sc} [dealRef: {deal_ref}]. Avvio verifica esecuzione (fino a 5 tentativi a intervalli di 5s)...")
+
+                # Fino a 5 tentativi distanziati di 5 secondi ciascuno (tolleranza 25 secondi totali)
+                for tentativo in range(1, 6):
+                    time.sleep(5.0)
+                    try:
+                        r_conf = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=self.get_auth_headers("1"), timeout=8)
+                        if r_conf.status_code == 200:
+                            c_data = r_conf.json()
+                            deal_status = c_data.get("dealStatus")
+                            if deal_status == "ACCEPTED":
+                                deal_id = c_data.get("dealId")
+                                level = float(c_data.get("level", 0.0))
+                                print_log(f"✅ Eseguito SHORT a mercato{lbl_sc} (confermato al tentativo {tentativo}/5): {size} contratti @ {level:.2f} [ID: {deal_id}]")
+                                return True, deal_id, level
+                            elif deal_status == "REJECTED":
+                                reason = c_data.get("reason", "UNKNOWN_REASON")
+                                print_log(f"🛑 [TENTATIVO {tentativo}/5] Ordine SHORT respinto da IG{lbl_sc}: {reason}")
+                                break
+                            else:
+                                print_log(f"⏳ [TENTATIVO {tentativo}/5] Deal {deal_ref} in elaborazione IG (stato: {deal_status}). Attesa 5s...")
+                        elif r_conf.status_code == 401:
+                            print_log("🔄 Token IG non valido durante verifica conferma: ricarico credenziali...")
+                            self.carica_token()
+                        else:
+                            print_log(f"⚠️ [TENTATIVO {tentativo}/5] Risposta HTTP {r_conf.status_code} da IG su /confirms/{deal_ref}")
+                    except Exception as e_conf:
+                        print_log(f"⚠️ [TENTATIVO {tentativo}/5] Errore verifica conferma{lbl_sc}: {e_conf}")
+
+                print_log(f"🛑 [ORDINE NON ESEGUITO] Scaglione{lbl_sc} NON eseguito dopo 5 tentativi (25s) di verifica su IG [dealRef: {deal_ref}]. Arresto tentativi per sicurezza.")
             else:
-                print_log(f"⚠️ Errore invio ordine SHORT IG: HTTP {r.status_code} - {r.text}")
+                print_log(f"⚠️ Errore invio ordine SHORT IG{lbl_sc}: HTTP {r.status_code} - {r.text}")
         except Exception as e:
-            print_log(f"⚠️ Eccezione invio ordine SHORT: {e}")
+            print_log(f"⚠️ Eccezione invio ordine SHORT{lbl_sc}: {e}")
         return False, None, None
 
     def chiudi_short_mercato(self, deal_id, size):
@@ -354,24 +372,35 @@ class GoldfingerEngine:
             print_log(f"🚀 GOLDFINGER AVVIATO: Livello 1 @ {pz_start:.2f}, Passo {passo} pip, Delta {delta} contratti ({len(self.stato['scaglioni'])} scaglioni).")
             invia_notifica("AVVIO GOLDFINGER", f"Guardia avviata: Livello 1 a {pz_start:.2f}, Delta {delta} contratti.", "rocket")
 
-        # 2b. GESTIONE AGGIORNAMENTO LIVELLO A CALDO (se non ci sono posizioni aperte)
+        # 2b. GESTIONE AGGIORNAMENTO LIVELLO O DELTA A CALDO (se non ci sono posizioni aperte)
         if self.stato.get("attivo") and is_attivo_ui:
             cfg_pz1 = config_ui.get("livello_1_prezzo")
             stato_pz1 = self.stato.get("livello_1_prezzo")
-            if cfg_pz1 and stato_pz1 and abs(float(cfg_pz1) - float(stato_pz1)) > 0.01:
+            cfg_delta = config_ui.get("delta_totale")
+            stato_delta = self.stato.get("delta_totale")
+
+            diff_pz1 = (cfg_pz1 is not None and stato_pz1 is not None and abs(float(cfg_pz1) - float(stato_pz1)) > 0.01)
+            diff_delta = (cfg_delta is not None and stato_delta is not None and int(cfg_delta) != int(stato_delta))
+
+            if diff_pz1 or diff_delta:
                 scaglioni_curr = self.stato.get("scaglioni", [])
-                aperti_curr = [s for s in scaglioni_curr if s.get("stato") in ("APERTO", "PROTETTO_BE")]
+                aperti_curr = [s for s in scaglioni_curr if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
                 if not aperti_curr:
+                    target_pz1 = float(cfg_pz1) if cfg_pz1 is not None else float(stato_pz1)
+                    target_delta = int(cfg_delta) if cfg_delta is not None else int(stato_delta)
                     passo_c = float(config_ui.get("passo_pip", self.stato.get("passo_pip", 6.0)))
                     sz_c = int(config_ui.get("size_scaglione", self.stato.get("size_scaglione", 3)))
-                    delta_c = int(config_ui.get("delta_totale", self.stato.get("delta_totale", 15)))
-                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 spostato da {stato_pz1:.2f} a {float(cfg_pz1):.2f}")
-                    self.stato["livello_1_prezzo"] = float(cfg_pz1)
-                    self.stato["scaglioni"] = self.calcola_scaglioni_interi(float(cfg_pz1), passo_c, sz_c, delta_c)
+
+                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 = {target_pz1:.2f}, Delta = {target_delta} contratti ({max(1, target_delta // sz_c)} scaglioni)")
+                    self.stato["livello_1_prezzo"] = target_pz1
+                    self.stato["passo_pip"] = passo_c
+                    self.stato["size_scaglione"] = sz_c
+                    self.stato["delta_totale"] = target_delta
+                    self.stato["scaglioni"] = self.calcola_scaglioni_interi(target_pz1, passo_c, sz_c, target_delta)
                     self.stato["minimo_discesa"] = None
                     self.stato["minimo_precedente"] = None
                     self.salva_stato()
-                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 a {float(cfg_pz1):.2f}", "arrows_counterclockwise")
+                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 @ {target_pz1:.2f}, Delta {target_delta} mini ({len(self.stato['scaglioni'])} scaglioni).", "arrows_counterclockwise")
 
         # 3. VERIFICA FINESTRA ROLLOVER
         if self.is_in_rollover():
@@ -395,7 +424,7 @@ class GoldfingerEngine:
         self.stato["ultimo_prezzo_ask"] = ask
 
         scaglioni = self.stato.get("scaglioni", [])
-        aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE")]
+        aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
         
         # 5. TRACCIAMENTO DEL MINIMO DISCESA
         if aperti:
@@ -410,8 +439,8 @@ class GoldfingerEngine:
         for idx, sc in enumerate(scaglioni):
             if sc["stato"] == "IN_ATTESA":
                 if bid <= sc["prezzo_target"]:
-                    # Invia ordine SHORT a mercato
-                    ok, deal_id, lvl = self.apri_short_mercato(sc["size"])
+                    # Invia ordine SHORT a mercato con tolleranza (5 tentativi a intervalli di 5s)
+                    ok, deal_id, lvl = self.apri_short_mercato(sc["size"], numero_scaglione=sc.get("numero"))
                     if ok:
                         sc["stato"] = "APERTO"
                         sc["deal_id"] = deal_id
@@ -420,13 +449,36 @@ class GoldfingerEngine:
                         sc["opened_at"] = time.time()
                         
                         # Protezione a Break-Even + 1 pip dello scaglione precedente!
-                        if idx > 0 and scaglioni[idx - 1]["stato"] in ("APERTO", "PROTETTO_BE"):
+                        if idx > 0 and scaglioni[idx - 1]["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
                             sc_prev = scaglioni[idx - 1]
                             sc_prev["stato"] = "PROTETTO_BE"
                             sc_prev["sl_price"] = sc_prev["open_price"] - 1.0 # 1 pip sotto l'entrata SHORT = profitto blindato
                             print_log(f"🛡️ Scaglione {sc_prev['numero']} protetto a Break-Even+1 @ {sc_prev['sl_price']:.2f}")
 
                         invia_notifica("SCAGLIONE SHORT ESEGUITO", f"Agganciato Scaglione {sc['numero']} ({sc['size']} mini) @ {lvl:.2f}", "heavy_minus_sign")
+                        self.salva_stato()
+
+                        # CONTROLLO RECUPERO SCAGLIONI ROSSI PRECEDENTI
+                        scaglioni_rossi = [s for s in scaglioni if s.get("numero") < sc.get("numero") and s.get("stato") == "NON_ESEGUITO"]
+                        for sc_r in scaglioni_rossi:
+                            print_log(f"🔍 Rilevato Scaglione {sc_r['numero']} NON ESEGUITO in precedenza (rosso). Tento il recupero a mercato al prezzo attuale ({bid:.2f})...")
+                            ok_rec, deal_id_rec, lvl_rec = self.apri_short_mercato(sc_r["size"], numero_scaglione=f"{sc_r['numero']} (RECUPERO)")
+                            if ok_rec:
+                                sc_r["stato"] = "RECUPERATO"
+                                sc_r["deal_id"] = deal_id_rec
+                                sc_r["open_price"] = lvl_rec
+                                sc_r["sl_price"] = lvl_rec + 6.0
+                                sc_r["opened_at"] = time.time()
+                                print_log(f"🟡 [RECUPERO COMPLETATO] Scaglione {sc_r['numero']} recuperato con successo a {lvl_rec:.2f} [ID: {deal_id_rec}]! Segnato GIALLO.")
+                                invia_notifica("RECUPERO SCAGLIONE", f"Scaglione {sc_r['numero']} recuperato a mercato @ {lvl_rec:.2f}", "arrows_counterclockwise")
+                                self.salva_stato()
+                            else:
+                                print_log(f"⚠️ Recupero Scaglione {sc_r['numero']} fallito anche al prezzo attuale. Rimane NON ESEGUITO (rosso).")
+                    else:
+                        # Non eseguito dopo i 5 tentativi: segna NON_ESEGUITO (pallino rosso) e fermati
+                        sc["stato"] = "NON_ESEGUITO"
+                        print_log(f"🔴 Scaglione {sc['numero']} marchiato NON_ESEGUITO. Il motore si ferma per questo livello per evitare duplicazioni.")
+                        invia_notifica("SCAGLIONE NON ESEGUITO", f"Scaglione {sc['numero']} non eseguito su IG dopo 5 tentativi (25s).", "stop_sign")
                         self.salva_stato()
                     break # Gestisci un livello per tick
 
@@ -440,7 +492,7 @@ class GoldfingerEngine:
                 for sc in aperti:
                     ok, lvl_c, pnl = self.chiudi_short_mercato(sc["deal_id"], sc["size"])
                     if ok:
-                        sc["stato"] = "CHIUSO"
+                        sc["stato"] = "RECUPERATO_CHIUSO" if sc.get("stato") == "RECUPERATO" else "CHIUSO"
                         pnl_tot_rimbalzo += pnl
                         self.stato["storico_operazioni"].append({
                             "data": now_it().strftime("%d/%m %H:%M:%S"),
@@ -461,7 +513,7 @@ class GoldfingerEngine:
                 return
 
         # 8. RIARMO AUTOMATICO SULLA SECONDA ONDATA (Rottura Minimo Precedente di 5 pip)
-        tutti_chiusi = len(scaglioni) > 0 and all(s["stato"] == "CHIUSO" for s in scaglioni)
+        tutti_chiusi = len(scaglioni) > 0 and all(s["stato"] in ("CHIUSO", "RECUPERATO_CHIUSO") for s in scaglioni)
         min_prec = self.stato.get("minimo_precedente")
         if tutti_chiusi and min_prec is not None:
             soglia_riarmo = round(min_prec - 5.0, 2)
@@ -483,7 +535,7 @@ class GoldfingerEngine:
                 print_log(f"🛑 Falso allarme Scaglione {sc_unica['numero']}: Colpito Stop Loss a {ask:.2f}. Chiudo in minima perdita.")
                 ok, lvl_c, pnl = self.chiudi_short_mercato(sc_unica["deal_id"], sc_unica["size"])
                 if ok:
-                    sc_unica["stato"] = "CHIUSO"
+                    sc_unica["stato"] = "RECUPERATO_CHIUSO" if sc_unica.get("stato") == "RECUPERATO" else "CHIUSO"
                     self.stato["pnl_sessione"] += pnl
                     self.stato["minimo_discesa"] = None
                     self.stato["storico_operazioni"].append({

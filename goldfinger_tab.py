@@ -381,7 +381,7 @@ def renderizza_tab_goldfinger(conto):
 
         # Controllo posizioni già a mercato per sblocco modifiche a caldo
         scaglioni_att = stato.get("scaglioni", [])
-        aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE")]
+        aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
         has_aperti = len(aperti_att) > 0
 
         col_inp, col_btn_sugg = st.columns([7, 5], vertical_alignment="bottom")
@@ -405,6 +405,65 @@ def renderizza_tab_goldfinger(conto):
                         st.rerun()
                     st.session_state[ss_key] = float(sugg_lvl)
                     st.rerun()
+
+        # Tasto Salva dedicato subito sotto la casella Livello 1 quando il valore digitato differisce da quello salvato
+        if not has_aperti and abs(float(pz_l1) - float(saved_pz1)) > 0.01:
+            if is_attivo:
+                if st.button(
+                    f"💾 Salva Nuovo Livello 1 @ {pz_l1:.2f}",
+                    key=f"btn_aggiorna_man_{conto}",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=(not is_operativo),
+                    help=help_gf_viewer or "Conferma e applica immediatamente il nuovo prezzo Livello 1 al robot a mercato"
+                ):
+                    if not is_operativo:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
+                    if bid_live and float(pz_l1) >= float(bid_live):
+                        st.error(f"🛑 ERRORE DI SICUREZZA: Il nuovo Livello 1 ({pz_l1:.2f}) deve essere RIGOROSAMENTE INFERIORE al prezzo live ({float(bid_live):.2f})!")
+                    elif bid_live and (float(bid_live) - float(pz_l1)) > 200:
+                        st.error(f"🛑 ERRORE: Il nuovo Livello 1 ({pz_l1:.2f}) è troppo distante dal prezzo attuale ({float(bid_live):.2f}). Verifica il valore!")
+                    else:
+                        new_cfg = cfg.copy()
+                        new_cfg["livello_1_prezzo"] = float(pz_l1)
+                        new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                        scrivi_json_sicuro(paths["config"], new_cfg)
+
+                        new_stato = stato.copy()
+                        new_stato["livello_1_prezzo"] = float(pz_l1)
+                        new_stato["scaglioni"] = calcola_scaglioni_interi(
+                            float(pz_l1),
+                            float(cfg.get("passo_pip", 6.0)),
+                            int(cfg.get("size_scaglione", 3)),
+                            int(cfg.get("delta_totale", 15))
+                        )
+                        scrivi_json_sicuro(paths["stato"], new_stato)
+                        st.session_state[ss_key] = float(pz_l1)
+                        st.success(f"✅ Guardia aggiornata a caldo: Livello 1 spostato a {pz_l1:.2f} con scaglioni ricalcolati!")
+                        time.sleep(0.5)
+                        st.rerun()
+            else:
+                if st.button(
+                    f"💾 Salva Prezzo Livello 1 @ {pz_l1:.2f}",
+                    key=f"btn_salva_inattivo_{conto}",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=(not is_operativo),
+                    help=help_gf_viewer or "Salva il prezzo Livello 1 nei parametri di configurazione"
+                ):
+                    if not is_operativo:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
+                    new_cfg = cfg.copy()
+                    new_cfg["livello_1_prezzo"] = float(pz_l1)
+                    scrivi_json_sicuro(paths["config"], new_cfg)
+                    st.session_state[ss_key] = float(pz_l1)
+                    st.success(f"✅ Prezzo Livello 1 salvato a {pz_l1:.2f}!")
+                    time.sleep(0.3)
+                    st.rerun()
+        elif is_attivo and saved_pz1 > 0:
+            st.markdown(f"<div style='color: #22c55e; font-size: 0.73rem; margin-top: -6px; margin-bottom: 8px;'>🔒 Livello 1 attualmente armato e operativo a <b>{saved_pz1:.2f}</b></div>", unsafe_allow_html=True)
 
         cp, cs = st.columns(2)
         with cp:
@@ -449,39 +508,8 @@ def renderizza_tab_goldfinger(conto):
                 unsafe_allow_html=True
             )
 
-            # Hot-Update a caldo (se nessuna posizione è già aperta a mercato)
+            # Scorciatoia diretta per aggiornare con un click al Chirurgico Consigliato (se nessuna posizione è già aperta a mercato)
             if not has_aperti:
-                # 1. Modifica manuale del campo Livello 1
-                if abs(float(pz_l1) - float(saved_pz1)) > 0.01:
-                    if st.button(f"💾 Salva Nuovo Livello 1 @ {pz_l1:.2f}", key=f"btn_aggiorna_man_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
-                        if not is_operativo:
-                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                            st.rerun()
-                        if bid_live and float(pz_l1) >= float(bid_live):
-                            st.error(f"🛑 ERRORE DI SICUREZZA: Il nuovo Livello 1 ({pz_l1:.2f}) deve essere RIGOROSAMENTE INFERIORE al prezzo live ({float(bid_live):.2f})!")
-                        elif bid_live and (float(bid_live) - float(pz_l1)) > 200:
-                            st.error(f"🛑 ERRORE: Il nuovo Livello 1 ({pz_l1:.2f}) è troppo distante dal prezzo attuale ({float(bid_live):.2f}). Verifica il valore!")
-                        else:
-                            new_cfg = cfg.copy()
-                            new_cfg["livello_1_prezzo"] = float(pz_l1)
-                            new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                            scrivi_json_sicuro(paths["config"], new_cfg)
-
-                            new_stato = stato.copy()
-                            new_stato["livello_1_prezzo"] = float(pz_l1)
-                            new_stato["scaglioni"] = calcola_scaglioni_interi(
-                                float(pz_l1),
-                                float(cfg.get("passo_pip", passo)),
-                                int(cfg.get("size_scaglione", size_u)),
-                                int(cfg.get("delta_totale", delta_input))
-                            )
-                            scrivi_json_sicuro(paths["stato"], new_stato)
-                            st.session_state[ss_key] = float(pz_l1)
-                            st.success(f"✅ Guardia aggiornata a caldo: Livello 1 spostato a {pz_l1:.2f} con scaglioni ricalcolati!")
-                            time.sleep(0.5)
-                            st.rerun()
-
-                # 2. Scorciatoia diretta per aggiornare con un click al Chirurgico Consigliato
                 if sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
                     if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
                         if not is_operativo:
@@ -547,16 +575,14 @@ def renderizza_tab_goldfinger(conto):
             tab_rows = ""
             for s in scaglioni:
                 st_code = s.get("stato", "IN_ATTESA")
-                if st_code == "IN_ATTESA":
-                    st_badge = "<span style='color: #94a3b8; font-weight: bold;'>⏳ In Attesa</span>"
-                elif st_code == "APERTO":
-                    st_badge = f"<span style='color: #38bdf8; font-weight: bold;'>🟢 APERTO @ {s.get('open_price', 0):.2f}</span>"
-                elif st_code == "PROTETTO_BE":
-                    st_badge = f"<span style='color: #22c55e; font-weight: bold;'>🛡️ BE+1 (SL: {s.get('sl_price', 0):.2f})</span>"
-                elif st_code == "CHIUSO":
-                    st_badge = "<span style='color: #FFD700; font-weight: bold;'>💰 Chiuso all'Incasso</span>"
+                if st_code in ("RECUPERATO", "RECUPERATO_CHIUSO"):
+                    st_badge = "<span style='font-size: 1.10rem;' title='Eseguito successivamente (Recuperato)'>🟡</span>"
+                elif st_code in ("APERTO", "PROTETTO_BE", "CHIUSO"):
+                    st_badge = "<span style='font-size: 1.10rem;' title='Eseguito'>🟢</span>"
+                elif st_code in ("NON_ESEGUITO", "FALLITO", "RIFIUTATO"):
+                    st_badge = "<span style='font-size: 1.10rem;' title='Non eseguito'>🔴</span>"
                 else:
-                    st_badge = st_code
+                    st_badge = "<span style='color: #94a3b8; font-weight: 500;'>In attesa</span>"
                 
                 pz_tgt = f"{s.get('prezzo_target', 0):.2f}"
                 tab_rows += (
@@ -595,6 +621,72 @@ def renderizza_tab_goldfinger(conto):
                 )
         else:
             st.info("Imposta il Prezzo del Livello 1 a sinistra per visualizzare l'anteprima della scaletta.")
+
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+        if st.button("Ricalcola", key=f"btn_ricalcola_scaletta_{conto}", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Ricalcola a caldo il delta scoperto netto (Long - Short) e aggiorna la scaletta scaglioni"):
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
+
+            # 1. Ricalcolo delta live reale dalle posizioni su Spot Gold
+            curr_long = 0
+            curr_short = 0
+            pos_agg = carica_json_sicuro(paths["posizioni"], [])
+            for p in pos_agg:
+                inst = str(p.get("instrument", "")).upper()
+                epic = str(p.get("epic", "")).upper()
+                if "GOLD" in inst or "GOLD" in epic or "CFEGOLD" in epic:
+                    sz = int(float(p.get("size", 0)))
+                    d = p.get("direction", "").upper()
+                    if d in ("BUY", "LONG"):
+                        curr_long += sz
+                    elif d in ("SELL", "SHORT"):
+                        curr_short += sz
+
+            nuovo_delta = max(0, curr_long - curr_short)
+
+            # Parametri attuali
+            pz_rif = float(cfg.get("livello_1_prezzo") or pz_l1 or 0.0)
+            passo_rif = float(cfg.get("passo_pip", passo))
+            size_rif = int(cfg.get("size_scaglione", size_u))
+
+            if pz_rif <= 0:
+                st.error("🛑 Errore: Livello 1 non definito. Inserisci un prezzo valido a sinistra prima di ricalcolare.")
+            else:
+                # Scaglioni attuali
+                scaglioni_att = stato.get("scaglioni", [])
+                aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+
+                if aperti_att:
+                    # Preserva gli scaglioni già aperti a mercato e riallinea il residuo
+                    size_aperta = sum(s.get("size", size_rif) for s in aperti_att)
+                    delta_residuo = max(0, nuovo_delta - size_aperta)
+                    nuovi_scaglioni = list(aperti_att)
+                    if delta_residuo > 0:
+                        ult_pz = min(s.get("prezzo_target", pz_rif) for s in aperti_att)
+                        num_partenza = max(s.get("numero", 1) for s in aperti_att) + 1
+                        sc_extra = calcola_scaglioni_interi(round(ult_pz - passo_rif, 2), passo_rif, size_rif, delta_residuo)
+                        for idx, se in enumerate(sc_extra):
+                            se["numero"] = num_partenza + idx
+                            nuovi_scaglioni.append(se)
+                else:
+                    # Nessuna posizione aperta: ricalcolo completo pulito
+                    nuovi_scaglioni = calcola_scaglioni_interi(pz_rif, passo_rif, size_rif, nuovo_delta)
+
+                new_cfg = cfg.copy()
+                new_cfg["delta_totale"] = int(nuovo_delta)
+                new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                scrivi_json_sicuro(paths["config"], new_cfg)
+
+                new_stato = stato.copy()
+                new_stato["delta_totale"] = int(nuovo_delta)
+                new_stato["scaglioni"] = nuovi_scaglioni
+                scrivi_json_sicuro(paths["stato"], new_stato)
+
+                num_sc = len(nuovi_scaglioni)
+                st.success(f"✅ Ricalcolo completato: {curr_long} Long - {curr_short} Short = Delta scoperto {nuovo_delta} mini. Scaletta aggiornata a {num_sc} scaglioni da {size_rif}!")
+                time.sleep(0.6)
+                st.rerun()
 
     # Storico Operazioni di Incasso
     st.markdown("<hr style='margin: 15px 0 10px 0; border-color: #334155;'>", unsafe_allow_html=True)
