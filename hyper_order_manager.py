@@ -613,18 +613,18 @@ class HyperOrderManager:
                             contracts = float(t.get("contracts") or 5.0)
 
                             # Modalità incremento o core
-                            lbl = "Spot Gold 10M"
+                            lbl = "Spot Gold 5M"
                             if "INC" in act:
                                 mode = "RUNNER" if "RUNNER" in act else "BANCOMAT"
-                                lbl = f"Inc {mode} Spot Gold 10M"
+                                lbl = f"Inc {mode} Spot Gold 5M"
                             elif "CORE" in act:
-                                lbl = "Core Spot Gold 10M"
+                                lbl = "Core Spot Gold 5M"
 
                             trade_recovered = {
                                 "id": str(int(time.time() * 1000)),
                                 "time_open": time_close,
                                 "time_close": time_close,
-                                "tf": "10M",
+                                "tf": "5M",
                                 "epic": EPIC_GOLD,
                                 "direction": direction,
                                 "contracts": contracts,
@@ -673,18 +673,18 @@ class HyperOrderManager:
                             close_px = float(t.get("close_price") or 0.0)
                             contracts = float(t.get("contracts") or 5.0)
 
-                            lbl = "US500 10M"
+                            lbl = "US500 5M"
                             if "INC" in act:
                                 mode = "RUNNER" if "RUNNER" in act else "BANCOMAT"
-                                lbl = f"Inc {mode} US500 10M"
+                                lbl = f"Inc {mode} US500 5M"
                             elif "CORE" in act:
-                                lbl = "Core US500 10M"
+                                lbl = "Core US500 5M"
 
                             trade_recovered = {
                                 "id": str(int(time.time() * 1000)),
                                 "time_open": time_close,
                                 "time_close": time_close,
-                                "tf": "10M",
+                                "tf": "5M",
                                 "epic": "IX.D.SPTRD.IBE.IP",
                                 "direction": direction,
                                 "contracts": contracts,

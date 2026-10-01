@@ -18,13 +18,13 @@ except Exception:
     pass
 
 EPIC_US500 = "IX.D.SPTRD.IBE.IP"
-CANDLE_SECONDS = 600    # 10 Minuti (M10) per barra
-WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M10 = 550 min = ~9.1 ore)
+CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
+WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M5 = 275 min = ~4.58 ore)
 WARMUP_BARS_TK = 55     # Retrocompatibilità
 STATE_FILE = "hyper_us500_m5_state.json"
 
-def aggregate_candles_to_10m(candles):
-    """Aggrega una lista di candele a 10 Minuti (600s boundary) da candele 5M o 10M esistenti"""
+def aggregate_candles_to_5m(candles):
+    """Aggrega una lista di candele a 5 Minuti (300s boundary) da candele esistenti"""
     if not candles:
         return []
     buckets = {}
@@ -52,7 +52,10 @@ def aggregate_candles_to_10m(candles):
         })
     return aggregated
 
-# Parametri Strategia: S&R Puro KJ55 a Doppia Velocità (Core 4c + Incrementi Bancomat/Runner + Trailing Stop M10)
+# Alias per retrocompatibilità
+aggregate_candles_to_10m = aggregate_candles_to_5m
+
+# Parametri Strategia: S&R Puro KJ55 a Doppia Velocità (Core 4c + Incrementi Bancomat/Runner + Trailing Stop M5)
 CORE_CONTRACTS = 4          # Size iniziale Core: 4 contratti
 CORE_TS_TRIGGER_PIPS = 15.0 # Attivazione Trailing Stop Core: a +15 punti di guadagno
 CORE_TS_LOCK_PIPS = 10.0    # Lock profit iniziale Core: +10 punti garantiti (+40.00 €)
@@ -271,17 +274,17 @@ class HyperUS500M5Engine:
         return user, pwd, api_key
 
     def _fetch_historical_m5_bars_from_ig(self):
-        """Caricamento e aggregazione a 10M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
+        """Caricamento e aggregazione a 5M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
         now_ts = now_it().timestamp()
 
-        # 1. Verifica se candele già fresche e complete (senza buchi interni > 20 min)
+        # 1. Verifica se candele già fresche e complete (senza buchi interni > 10 min)
         with self.lock:
             if len(self.candles) >= WARMUP_BARS_KJ:
                 last_b = self.candles[-1].get("boundary", 0)
                 sub_tail = self.candles[-WARMUP_BARS_KJ:]
-                has_internal_gap = any((sub_tail[i+1].get("boundary", 0) - sub_tail[i].get("boundary", 0)) > 1200 for i in range(len(sub_tail)-1))
-                if not has_internal_gap and ((now_ts - last_b) <= 1200 or is_us500_feed_suspended()):
-                    self.candles = aggregate_candles_to_10m(self.candles)[-500:]
+                has_internal_gap = any((sub_tail[i+1].get("boundary", 0) - sub_tail[i].get("boundary", 0)) > 600 for i in range(len(sub_tail)-1))
+                if not has_internal_gap and ((now_ts - last_b) <= 600 or is_us500_feed_suspended()):
+                    self.candles = aggregate_candles_to_5m(self.candles)[-500:]
                     self._recalculate_indicators()
                     self.save_state()
                     return
@@ -293,7 +296,7 @@ class HyperUS500M5Engine:
             os.path.join(self.account_dir or "", "candele_US_500_Cash_HOUR.json"),
             os.path.join("..", "candele_US_500_Cash_HOUR.json"),
         ]
-        derived_10m = []
+        derived_5m = []
         for h_path in hourly_candidates:
             if os.path.exists(h_path):
                 try:
@@ -310,10 +313,10 @@ class HyperUS500M5Engine:
                             hi = float(hb["highPrice"]["bid"])
                             lo = float(hb["lowPrice"]["bid"])
                             cl = float(hb["closePrice"]["bid"])
-                            for i in range(6):
+                            for i in range(12):
                                 b = base_b + i * CANDLE_SECONDS
                                 t_str_it = datetime.datetime.fromtimestamp(b, TZ_ITALIA).strftime("%H:%M:%S")
-                                derived_10m.append({
+                                derived_5m.append({
                                     "boundary": b,
                                     "time": t_str_it,
                                     "open": op,
@@ -321,14 +324,14 @@ class HyperUS500M5Engine:
                                     "low": lo,
                                     "close": cl
                                 })
-                        if derived_10m:
+                        if derived_5m:
                             break
                 except Exception as e_h:
                     logger.warning(f"Errore lettura file orario {h_path}: {e_h}")
 
         with self.lock:
             merged_map = {}
-            for b in derived_10m:
+            for b in derived_5m:
                 merged_map[b["boundary"]] = b
             for b in self.candles:
                 merged_map[b["boundary"]] = b
@@ -337,7 +340,7 @@ class HyperUS500M5Engine:
                 self.candles = [merged_map[k] for k in sorted(merged_map.keys())][-500:]
                 self._recalculate_indicators()
                 self.save_state()
-                logger.info(f"✅ [HYPER US500 10M] Riallineate {len(self.candles)} barre 10M con cache oraria locale (KJ55: {self.kj55}, ZERO chiamate IG).")
+                logger.info(f"✅ [HYPER US500 5M] Riallineate {len(self.candles)} barre 5M con cache oraria locale (KJ55: {self.kj55}, ZERO chiamate IG).")
                 return
 
         # 3. Fallback su file candele alternativi se presenti
@@ -362,16 +365,16 @@ class HyperUS500M5Engine:
                     c_list = d if isinstance(d, list) else d.get("candles", [])
                     if len(c_list) >= 55:
                         with self.lock:
-                            self.candles = aggregate_candles_to_10m(c_list)[-500:]
+                            self.candles = aggregate_candles_to_5m(c_list)[-500:]
                             self._recalculate_indicators()
                             self.save_state()
-                        logger.info(f"✅ [HYPER US500 10M] Caricate {len(self.candles)} barre 10M aggregate da file locale {fpath} (ZERO chiamate IG).")
+                        logger.info(f"✅ [HYPER US500 5M] Caricate {len(self.candles)} barre 5M aggregate da file locale {fpath} (ZERO chiamate IG).")
                         return
                 except Exception:
                     pass
 
     def _recalculate_indicators(self):
-        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M10 US500.
+        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M5 US500.
         Allineato agli standard di mercato (TradingView / IG Charts):
         prende le ultime 54 candele chiuse + gli estremi della candela corrente in formazione."""
         n = len(self.candles)
@@ -454,8 +457,8 @@ class HyperUS500M5Engine:
             self.increments = d.get("increments", [])
             self.trades = d.get("trades", [])
             raw_c = d.get("candles", [])
-            self.candles = aggregate_candles_to_10m(raw_c) if raw_c else []
-            if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 600):
+            self.candles = aggregate_candles_to_5m(raw_c) if raw_c else []
+            if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 300):
                 self.candles = []
             self.last_ts_cycle = d.get("last_ts_cycle")
             self.last_regime = d.get("last_regime", None)
@@ -561,7 +564,7 @@ class HyperUS500M5Engine:
             self.save_state()
 
     def manual_entry_core(self, direction: str) -> dict:
-        """Avvio manuale discrezionale della posizione Core 10M US 500 (4 contratti)."""
+        """Avvio manuale discrezionale della posizione Core 5M US 500 (4 contratti)."""
         norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
         with self.lock:
             if not self.trading_enabled:
@@ -621,8 +624,8 @@ class HyperUS500M5Engine:
                             logger.info(f"🛑 [WEEKEND SHUTDOWN] Venerdì ore {t.strftime('%H:%M:%S')}: Trading US 500 Cash disattivato automaticamente per il weekend. Stato impostato su DA AVVIARE.")
                             try:
                                 order_mgr.send_notification(
-                                    "🛑 US 500 CASH 10M: WEEKEND SHUTDOWN",
-                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore US 500 Cash 10M disattivato e reimpostato su DA AVVIARE.",
+                                    "🛑 US 500 CASH 5M: WEEKEND SHUTDOWN",
+                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore US 500 Cash 5M disattivato e reimpostato su DA AVVIARE.",
                                     "pause_button"
                                 )
                             except Exception:
@@ -733,7 +736,7 @@ class HyperUS500M5Engine:
 
                 self.trades.insert(0, {
                     "time": time_str,
-                    "action": f"🚀 TRAILING ATTIVATO US500 10M {direction}",
+                    "action": f"🚀 TRAILING ATTIVATO US500 5M {direction}",
                     "open_price": open_px,
                     "close_price": current_price,
                     "contracts": pos["contracts"],
@@ -794,7 +797,7 @@ class HyperUS500M5Engine:
                 direction=direction,
                 size=CORE_CONTRACTS,
                 limit_level=None,
-                label="Core US500 10M",
+                label="Core US500 5M",
                 epic=EPIC_US500
             )
             if res.get("success"):
@@ -814,7 +817,7 @@ class HyperUS500M5Engine:
                     }
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"🚀 OPEN REAL IG US500 {direction} ({CORE_CONTRACTS}c Core 10M)",
+                        "action": f"🚀 OPEN REAL IG US500 {direction} ({CORE_CONTRACTS}c Core 5M)",
                         "open_price": real_open,
                         "close_price": None,
                         "contracts": CORE_CONTRACTS,
@@ -824,12 +827,12 @@ class HyperUS500M5Engine:
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        "🚀 OPEN CORE 10M: US 500 Cash",
+                        "🚀 OPEN CORE 5M: US 500 Cash",
                         f"[US 500] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} pt",
                         "rocket"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura Core US500 10M IG: {e}")
+            logger.error(f"Errore apertura Core US500 5M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
@@ -844,11 +847,11 @@ class HyperUS500M5Engine:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             if mode == "BANCOMAT":
                 tp_px = round(exec_price + self.inc_tp_pips if direction == "LONG" else exec_price - self.inc_tp_pips, 2)
-                lbl_order = f"Inc. Bancomat US500 10M #{len(self.increments)+1}"
+                lbl_order = f"Inc. Bancomat US500 5M #{len(self.increments)+1}"
                 limit_level = tp_px
             else: # RUNNER
                 tp_px = None
-                lbl_order = f"Inc. Runner US500 10M #{len(self.increments)+1}"
+                lbl_order = f"Inc. Runner US500 5M #{len(self.increments)+1}"
                 limit_level = None
 
             res = order_mgr.open_market_deal(
@@ -904,22 +907,22 @@ class HyperUS500M5Engine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Incremento {mode} US500 10M @ {real_open:.2f} ({tp_desc}, Deal ID: {deal_id})"
+                        "reason": f"Incremento {mode} US500 5M @ {real_open:.2f} ({tp_desc}, Deal ID: {deal_id})"
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        f"➕ INCREMENTO {mode} 10M: US 500 Cash",
+                        f"➕ INCREMENTO {mode} 5M: US 500 Cash",
                         f"[US 500] Incremento {mode} #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} pt ({tp_desc}, Tot: {tot_c}c)",
                         "heavy_plus_sign"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura incremento {mode} US500 10M IG: {e}")
+            logger.error(f"Errore apertura incremento {mode} US500 5M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
 
     def _execute_close_increment(self, inc: dict, current_price: float, time_str: str, reason: str = None):
-        """Chiude a mercato reale un singolo incremento 10M (per TP Bancomat, Trailing Stop Runner, o Incasso Sicurezza)."""
+        """Chiude a mercato reale un singolo incremento 5M (per TP Bancomat, Trailing Stop Runner, o Incasso Sicurezza)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             deal_id = inc.get("deal_id")
@@ -931,7 +934,7 @@ class HyperUS500M5Engine:
                 deal_id=deal_id,
                 direction_open=inc["direction"],
                 size=inc["contracts"],
-                label=f"Chiusura Inc {mode} US500 10M",
+                label=f"Chiusura Inc {mode} US500 5M",
                 reason_note=reason
             )
             profit = float(res.get("profit") or 0.0)
@@ -945,7 +948,7 @@ class HyperUS500M5Engine:
                 self.balance += profit
 
                 order_mgr.record_closed_trade(
-                    tf="10M",
+                    tf="5M",
                     direction=inc["direction"],
                     contracts=inc["contracts"],
                     open_price=inc["open_price"],
@@ -954,7 +957,7 @@ class HyperUS500M5Engine:
                     deal_id=deal_id,
                     reason=reason,
                     time_open=inc.get("open_time", time_str),
-                    label=f"Inc {mode} US500 10M",
+                    label=f"Inc {mode} US500 5M",
                     epic=EPIC_US500
                 )
 
@@ -970,12 +973,12 @@ class HyperUS500M5Engine:
                 })
                 self.save_state()
                 order_mgr.send_notification(
-                    f"🎯 CHIUSURA INC {mode} 10M: US 500 Cash",
+                    f"🎯 CHIUSURA INC {mode} 5M: US 500 Cash",
                     f"[US 500] Close Incr {mode} {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}",
                     "dart"
                 )
         except Exception as e:
-            logger.error(f"Errore chiusura incremento US500 10M IG: {e}")
+            logger.error(f"Errore chiusura incremento US500 5M IG: {e}")
 
     def _execute_close_all_flat(self, exec_price: float, time_str: str, reason: str):
         try:
@@ -1008,7 +1011,7 @@ class HyperUS500M5Engine:
                         close_px = float(res.get("close_level") or exec_price)
                         try:
                             order_mgr.record_closed_trade(
-                                tf="10M",
+                                tf="5M",
                                 direction=pos_to_close["direction"],
                                 contracts=pos_to_close["contracts"],
                                 open_price=pos_to_close["open_price"],
@@ -1017,7 +1020,7 @@ class HyperUS500M5Engine:
                                 deal_id=deal_id,
                                 reason=reason,
                                 time_open=pos_to_close.get("open_time", time_str),
-                                label="Core US500 10M",
+                                label="Core US500 5M",
                                 epic=EPIC_US500
                             )
                         except Exception as ex_rec:
@@ -1039,13 +1042,13 @@ class HyperUS500M5Engine:
                         is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
                         if is_ts:
                             tag_cl = "dart"
-                            tit_cl = "🎯 TS HIT 10M: US 500 Cash"
+                            tit_cl = "🎯 TS HIT 5M: US 500 Cash"
                         elif is_rev:
                             tag_cl = "warning"
-                            tit_cl = "🛑 REVERSAL 10M: US 500 Cash"
+                            tit_cl = "🛑 REVERSAL 5M: US 500 Cash"
                         else:
                             tag_cl = "octagonal_sign"
-                            tit_cl = "🛑 CHIUSURA FLAT 10M: US 500 Cash"
+                            tit_cl = "🛑 CHIUSURA FLAT 5M: US 500 Cash"
                         msg_cl = f"[US 500] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {close_px:.2f} pt [PnL: {profit:+.2f} €] - Motivo: {reason}"
                         order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
                 except Exception as ex_c:
@@ -1061,7 +1064,7 @@ class HyperUS500M5Engine:
                             deal_id=deal_i,
                             direction_open=inc["direction"],
                             size=inc["contracts"],
-                            label=f"Chiusura Inc {mode_i} US500 10M Flat",
+                            label=f"Chiusura Inc {mode_i} US500 5M Flat",
                             reason_note=reason
                         )
                         if not res_i.get("success") and not res_i.get("already_closed"):
@@ -1074,7 +1077,7 @@ class HyperUS500M5Engine:
                         close_i = float(res_i.get("close_level") or exec_price)
                         try:
                             order_mgr.record_closed_trade(
-                                tf="10M",
+                                tf="5M",
                                 direction=inc["direction"],
                                 contracts=inc["contracts"],
                                 open_price=inc["open_price"],
@@ -1083,7 +1086,7 @@ class HyperUS500M5Engine:
                                 deal_id=inc["deal_id"],
                                 reason=reason,
                                 time_open=inc.get("open_time", time_str),
-                                label=f"Inc {mode_i} US500 10M",
+                                label=f"Inc {mode_i} US500 5M",
                                 epic=EPIC_US500
                             )
                         except Exception as ex_rec:
@@ -1104,7 +1107,7 @@ class HyperUS500M5Engine:
                 except Exception as ex_i:
                     logger.error(f"Errore chiusura incremento US500 {inc.get('deal_id')}: {ex_i}")
                 order_mgr.send_notification(
-                    f"🛑 CHIUSURA FLAT INC {mode_i} 10M: US 500 Cash",
+                    f"🛑 CHIUSURA FLAT INC {mode_i} 5M: US 500 Cash",
                     f"[US 500] Incremento {mode_i} {inc['direction']} ({inc['contracts']}c) chiuso a {close_i:.2f} pt [PnL: {prof_i:+.2f} €]",
                     "octagonal_sign"
                 )
@@ -1113,7 +1116,7 @@ class HyperUS500M5Engine:
             with self.lock:
                 self.save_state()
         except Exception as e:
-            logger.error(f"Errore chiusura posizioni flat US500 10M IG: {e}")
+            logger.error(f"Errore chiusura posizioni flat US500 5M IG: {e}")
         finally:
             with self.lock:
                 self.closing_in_progress = False
@@ -1124,7 +1127,7 @@ class HyperUS500M5Engine:
         self.closing_in_progress = True
         threading.Thread(
             target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"TS US500 10M @ {current_price:.2f}"),
+            args=(current_price, time_str, f"TS US500 5M @ {current_price:.2f}"),
             daemon=True
         ).start()
 
@@ -1267,10 +1270,10 @@ class HyperUS500M5Engine:
                 self.curr_low = mid
                 self.curr_close = mid
                 self.curr_bar_start_t = now_t
-                # Se il motore parte a più di 60s dall'inizio del boundary M10, la prima barra è parziale
+                # Se il motore parte a più di 60s dall'inizio del boundary M5, la prima barra è parziale
                 self.curr_bar_is_partial = (now_t - boundary) > 60
                 if self.curr_bar_is_partial:
-                    logger.info(f"⏳ [CANDELA M10 PARZIALE AVVIATA] US 500 Cash: motore avviato a metà barra (trascorsi {int(now_t - boundary)}s). La prima barra sarà di solo allineamento.")
+                    logger.info(f"⏳ [CANDELA M5 PARZIALE AVVIATA] US 500 Cash: motore avviato a metà barra (trascorsi {int(now_t - boundary)}s). La prima barra sarà di solo allineamento.")
                 return
 
             if boundary == self.curr_boundary:
@@ -1319,7 +1322,7 @@ class HyperUS500M5Engine:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 
     def _update_increments_dynamic_mode(self, dist_kj: float, closed_close: float, time_str: str):
-        """A fine candela M10, valuta dinamicamente gli incrementi attivi:
+        """A fine candela M5, valuta dinamicamente gli incrementi attivi:
         1. Se dist_kj > 10 pt: i Bancomat passano a RUNNER (rimozione TP su IG, attivazione TS con cricchetto).
            Una volta RUNNER, un incremento NON torna MAI più a Bancomat.
         2. Per tutti i RUNNER (nati Runner o promossi): aggiornamento TS a cricchetto (Ratchet):
@@ -1396,7 +1399,7 @@ class HyperUS500M5Engine:
 
         # Rilevamento Taglio (Cross) KJ55
         if self.last_regime is not None and current_regime is not None and current_regime != self.last_regime:
-            logger.info(f"⚡ [TAGLIO KJ 10M] US 500 Cash: cambio regime da {self.last_regime} a {current_regime} (Close={prev_close:.2f}, KJ={kj:.2f})")
+            logger.info(f"⚡ [TAGLIO KJ 5M] US 500 Cash: cambio regime da {self.last_regime} a {current_regime} (Close={prev_close:.2f}, KJ={kj:.2f})")
             self.last_regime = current_regime
             self.regime_traded = False
             self.save_state()
@@ -1406,7 +1409,7 @@ class HyperUS500M5Engine:
             # Non azzarda mai ingressi a freddo su trend preesistenti. Si opera SOLO su tagli confermati in diretta.
             self.last_regime = current_regime
             self.regime_traded = True
-            logger.info(f"🔄 [BOOTSTRAP KJ 10M] US 500 Cash: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
+            logger.info(f"🔄 [BOOTSTRAP KJ 5M] US 500 Cash: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
             self.save_state()
 
         # AGGIORNAMENTO DINAMICO INCREMENTI A FINE CANDELA (OPZIONE 1):

@@ -18,13 +18,13 @@ except Exception:
     pass
 
 EPIC_GOLD = "CS.D.CFEGOLD.CBE.IP"
-CANDLE_SECONDS = 600    # 10 Minuti (M10) per barra
-WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M10 = 550 min = ~9.1 ore)
+CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
+WARMUP_BARS_KJ = 55     # Kijun 55 periodi (55 barre M5 = 275 min = ~4.58 ore)
 WARMUP_BARS_TK = 55     # Retrocompatibilità
 STATE_FILE = "hyper_gold_m5_state.json"
 
-def aggregate_candles_to_10m(candles):
-    """Aggrega una lista di candele a 10 Minuti (600s boundary) da candele 5M o 10M esistenti"""
+def aggregate_candles_to_5m(candles):
+    """Aggrega una lista di candele a 5 Minuti (300s boundary) da candele esistenti"""
     if not candles:
         return []
     buckets = {}
@@ -51,6 +51,9 @@ def aggregate_candles_to_10m(candles):
             "close": cl
         })
     return aggregated
+
+# Alias per retrocompatibilità
+aggregate_candles_to_10m = aggregate_candles_to_5m
 
 # Parametri Strategia: S&R Puro KJ55 a Doppia Velocità (Core + Incrementi Bancomat/Runner + Trailing Stop M5)
 CORE_CONTRACTS = 5          # Size iniziale Core: 5 contratti
@@ -98,7 +101,7 @@ GOLD_TRADE_SUSPEND_END_MIN = 15
 def is_gold_feed_suspended(dt: datetime.datetime = None) -> bool:
     """Restituisce True durante la chiusura reale del mercato Gold (pausa tecnica COMEX 23:00 - 00:00):
     - Weekend: da venerdì sera ore 23:00 fino alla domenica sera ore 21:58.
-    - Notturno feriale (Lun-Gio): dalle 23:00:00 alle 23:59:59 (dalle 00:00 il feed riapre per candele M10)."""
+    - Notturno feriale (Lun-Gio): dalle 23:00:00 alle 23:59:59 (dalle 00:00 il feed riapre per candele M5)."""
     if dt is None:
         dt = now_it()
     wd = dt.weekday()
@@ -287,17 +290,17 @@ class HyperGoldM5Engine:
         return user, pwd, api_key
 
     def _fetch_historical_m5_bars_from_ig(self):
-        """Caricamento e aggregazione a 10M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
+        """Caricamento e aggregazione a 5M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
         now_ts = now_it().timestamp()
 
-        # 1. Verifica se candele già fresche e complete (senza buchi interni > 20 min)
+        # 1. Verifica se candele già fresche e complete (senza buchi interni > 10 min)
         with self.lock:
             if len(self.candles) >= WARMUP_BARS_KJ:
                 last_b = self.candles[-1].get("boundary", 0)
                 sub_tail = self.candles[-WARMUP_BARS_KJ:]
-                has_internal_gap = any((sub_tail[i+1].get("boundary", 0) - sub_tail[i].get("boundary", 0)) > 1200 for i in range(len(sub_tail)-1))
-                if not has_internal_gap and ((now_ts - last_b) <= 1200 or is_gold_feed_suspended()):
-                    self.candles = aggregate_candles_to_10m(self.candles)[-500:]
+                has_internal_gap = any((sub_tail[i+1].get("boundary", 0) - sub_tail[i].get("boundary", 0)) > 600 for i in range(len(sub_tail)-1))
+                if not has_internal_gap and ((now_ts - last_b) <= 600 or is_gold_feed_suspended()):
+                    self.candles = aggregate_candles_to_5m(self.candles)[-500:]
                     self._recalculate_indicators()
                     self.save_state()
                     return
@@ -309,7 +312,7 @@ class HyperGoldM5Engine:
             os.path.join(self.account_dir or "", "candele_Spot_Gold_HOUR.json"),
             os.path.join("..", "candele_Spot_Gold_HOUR.json"),
         ]
-        derived_10m = []
+        derived_5m = []
         for h_path in hourly_candidates:
             if os.path.exists(h_path):
                 try:
@@ -326,10 +329,10 @@ class HyperGoldM5Engine:
                             hi = float(hb["highPrice"]["bid"])
                             lo = float(hb["lowPrice"]["bid"])
                             cl = float(hb["closePrice"]["bid"])
-                            for i in range(6):
+                            for i in range(12):
                                 b = base_b + i * CANDLE_SECONDS
                                 t_str_it = datetime.datetime.fromtimestamp(b, TZ_ITALIA).strftime("%H:%M:%S")
-                                derived_10m.append({
+                                derived_5m.append({
                                     "boundary": b,
                                     "time": t_str_it,
                                     "open": op,
@@ -337,14 +340,14 @@ class HyperGoldM5Engine:
                                     "low": lo,
                                     "close": cl
                                 })
-                        if derived_10m:
+                        if derived_5m:
                             break
                 except Exception as e_h:
                     logger.warning(f"Errore lettura file orario {h_path}: {e_h}")
 
         with self.lock:
             merged_map = {}
-            for b in derived_10m:
+            for b in derived_5m:
                 merged_map[b["boundary"]] = b
             for b in self.candles:
                 merged_map[b["boundary"]] = b
@@ -353,7 +356,7 @@ class HyperGoldM5Engine:
                 self.candles = [merged_map[k] for k in sorted(merged_map.keys())][-500:]
                 self._recalculate_indicators()
                 self.save_state()
-                logger.info(f"✅ [HYPER GOLD 10M] Riallineate {len(self.candles)} barre 10M con cache oraria locale (KJ55: {self.kj55}, ZERO chiamate IG).")
+                logger.info(f"✅ [HYPER GOLD 5M] Riallineate {len(self.candles)} barre 5M con cache oraria locale (KJ55: {self.kj55}, ZERO chiamate IG).")
                 return
 
         # 3. Fallback su file candele alternativi se presenti
@@ -378,16 +381,16 @@ class HyperGoldM5Engine:
                     c_list = d if isinstance(d, list) else d.get("candles", [])
                     if len(c_list) >= 55:
                         with self.lock:
-                            self.candles = aggregate_candles_to_10m(c_list)[-500:]
+                            self.candles = aggregate_candles_to_5m(c_list)[-500:]
                             self._recalculate_indicators()
                             self.save_state()
-                        logger.info(f"✅ [HYPER GOLD 10M] Caricate {len(self.candles)} barre 10M aggregate da file locale {fpath} (ZERO chiamate IG).")
+                        logger.info(f"✅ [HYPER GOLD 5M] Caricate {len(self.candles)} barre 5M aggregate da file locale {fpath} (ZERO chiamate IG).")
                         return
                 except Exception:
                     pass
 
     def _recalculate_indicators(self):
-        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M10.
+        """Calcola KJ55 (Supporto & Resistenza Puro) su 55 periodi M5.
         Allineato agli standard di mercato (TradingView / IG Charts):
         prende le ultime 54 candele chiuse + gli estremi della candela corrente in formazione."""
         n = len(self.candles)
@@ -480,8 +483,8 @@ class HyperGoldM5Engine:
             self.last_regime = d.get("last_regime", None)
             self.regime_traded = bool(d.get("regime_traded", True))
             raw_c = d.get("candles", [])
-            self.candles = aggregate_candles_to_10m(raw_c) if raw_c else []
-            if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 600):
+            self.candles = aggregate_candles_to_5m(raw_c) if raw_c else []
+            if self.candles and self.candles[-1].get("boundary", 0) > (time.time() + 300):
                 self.candles = []
             self.signal_candle_active = bool(d.get("signal_candle_active", False))
             self.signal_stop_price = d.get("signal_stop_price")
@@ -585,7 +588,7 @@ class HyperGoldM5Engine:
             self.save_state()
 
     def manual_entry_core(self, direction: str) -> dict:
-        """Avvio manuale discrezionale della posizione Core 10M (5 contratti)."""
+        """Avvio manuale discrezionale della posizione Core 5M (5 contratti)."""
         norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
         with self.lock:
             if not self.trading_enabled:
@@ -645,8 +648,8 @@ class HyperGoldM5Engine:
                             logger.info(f"🛑 [WEEKEND SHUTDOWN] Venerdì ore {t.strftime('%H:%M:%S')}: Trading Spot Gold disattivato automaticamente per il weekend. Stato impostato su DA AVVIARE.")
                             try:
                                 order_mgr.send_notification(
-                                    "🛑 SPOT GOLD 10M: WEEKEND SHUTDOWN",
-                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore Spot Gold 10M disattivato e reimpostato su DA AVVIARE.",
+                                    "🛑 SPOT GOLD 5M: WEEKEND SHUTDOWN",
+                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore Spot Gold 5M disattivato e reimpostato su DA AVVIARE.",
                                     "pause_button"
                                 )
                             except Exception:
@@ -854,14 +857,14 @@ class HyperGoldM5Engine:
                     pos.pop("ts_suspended_logged", None)
 
     def _execute_entry_core(self, direction: str, exec_price: float, time_str: str):
-        """Esegue l'apertura a mercato reale su IG della Core 10M (5 contratti)."""
+        """Esegue l'apertura a mercato reale su IG della Core 5M (5 contratti)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             res = order_mgr.open_market_deal(
                 direction=direction,
                 size=CORE_CONTRACTS,
                 limit_level=None,
-                label="Core 10M"
+                label="Core 5M"
             )
             if res.get("success"):
                 deal_id = res.get("deal_id")
@@ -880,7 +883,7 @@ class HyperGoldM5Engine:
                     }
                     self.trades.insert(0, {
                         "time": time_str,
-                        "action": f"🚀 OPEN REAL IG {direction} ({CORE_CONTRACTS}c Core 10M)",
+                        "action": f"🚀 OPEN REAL IG {direction} ({CORE_CONTRACTS}c Core 5M)",
                         "open_price": real_open,
                         "close_price": None,
                         "contracts": CORE_CONTRACTS,
@@ -890,18 +893,18 @@ class HyperGoldM5Engine:
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        "🚀 OPEN CORE 10M: Spot Gold",
+                        "🚀 OPEN CORE 5M: Spot Gold",
                         f"[Spot Gold] Core {direction} {CORE_CONTRACTS}c a {real_open:.2f} €",
                         "rocket"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura Core 10M IG: {e}")
+            logger.error(f"Errore apertura Core 5M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
 
     def _execute_entry_increment(self, direction: str, exec_price: float, time_str: str, mode: str = "BANCOMAT"):
-        """Esegue l'apertura a mercato reale su IG di un incremento 10M (5 contratti):
+        """Esegue l'apertura a mercato reale su IG di un incremento 5M (5 contratti):
         - Se mode='BANCOMAT': imposta TP a +5p
         - Se mode='RUNNER': nessun TP fisso, profitto corre con Trailing Stop Virtuale"""
         try:
@@ -909,11 +912,11 @@ class HyperGoldM5Engine:
             if mode == "BANCOMAT":
                 tp_px = round(exec_price + self.inc_tp_pips if direction == "LONG" else exec_price - self.inc_tp_pips, 2)
                 limit_lvl = tp_px
-                lbl_order = f"Inc. Bancomat Spot Gold 10M #{len(self.increments)+1}"
+                lbl_order = f"Inc. Bancomat Spot Gold 5M #{len(self.increments)+1}"
             else:
                 tp_px = None
                 limit_lvl = None
-                lbl_order = f"Inc. Runner Spot Gold 10M #{len(self.increments)+1}"
+                lbl_order = f"Inc. Runner Spot Gold 5M #{len(self.increments)+1}"
 
             res = order_mgr.open_market_deal(
                 direction=direction,
@@ -950,16 +953,16 @@ class HyperGoldM5Engine:
                         "contracts": INC_CONTRACTS,
                         "pnl": 0.0,
                         "balance": round(self.balance, 2),
-                        "reason": f"Incremento {mode} 10M IG @ {real_open:.2f} € ({tp_desc}, Deal ID: {deal_id})"
+                        "reason": f"Incremento {mode} 5M IG @ {real_open:.2f} € ({tp_desc}, Deal ID: {deal_id})"
                     })
                     self.save_state()
                     order_mgr.send_notification(
-                        f"➕ INCREMENTO {mode} 10M: Spot Gold",
+                        f"➕ INCREMENTO {mode} 5M: Spot Gold",
                         f"[Spot Gold] Incremento {mode} #{len(self.increments)} {direction} {INC_CONTRACTS}c a {real_open:.2f} € ({tp_desc}, Tot: {tot_c}c)",
                         "heavy_plus_sign"
                     )
         except Exception as e:
-            logger.error(f"Errore apertura incremento 10M IG: {e}")
+            logger.error(f"Errore apertura incremento 5M IG: {e}")
         finally:
             with self.lock:
                 self.entry_in_progress = False
@@ -977,7 +980,7 @@ class HyperGoldM5Engine:
                 deal_id=deal_id,
                 direction_open=inc["direction"],
                 size=inc["contracts"],
-                label=f"Chiusura Inc {mode} Spot Gold 10M",
+                label=f"Chiusura Inc {mode} Spot Gold 5M",
                 reason_note=reason
             )
             profit = float(res.get("profit") or 0.0)
@@ -992,7 +995,7 @@ class HyperGoldM5Engine:
 
                 try:
                     order_mgr.record_closed_trade(
-                        tf="10M",
+                        tf="5M",
                         direction=inc["direction"],
                         contracts=inc["contracts"],
                         open_price=inc["open_price"],
@@ -1001,7 +1004,7 @@ class HyperGoldM5Engine:
                         deal_id=deal_id,
                         reason=reason,
                         time_open=inc.get("open_time", time_str),
-                        label=f"Inc {mode} Spot Gold 10M",
+                        label=f"Inc {mode} Spot Gold 5M",
                         epic=EPIC_GOLD
                     )
                 except Exception as ex_rec:
@@ -1019,15 +1022,15 @@ class HyperGoldM5Engine:
                 })
                 self.save_state()
                 order_mgr.send_notification(
-                    f"🎯 CHIUSURA INC {mode} 10M: Spot Gold",
+                    f"🎯 CHIUSURA INC {mode} 5M: Spot Gold",
                     f"[Spot Gold] Close Incr {mode} {inc['direction']} ({inc['contracts']}c) a {close_px:.2f} [PnL: {profit:+.2f} €] - Motivo: {reason}",
                     "dart"
                 )
         except Exception as e:
-            logger.error(f"Errore chiusura incremento 10M IG: {e}")
+            logger.error(f"Errore chiusura incremento 5M IG: {e}")
 
     def _execute_close_all_flat(self, exec_price: float, time_str: str, reason: str):
-        """Chiude a mercato reale tutte le posizioni aperte su IG (Core + Incrementi 10M)."""
+        """Chiude a mercato reale tutte le posizioni aperte su IG (Core + Incrementi 5M)."""
         try:
             order_mgr = HyperOrderManager.get_instance(self.account_dir)
             with self.lock:
@@ -1045,7 +1048,7 @@ class HyperGoldM5Engine:
                         deal_id=deal_c,
                         direction_open=pos_to_close["direction"],
                         size=pos_to_close["contracts"],
-                        label="Chiusura Core Spot Gold 10M Flat",
+                        label="Chiusura Core Spot Gold 5M Flat",
                         reason_note=reason
                     )
                     if not res_c.get("success") and not res_c.get("already_closed"):
@@ -1058,7 +1061,7 @@ class HyperGoldM5Engine:
                         cl_c = float(res_c.get("close_level") or exec_price)
                         try:
                             order_mgr.record_closed_trade(
-                                tf="10M",
+                                tf="5M",
                                 direction=pos_to_close["direction"],
                                 contracts=pos_to_close["contracts"],
                                 open_price=pos_to_close["open_price"],
@@ -1067,7 +1070,7 @@ class HyperGoldM5Engine:
                                 deal_id=deal_c,
                                 reason=reason,
                                 time_open=pos_to_close.get("open_time", time_str),
-                                label="Core Spot Gold 10M",
+                                label="Core Spot Gold 5M",
                                 epic=EPIC_GOLD
                             )
                         except Exception as ex_rec:
@@ -1076,7 +1079,7 @@ class HyperGoldM5Engine:
                             self.balance += prof_c
                             self.trades.insert(0, {
                                 "time": time_str,
-                                "action": f"CLOSE CORE 10M {pos_to_close['direction']} ({prof_c:+.2f} €)",
+                                "action": f"CLOSE CORE 5M {pos_to_close['direction']} ({prof_c:+.2f} €)",
                                 "open_price": pos_to_close["open_price"],
                                 "close_price": cl_c,
                                 "contracts": pos_to_close["contracts"],
@@ -1089,13 +1092,13 @@ class HyperGoldM5Engine:
                         is_rev = "Reversal" in reason or "Inversione" in reason or "taglio" in reason.lower()
                         if is_ts:
                             tag_cl = "dart"
-                            tit_cl = "🎯 TS HIT 10M: Spot Gold"
+                            tit_cl = "🎯 TS HIT 5M: Spot Gold"
                         elif is_rev:
                             tag_cl = "warning"
-                            tit_cl = "🛑 REVERSAL 10M: Spot Gold"
+                            tit_cl = "🛑 REVERSAL 5M: Spot Gold"
                         else:
                             tag_cl = "octagonal_sign"
-                            tit_cl = "🛑 CHIUSURA FLAT 10M: Spot Gold"
+                            tit_cl = "🛑 CHIUSURA FLAT 5M: Spot Gold"
                         msg_cl = f"[Spot Gold] Core {pos_to_close['direction']} ({pos_to_close['contracts']}c) chiusa a {cl_c:.2f} € [PnL: {prof_c:+.2f} €] - Motivo: {reason}"
                         order_mgr.send_notification(tit_cl, msg_cl, tag_cl)
                 except Exception as ex_c:
@@ -1112,7 +1115,7 @@ class HyperGoldM5Engine:
                             deal_id=deal_i,
                             direction_open=inc["direction"],
                             size=inc["contracts"],
-                            label="Chiusura Inc Spot Gold 10M Flat",
+                            label="Chiusura Inc Spot Gold 5M Flat",
                             reason_note=reason
                         )
                         if not res_i.get("success") and not res_i.get("already_closed"):
@@ -1125,7 +1128,7 @@ class HyperGoldM5Engine:
                         cl_i = float(res_i.get("close_level") or exec_price)
                         try:
                             order_mgr.record_closed_trade(
-                                tf="10M",
+                                tf="5M",
                                 direction=inc["direction"],
                                 contracts=inc["contracts"],
                                 open_price=inc["open_price"],
@@ -1134,7 +1137,7 @@ class HyperGoldM5Engine:
                                 deal_id=deal_i,
                                 reason=reason,
                                 time_open=inc.get("open_time", time_str),
-                                label=f"Inc {inc.get('mode', 'BANCOMAT')} Spot Gold 10M",
+                                label=f"Inc {inc.get('mode', 'BANCOMAT')} Spot Gold 5M",
                                 epic=EPIC_GOLD
                             )
                         except Exception as ex_rec:
@@ -1143,7 +1146,7 @@ class HyperGoldM5Engine:
                             self.balance += prof_i
                             self.trades.insert(0, {
                                 "time": time_str,
-                                "action": f"CLOSE INC 10M {inc['direction']} ({prof_i:+.2f} €)",
+                                "action": f"CLOSE INC 5M {inc['direction']} ({prof_i:+.2f} €)",
                                 "open_price": inc["open_price"],
                                 "close_price": cl_i,
                                 "contracts": inc["contracts"],
@@ -1155,7 +1158,7 @@ class HyperGoldM5Engine:
                 except Exception as ex_i:
                     logger.error(f"Errore chiusura incremento Spot Gold {inc.get('deal_id')}: {ex_i}")
                     order_mgr.send_notification(
-                        "🛑 CHIUSURA FLAT INC 10M: Spot Gold",
+                        "🛑 CHIUSURA FLAT INC 5M: Spot Gold",
                         f"[Spot Gold] Incremento {inc['direction']} ({inc['contracts']}c) chiuso a {cl_i:.2f} € [PnL: {prof_i:+.2f} €]",
                         "octagonal_sign"
                     )
@@ -1165,19 +1168,19 @@ class HyperGoldM5Engine:
             with self.lock:
                 self.save_state()
         except Exception as e:
-            logger.error(f"Errore chiusura posizioni flat 10M IG: {e}")
+            logger.error(f"Errore chiusura posizioni flat 5M IG: {e}")
         finally:
             with self.lock:
                 self.closing_in_progress = False
 
     def _close_cycle_trailing_hit(self, current_price: float, time_str: str):
-        """Chiusura completa a FLAT all'entrata del Trailing Stop su 10M"""
+        """Chiusura completa a FLAT all'entrata del Trailing Stop su 5M"""
         if not self.position or getattr(self, "closing_in_progress", False):
             return
         self.closing_in_progress = True
         threading.Thread(
             target=self._execute_close_all_flat,
-            args=(current_price, time_str, f"TS Spot Gold 10M @ {current_price:.2f}"),
+            args=(current_price, time_str, f"TS Spot Gold 5M @ {current_price:.2f}"),
             daemon=True
         ).start()
 
@@ -1325,7 +1328,7 @@ class HyperGoldM5Engine:
                 if self.trading_enabled and self.position and self.signal_candle_active:
                     self._check_candela_segnale_stop(mid, time_str)
 
-            # Inizializzazione prima barra M10
+            # Inizializzazione prima barra M5
             if self.curr_boundary is None:
                 self.curr_boundary = boundary
                 self.curr_open = mid
@@ -1333,14 +1336,14 @@ class HyperGoldM5Engine:
                 self.curr_low = mid
                 self.curr_close = mid
                 self.curr_bar_start_t = now_t
-                # Se il motore parte a più di 60s dall'inizio del boundary M10, la prima barra è parziale
+                # Se il motore parte a più di 60s dall'inizio del boundary M5, la prima barra è parziale
                 self.curr_bar_is_partial = (now_t - boundary) > 60
                 if self.curr_bar_is_partial:
-                    logger.info(f"⏳ [CANDELA M10 PARZIALE AVVIATA] Spot Gold: motore avviato a metà barra (trascorsi {int(now_t - boundary)}s). La prima barra sarà di solo allineamento.")
+                    logger.info(f"⏳ [CANDELA M5 PARZIALE AVVIATA] Spot Gold: motore avviato a metà barra (trascorsi {int(now_t - boundary)}s). La prima barra sarà di solo allineamento.")
                 return
 
             if boundary == self.curr_boundary:
-                # Barra M10 corrente in formazione
+                # Barra M5 corrente in formazione
                 new_extreme = False
                 if mid > self.curr_high:
                     self.curr_high = mid
@@ -1352,7 +1355,7 @@ class HyperGoldM5Engine:
                 if new_extreme and self.kj55 is not None:
                     self._recalculate_indicators()
             else:
-                # Chiusura barra M10
+                # Chiusura barra M5
                 closed_candle = {
                     "boundary": self.curr_boundary,
                     "time": datetime.datetime.fromtimestamp(self.curr_boundary, TZ_ITALIA).strftime("%H:%M:%S"),
@@ -1371,7 +1374,7 @@ class HyperGoldM5Engine:
                 # Ricalcola KJ55 e TK144
                 self._recalculate_indicators()
 
-                # Apertura nuova candela M10
+                # Apertura nuova candela M5
                 new_open = mid
                 self.curr_boundary = boundary
                 self.curr_open = new_open
@@ -1389,7 +1392,7 @@ class HyperGoldM5Engine:
                     self._evaluate_pure_sr_strategy(closed_candle, self.kj55, new_open, time_str)
 
     def _update_increments_dynamic_mode(self, dist_kj: float, closed_close: float, time_str: str):
-        """A fine candela M10, valuta dinamicamente gli incrementi già aperti in base alla distanza da KJ:
+        """A fine candela M5, valuta dinamicamente gli incrementi già aperti in base alla distanza da KJ:
         1. Se dist_kj > 10 pip: i Bancomat passano a RUNNER (rimozione TP su IG e attivazione TS Dinamico KJ Close +- 10p con cricchetto)
         2. Se dist_kj <= 10 pip: i Runner tornano BANCOMAT (ripristino TP a +5 pip dall'ingresso, nessun TS ravvicinato)"""
         with self.lock:
@@ -1481,7 +1484,7 @@ class HyperGoldM5Engine:
 
         # Rilevamento Taglio (Cross) KJ55
         if self.last_regime is not None and current_regime is not None and current_regime != self.last_regime:
-            logger.info(f"⚡ [TAGLIO KJ 10M] Spot Gold: cambio regime da {self.last_regime} a {current_regime} (Close={prev_close:.2f}, KJ={kj:.2f})")
+            logger.info(f"⚡ [TAGLIO KJ 5M] Spot Gold: cambio regime da {self.last_regime} a {current_regime} (Close={prev_close:.2f}, KJ={kj:.2f})")
             self.last_regime = current_regime
             self.regime_traded = False
             self.save_state()
@@ -1491,7 +1494,7 @@ class HyperGoldM5Engine:
             # Non azzarda mai ingressi a freddo su trend preesistenti. Si opera SOLO su tagli confermati in diretta.
             self.last_regime = current_regime
             self.regime_traded = True
-            logger.info(f"🔄 [BOOTSTRAP KJ 10M] Spot Gold: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
+            logger.info(f"🔄 [BOOTSTRAP KJ 5M] Spot Gold: regime iniziale agganciato a {current_regime}. In attesa del prossimo taglio in tempo reale per operare.")
             self.save_state()
 
         # AGGIORNAMENTO DINAMICO INCREMENTI A FINE CANDELA (OPZIONE 1):

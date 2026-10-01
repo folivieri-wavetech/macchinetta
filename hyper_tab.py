@@ -460,7 +460,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #334155;'>
         <div style='display: flex; align-items: center; gap: 6px;'>
             <span style='font-size: 0.95rem; font-weight: 800; color: #f8fafc;'>{instr_name}</span>
-            <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 800;'>10M</span>
+            <span style='background: rgba(245, 158, 11, 0.20); color: #f59e0b; border: 1px solid #f59e0b; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 800;'>5M</span>
             {badge_st}
         </div>
         <div style='display: flex; gap: 4px; align-items: center;'>
@@ -527,13 +527,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     </div>
     """, unsafe_allow_html=True)
 
-    # Pulsanti di Controllo Motore 10M (AVVIA / STOP)
+    # Pulsanti di Controllo Motore 5M (AVVIA / STOP)
     is_operativo = st.session_state.get("ruolo", "VIEWER") in ["MANAGER", "REGISTA", "OWNER", "GUEST"]
     c_b1, c_b2 = st.columns(2)
     with c_b1:
         st.markdown("<div class='btn-start-hyper btn-compact-hyper'>", unsafe_allow_html=True)
         help_start = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
-        if st.button("🟢 AVVIA 10M", key=f"btn_start_m5_{btn_sfx}", disabled=(trading_on or not is_operativo), help=help_start, use_container_width=True):
+        if st.button("🟢 AVVIA 5M", key=f"btn_start_m5_{btn_sfx}", disabled=(trading_on or not is_operativo), help=help_start, use_container_width=True):
             if not is_operativo:
                 st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                 st.rerun()
@@ -549,7 +549,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     with c_b2:
         st.markdown("<div class='btn-stop-hyper btn-compact-hyper'>", unsafe_allow_html=True)
         help_stop = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
-        if st.button("🔴 STOP 10M", key=f"btn_stop_m5_{btn_sfx}", disabled=((not trading_on) or (not is_operativo)), help=help_stop, use_container_width=True):
+        if st.button("🔴 STOP 5M", key=f"btn_stop_m5_{btn_sfx}", disabled=((not trading_on) or (not is_operativo)), help=help_stop, use_container_width=True):
             if not is_operativo:
                 st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                 st.rerun()
@@ -774,11 +774,11 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
 
 
-    # Expander Regole 10M
-    with st.expander(f"⚙️ Assetto & Regole 10M {instr_name}", expanded=False):
+    # Expander Regole 5M
+    with st.expander(f"⚙️ Assetto & Regole 5M {instr_name}", expanded=False):
         st.markdown(f"""
         <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.70rem; line-height: 1.4;'>
-            <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name} (10M):</div>
+            <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name} (5M):</div>
             <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su <b>Taglio KJ55</b> (stacco Prezzo - KJ &ge; {2 if instr_type == 'GOLD' else 3}{unit_lbl})</div>
             <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, TS Dinamico KJ Close &plusmn; 10{unit_lbl})</div>
             <div>• <b>Gestione Core</b>: Libera da TS (governata al 100% da Kijun &amp; Candela Segnale)</div>
@@ -802,11 +802,11 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
 
 @st.fragment(run_every=5)
 def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
-    """Visualizzazione unificata e affiancata di Spot Gold 1€ e US 500 Cash 1€ su timeframe 10M."""
+    """Visualizzazione unificata e affiancata di Spot Gold 1€ e US 500 Cash 1€ su timeframe 5M."""
     conto_attivo = st.session_state.get("conto_selezionato") or conto_selezionato or "DANY_DEMO"
     nome_clean = conto_attivo.replace("_DEMO", "").replace("_REALE", "")
 
-    # Motori dei due strumenti 10M
+    # Motori dei due strumenti 5M
     engine_gold = HyperGoldM5Engine.get_instance(account_dir=conto_attivo)
     engine_us500 = HyperUS500M5Engine.get_instance(account_dir=conto_attivo)
 
@@ -944,7 +944,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
     n_win = len([t for t in trades_active if float(t.get("pnl_eur", 0.0) or 0.0) > 0])
     wr = (n_win / n_tot * 100.0) if n_tot > 0 else 0.0
 
-    st.markdown(f"<h3 style='margin: 0 0 10px 0; font-size: 1.05rem; font-weight: 700;'>📋 Sintesi Eseguiti Reali Hyper 10M <span style='font-size: 0.80rem; color: #94a3b8;'>({nome_clean})</span></h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='margin: 0 0 10px 0; font-size: 1.05rem; font-weight: 700;'>📋 Sintesi Eseguiti Reali Hyper 5M <span style='font-size: 0.80rem; color: #94a3b8;'>({nome_clean})</span></h3>", unsafe_allow_html=True)
 
     # 1. KPI SINTESI
     s1, s2, s3, s4 = st.columns(4)
@@ -953,7 +953,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         sign_p = "+" if tot_pnl > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper' style='text-align: center;'>
-            <div class='kpi-title-hyper' style='text-align: center;'>P&L Totale Reale Hyper 10M</div>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Totale Reale Hyper 5M</div>
             <div class='kpi-val-hyper' style='color: {col_pnl}; text-align: center;'>{sign_p}{tot_pnl:,.2f} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>Somma Gold + US500 su IG</div>
         </div>
@@ -974,7 +974,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         sign_g = "+" if tot_gold > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper' style='text-align: center;'>
-            <div class='kpi-title-hyper' style='text-align: center;'>P&L Spot Gold 1€ (10M)</div>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L Spot Gold 1€ (5M)</div>
             <div class='kpi-val-hyper' style='color: {col_g}; text-align: center;'>{sign_g}{tot_gold:,.2f} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>{len(trades_gold)} operazioni concluse</div>
         </div>
@@ -985,7 +985,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         sign_u = "+" if tot_us500 > 0 else ""
         st.markdown(f"""
         <div class='kpi-card-hyper' style='text-align: center;'>
-            <div class='kpi-title-hyper' style='text-align: center;'>P&L US 500 Cash 1€ (10M)</div>
+            <div class='kpi-title-hyper' style='text-align: center;'>P&L US 500 Cash 1€ (5M)</div>
             <div class='kpi-val-hyper' style='color: {col_u}; text-align: center;'>{sign_u}{tot_us500:,.2f} €</div>
             <div class='kpi-sub-hyper' style='color: #cbd5e1; text-align: center;'>{len(trades_us500)} operazioni concluse</div>
         </div>
@@ -1149,9 +1149,9 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
         """, unsafe_allow_html=True)
 
     tab_s_all, tab_s_gold, tab_s_us500 = st.tabs([
-        f"📜 Tutti i Trade 10M ({len(trades_active)})",
-        f"🪙 Spot Gold 10M ({len(trades_gold)})",
-        f"📈 US 500 Cash 10M ({len(trades_us500)})"
+        f"📜 Tutti i Trade 5M ({len(trades_active)})",
+        f"🪙 Spot Gold 5M ({len(trades_gold)})",
+        f"📈 US 500 Cash 5M ({len(trades_us500)})"
     ])
 
     def _render_trades_table(trade_list, empty_msg, tab_key="all"):
@@ -1246,7 +1246,7 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                         st.rerun()
 
     with tab_s_all:
-        _render_trades_table(trades_active, "Nessuna operazione 10M registrata.", tab_key="all")
+        _render_trades_table(trades_active, "Nessuna operazione 5M registrata.", tab_key="all")
         if trades_active:
             c_cl1, c_cl2 = st.columns([3, 1])
             with c_cl2:
@@ -1263,10 +1263,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                     st.rerun(scope="app")
 
     with tab_s_gold:
-        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 10M.", tab_key="gold")
+        _render_trades_table(trades_gold, "Nessuna operazione reale chiusa su Spot Gold 5M.", tab_key="gold")
 
     with tab_s_us500:
-        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 10M.", tab_key="us500")
+        _render_trades_table(trades_us500, "Nessuna operazione reale chiusa su US 500 Cash 5M.", tab_key="us500")
 
 
 def render_hyper_tab(conto_selezionato="DANY_DEMO"):
