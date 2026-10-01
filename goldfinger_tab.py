@@ -501,59 +501,47 @@ def renderizza_tab_goldfinger(conto):
                     st.success(f"✅ GOLDFINGER AVVIATO: Guardia armata dal livello {pz_l1:.2f} in giù.")
                     time.sleep(0.5)
                     st.rerun()
-        else:
-            st.markdown(
-                "<div style='background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.35); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; color: #facc15; font-size: 0.80rem; font-weight: 600; text-align: center; letter-spacing: 0.3px;'>"
-                "⚠️ GOLDFINGER È ATTIVO E OPERATIVO A MERCATO"
-                "</div>",
-                unsafe_allow_html=True
-            )
-
-            # Scorciatoia diretta per aggiornare con un click al Chirurgico Consigliato (se nessuna posizione è già aperta a mercato)
-            if not has_aperti:
-                if sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
-                    if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
-                        if not is_operativo:
-                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                            st.rerun()
-                        if bid_live and float(sugg_lvl) >= float(bid_live):
-                            st.error(f"🛑 ERRORE DI SICUREZZA: Il livello chirurgico ({sugg_lvl:.2f}) non è inferiore al prezzo live ({float(bid_live):.2f})!")
-                        else:
-                            new_cfg = cfg.copy()
-                            new_cfg["livello_1_prezzo"] = float(sugg_lvl)
-                            new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                            scrivi_json_sicuro(paths["config"], new_cfg)
-
-                            new_stato = stato.copy()
-                            new_stato["livello_1_prezzo"] = float(sugg_lvl)
-                            new_stato["scaglioni"] = calcola_scaglioni_interi(
-                                float(sugg_lvl),
-                                float(cfg.get("passo_pip", passo)),
-                                int(cfg.get("size_scaglione", size_u)),
-                                int(cfg.get("delta_totale", delta_input))
-                            )
-                            scrivi_json_sicuro(paths["stato"], new_stato)
-                            st.session_state[ss_key] = float(sugg_lvl)
-                            st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con difese ricalcolate!")
-                            time.sleep(0.5)
-                            st.rerun()
-            else:
-                st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} difese aperte. Fermare con STOP per riarmare da zero.")
-
-            if st.button("🛑 STOP GOLDFINGER", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
-                if not is_operativo:
-                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                    st.rerun()
-                new_cfg = cfg.copy()
-                new_cfg["attivo"] = False
-                new_cfg["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                scrivi_json_sicuro(paths["config"], new_cfg)
-                st.info("🛑 GOLDFINGER ARRESTATO. Le posizioni aperte rimangono intatte sotto gestione manuale.")
-                time.sleep(0.5)
-                st.rerun()
 
     with col_ladder:
-        st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
+        if is_attivo:
+            c_title, c_stop = st.columns([65, 35], vertical_alignment="center")
+            with c_title:
+                st.markdown("<h4 style='color: #FFD700; margin: 0;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
+            with c_stop:
+                st.markdown("""
+                    <style>
+                    div.btn-stop-compact button {
+                        height: 32px !important;
+                        min-height: 32px !important;
+                        padding: 0px 8px !important;
+                        font-size: 0.78rem !important;
+                        font-weight: 700 !important;
+                        border: 1px solid #ef4444 !important;
+                        color: #f87171 !important;
+                        background: rgba(239, 68, 68, 0.08) !important;
+                    }
+                    div.btn-stop-compact button:hover {
+                        background: rgba(239, 68, 68, 0.25) !important;
+                        color: #ffffff !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+                st.markdown("<div class='btn-stop-compact'>", unsafe_allow_html=True)
+                if st.button("🛑 STOP GOLDFINGER", key=f"btn_stop_gf_{conto}", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                    if not is_operativo:
+                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                        st.rerun()
+                    new_cfg = cfg.copy()
+                    new_cfg["attivo"] = False
+                    new_cfg["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                    scrivi_json_sicuro(paths["config"], new_cfg)
+                    st.info("🛑 GOLDFINGER ARRESTATO. Le posizioni aperte rimangono intatte sotto gestione manuale.")
+                    time.sleep(0.5)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
         
         scaglioni = stato.get("scaglioni", [])
         if not scaglioni and pz_l1 > 0:
@@ -688,6 +676,45 @@ def renderizza_tab_goldfinger(conto):
                 st.success(f"✅ Ricalcolo completato: {curr_long} Long - {curr_short} Short = Delta scoperto {nuovo_delta} mini. Scaletta aggiornata a {num_sc} difese da {size_rif}!")
                 time.sleep(0.6)
                 st.rerun()
+
+        if is_attivo:
+            st.markdown(
+                "<div style='background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.35); border-radius: 6px; padding: 6px 10px; margin-top: 10px; margin-bottom: 8px; color: #facc15; font-size: 0.80rem; font-weight: 600; text-align: center; letter-spacing: 0.3px;'>"
+                "⚠️ GOLDFINGER È ATTIVO E OPERATIVO A MERCATO"
+                "</div>",
+                unsafe_allow_html=True
+            )
+
+            # Scorciatoia diretta per aggiornare con un click al Chirurgico Consigliato (se nessuna posizione è già aperta a mercato)
+            if not has_aperti:
+                if sugg_lvl is not None and abs(float(sugg_lvl) - float(saved_pz1)) > 0.01:
+                    if st.button(f"🎯 Aggiorna a Chirurgico ({sugg_lvl:.2f})", key=f"btn_aggiorna_chir_{conto}", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
+                        if bid_live and float(sugg_lvl) >= float(bid_live):
+                            st.error(f"🛑 ERRORE DI SICUREZZA: Il livello chirurgico ({sugg_lvl:.2f}) non è inferiore al prezzo live ({float(bid_live):.2f})!")
+                        else:
+                            new_cfg = cfg.copy()
+                            new_cfg["livello_1_prezzo"] = float(sugg_lvl)
+                            new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                            scrivi_json_sicuro(paths["config"], new_cfg)
+
+                            new_stato = stato.copy()
+                            new_stato["livello_1_prezzo"] = float(sugg_lvl)
+                            new_stato["scaglioni"] = calcola_scaglioni_interi(
+                                float(sugg_lvl),
+                                float(cfg.get("passo_pip", passo)),
+                                int(cfg.get("size_scaglione", size_u)),
+                                int(cfg.get("delta_totale", delta_input))
+                            )
+                            scrivi_json_sicuro(paths["stato"], new_stato)
+                            st.session_state[ss_key] = float(sugg_lvl)
+                            st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con difese ricalcolate!")
+                            time.sleep(0.5)
+                            st.rerun()
+            else:
+                st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} difese aperte. Fermare con STOP per riarmare da zero.")
 
     # Storico Operazioni di Incasso
     st.markdown("<hr style='margin: 15px 0 10px 0; border-color: #334155;'>", unsafe_allow_html=True)
