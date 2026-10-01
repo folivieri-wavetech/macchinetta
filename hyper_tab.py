@@ -14,7 +14,8 @@ from hyper_gold_m5_engine import (
     is_gold_trading_suspended, is_gold_feed_suspended, EPIC_GOLD
 )
 from hyper_us500_m5_engine import (
-    HyperUS500M5Engine, is_us500_trading_suspended, is_us500_feed_suspended, EPIC_US500
+    HyperUS500M5Engine, is_us500_trading_suspended, is_us500_feed_suspended, EPIC_US500,
+    CORE_CONTRACTS as CORE_CONTRACTS_US500_5M, INC_CONTRACTS as INC_CONTRACTS_US500_5M
 )
 import json
 from hyper_order_manager import HyperOrderManager, TZ_ITALIA, now_it
@@ -387,10 +388,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     if instr_type == "US500":
         instr_name = "US 500 Cash 1€"
         unit_lbl = "pt"
-        core_c = 4
-        inc_c = 4
+        core_c = CORE_CONTRACTS_US500_5M
+        inc_c = INC_CONTRACTS_US500_5M
         max_inc = 3
         inc_tp = 10.0
+        runner_tp = 16.0
+        runner_be_trig = 8.0
+        runner_be_lock = 2.0
         parachute_p = 10.0
         ts_trig = 15.0
         ts_lock = 10.0
@@ -408,6 +412,9 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         inc_c = INC_CONTRACTS_5M
         max_inc = MAX_INCREMENTS_5M
         inc_tp = INC_TP_PIPS_5M
+        runner_tp = 12.0
+        runner_be_trig = 6.0
+        runner_be_lock = 1.0
         parachute_p = 6.0
         ts_trig = CORE_TS_TRIGGER_PIPS_5M
         ts_lock = 6.0
@@ -685,10 +692,14 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             else:
                 tp_cell = "<span style='color: #64748b;'>-</span>"
 
-            if ts_val is not None:
+            be_act = inc.get("be_active", False)
+            be_val = inc.get("be_price")
+            if be_act and be_val is not None:
+                ts_inc_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Break-Even Protetto'>BE {be_val:.2f}</span>"
+            elif ts_val is not None:
                 ts_inc_cell = f"<span style='color: #38bdf8; font-weight: 700;'>{ts_val:.2f}</span>"
             elif mode_inc == "RUNNER":
-                ts_inc_cell = "<span style='color: #38bdf8; font-size: 0.68rem;'>TS dyn</span>"
+                ts_inc_cell = f"<span style='color: #94a3b8; font-size: 0.68rem;'>BE @+{runner_be_trig:.0f}{unit_lbl}</span>"
             else:
                 ts_inc_cell = ""
 
@@ -780,7 +791,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         <div style='background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 5px; padding: 5px 8px; font-size: 0.70rem; line-height: 1.4;'>
             <div style='color: #f59e0b; font-weight: 700; margin-bottom: 2px;'>🎯 Parametri {instr_name} (5M):</div>
             <div>• <b>Ingresso Core</b>: <span style='color: #4ade80; font-weight: 600;'>{core_c}c</span> su <b>Taglio KJ55</b> (stacco Prezzo - KJ &ge; {2 if instr_type == 'GOLD' else 3}{unit_lbl})</div>
-            <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, TS Dinamico KJ Close &plusmn; 10{unit_lbl})</div>
+            <div>• <b>Incrementi Doppia Velocità</b>: Bancomat (&le; 10{unit_lbl}, TP +{inc_tp:.0f}{unit_lbl}) | Runner (&gt; 10{unit_lbl}, Bancomat Esteso TP +{runner_tp:.0f}{unit_lbl} con BE +{runner_be_lock:.0f}{unit_lbl} a +{runner_be_trig:.0f}{unit_lbl})</div>
             <div>• <b>Gestione Core</b>: Libera da TS (governata al 100% da Kijun &amp; Candela Segnale)</div>
             <div>• <b>Protezioni</b>: Paracadute &plusmn;{parachute_p:.0f}{unit_lbl} • Candela Segnale &plusmn;{sig_offset:.0f}{unit_lbl}</div>
         </div>
@@ -838,7 +849,7 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     with engine_us500.lock:
         pos_u = engine_us500.position
         inc_u = list(engine_us500.increments)
-        c_us500 = (pos_u.get("contracts", 4) + sum(i.get("contracts", 2) for i in inc_u)) if pos_u else 0
+        c_us500 = (pos_u.get("contracts", CORE_CONTRACTS_US500_5M) + sum(i.get("contracts", INC_CONTRACTS_US500_5M) for i in inc_u)) if pos_u else 0
         dir_us500 = pos_u["direction"] if pos_u else "FLAT"
 
     tot_hyper_margin = (c_gold * 220.0) + (c_us500 * 400.0)
@@ -1199,12 +1210,26 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
             import re
             reason_txt = re.sub(r"\s*\((?:Minimo|Massimo)\s*[-+]\s*\d+p\)", "", reason_txt)
 
+            # Identificazione Tipologia Operazione (Core, Bco, Run)
+            lbl_u = str(t.get("label", "")).upper()
+            rsn_u = str(t.get("reason", "")).upper()
+            act_u = str(t.get("action", "")).upper()
+            mode_u = str(t.get("mode", "")).upper()
+            if "RUNNER" in lbl_u or "RUNNER" in rsn_u or "RUNNER" in mode_u or "RUNNER" in act_u or "RUN" in lbl_u:
+                type_tag = "<span style='color: #38bdf8; font-size: 0.67rem; font-weight: 700; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); padding: 1px 4px; border-radius: 3px;'>Run</span>"
+            elif "BANCOMAT" in lbl_u or "BANCOMAT" in rsn_u or "BANCOMAT" in mode_u or "BANCOMAT" in act_u or "BCO" in lbl_u:
+                type_tag = "<span style='color: #f59e0b; font-size: 0.67rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); padding: 1px 4px; border-radius: 3px;'>Bco</span>"
+            else:
+                type_tag = "<span style='color: #a78bfa; font-size: 0.67rem; font-weight: 700; background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.35); padding: 1px 4px; border-radius: 3px;'>Core</span>"
+
+            size_cell = f"<span style='color: #f8fafc; font-weight: 700;'>{t.get('contracts', 0)}c</span> {type_tag}"
+
             rows.append(
                 f"<tr>"
                 f"<td style='white-space: nowrap; color: {date_color}; font-weight: 600;'>{t.get('time_close', '--')}</td>"
                 f"<td style='white-space: nowrap;'>{inst_badge}</td>"
                 f"<td style='text-align: center; color: {d_col}; font-weight: 700;'>{t.get('direction', '--')}</td>"
-                f"<td style='text-align: center; white-space: nowrap;'>{t.get('contracts', 0)}c</td>"
+                f"<td style='text-align: center; white-space: nowrap;'>{size_cell}</td>"
                 f"<td style='text-align: right;'>{float(t.get('open_price', 0.0)):.2f}</td>"
                 f"<td style='text-align: right;'>{float(t.get('close_price', 0.0)):.2f}</td>"
                 f"<td style='text-align: right; color: {col_p}; font-weight: 700; white-space: nowrap;'>{sign}{pnl:,.2f} €</td>"
@@ -1218,10 +1243,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                     <th>Data/Ora Chiusura</th>
                     <th>Strumento</th>
                     <th style='text-align: center;'>Direzione</th>
-                    <th style='text-align: center; width: 55px;'>Size</th>
+                    <th style='text-align: center; min-width: 82px; width: 88px;'>Size</th>
                     <th style='text-align: right;'>Open</th>
                     <th style='text-align: right;'>Close</th>
-                    <th style='text-align: right; min-width: 105px; width: 115px;'>P&L Netto</th>
+                    <th style='text-align: right; min-width: 82px; width: 88px;'>P&L Netto</th>
                     <th style='text-align: center;'>Motivo Uscita</th>
                 </tr>
             </thead>
