@@ -258,7 +258,7 @@ class GoldfingerEngine:
             "forceOpen": "true",
             "currencyCode": VALUTA_GOLD
         }
-        lbl_sc = f" [Scaglione {numero_scaglione}]" if numero_scaglione else ""
+        lbl_sc = f" [Difesa {numero_scaglione}]" if numero_scaglione else ""
         try:
             r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=payload, timeout=8)
             if r.status_code == 200:
@@ -292,7 +292,7 @@ class GoldfingerEngine:
                     except Exception as e_conf:
                         print_log(f"⚠️ [TENTATIVO {tentativo}/5] Errore verifica conferma{lbl_sc}: {e_conf}")
 
-                print_log(f"🛑 [ORDINE NON ESEGUITO] Scaglione{lbl_sc} NON eseguito dopo 5 tentativi (25s) di verifica su IG [dealRef: {deal_ref}]. Arresto tentativi per sicurezza.")
+                print_log(f"🛑 [ORDINE NON ESEGUITO] Difesa{lbl_sc} NON eseguita dopo 5 tentativi (25s) di verifica su IG [dealRef: {deal_ref}]. Arresto tentativi per sicurezza.")
             else:
                 print_log(f"⚠️ Errore invio ordine SHORT IG{lbl_sc}: HTTP {r.status_code} - {r.text}")
         except Exception as e:
@@ -369,7 +369,7 @@ class GoldfingerEngine:
             self.stato["minimo_discesa"] = None
             self.stato["minimo_precedente"] = None
             self.salva_stato()
-            print_log(f"🚀 GOLDFINGER AVVIATO: Livello 1 @ {pz_start:.2f}, Passo {passo} pip, Delta {delta} contratti ({len(self.stato['scaglioni'])} scaglioni).")
+            print_log(f"🚀 GOLDFINGER AVVIATO: Livello 1 @ {pz_start:.2f}, Passo {passo} pip, Delta {delta} contratti ({len(self.stato['scaglioni'])} difese).")
             invia_notifica("AVVIO GOLDFINGER", f"Guardia avviata: Livello 1 a {pz_start:.2f}, Delta {delta} contratti.", "rocket")
 
         # 2b. GESTIONE AGGIORNAMENTO LIVELLO O DELTA A CALDO (se non ci sono posizioni aperte)
@@ -391,7 +391,7 @@ class GoldfingerEngine:
                     passo_c = float(config_ui.get("passo_pip", self.stato.get("passo_pip", 6.0)))
                     sz_c = int(config_ui.get("size_scaglione", self.stato.get("size_scaglione", 3)))
 
-                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 = {target_pz1:.2f}, Delta = {target_delta} contratti ({max(1, target_delta // sz_c)} scaglioni)")
+                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 = {target_pz1:.2f}, Delta = {target_delta} contratti ({max(1, target_delta // sz_c)} difese)")
                     self.stato["livello_1_prezzo"] = target_pz1
                     self.stato["passo_pip"] = passo_c
                     self.stato["size_scaglione"] = sz_c
@@ -400,7 +400,7 @@ class GoldfingerEngine:
                     self.stato["minimo_discesa"] = None
                     self.stato["minimo_precedente"] = None
                     self.salva_stato()
-                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 @ {target_pz1:.2f}, Delta {target_delta} mini ({len(self.stato['scaglioni'])} scaglioni).", "arrows_counterclockwise")
+                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 @ {target_pz1:.2f}, Delta {target_delta} mini ({len(self.stato['scaglioni'])} difese).", "arrows_counterclockwise")
 
         # 3. VERIFICA FINESTRA ROLLOVER
         if self.is_in_rollover():
@@ -448,20 +448,20 @@ class GoldfingerEngine:
                         sc["sl_price"] = lvl + 6.0 # SL iniziale per falso allarme
                         sc["opened_at"] = time.time()
                         
-                        # Protezione a Break-Even + 1 pip dello scaglione precedente!
+                        # Protezione a Break-Even + 1 pip della difesa precedente!
                         if idx > 0 and scaglioni[idx - 1]["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
                             sc_prev = scaglioni[idx - 1]
                             sc_prev["stato"] = "PROTETTO_BE"
                             sc_prev["sl_price"] = sc_prev["open_price"] - 1.0 # 1 pip sotto l'entrata SHORT = profitto blindato
-                            print_log(f"🛡️ Scaglione {sc_prev['numero']} protetto a Break-Even+1 @ {sc_prev['sl_price']:.2f}")
+                            print_log(f"🛡️ Difesa {sc_prev['numero']} protetta a Break-Even+1 @ {sc_prev['sl_price']:.2f}")
 
-                        invia_notifica("SCAGLIONE SHORT ESEGUITO", f"Agganciato Scaglione {sc['numero']} ({sc['size']} mini) @ {lvl:.2f}", "heavy_minus_sign")
+                        invia_notifica("DIFESA SHORT ESEGUITA", f"Agganciata Difesa {sc['numero']} ({sc['size']} mini) @ {lvl:.2f}", "heavy_minus_sign")
                         self.salva_stato()
 
-                        # CONTROLLO RECUPERO SCAGLIONI ROSSI PRECEDENTI
+                        # CONTROLLO RECUPERO DIFESE ROSSE PRECEDENTI
                         scaglioni_rossi = [s for s in scaglioni if s.get("numero") < sc.get("numero") and s.get("stato") == "NON_ESEGUITO"]
                         for sc_r in scaglioni_rossi:
-                            print_log(f"🔍 Rilevato Scaglione {sc_r['numero']} NON ESEGUITO in precedenza (rosso). Tento il recupero a mercato al prezzo attuale ({bid:.2f})...")
+                            print_log(f"🔍 Rilevata Difesa {sc_r['numero']} NON ESEGUITA in precedenza (rosso). Tento il recupero a mercato al prezzo attuale ({bid:.2f})...")
                             ok_rec, deal_id_rec, lvl_rec = self.apri_short_mercato(sc_r["size"], numero_scaglione=f"{sc_r['numero']} (RECUPERO)")
                             if ok_rec:
                                 sc_r["stato"] = "RECUPERATO"
@@ -469,16 +469,16 @@ class GoldfingerEngine:
                                 sc_r["open_price"] = lvl_rec
                                 sc_r["sl_price"] = lvl_rec + 6.0
                                 sc_r["opened_at"] = time.time()
-                                print_log(f"🟡 [RECUPERO COMPLETATO] Scaglione {sc_r['numero']} recuperato con successo a {lvl_rec:.2f} [ID: {deal_id_rec}]! Segnato GIALLO.")
-                                invia_notifica("RECUPERO SCAGLIONE", f"Scaglione {sc_r['numero']} recuperato a mercato @ {lvl_rec:.2f}", "arrows_counterclockwise")
+                                print_log(f"🟡 [RECUPERO COMPLETATO] Difesa {sc_r['numero']} recuperata con successo a {lvl_rec:.2f} [ID: {deal_id_rec}]! Segnato GIALLO.")
+                                invia_notifica("RECUPERO DIFESA", f"Difesa {sc_r['numero']} recuperata a mercato @ {lvl_rec:.2f}", "arrows_counterclockwise")
                                 self.salva_stato()
                             else:
-                                print_log(f"⚠️ Recupero Scaglione {sc_r['numero']} fallito anche al prezzo attuale. Rimane NON ESEGUITO (rosso).")
+                                print_log(f"⚠️ Recupero Difesa {sc_r['numero']} fallito anche al prezzo attuale. Rimane NON ESEGUITA (rosso).")
                     else:
                         # Non eseguito dopo i 5 tentativi: segna NON_ESEGUITO (pallino rosso) e fermati
                         sc["stato"] = "NON_ESEGUITO"
-                        print_log(f"🔴 Scaglione {sc['numero']} marchiato NON_ESEGUITO. Il motore si ferma per questo livello per evitare duplicazioni.")
-                        invia_notifica("SCAGLIONE NON ESEGUITO", f"Scaglione {sc['numero']} non eseguito su IG dopo 5 tentativi (25s).", "stop_sign")
+                        print_log(f"🔴 Difesa {sc['numero']} marchiata NON_ESEGUITO. Il motore si ferma per questo livello per evitare duplicazioni.")
+                        invia_notifica("DIFESA NON ESEGUITA", f"Difesa {sc['numero']} non eseguita su IG dopo 5 tentativi (25s).", "stop_sign")
                         self.salva_stato()
                     break # Gestisci un livello per tick
 
@@ -532,7 +532,7 @@ class GoldfingerEngine:
         if len(aperti) == 1:
             sc_unica = aperti[0]
             if sc_unica.get("sl_price") and ask >= sc_unica["sl_price"]:
-                print_log(f"🛑 Falso allarme Scaglione {sc_unica['numero']}: Colpito Stop Loss a {ask:.2f}. Chiudo in minima perdita.")
+                print_log(f"🛑 Falso allarme Difesa {sc_unica['numero']}: Colpito Stop Loss a {ask:.2f}. Chiudo in minima perdita.")
                 ok, lvl_c, pnl = self.chiudi_short_mercato(sc_unica["deal_id"], sc_unica["size"])
                 if ok:
                     sc_unica["stato"] = "RECUPERATO_CHIUSO" if sc_unica.get("stato") == "RECUPERATO" else "CHIUSO"
@@ -547,7 +547,7 @@ class GoldfingerEngine:
                         "pnl": pnl,
                         "motivo": "SL_FALSO_ALLARME"
                     })
-                    invia_notifica("STOP LOSS FALSO ALLARME", f"Scaglione {sc_unica['numero']} ({sc_unica['size']} mini) chiuso a {lvl_c:.2f}. PnL: {pnl:+.2f} €", "warning")
+                    invia_notifica("STOP LOSS FALSO ALLARME", f"Difesa {sc_unica['numero']} ({sc_unica['size']} mini) chiusa a {lvl_c:.2f}. PnL: {pnl:+.2f} €", "warning")
                     self.salva_stato()
 
     def avvia_loop(self):

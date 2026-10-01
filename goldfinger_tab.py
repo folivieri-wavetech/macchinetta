@@ -263,7 +263,7 @@ def renderizza_tab_goldfinger(conto):
         <div style='display: flex; align-items: center; justify-content: space-between; margin-top: -10px; margin-bottom: 12px;'>
             <div>
                 <h1 style='color: #FFD700; margin: 0; font-size: 1.8rem; font-weight: 800;'>🏆 Goldfinger - Paracadute e Copertura Spot Gold</h1>
-                <p style='color: #94a3b8; margin: 2px 0 0 0; font-size: 0.88rem;'>Modulo chirurgico di difesa a scaglioni (Passo 6 pip) con incasso su rimbalzo e riarmo seconda ondata • <i>Auto-refresh ogni 10s</i></p>
+                <p style='color: #94a3b8; margin: 2px 0 0 0; font-size: 0.88rem;'>Modulo chirurgico di difesa progressiva (Passo 6 pip) con incasso su rimbalzo e riarmo seconda ondata • <i>Auto-refresh ogni 10s</i></p>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -346,19 +346,20 @@ def renderizza_tab_goldfinger(conto):
             if is_attivo and saved_pz1 > 0:
                 diff_pts = sugg_lvl - saved_pz1
                 diff_sign = f"+{diff_pts:.2f}" if diff_pts >= 0 else f"{diff_pts:.2f}"
-                confronto_armato_html = f"<span style='color: #94a3b8; font-size: 0.74rem; font-weight: 500; margin-left: 10px;'>(In esecuzione @ <b style='color: #facc15;'>{saved_pz1:.2f}</b> • Delta: {diff_sign} pip)</span>"
+                confronto_armato_html = f"<span style='color: #94a3b8; font-size: 0.74rem; font-weight: 500;'>(In esecuzione @ <b style='color: #facc15;'>{saved_pz1:.2f}</b> • Delta: {diff_sign} pip)</span>"
             
             st.markdown(f"""
                 <div style='background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;'>
-                    <div style='display: flex; justify-content: space-between; align-items: center;'>
-                        <span style='color: #38bdf8; font-weight: 700; font-size: 0.84rem;'>🎯 LIVELLO CHIRURGICO CONSIGLIATO (-5 pip):</span>
-                        <div>
+                    <div style='display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;'>
+                        <span style='color: #38bdf8; font-weight: 700; font-size: 0.84rem;'>🎯 LIVELLO CHIRURGICO:</span>
+                        <div style='display: flex; align-items: baseline; gap: 8px;'>
                             <span style='color: #FFD700; font-weight: 800; font-size: 1.15rem;'>{sugg_lvl:.2f}</span>
                             {confronto_armato_html}
                         </div>
                     </div>
-                    <div style='color: #94a3b8; font-size: 0.74rem; margin-top: 4px;'>
-                        Riferimento: <b>{rif_tipo} ({rif_val:.2f}) - 5 pip</b> | Minimi sotto live: <b>Min21: {min21_str}</b> | <b>Min55: {min55_str}</b> | <b>Min9: {min9_str}</b>
+                    <div style='margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(56, 189, 248, 0.15); font-size: 0.74rem; color: #94a3b8; line-height: 1.5;'>
+                        <div>Riferimento: <b>{rif_tipo} ({rif_val:.2f}) - 5 pip</b></div>
+                        <div>Minimi: <b>Min21: {min21_str}</b> &nbsp;|&nbsp; <b>Min55: {min55_str}</b> &nbsp;|&nbsp; <b>Min9: {min9_str}</b></div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
@@ -395,7 +396,7 @@ def renderizza_tab_goldfinger(conto):
                 format="%.2f",
                 key=f"input_{ss_key}",
                 disabled=(has_aperti or not is_operativo),
-                help="Prezzo a cui scatterà il primo scaglione SHORT a mercato. Modificabile a caldo finché non ci sono posizioni aperte."
+                help="Prezzo a cui scatterà la prima Difesa SHORT a mercato. Modificabile a caldo finché non ci sono posizioni aperte."
             )
         with col_btn_sugg:
             if sugg_lvl is not None:
@@ -440,7 +441,7 @@ def renderizza_tab_goldfinger(conto):
                         )
                         scrivi_json_sicuro(paths["stato"], new_stato)
                         st.session_state[ss_key] = float(pz_l1)
-                        st.success(f"✅ Guardia aggiornata a caldo: Livello 1 spostato a {pz_l1:.2f} con scaglioni ricalcolati!")
+                        st.success(f"✅ Guardia aggiornata a caldo: Livello 1 spostato a {pz_l1:.2f} con difese ricalcolate!")
                         time.sleep(0.5)
                         st.rerun()
             else:
@@ -467,7 +468,7 @@ def renderizza_tab_goldfinger(conto):
 
         cp, cs = st.columns(2)
         with cp:
-            passo = st.number_input("Passo Scaglioni (pip)", min_value=1.0, max_value=50.0, value=float(cfg.get("passo_pip", 6.0)), step=1.0, disabled=(is_attivo or not is_operativo))
+            passo = st.number_input("Passo Difesa (pip)", min_value=1.0, max_value=50.0, value=float(cfg.get("passo_pip", 6.0)), step=1.0, disabled=(is_attivo or not is_operativo))
         with cs:
             size_u = st.number_input("Size Tranche (Interi)", min_value=1, max_value=20, value=int(cfg.get("size_scaglione", 3)), step=1, disabled=(is_attivo or not is_operativo))
 
@@ -533,11 +534,11 @@ def renderizza_tab_goldfinger(conto):
                             )
                             scrivi_json_sicuro(paths["stato"], new_stato)
                             st.session_state[ss_key] = float(sugg_lvl)
-                            st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con scaglioni ricalcolati!")
+                            st.success(f"✅ Guardia aggiornata a Chirurgico: Livello 1 spostato a {sugg_lvl:.2f} con difese ricalcolate!")
                             time.sleep(0.5)
                             st.rerun()
             else:
-                st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} scaglioni aperti. Fermare con STOP per riarmare da zero.")
+                st.caption(f"🔒 Guardia a mercato: {len(aperti_att)} difese aperte. Fermare con STOP per riarmare da zero.")
 
             if st.button("🛑 STOP GOLDFINGER", type="secondary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer):
                 if not is_operativo:
@@ -552,7 +553,7 @@ def renderizza_tab_goldfinger(conto):
                 st.rerun()
 
     with col_ladder:
-        st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Scaglioni e Monitoraggio</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
         
         scaglioni = stato.get("scaglioni", [])
         if not scaglioni and pz_l1 > 0:
@@ -587,7 +588,7 @@ def renderizza_tab_goldfinger(conto):
                 pz_tgt = f"{s.get('prezzo_target', 0):.2f}"
                 tab_rows += (
                     f"<tr style='border-bottom: 1px solid #334155; text-align: center;'>"
-                    f"<td style='padding: 6px; font-weight: bold; text-align: center;'>Scaglione {s.get('numero')}</td>"
+                    f"<td style='padding: 6px; font-weight: bold; text-align: center;'>Difesa {s.get('numero')}</td>"
                     f"<td style='padding: 6px; color: #f8fafc; text-align: center;'>{pz_tgt}</td>"
                     f"<td style='padding: 6px; color: #38bdf8; font-weight: bold; text-align: center;'>-{s.get('size')} mini</td>"
                     f"<td style='padding: 6px; text-align: center;'>{st_badge}</td>"
@@ -598,7 +599,7 @@ def renderizza_tab_goldfinger(conto):
                 "<table style='width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center;'>"
                 "<thead>"
                 "<tr style='border-bottom: 2px solid #64748b; color: #94a3b8; text-align: center;'>"
-                "<th style='text-align: center; padding: 6px;'>Scaglione</th>"
+                "<th style='text-align: center; padding: 6px;'>Difesa</th>"
                 "<th style='text-align: center; padding: 6px;'>Trigger Prezzo</th>"
                 "<th style='text-align: center; padding: 6px;'>Size Short</th>"
                 "<th style='text-align: center; padding: 6px;'>Stato</th>"
@@ -623,7 +624,7 @@ def renderizza_tab_goldfinger(conto):
             st.info("Imposta il Prezzo del Livello 1 a sinistra per visualizzare l'anteprima della scaletta.")
 
         st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
-        if st.button("Ricalcola", key=f"btn_ricalcola_scaletta_{conto}", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Ricalcola a caldo il delta scoperto netto (Long - Short) e aggiorna la scaletta scaglioni"):
+        if st.button("Ricalcola", key=f"btn_ricalcola_scaletta_{conto}", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Ricalcola a caldo il delta scoperto netto (Long - Short) e aggiorna la scaletta difesa"):
             if not is_operativo:
                 st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                 st.rerun()
@@ -684,7 +685,7 @@ def renderizza_tab_goldfinger(conto):
                 scrivi_json_sicuro(paths["stato"], new_stato)
 
                 num_sc = len(nuovi_scaglioni)
-                st.success(f"✅ Ricalcolo completato: {curr_long} Long - {curr_short} Short = Delta scoperto {nuovo_delta} mini. Scaletta aggiornata a {num_sc} scaglioni da {size_rif}!")
+                st.success(f"✅ Ricalcolo completato: {curr_long} Long - {curr_short} Short = Delta scoperto {nuovo_delta} mini. Scaletta aggiornata a {num_sc} difese da {size_rif}!")
                 time.sleep(0.6)
                 st.rerun()
 
@@ -700,7 +701,7 @@ def renderizza_tab_goldfinger(conto):
                 r_html += (
                     f"<tr style='border-bottom: 1px solid #1e293b; text-align: center;'>"
                     f"<td style='padding: 5px; color: #94a3b8; text-align: center;'>{op.get('data')}</td>"
-                    f"<td style='padding: 5px; text-align: center;'>Scaglione {op.get('scaglione')}</td>"
+                    f"<td style='padding: 5px; text-align: center;'>Difesa {op.get('scaglione')}</td>"
                     f"<td style='padding: 5px; text-align: center;'>{op.get('size')} mini</td>"
                     f"<td style='padding: 5px; text-align: center;'>{op.get('open'):.2f}</td>"
                     f"<td style='padding: 5px; text-align: center;'>{op.get('close'):.2f}</td>"
@@ -713,7 +714,7 @@ def renderizza_tab_goldfinger(conto):
                 "<thead>"
                 "<tr style='border-bottom: 2px solid #475569; color: #94a3b8; text-align: center;'>"
                 "<th style='text-align: center; padding: 5px;'>Data</th>"
-                "<th style='text-align: center; padding: 5px;'>Scaglione</th>"
+                "<th style='text-align: center; padding: 5px;'>Difesa</th>"
                 "<th style='text-align: center; padding: 5px;'>Size</th>"
                 "<th style='text-align: center; padding: 5px;'>Open</th>"
                 "<th style='text-align: center; padding: 5px;'>Close</th>"

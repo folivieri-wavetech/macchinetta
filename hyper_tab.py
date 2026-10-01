@@ -1204,10 +1204,10 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                 f"<td style='white-space: nowrap; color: {date_color}; font-weight: 600;'>{t.get('time_close', '--')}</td>"
                 f"<td style='white-space: nowrap;'>{inst_badge}</td>"
                 f"<td style='text-align: center; color: {d_col}; font-weight: 700;'>{t.get('direction', '--')}</td>"
-                f"<td style='text-align: center;'>{t.get('contracts', 0)}c</td>"
+                f"<td style='text-align: center; white-space: nowrap;'>{t.get('contracts', 0)}c</td>"
                 f"<td style='text-align: right;'>{float(t.get('open_price', 0.0)):.2f}</td>"
                 f"<td style='text-align: right;'>{float(t.get('close_price', 0.0)):.2f}</td>"
-                f"<td style='text-align: right; color: {col_p}; font-weight: 700;'>{sign}{pnl:,.2f} €</td>"
+                f"<td style='text-align: right; color: {col_p}; font-weight: 700; white-space: nowrap;'>{sign}{pnl:,.2f} €</td>"
                 f"<td style='color: #cbd5e1; font-size: 0.72rem;'>{reason_txt}</td>"
                 f"</tr>"
             )
@@ -1218,11 +1218,11 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
                     <th>Data/Ora Chiusura</th>
                     <th>Strumento</th>
                     <th style='text-align: center;'>Direzione</th>
-                    <th style='text-align: center;'>Contratti</th>
+                    <th style='text-align: center; width: 55px;'>Size</th>
                     <th style='text-align: right;'>Open</th>
                     <th style='text-align: right;'>Close</th>
-                    <th style='text-align: right;'>P&L Netto</th>
-                    <th>Motivo Uscita</th>
+                    <th style='text-align: right; min-width: 105px; width: 115px;'>P&L Netto</th>
+                    <th style='text-align: center;'>Motivo Uscita</th>
                 </tr>
             </thead>
             <tbody>{''.join(rows)}</tbody>
