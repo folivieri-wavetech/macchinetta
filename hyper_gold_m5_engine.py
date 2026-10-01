@@ -290,11 +290,13 @@ class HyperGoldM5Engine:
         """Caricamento e aggregazione a 10M da cache/stato locale con riallineamento automatico dei buchi (ZERO chiamate IG REST)"""
         now_ts = now_it().timestamp()
 
-        # 1. Verifica se candele già fresche e complete (senza buchi > 20 min)
+        # 1. Verifica se candele già fresche e complete (senza buchi interni > 20 min)
         with self.lock:
             if len(self.candles) >= WARMUP_BARS_KJ:
                 last_b = self.candles[-1].get("boundary", 0)
-                if (now_ts - last_b) <= 1200 or is_gold_feed_suspended():
+                sub_tail = self.candles[-WARMUP_BARS_KJ:]
+                has_internal_gap = any((sub_tail[i+1].get("boundary", 0) - sub_tail[i].get("boundary", 0)) > 1200 for i in range(len(sub_tail)-1))
+                if not has_internal_gap and ((now_ts - last_b) <= 1200 or is_gold_feed_suspended()):
                     self.candles = aggregate_candles_to_10m(self.candles)[-500:]
                     self._recalculate_indicators()
                     self.save_state()
