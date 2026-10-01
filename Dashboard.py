@@ -1121,7 +1121,30 @@ def carica_radar_trend_dash(conto=None):
                 pass
     return {}, None
 
+HULL_TREND_FILE = "hull_trend.json"
+
+def carica_hull_trend_dash(conto=None):
+    """Carica i dati di Hull Moving Average 377 (H1) da hull_trend.json."""
+    candidates = []
+    if conto:
+        candidates.append(os.path.join(conto, HULL_TREND_FILE))
+        candidates.append(os.path.join("..", conto, HULL_TREND_FILE))
+    for c_alt in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_REALE", "DANY_REALE", "BONGIOLO_REALE", "Logs_e_Cache", "."]:
+        candidates.append(os.path.join(c_alt, HULL_TREND_FILE))
+        candidates.append(os.path.join("..", c_alt, HULL_TREND_FILE))
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                    if isinstance(d, dict) and d:
+                        return d
+            except Exception:
+                pass
+    return {}
+
 CACHE_ULTIMI_KJ_FILE = "cache_ultimi_rilevamenti_kj.json"
+
 
 def carica_cache_ultimi_kj(conto=None):
     candidates = []
@@ -2152,6 +2175,70 @@ def calcola_atr_da_candele_dash(candele_list, periods=21):
     for tr in trs[p_eff:]:
         atr_wilder = (atr_wilder * (periods - 1) + tr) / float(periods)
     return atr_wilder
+
+def calcola_hma377_da_candele_dash(candele_list, mult=0.0001):
+    """Calcola la Hull Moving Average a 377 periodi su candele H1."""
+    if not candele_list or len(candele_list) < 396:
+        return None
+    closes = []
+    for c in candele_list:
+        cp = c.get("closePrice")
+        if isinstance(cp, dict):
+            v = cp.get("bid") or cp.get("mid") or cp.get("ask")
+        else:
+            v = c.get("close")
+        if v is not None:
+            try:
+                closes.append(float(v))
+            except Exception:
+                pass
+    n = 377
+    half_n = 188
+    sqrt_n = 19
+    req_len = n + sqrt_n
+    if len(closes) < req_len:
+        return None
+        
+    denom_half = half_n * (half_n + 1) // 2
+    weights_half = list(range(1, half_n + 1))
+    denom_full = n * (n + 1) // 2
+    weights_full = list(range(1, n + 1))
+    
+    raw_diffs = []
+    for i in range(n, len(closes) + 1):
+        window = closes[:i]
+        wma_half = sum(v * w for v, w in zip(window[-half_n:], weights_half)) / denom_half
+        wma_full = sum(v * w for v, w in zip(window[-n:], weights_full)) / denom_full
+        diff = 2.0 * wma_half - wma_full
+        raw_diffs.append(diff)
+        
+    denom_sqrt = sqrt_n * (sqrt_n + 1) // 2
+    weights_sqrt = list(range(1, sqrt_n + 1))
+    
+    hmas = []
+    for i in range(sqrt_n, len(raw_diffs) + 1):
+        window_diff = raw_diffs[:i]
+        hma_val = sum(v * w for v, w in zip(window_diff[-sqrt_n:], weights_sqrt)) / denom_sqrt
+        hmas.append(hma_val)
+        
+    if not hmas:
+        return None
+    curr = hmas[-1]
+    prev = hmas[-2] if len(hmas) > 1 else curr
+    d_slope = curr - prev
+    tol = mult * 0.1
+    slope = "CRESCENTE" if d_slope > tol else ("DECRESCENTE" if d_slope < -tol else "PIATTA")
+    last_c = closes[-1]
+    pos = "SOPRA" if last_c > curr else ("SOTTO" if last_c < curr else "SU HULL")
+    return {
+        "hma377": curr,
+        "prev_hma377": prev,
+        "slope": slope,
+        "diff": d_slope,
+        "last_close": last_c,
+        "pos_vs_hull": pos
+    }
+
 
 def calcola_default_range_da_atr_dash(conto, nome):
     """Calcola TP, OPP, DTS consigliati per il Range usando ATR(21) Daily (D1) con step 20 e min 80."""
@@ -5810,6 +5897,7 @@ else:
                     ]
                     timeframes_kj = ["H1", "H4", "D1"]
                     radar_cached_kj, _ = carica_radar_trend_dash(conto_selezionato)
+                    hull_cached_kj = carica_hull_trend_dash(conto_selezionato)
                     cache_kj = carica_cache_ultimi_kj(conto_selezionato)
                     cache_modificata = False
                     
@@ -5964,6 +6052,41 @@ else:
                                 riga_fmt
                             )
                             righe_strum_html.append(f"<div style='padding: 1px 0;'>{riga_fmt}</div>")
+                            
+                            # Riga dedicata HULL 377 per H1 (immediatamente sotto la riga H1 e sopra H4)
+                            if tf == "H1":
+                                hull_info = hull_cached_kj.get(s_nome, {})
+                                hma_v = hull_info.get("hma377")
+                                slope_v = hull_info.get("slope", "-")
+                                pos_v = hull_info.get("pos_vs_hull", "-")
+                                
+                                # Se assente in cache, calcola al volo da storico candele HOUR locali se disponibili
+                                if hma_v is None:
+                                    c_h1_loc = carica_candele_locali_dash(conto_selezionato, s_nome, "HOUR")
+                                    if c_h1_loc and len(c_h1_loc) >= 396:
+                                        calc_h = calcola_hma377_da_candele_dash(c_h1_loc, mult=cfg_s.get("moltiplicatore", 0.0001))
+                                        if calc_h:
+                                            hma_v = calc_h.get("hma377")
+                                            slope_v = calc_h.get("slope", "-")
+                                            pos_v = calc_h.get("pos_vs_hull", "-")
+                                
+                                ts_m = re.match(r"^(\[\d{2}:\d{2}\]|\[--:--\])", line_match)
+                                hull_ts = ts_m.group(1) if ts_m else "[--:--]"
+                                hma_str = f"{hma_v:.{dec_s}f}" if isinstance(hma_v, (int, float)) else "-"
+                                arrow_s = " ▲" if slope_v == "CRESCENTE" else (" ▼" if slope_v == "DECRESCENTE" else "")
+                                slope_color = "#22c55e" if slope_v == "CRESCENTE" else ("#ef4444" if slope_v == "DECRESCENTE" else "#94a3b8")
+                                pos_color = "#22c55e" if pos_v == "SOPRA" else ("#ef4444" if pos_v == "SOTTO" else "#eab308")
+                                
+                                riga_hull_fmt = (
+                                    f"<span style='color: #64748b; font-weight: 500;'>{hull_ts}</span> "
+                                    f"<span style='color: #38bdf8; font-weight: 600;'>[{s_nome}]</span> "
+                                    f"🌊<span style='color: #fb923c; font-weight: 600;'>[H1]</span>  "
+                                    f"<span style='color: #ec4899; font-weight: 600;'>HULL 377: {hma_str}</span> | "
+                                    f"<span style='color: {slope_color}; font-weight: 600;'>Pendenza: {slope_v}{arrow_s}</span> | "
+                                    f"<span style='color: {pos_color}; font-weight: 600;'>Prezzo: {pos_v}</span>"
+                                )
+                                righe_strum_html.append(f"<div style='padding: 1px 0;'>{riga_hull_fmt}</div>")
+
                         
                         blocco_str = "".join(righe_strum_html)
                         if idx_s < len(tutti_strumenti_kj) - 1:

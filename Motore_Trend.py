@@ -853,7 +853,7 @@ def carica_candele_locali(nome, tf, px_live=None):
                 if isinstance(data, list) and is_valid_candele(data, tf, check_freshness=False):
                     local_data = data
                     if len(data) >= 55:
-                        LOCAL_CANDELE_CACHE[(nome, tf)] = data[-60:]
+                        LOCAL_CANDELE_CACHE[(nome, tf)] = data[-500:] if tf == "HOUR" else data[-60:]
                         if px_live and isinstance(px_live, (int, float)):
                             return allinea_candele_live(data, nome, tf, px_live)
                         return data
@@ -877,7 +877,7 @@ def carica_candele_locali(nome, tf, px_live=None):
                     d = json.load(f)
                     if len(d) >= 55 and is_valid_candele(d, tf, check_freshness=False):
                         salva_candele_locali(nome, tf, d)
-                        LOCAL_CANDELE_CACHE[(nome, tf)] = d[-60:]
+                        LOCAL_CANDELE_CACHE[(nome, tf)] = d[-500:] if tf == "HOUR" else d[-60:]
                         if px_live and isinstance(px_live, (int, float)):
                             return allinea_candele_live(d, nome, tf, px_live)
                         return d
@@ -963,30 +963,31 @@ def salva_candele_locali(nome, tf, candele_list):
     # REGOLA COMEX: Spot Gold non ha candela H1 alle 23:00
     if tf == "HOUR" and nome in ("Spot Gold",):
         candele_list = [c for c in candele_list if " 23:00:00" not in c.get("snapshotTime", "")]
-    buffer_60 = candele_list[-60:]
+    max_buf = 500 if tf == "HOUR" else 60
+    min_buf = 396 if tf == "HOUR" else 55
+    buffer_dati = candele_list[-max_buf:]
     
     target_dirs = [".", "/data", "Logs_e_Cache", "../Logs_e_Cache", "/data/Logs_e_Cache"]
     for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
         target_dirs.extend([f"../{acc}", f"/data/{acc}", acc])
         
-    dati_da_salvare = buffer_60
+    dati_da_salvare = buffer_dati
     for d in set(target_dirs):
         if os.path.exists(d) and os.path.isdir(d):
             dest = os.path.join(d, fname)
-            # PROTEZIONE ANTI-TRONCAMENTO: se il file esistente ha più candele di buffer_60, fai il merge
-            salvataggio_locale = buffer_60
-            if len(buffer_60) < 55 and os.path.exists(dest):
+            salvataggio_locale = buffer_dati
+            if len(buffer_dati) < min_buf and os.path.exists(dest):
                 try:
                     with open(dest, "r", encoding="utf-8") as f_ex:
                         ex_list = json.load(f_ex)
-                        if isinstance(ex_list, list) and len(ex_list) > len(buffer_60):
+                        if isinstance(ex_list, list) and len(ex_list) > len(buffer_dati):
                             snaps = {c.get("snapshotTime"): c for c in ex_list if c.get("snapshotTime")}
-                            for c in buffer_60:
+                            for c in buffer_dati:
                                 s = c.get("snapshotTime")
                                 if s:
                                     snaps[s] = c
-                            merged = sorted(snaps.values(), key=lambda x: x.get("snapshotTime", ""))[-60:]
-                            if len(merged) > len(buffer_60):
+                            merged = sorted(snaps.values(), key=lambda x: x.get("snapshotTime", ""))[-max_buf:]
+                            if len(merged) > len(buffer_dati):
                                 salvataggio_locale = merged
                                 dati_da_salvare = merged
                 except Exception:
@@ -998,7 +999,7 @@ def salva_candele_locali(nome, tf, candele_list):
                 os.replace(tmp, dest)
             except Exception:
                 pass
-    LOCAL_CANDELE_CACHE[(nome, tf)] = dati_da_salvare[-60:]
+    LOCAL_CANDELE_CACHE[(nome, tf)] = dati_da_salvare[-max_buf:]
 
 # --- FUNZIONI CORE ---
 def scarica_candele(epic, timeframe, limit=60, headers=None):
@@ -1124,6 +1125,111 @@ def calcola_atr_da_candele(candele_list, periods=21):
     for tr in trs[p_eff:]:
         atr_wilder = (atr_wilder * (periods - 1) + tr) / float(periods)
     return atr_wilder
+
+def calcola_hma377_da_candele(candele_list, mult=0.0001):
+    """Calcola la Hull Moving Average a 377 periodi su candele H1."""
+    if not candele_list or len(candele_list) < 396:
+        return None
+    closes = []
+    for c in candele_list:
+        cp = c.get("closePrice")
+        if isinstance(cp, dict):
+            v = cp.get("bid") or cp.get("mid") or cp.get("ask")
+        else:
+            v = c.get("close")
+        if v is not None:
+            try:
+                closes.append(float(v))
+            except Exception:
+                pass
+    n = 377
+    half_n = 188
+    sqrt_n = 19
+    req_len = n + sqrt_n
+    if len(closes) < req_len:
+        return None
+        
+    denom_half = half_n * (half_n + 1) // 2
+    weights_half = list(range(1, half_n + 1))
+    denom_full = n * (n + 1) // 2
+    weights_full = list(range(1, n + 1))
+    
+    raw_diffs = []
+    for i in range(n, len(closes) + 1):
+        window = closes[:i]
+        wma_half = sum(v * w for v, w in zip(window[-half_n:], weights_half)) / denom_half
+        wma_full = sum(v * w for v, w in zip(window[-n:], weights_full)) / denom_full
+        diff = 2.0 * wma_half - wma_full
+        raw_diffs.append(diff)
+        
+    denom_sqrt = sqrt_n * (sqrt_n + 1) // 2
+    weights_sqrt = list(range(1, sqrt_n + 1))
+    
+    hmas = []
+    for i in range(sqrt_n, len(raw_diffs) + 1):
+        window_diff = raw_diffs[:i]
+        hma_val = sum(v * w for v, w in zip(window_diff[-sqrt_n:], weights_sqrt)) / denom_sqrt
+        hmas.append(hma_val)
+        
+    if not hmas:
+        return None
+    curr = hmas[-1]
+    prev = hmas[-2] if len(hmas) > 1 else curr
+    d_slope = curr - prev
+    tol = mult * 0.1
+    slope = "CRESCENTE" if d_slope > tol else ("DECRESCENTE" if d_slope < -tol else "PIATTA")
+    last_c = closes[-1]
+    pos = "SOPRA" if last_c > curr else ("SOTTO" if last_c < curr else "SU HULL")
+    return {
+        "hma377": curr,
+        "prev_hma377": prev,
+        "slope": slope,
+        "diff": d_slope,
+        "last_close": last_c,
+        "pos_vs_hull": pos
+    }
+
+HULL_TREND_FILE = "hull_trend.json"
+
+def salva_hull_trend_motore(nome, hull_info):
+    """Aggiorna il file hull_trend.json con l'ultimo rilevamento per lo strumento."""
+    target_dirs = [".", "/data", "Logs_e_Cache", "../Logs_e_Cache", "/data/Logs_e_Cache"]
+    for acc in ["FIORDOK_DEMO", "DANY_DEMO", "BONGIOLO_DEMO"]:
+        target_dirs.extend([f"../{acc}", f"/data/{acc}", acc])
+    
+    dati_hull = {}
+    for d in set(target_dirs):
+        p = os.path.join(d, HULL_TREND_FILE)
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    d_read = json.load(f)
+                    if isinstance(d_read, dict) and d_read:
+                        dati_hull.update(d_read)
+                        break
+            except Exception:
+                pass
+                
+    dati_hull[nome] = {
+        "hma377": round(hull_info["hma377"], 5),
+        "prev_hma377": round(hull_info["prev_hma377"], 5),
+        "slope": hull_info["slope"],
+        "diff": hull_info["diff"],
+        "last_close": hull_info["last_close"],
+        "pos_vs_hull": hull_info["pos_vs_hull"],
+        "time": now_it().strftime("%Y/%m/%d %H:%M:%S")
+    }
+    
+    for d in set(target_dirs):
+        if os.path.exists(d) and os.path.isdir(d):
+            dest = os.path.join(d, HULL_TREND_FILE)
+            try:
+                tmp = f"{dest}.tmp.{os.getpid()}"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(dati_hull, f, indent=2)
+                os.replace(tmp, dest)
+            except Exception:
+                pass
 
 def garantisce_candele_venerdi_chiuse(prezzi_live=None):
     """
@@ -1534,8 +1640,9 @@ def aggiorna_candele_live_globale(prezzi_live):
                     c_loc[found_idx] = closed_candle_dict
                 else:
                     c_loc.append(closed_candle_dict)
-                if len(c_loc) > 60:
-                    c_loc = c_loc[-60:]
+                max_c = 500 if tf == "HOUR" else 60
+                if len(c_loc) > max_c:
+                    c_loc = c_loc[-max_c:]
                 salva_candele_locali(nome, tf, c_loc)
                 
                 tf_lbl = "H4" if tf == "HOUR_4" else ("H1" if tf == "HOUR" else "D1")
@@ -1569,6 +1676,20 @@ def aggiorna_candele_live_globale(prezzi_live):
                     aggiorna_cache_ultimo_kj_motore(nome, tf_lbl, riga_persistente)
                 except Exception:
                     pass
+                if tf == "HOUR":
+                    try:
+                        mult_strum = CONFIG_STRUMENTI.get(nome, {}).get("moltiplicatore", 0.0001)
+                        h_res = calcola_hma377_da_candele(c_loc, mult=mult_strum)
+                        if h_res:
+                            hma_v = h_res.get("hma377")
+                            sl_v = h_res.get("slope")
+                            arr = "▲" if sl_v == "CRESCENTE" else ("▼" if sl_v == "DECRESCENTE" else "")
+                            ps_v = h_res.get("pos_vs_hull")
+                            riga_hull_log = f"🌊[H1]  HULL 377: {hma_v:.{dec}f} | Pendenza: {sl_v} {arr} | Prezzo: {ps_v}"
+                            print_log(nome, riga_hull_log)
+                            salva_hull_trend_motore(nome, h_res)
+                    except Exception:
+                        pass
 
             else:
                 # Se siamo in session break per Gold, non tracciare tick a mercato chiuso

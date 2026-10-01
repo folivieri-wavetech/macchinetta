@@ -1,0 +1,112 @@
+{
+  "AUD/NZD": {
+    "hma377": 1.23604,
+    "prev_hma377": 1.23609,
+    "slope": "DECRESCENTE",
+    "diff": -5.24e-05,
+    "last_close": 1.23483,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:15",
+    "candles_count": 500
+  },
+  "CAD/JPY": {
+    "hma377": 110.916,
+    "prev_hma377": 110.926,
+    "slope": "DECRESCENTE",
+    "diff": -0.01006,
+    "last_close": 110.686,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:16",
+    "candles_count": 500
+  },
+  "EUR/JPY": {
+    "hma377": 178.697,
+    "prev_hma377": 178.721,
+    "slope": "DECRESCENTE",
+    "diff": -0.02432,
+    "last_close": 176.971,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:16",
+    "candles_count": 500
+  },
+  "GBP/JPY": {
+    "hma377": 208.533,
+    "prev_hma377": 208.541,
+    "slope": "DECRESCENTE",
+    "diff": -0.00784,
+    "last_close": 207.956,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:16",
+    "candles_count": 500
+  },
+  "GBP/USD": {
+    "hma377": 1.31969,
+    "prev_hma377": 1.31973,
+    "slope": "DECRESCENTE",
+    "diff": -3.21e-05,
+    "last_close": 1.31865,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:00",
+    "candles_count": 500
+  },
+  "USD/CAD": {
+    "hma377": 1.42449,
+    "prev_hma377": 1.42438,
+    "slope": "CRESCENTE",
+    "diff": 0.0001121,
+    "last_close": 1.4246,
+    "pos_vs_hull": "SOPRA",
+    "time": "2026/10/01 19:12:17",
+    "candles_count": 500
+  },
+  "USD/CHF": {
+    "hma377": 0.83547,
+    "prev_hma377": 0.83542,
+    "slope": "CRESCENTE",
+    "diff": 5.75e-05,
+    "last_close": 0.83185,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:18",
+    "candles_count": 500
+  },
+  "USD/JPY": {
+    "hma377": 158.015,
+    "prev_hma377": 158.017,
+    "slope": "DECRESCENTE",
+    "diff": -0.00202,
+    "last_close": 157.703,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:12:19",
+    "candles_count": 500
+  },
+  "Spot Gold": {
+    "hma377": 4151.6,
+    "prev_hma377": 4152.64,
+    "slope": "DECRESCENTE",
+    "diff": -1.04,
+    "last_close": 4164.83,
+    "pos_vs_hull": "SOPRA",
+    "time": "2026/10/01 19:02:18",
+    "candles_count": 479
+  },
+  "US 500 Cash": {
+    "hma377": 7767.76,
+    "prev_hma377": 7768.96,
+    "slope": "DECRESCENTE",
+    "diff": -1.194,
+    "last_close": 7698.0,
+    "pos_vs_hull": "SOTTO",
+    "time": "2026/10/01 19:02:17",
+    "candles_count": 483
+  },
+  "CHF/JPY": {
+    "hma377": 189.099,
+    "prev_hma377": 189.114,
+    "slope": "DECRESCENTE",
+    "diff": -0.01545,
+    "last_close": 189.623,
+    "pos_vs_hull": "SOPRA",
+    "time": "2026/10/01 19:35:41",
+    "candles_count": 500
+  }
+}
