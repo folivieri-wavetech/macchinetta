@@ -23,6 +23,7 @@ if not os.path.exists(CONTO_DIR):
 ENV_FILE = os.path.join(CONTO_DIR, ".env")
 TOKEN_FILE = os.path.join(CONTO_DIR, "token_ig.json")
 STATO_FILE = os.path.join(CONTO_DIR, "stato_sistema.json")
+POSIZIONI_FILE = os.path.join(CONTO_DIR, "posizioni_aperte.json")
 CONFIG_GOLDFINGER_FILE = os.path.join(CONTO_DIR, "config_goldfinger.json")
 STATO_GOLDFINGER_FILE = os.path.join(CONTO_DIR, "stato_goldfinger.json")
 LOG_FILE = os.path.join(CONTO_DIR, "goldfinger.log")
@@ -301,8 +302,9 @@ class GoldfingerEngine:
 
     def chiudi_short_mercato(self, deal_id, size):
         headers = self.get_auth_headers("1")
+        headers["_method"] = "DELETE"
         payload = {
-            "dealId": deal_id,
+            "dealId": str(deal_id),
             "direction": "BUY", # Per chiudere uno SHORT si compra
             "size": str(int(size)),
             "orderType": "MARKET"
@@ -424,6 +426,25 @@ class GoldfingerEngine:
         self.stato["ultimo_prezzo_ask"] = ask
 
         scaglioni = self.stato.get("scaglioni", [])
+        
+        # RICONCILIAZIONE CON IG: se un deal aperto non è più presente su IG, allinea a CHIUSO
+        if os.path.exists(POSIZIONI_FILE):
+            try:
+                with open(POSIZIONI_FILE, "r", encoding="utf-8") as f_pos:
+                    pos_data = json.load(f_pos)
+                    live_deals = {str(p.get("dealId")) for p in pos_data if p.get("dealId")}
+                reconciled = False
+                for s in scaglioni:
+                    if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO") and s.get("deal_id"):
+                        if str(s["deal_id"]) not in live_deals:
+                            print_log(f"🔄 Riconciliazione IG: Difesa {s.get('numero')} [dealId: {s.get('deal_id')}] chiusa a mercato. Allineo stato interno a CHIUSO.")
+                            s["stato"] = "CHIUSO"
+                            reconciled = True
+                if reconciled:
+                    self.salva_stato()
+            except Exception:
+                pass
+
         aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
         
         # 5. TRACCIAMENTO DEL MINIMO DISCESA
