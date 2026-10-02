@@ -3,6 +3,7 @@ import sys
 import ssl
 import time
 import json
+import re
 import threading
 import datetime
 import requests
@@ -1115,6 +1116,12 @@ class HyperUS500M5Engine:
                     act_pnl_run = float(res_r.get("profit"))
                 if res_r.get("close_level"):
                     act_cl_run = float(res_r.get("close_level"))
+                elif res_r.get("already_closed") and float(res_r.get("profit") or 0.0) == 0.0:
+                    m_stop = re.search(r"\(([0-9.]+)\)", reason)
+                    if m_stop:
+                        act_cl_run = float(m_stop.group(1))
+                        pnl_pts = (act_cl_run - open_px) if direction == "LONG" else (open_px - act_cl_run)
+                        act_pnl_run = round(pnl_pts * self.point_value * RUNNER_CONTRACTS, 2)
 
             order_mgr.record_closed_trade(
                 tf="5M",
@@ -1140,6 +1147,12 @@ class HyperUS500M5Engine:
                         act_pnl_b = float(res_b.get("profit"))
                     if res_b.get("close_level"):
                         act_cl_b = float(res_b.get("close_level"))
+                    elif res_b.get("already_closed") and float(res_b.get("profit") or 0.0) == 0.0:
+                        m_stop = re.search(r"\(([0-9.]+)\)", reason)
+                        if m_stop:
+                            act_cl_b = float(m_stop.group(1))
+                            pnl_pts = (act_cl_b - open_px) if direction == "LONG" else (open_px - act_cl_b)
+                            act_pnl_b = round(pnl_pts * self.point_value * BANCOMAT_CONTRACTS, 2)
                 order_mgr.record_closed_trade(
                     tf="5M",
                     direction=direction,

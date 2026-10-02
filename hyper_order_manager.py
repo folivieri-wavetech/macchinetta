@@ -424,10 +424,75 @@ class HyperOrderManager:
             return filtered
         return positions
 
+    def get_closed_deal_details(self, deal_id: str, epic: str = None, open_price: float = None, max_span_seconds: int = 86400) -> dict:
+        """Cerca i dettagli reali di una posizione chiusa nell'endpoint transazioni di IG (P&L reale e prezzo di chiusura)."""
+        if not deal_id or deal_id == "--":
+            return None
+        with self.lock:
+            if not self._ensure_session():
+                return None
+            try:
+                url = f"{self.base_url}/history/transactions?type=ALL&maxSpanSeconds={max_span_seconds}&pageSize=50"
+                h = self._get_headers(version="2")
+                r = requests.get(url, headers=h, timeout=10)
+                if r.status_code == 200:
+                    txs = r.json().get("transactions", [])
+                    clean_d = deal_id.replace("DIAAAA", "")
+                    for t in txs:
+                        if t.get("transactionType") != "DEAL":
+                            continue
+                        ref = str(t.get("reference", ""))
+                        inst = str(t.get("instrumentName", "")).upper()
+                        matched = False
+                        if clean_d and clean_d in ref:
+                            matched = True
+                        elif ref and ref in deal_id:
+                            matched = True
+                        elif open_price and epic:
+                            is_inst_match = False
+                            if "GOLD" in epic.upper() and "GOLD" in inst:
+                                is_inst_match = True
+                            elif any(k in epic.upper() for k in ("SPTRD", "US500", "SPX")) and "US 500" in inst:
+                                is_inst_match = True
+                            if is_inst_match:
+                                t_op = float(t.get("openLevel", 0.0) or 0.0)
+                                if abs(t_op - open_price) < 0.5:
+                                    matched = True
+
+                        if matched:
+                            pnl_str = str(t.get("profitAndLoss", ""))
+                            pnl_val = float(pnl_str[1:]) if pnl_str.startswith("E") else float(pnl_str or 0.0)
+                            cl_lvl = float(t.get("closeLevel", 0.0) or 0.0)
+                            return {
+                                "close_level": cl_lvl,
+                                "profit": pnl_val,
+                                "reference": ref
+                            }
+            except Exception as e:
+                logger.warning(f"⚠️ Errore get_closed_deal_details per {deal_id}: {e}")
+        return None
+
     def close_market_deal(self, deal_id: str, direction_open: str, size: float, label: str = "Chiusura", reason_note: str = "") -> dict:
         """Chiude a mercato una posizione aperta su IG tramite DELETE /positions/otc con verifica conferma."""
         if not deal_id:
             return {"success": False, "reason": "MISSING_DEAL_ID"}
+
+        def _handle_already_closed(d_id):
+            logger.info(f"ℹ️ Posizione IG {d_id} già chiusa su IG. Ricerca dettagli transazione reale...")
+            tx_info = self.get_closed_deal_details(d_id)
+            if tx_info and tx_info.get("close_level"):
+                logger.info(f"✅ Recuperati dettagli IG per {d_id}: Close {tx_info['close_level']}, P&L {tx_info['profit']:+.2f} €")
+                return {
+                    "success": True,
+                    "deal_id": d_id,
+                    "close_level": tx_info["close_level"],
+                    "profit": tx_info["profit"],
+                    "already_closed": True,
+                    "label": label,
+                    "reason": reason_note,
+                    "time": now_it().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            return {"success": True, "deal_id": d_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
 
         with self.lock:
             self._throttle()
@@ -483,13 +548,11 @@ class HyperOrderManager:
                             rej_upper = str(rej_reason).upper()
                             # Se la posizione non esiste più, è già stata chiusa (es. per TP già toccato)
                             if any(k in rej_upper for k in ("POSITION_NOT_FOUND", "ALREADY_CLOSED", "NOT_AVAILABLE", "ORDER_NOT_FOUND")):
-                                logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa su IG ({rej_reason}).")
-                                return {"success": True, "deal_id": deal_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
+                                return _handle_already_closed(deal_id)
 
                             # Verifica immediata su IG: se non è più tra le posizioni aperte, è già stata chiusa dal TP nativo
                             if not self.is_deal_open(deal_id):
-                                logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta su IG (già eseguita da TP/SL nativo IG). Nessun allarme.")
-                                return {"success": True, "deal_id": deal_id, "close_level": 0.0, "profit": 0.0, "already_closed": True}
+                                return _handle_already_closed(deal_id)
 
                             self.send_notification(f"⚠️ RIFIUTO CHIUSURA: {label}", f"Posizione ({dir_close} {size_str}c) rifiutata: {rej_reason}", "warning")
                             return {"success": False, "reason": rej_reason}
@@ -499,20 +562,18 @@ class HyperOrderManager:
                     err_txt = r.text
                     err_upper = err_txt.upper()
                     if any(k in err_upper for k in ("POSITION_NOT_FOUND", "DEAL-NOT-FOUND", "ALREADY_CLOSED", "NOT_AVAILABLE")):
-                        logger.info(f"ℹ️ Posizione IG {deal_id} già chiusa precedentemente.")
-                        return {"success": True, "deal_id": deal_id, "already_closed": True}
+                        return _handle_already_closed(deal_id)
                     if not self.is_deal_open(deal_id):
-                        logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta su IG (già chiusa da TP/SL).")
-                        return {"success": True, "deal_id": deal_id, "already_closed": True}
+                        return _handle_already_closed(deal_id)
                     logger.error(f"❌ Errore chiusura IG {deal_id}: HTTP {r.status_code} - {err_txt}")
                     self.send_notification(f"⚠️ ERRORE CHIUSURA: {label}", f"HTTP {r.status_code}: {err_txt[:100]}", "warning")
                     return {"success": False, "reason": f"HTTP_{r.status_code}: {err_txt}"}
             except Exception as e:
                 logger.error(f"❌ Eccezione chiusura IG {deal_id}: {e}")
                 if not self.is_deal_open(deal_id):
-                    logger.info(f"ℹ️ Posizione IG {deal_id} non più aperta dopo eccezione (già chiusa).")
-                    return {"success": True, "deal_id": deal_id, "already_closed": True}
+                    return _handle_already_closed(deal_id)
                 self.send_notification(f"⚠️ ECCEZIONE CHIUSURA: {label}", f"Errore chiusura: {str(e)[:100]}", "warning")
+                return {"success": False, "reason": f"EXCEPTION: {e}"}
     def remove_limit_order(self, deal_id: str, label: str = "Rimozione TP") -> bool:
         """Invia una richiesta PUT a IG per rimuovere il Limit Order (Take Profit) da una posizione aperta,
         trasformando il deal in posizione a corsa libera con Trailing Stop."""
