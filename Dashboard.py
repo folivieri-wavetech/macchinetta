@@ -777,6 +777,13 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
         or "CFEGOLD" in str(pos_dict.get("epic", ""))
     )
 
+    is_us500 = (
+        "US 500" in str(nome_strum).upper()
+        or "US500" in str(nome_strum).upper()
+        or "SP500" in str(nome_strum).upper()
+        or "USA500" in str(pos_dict.get("epic", ""))
+    )
+
     # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold e US 500) ---
     pos_30s = hyper_30s_state.get("position") or {}
     incs_30s = hyper_30s_state.get("increments") or []
@@ -788,33 +795,44 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
     u_incs_5m = (hyper_5m_state.get("us500") or {}).get("increments") or []
 
     if deal_id:
-        if deal_id == pos_30s.get("deal_id"):
+        if deal_id == pos_30s.get("deal_id") or deal_id == pos_30s.get("deal_id_runner"):
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
         for idx_30, inc in enumerate(incs_30s):
             if inc.get("deal_id") == deal_id:
                 st_num = inc.get("step_idx", idx_30 + 1)
                 return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {st_num}</span>"
 
+        # Gold Hyper 5M
+        if deal_id == pos_5m.get("deal_id_bancomat"):
+            return "<span style='color: #f59e0b; font-weight: bold;'>Hyper-Bco</span>"
+        if deal_id == pos_5m.get("deal_id_runner"):
+            return "<span style='color: #38bdf8; font-weight: bold;'>Hyper-Run</span>"
         if deal_id == pos_5m.get("deal_id"):
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5M</span>"
         for idx_5, inc in enumerate(incs_5m):
             if inc.get("deal_id") == deal_id:
-                return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {idx_5 + 1}</span>"
+                lbl_name = inc.get("label", f"Hyper-Speed {idx_5 + 1}")
+                return f"<span style='color: #c084fc; font-weight: bold;'>{lbl_name}</span>"
 
-        # US500 Hyper
-        if deal_id == u_pos_30s.get("deal_id"):
+        # US500 Hyper 30S
+        if deal_id == u_pos_30s.get("deal_id") or deal_id == u_pos_30s.get("deal_id_runner"):
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S (US500)</span>"
+
+        # US500 Hyper 5M
+        if deal_id == u_pos_5m.get("deal_id_bancomat"):
+            return "<span style='color: #f59e0b; font-weight: bold;'>Hyper-Bco</span>"
+        if deal_id == u_pos_5m.get("deal_id_runner"):
+            return "<span style='color: #38bdf8; font-weight: bold;'>Hyper-Run</span>"
         if deal_id == u_pos_5m.get("deal_id"):
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5M (US500)</span>"
         for idx_u5, inc in enumerate(u_incs_5m):
             if inc.get("deal_id") == deal_id:
-                return f"<span style='color: #38bdf8; font-weight: bold;'>incremento US500 n. {idx_u5 + 1}</span>"
+                lbl_name = inc.get("label", f"Hyper-Speed US500 {idx_u5 + 1}")
+                return f"<span style='color: #c084fc; font-weight: bold;'>{lbl_name}</span>"
 
     if is_gold:
         if abs(sz_pos - 2.0) < 0.001:
             return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
-        elif abs(sz_pos - 5.0) < 0.001:
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5M</span>"
         elif abs(sz_pos - 4.0) < 0.001:
             matching_4c = [p for p in pos_data if abs(float(p['position']['size']) - 4.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
             try:
@@ -829,6 +847,13 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
             except Exception:
                 inc_idx = 1
             return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {inc_idx}</span>"
+
+    if is_gold or is_us500:
+        has_tp = bool(pos_dict.get('limitLevel') or pos_dict.get('limitDistance'))
+        if has_tp:
+            return "<span style='color: #f59e0b; font-weight: bold;'>Hyper-Bco</span>"
+        else:
+            return "<span style='color: #38bdf8; font-weight: bold;'>Hyper-Run</span>"
 
     tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
     if tipo_strategia != "TREND" and deal_id:
@@ -3260,15 +3285,17 @@ else:
                         except Exception:
                             pass
                     
+                    lbl_kj = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>KJ</span>"
+                    lbl_tk = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>TK</span>"
                     if kj_val is not None:
-                        stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>"
+                        stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>{lbl_kj}"
                     else:
-                        stop_str = "-"
+                        stop_str = f"-{lbl_kj}"
                         
                     if tk_val is not None:
-                        lim_str = f"<span style='color: #00BFFF;' title='Tenkan-sen (TK)'>{formatta_numero(tk_val, dec)}</span>"
+                        lim_str = f"<span style='color: #00BFFF;' title='Tenkan-sen (TK)'>{formatta_numero(tk_val, dec)}</span>{lbl_tk}"
                     else:
-                        lim_str = "-"
+                        lim_str = f"-{lbl_tk}"
                 else:
                     if len(stops) > 1: stop_str = "<span class='ig-multiplo'>Multiplo</span>"
                     elif len(stops) == 1:
@@ -3285,7 +3312,13 @@ else:
                 
                 if len(posizioni) > 1:
                     is_gold = (nome in ("Spot Gold", "ORO") or "GOLD" in str(nome).upper())
-                    ruolo_master_str = "<span style='color: #FFD700; font-weight: bold;'>Hyper Gold</span>" if is_gold else ""
+                    is_us500 = ("US 500" in str(nome).upper() or "US500" in str(nome).upper() or "SP500" in str(nome).upper())
+                    if is_gold:
+                        ruolo_master_str = "<span style='color: #FFD700; font-weight: bold;'>Hyper Gold</span>"
+                    elif is_us500:
+                        ruolo_master_str = "<span style='color: #FFD700; font-weight: bold;'>Hyper US 500</span>"
+                    else:
+                        ruolo_master_str = ""
                 else:
                     ruolo_master_str = list(ruoli_master)[0] if ruoli_master else "-"
                 
@@ -3304,8 +3337,9 @@ else:
                     if prev_nome == nome:
                         is_first_of_instrument = False
                         
-                prezzo_str = f"<u>{formatta_numero(prezzo_attuale, dec)}</u>" if prezzo_attuale else "<u>-</u>"
-                if not is_first_of_instrument:
+                lbl_live = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>Live</span>" if is_trend else ""
+                prezzo_str = f"<u>{formatta_numero(prezzo_attuale, dec)}</u>{lbl_live}" if prezzo_attuale else f"<u>-</u>{lbl_live}"
+                if not is_first_of_instrument and not is_trend:
                     prezzo_str = ""
 
                 trend_color = "#FF8C00" if is_trend else None

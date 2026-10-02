@@ -829,6 +829,9 @@ class HyperUS500M5Engine:
         if not self.position or self.closing_in_progress:
             return
 
+        if is_us500_trading_suspended():
+            return
+
         direction = self.position["direction"]
         open_px = self.position["open_price"]
         sl_px = self.position["sl_price"]
@@ -1359,16 +1362,44 @@ class HyperUS500M5Engine:
                 time.sleep(5)
 
     def _run_rollover_watchdog(self):
+        """Watchdog automatico per freeze rollover e weekend."""
+        last_friday_disarmed_date = None
         while self.running:
             try:
                 now_t = now_it()
-                if is_us500_trading_suspended(now_t):
-                    if self.position:
-                        exec_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
-                        self._close_all_to_flat(exec_px, now_t.strftime("%H:%M:%S"), reason="🌙 Chiusura Freeze Notturno US500")
+                wd = now_t.weekday()
+                t = now_t.time()
+                today_str = now_t.strftime("%Y-%m-%d")
+
+                # 1. Chiusura forzata a FLAT SOLO il venerdì sera alle 22:44 prima del weekend
+                if wd == 4 and t >= datetime.time(22, 44, 0):
+                    with self.lock:
+                        has_pos = (self.position is not None or len(self.increments) > 0)
+                        mid_px = self.live_mid if self.live_mid is not None else (self.candles[-1]["close"] if self.candles else 0.0)
+                    if has_pos and not getattr(self, "closing_in_progress", False):
+                        self._close_all_to_flat(mid_px, now_t.strftime("%H:%M:%S"), reason="🏁 Chiusura Pre-Weekend Venerdì 22:44 US500")
+
+                # 2. Venerdì sera alle 23:05: Disattivazione automatica per il weekend (stato 'DA AVVIARE')
+                if wd == 4 and t >= datetime.time(23, 5, 0):
+                    if last_friday_disarmed_date != today_str:
+                        last_friday_disarmed_date = today_str
+                        if self.trading_enabled:
+                            with self.lock:
+                                self.trading_enabled = False
+                                self.save_state()
+                            logger.info(f"🛑 [WEEKEND SHUTDOWN] Venerdì ore {t.strftime('%H:%M:%S')}: Trading US 500 disattivato per il weekend (DA AVVIARE).")
+                            try:
+                                order_mgr = HyperOrderManager.get_instance(self.account_dir)
+                                order_mgr.send_notification(
+                                    "🛑 US 500 M5: WEEKEND SHUTDOWN",
+                                    f"Chiusura weekend ({t.strftime('%H:%M:%S')}). Motore US 500 M5 disattivato e reimpostato su DA AVVIARE.",
+                                    "pause_button"
+                                )
+                            except Exception:
+                                pass
             except Exception:
                 pass
-            time.sleep(10)
+            time.sleep(5)
 
     def manual_entry_core(self, direction: str) -> dict:
         norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
