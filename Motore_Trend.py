@@ -2343,9 +2343,10 @@ def esegui_ciclo_trend():
         dec = CONFIG_STRUMENTI[nome]["decimali"]
 
         is_attivo = dati.get("attivo", False)
+        trigger_attivo = dati.get("trigger_start_attivo", False)
         candele_locali = carica_candele_locali(nome, tf)
 
-        if not is_attivo:
+        if not is_attivo and not trigger_attivo:
             # Salvaguardia: se ci sono posizioni reali aperte su IG per questo strumento e non è richiesta la chiusura,
             # consentiamo alla sezione di riconciliazione (CASO A) di riagganciare la posizione
             pos_ig_epic = filtra_posizioni_trend(posizioni_live_ig, epic) if has_pos_live_data else []
@@ -3009,8 +3010,7 @@ def esegui_ciclo_trend():
                     print_log(nome, f"🛑 Errore invio ordine IG per Trigger {trig_dir}")
                 continue
             else:
-                if not is_candle_just_closed:
-                    continue
+                continue
 
         # Se l'utente ha premuto AVVIA LONG/SHORT (needs_start), avviamo l'engine e l'ordine SUBITO a mercato
         if needs_start:
