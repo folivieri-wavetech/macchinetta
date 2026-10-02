@@ -324,7 +324,8 @@ class HyperUS500M5Engine:
     # MOTORE DI VALUTAZIONE: LE 4 LUCETTE (SEMAFORO APEX PER US 500)
     # ==============================================================================
 
-    def _evaluate_traffic_lights(self, time_str: str):
+    def _evaluate_traffic_lights(self, time_str: str, on_candle_close: bool = False):
+        """Valuta in tempo reale le 3 Lucette di Confluenza su M5 per US 500."""
         if len(self.candles) < 20:
             return
 
@@ -459,8 +460,9 @@ class HyperUS500M5Engine:
             "ema21": round(ema21, 2) if ema21 else None
         }
 
-        # Controllo ingresso automatico
-        if self.trading_enabled and self.position is None and not self.entry_in_progress:
+        # INGRESSO AUTOMATICO: CONSENTITO SOLO A CHIUSURA CANDELA CONFERMATA (ALL'INIZIO DELLA NUOVA BARRA M5)
+        # Mai a metà candela o appena il bot si connette!
+        if on_candle_close and self.trading_enabled and self.position is None and not self.entry_in_progress:
             if not is_us500_entry_suspended():
                 if all_green_long:
                     self._trigger_entry("LONG", live_px, time_str, last_pl, last_ph)
@@ -696,7 +698,9 @@ class HyperUS500M5Engine:
             now_epoch = int(time.time())
             boundary = (now_epoch // CANDLE_SECONDS) * CANDLE_SECONDS
 
+            is_candle_close = False
             if self.curr_boundary != boundary:
+                # Chiusura barra precedente (avvenuta al termine dei 5 minuti esatti)
                 if self.curr_boundary is not None and self.curr_open is not None:
                     closed_bar = {
                         "time": self.curr_bar_start_t or time_str,
@@ -708,7 +712,9 @@ class HyperUS500M5Engine:
                     self.candles.append(closed_bar)
                     if len(self.candles) > 500:
                         self.candles = self.candles[-500:]
+                    is_candle_close = True
 
+                # Nuova barra M5
                 self.curr_boundary = boundary
                 self.curr_open = mid
                 self.curr_high = mid
@@ -720,7 +726,10 @@ class HyperUS500M5Engine:
                 self.curr_low = min(self.curr_low, mid)
                 self.curr_close = mid
 
-            self._evaluate_traffic_lights(time_str)
+            # 1. Valuta Semaforo a 3 Lucette (Ingresso automatico consentito ESCLUSIVAMENTE all'inizio della nuova candela)
+            self._evaluate_traffic_lights(time_str, on_candle_close=is_candle_close)
+
+            # 2. Gestisci Posizione Aperta (SL, TP1, Trailing) - sempre attivo tick-by-tick
             self._manage_open_position(mid, time_str)
 
     def _get_ig_credentials(self):

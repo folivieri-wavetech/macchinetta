@@ -31,7 +31,7 @@ CORE_CONTRACTS = 6          # Totale 6 contratti (3 Bancomat + 3 Runner)
 BANCOMAT_CONTRACTS = 3      # 3 contratti Bancomat (TP1 rapido a R:R 1:1 o 20 pip)
 RUNNER_CONTRACTS = 3        # 3 contratti Runner (Trailing Stop strutturale sui minimi/massimi crescenti)
 
-TP1_DEFAULT_PIPS = 20.0     # Take Profit Bancomat fisso/garantito: +20 pip (+60.00 €)
+TP1_DEFAULT_PIPS = 5.0      # Take Profit Bancomat rapido M5: +5 pip (+15.00 €)
 SL_BUFFER_PIPS = 3.0        # Cuscinetto oltre il pivot strutturale: 3 pip
 SL_MIN_PIPS = 10.0          # Stop Loss minimo di protezione: 10 pip
 SL_MAX_PIPS = 35.0          # Stop Loss massimo invalicabile (cap di sicurezza): 35 pip
@@ -339,8 +339,8 @@ class HyperGoldM5Engine:
     # MOTORE DI VALUTAZIONE: LE 4 LUCETTE (SEMAFORO APEX)
     # ==============================================================================
 
-    def _evaluate_traffic_lights(self, time_str: str):
-        """Valuta in tempo reale le 4 Lucette di Confluenza su M5."""
+    def _evaluate_traffic_lights(self, time_str: str, on_candle_close: bool = False):
+        """Valuta in tempo reale le 3 Lucette di Confluenza su M5 (L1 Struttura, L2 Breakout, L3 Spinta EMA)."""
         if len(self.candles) < 20:
             return
 
@@ -473,8 +473,9 @@ class HyperGoldM5Engine:
             "ema21": round(ema21, 2) if ema21 else None
         }
 
-        # SE IL TRADING E' ABILITATO E SIAMO FLAT, CONTROLLA INGRESSO AUTOMATICO
-        if self.trading_enabled and self.position is None and not self.entry_in_progress:
+        # INGRESSO AUTOMATICO: CONSENTITO SOLO A CHIUSURA CANDELA CONFERMATA (ALL'INIZIO DELLA NUOVA BARRA M5)
+        # Mai a metà candela o appena il bot si connette!
+        if on_candle_close and self.trading_enabled and self.position is None and not self.entry_in_progress:
             if not is_gold_entry_suspended():
                 if all_green_long:
                     self._trigger_entry("LONG", live_px, time_str, last_pl, last_ph)
@@ -738,8 +739,9 @@ class HyperGoldM5Engine:
             boundary = (now_epoch // CANDLE_SECONDS) * CANDLE_SECONDS
 
             # Aggiornamento barra M5 corrente
+            is_candle_close = False
             if self.curr_boundary != boundary:
-                # Chiusura barra precedente
+                # Chiusura barra precedente (avvenuta al termine dei 5 minuti esatti)
                 if self.curr_boundary is not None and self.curr_open is not None:
                     closed_bar = {
                         "time": self.curr_bar_start_t or time_str,
@@ -751,6 +753,7 @@ class HyperGoldM5Engine:
                     self.candles.append(closed_bar)
                     if len(self.candles) > 500:
                         self.candles = self.candles[-500:]
+                    is_candle_close = True
 
                 # Nuova barra M5
                 self.curr_boundary = boundary
@@ -764,10 +767,10 @@ class HyperGoldM5Engine:
                 self.curr_low = min(self.curr_low, mid)
                 self.curr_close = mid
 
-            # 1. Valuta Semaforo 4 Lucette
-            self._evaluate_traffic_lights(time_str)
+            # 1. Valuta Semaforo a 3 Lucette (Ingresso automatico consentito ESCLUSIVAMENTE all'inizio della nuova candela)
+            self._evaluate_traffic_lights(time_str, on_candle_close=is_candle_close)
 
-            # 2. Gestisci Posizione Aperta (SL, TP1, Trailing)
+            # 2. Gestisci Posizione Aperta (SL, TP1, Trailing) - sempre attivo tick-by-tick
             self._manage_open_position(mid, time_str)
 
     def _get_ig_credentials(self):

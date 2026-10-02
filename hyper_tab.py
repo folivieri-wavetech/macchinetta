@@ -685,13 +685,13 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         p_rows = []
 
         # Nuova Logica Apex Swing (Split Bancomat 3c + Runner 3c)
-        if "bancomat_contracts" in pos or "runner_contracts" in pos:
+        if "bancomat_contracts" in pos or "runner_contracts" in pos or "deal_id_bancomat" in pos or "tp1_price" in pos:
             bco_c = pos.get("bancomat_contracts", 3)
             run_c = pos.get("runner_contracts", 3)
-            bco_closed = pos.get("bancomat_closed", False)
-            tp_bco = pos.get("tp_bancomat")
+            bco_closed = pos.get("tp1_hit", False) or pos.get("bancomat_closed", False)
+            tp_bco = pos.get("tp1_price") or pos.get("tp_bancomat")
             sl_bco = pos.get("sl_price")
-            run_sl = pos.get("runner_sl")
+            run_sl = pos.get("runner_sl") or pos.get("sl_price")
             run_be = pos.get("runner_be_active", False)
 
             # 1. Riga BANCOMAT
@@ -759,21 +759,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 f"<td style='text-align: center; color: {col_rp}; font-weight: 700;'>{sign_rp}{r_pnl:,.2f} €</td>"
                 f"</tr>"
             )
-
-            # Riga vuota decorativa per allineamento
-            p_rows.append(
-                f"<tr style='opacity: 0.35;'>"
-                f"<td style='text-align: center;'><span style='color: #64748b; font-size: 0.71rem;'>➕ Riserva</span></td>"
-                f"<td style='text-align: center; color: #475569;'>--</td>"
-                f"<td style='text-align: center; color: #475569;'>--</td>"
-                f"<td style='text-align: center; color: #475569;'>--</td>"
-                f"<td style='text-align: center;'></td>"
-                f"<td style='text-align: center;'></td>"
-                f"<td style='text-align: center; color: #475569; font-size: 0.72rem;'>--</td>"
-                f"</tr>"
-            )
         else:
-            # Fallback generico
+            # Fallback generico con visualizzazione completa di SL e TP
             if live_mid is not None:
                 core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
                 core_pnl_val = round(core_diff * pos.get("contracts", core_c) * 1.0, 2)
@@ -785,14 +772,18 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             sign_c_size = "+" if dir_pos == "LONG" else "-"
             col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
             size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}</span>"
+            sl_val = pos.get("runner_sl") or pos.get("sl_price")
+            tp_val = pos.get("tp1_price") or pos.get("tp_bancomat") or pos.get("tp_price")
+            sl_cell = f"<span style='color: #fa8072; font-weight: 600;'>{sl_val:.2f}</span>" if sl_val else "--"
+            tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>" if tp_val else "--"
             p_rows.append(
                 f"<tr>"
                 f"<td style='text-align: center;'>{dir_badge}</td>"
                 f"<td style='text-align: center;'>{time_core_cell}</td>"
                 f"<td style='text-align: center;'>{size_core_cell}</td>"
                 f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                f"<td style='text-align: center;'>--</td>"
-                f"<td style='text-align: center;'></td>"
+                f"<td style='text-align: center;'>{sl_cell}</td>"
+                f"<td style='text-align: center;'>{tp_cell}</td>"
                 f"<td style='text-align: center; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
                 f"</tr>"
             )
