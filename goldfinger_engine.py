@@ -528,26 +528,36 @@ class GoldfingerEngine:
                 self.stato["totale_incassato"] += pnl_tot_rimbalzo
                 self.stato["minimo_precedente"] = min_curr
                 self.stato["minimo_discesa"] = None
-                print_log(f"💰 Chiusura rimbalzo completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €. Minimo precedente salvato a {min_curr:.2f}.")
-                invia_notifica("INCASSO RIMBALZO", f"Tutti gli Short chiusi sul rimbalzo! Incasso netto: {pnl_tot_rimbalzo:+.2f} €", "moneybag")
+
+                # RIARMO IMMEDIATO COMPLETO DELLA SECONDA ONDATA (Minimo discesa - 5 pip)
+                # Rigenera SEMPRE TUTTI i 18 contratti (6 difese) a partire da 5 pip sotto il minimo battuto
+                soglia_riarmo = round(min_curr - 5.0, 2)
+                passo = float(self.stato.get("passo_pip", 6.0))
+                sz = int(self.stato.get("size_scaglione", 3))
+                delta = int(self.stato.get("delta_totale", 18))
+                self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
+                self.stato["livello_1_prezzo"] = soglia_riarmo
+                print_log(f"💰 Chiusura rimbalzo completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €.")
+                print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} (Minimo {min_curr:.2f} - 5 pip) in giù.")
+                invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
                 self.salva_stato()
                 return
 
-        # 8. RIARMO AUTOMATICO SULLA SECONDA ONDATA (Rottura Minimo Precedente di 5 pip)
-        tutti_chiusi = len(scaglioni) > 0 and all(s["stato"] in ("CHIUSO", "RECUPERATO_CHIUSO") for s in scaglioni)
+        # 8. RIPRISTINO AUTOMATICO COPERTURA TOTALE (Garantisce sempre tutte le 6 difese per 18 contratti)
         min_prec = self.stato.get("minimo_precedente")
-        if tutti_chiusi and min_prec is not None:
+        difese_in_attesa = [s for s in scaglioni if s["stato"] == "IN_ATTESA"]
+        delta_in_attesa = sum(s["size"] for s in difese_in_attesa)
+        delta_richiesto = int(self.stato.get("delta_totale", 18))
+
+        if not aperti and delta_in_attesa < delta_richiesto and min_prec is not None:
             soglia_riarmo = round(min_prec - 5.0, 2)
-            if bid <= soglia_riarmo:
-                print_log(f"🛡️ SECONDA ONDATA: Prezzo {bid:.2f} <= Minimo prec ({min_prec:.2f}) - 5 pip ({soglia_riarmo:.2f}). Riarmo immediato della scala SHORT!")
-                passo = float(self.stato.get("passo_pip", 6.0))
-                sz = int(self.stato.get("size_scaglione", 3))
-                delta = int(self.stato.get("delta_totale", 15))
-                self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
-                self.stato["minimo_precedente"] = None
-                self.stato["minimo_discesa"] = None
-                invia_notifica("RIARMO GOLDFINGER", f"Riarmo seconda ondata da {soglia_riarmo:.2f} in giù.", "arrows_counterclockwise")
-                self.salva_stato()
+            passo = float(self.stato.get("passo_pip", 6.0))
+            sz = int(self.stato.get("size_scaglione", 3))
+            self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta_richiesto)
+            self.stato["livello_1_prezzo"] = soglia_riarmo
+            print_log(f"🛡️ RIPRISTINO COPERTURA TOTALE: Riarmo automatico {len(self.stato['scaglioni'])} difese ({delta_richiesto} mini) da {soglia_riarmo:.2f} (Minimo {min_prec:.2f} - 5 pip) in giù.")
+            invia_notifica("RIPRISTINO COPERTURA TOTALE", f"Riarmo automatico: {len(self.stato['scaglioni'])} difese ({delta_richiesto} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
+            self.salva_stato()
 
         # 9. STOP LOSS SINGOLO SU FALSO ALLARME
         if len(aperti) == 1:
