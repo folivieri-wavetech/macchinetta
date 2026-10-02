@@ -2286,66 +2286,70 @@ def esegui_ciclo_trend():
                 pos_incr = dati.get("posizioni_incr", [])
             
             # REGOLE FERREE:
-            # Trend deve considerare SOLO ED ESCLUSIVAMENTE ticket che appartengono alle sue posizioni core o incr!
+            # Trend deve considerare SOLO ED ESCLUSIVAMENTE ticket appartenenti a Trend per questo epic!
             # NON deve MAI toccare o chiudere posizioni generiche su IG che appartengono al motore RANGE!
-            trend_tickets = get_tutti_deal_trend_account(None)
+            trend_tickets_epic = set(carica_deal_trend(None).get(epic, []))
             for p in (pos_core + pos_incr):
                 t_id = p.get("ticket")
                 if t_id:
-                    trend_tickets.add(t_id)
+                    trend_tickets_epic.add(str(t_id).strip())
             
-            if trend_tickets or da_chiudere:
-                pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic and p.get('position', {}).get('dealId') in trend_tickets] if has_pos_live_data else []
-                
-                m_status = "TRADEABLE"
-                if pos_ig_strum:
-                    m_status = pos_ig_strum[0].get('market', {}).get('marketStatus', 'TRADEABLE')
-                
-                if m_status != "TRADEABLE":
-                    t_now = time.time()
-                    if t_now - ULTIMO_LOG_ATTESA.get(nome, 0) > 60:
-                        ULTIMO_LOG_ATTESA[nome] = t_now
-                        print_log(nome, f"⏳ Posizione in attesa liquidazione: mercato IG non negoziabile ({m_status}).")
-                    
-                    up_pend = {
-                        "attivo": False,
-                        "stato": "IN_ATTESA_CHIUSURA",
-                        "da_chiudere_a_riapertura": True,
-                        "msg_manuale": f"⚠️ Mercato {m_status} su IG. La posizione verrà chiusa automaticamente appena il mercato torna TRADEABLE."
-                    }
-                    aggiorna_memoria(nome, up_pend)
-                    continue
+            # Se non ci sono posizioni per questo epic né in memoria né da chiudere, salta immediatamente!
+            if not trend_tickets_epic and not da_chiudere and not pos_core and not pos_incr:
+                continue
 
-                print_log(nome, f"Motore Trend spento o in attesa chiusura. Verifica liquidazione posizioni Trend su IG...")
+            pos_ig_strum = [
+                p for p in posizioni_live_ig
+                if p.get('market', {}).get('epic') == epic
+                and p.get('position', {}).get('dealId') in trend_tickets_epic
+            ] if has_pos_live_data else []
+            
+            m_status = "TRADEABLE"
+            if pos_ig_strum:
+                m_status = pos_ig_strum[0].get('market', {}).get('marketStatus', 'TRADEABLE')
+            
+            if m_status != "TRADEABLE":
+                t_now = time.time()
+                if t_now - ULTIMO_LOG_ATTESA.get(nome, 0) > 60:
+                    ULTIMO_LOG_ATTESA[nome] = t_now
+                    print_log(nome, f"⏳ Posizione in attesa liquidazione: mercato IG non negoziabile ({m_status}).")
                 
-                # Costruisci l'elenco delle posizioni Trend da chiudere
-                tickets_da_chiudere = []
-                for p in (pos_core + pos_incr):
-                    t_id = p.get("ticket")
-                    if t_id:
-                        dir_c = "SELL" if p.get("direction") == "LONG" else "BUY"
-                        sz = p.get("size", size_i)
-                        tipo_pos = p.get("tipo", "core")
-                        tickets_da_chiudere.append((t_id, dir_c, sz, f"[{tipo_pos.upper()}]"))
-                
-                # Aggiungi eventuali residui registrati a Trend su IG per questo epic
-                tickets_gia_inclusi = {t[0] for t in tickets_da_chiudere}
-                for p_ig in pos_ig_strum:
-                    d_id = p_ig.get('position', {}).get('dealId')
-                    if d_id and d_id not in tickets_gia_inclusi:
-                        d_ig = "SELL" if p_ig.get('position', {}).get('direction') == "BUY" else "BUY"
-                        sz_ig = float(p_ig.get('position', {}).get('dealSize') or p_ig.get('position', {}).get('size', size_i))
-                        tickets_da_chiudere.append((d_id, d_ig, sz_ig, "[RESIDUA_TREND]"))
-                
+                up_pend = {
+                    "attivo": False,
+                    "stato": "IN_ATTESA_CHIUSURA",
+                    "da_chiudere_a_riapertura": True,
+                    "msg_manuale": f"⚠️ Mercato {m_status} su IG. La posizione verrà chiusa automaticamente appena il mercato torna TRADEABLE."
+                }
+                aggiorna_memoria(nome, up_pend)
+                continue
+
+            # Costruisci l'elenco delle posizioni Trend reali da chiudere
+            tickets_da_chiudere = []
+            for p in (pos_core + pos_incr):
+                t_id = p.get("ticket")
+                if t_id:
+                    dir_c = "SELL" if p.get("direction") == "LONG" else "BUY"
+                    sz = p.get("size", size_i)
+                    tipo_pos = p.get("tipo", "core")
+                    tickets_da_chiudere.append((t_id, dir_c, sz, f"[{tipo_pos.upper()}]"))
+            
+            # Aggiungi eventuali residui registrati a Trend su IG per questo epic
+            tickets_gia_inclusi = {t[0] for t in tickets_da_chiudere}
+            for p_ig in pos_ig_strum:
+                d_id = p_ig.get('position', {}).get('dealId')
+                if d_id and d_id not in tickets_gia_inclusi:
+                    d_ig = "SELL" if p_ig.get('position', {}).get('direction') == "BUY" else "BUY"
+                    sz_ig = float(p_ig.get('position', {}).get('dealSize') or p_ig.get('position', {}).get('size', size_i))
+                    tickets_da_chiudere.append((d_id, d_ig, sz_ig, "[RESIDUA_TREND]"))
+            
+            if tickets_da_chiudere:
+                print_log(nome, f"Motore Trend spento o in attesa chiusura. Liquidazione {len(tickets_da_chiudere)} posizioni Trend su IG...")
                 tutti_chiusi = True
-                if tickets_da_chiudere:
-                    for t_id, dir_c, sz, tag in tickets_da_chiudere:
-                        ok = chiudi_parziale(nome, t_id, dir_c, sz, headers, etichetta=tag)
-                        if not ok:
-                            tutti_chiusi = False
-                        time.sleep(0.3)
-                else:
-                    tutti_chiusi = True
+                for t_id, dir_c, sz, tag in tickets_da_chiudere:
+                    ok = chiudi_parziale(nome, t_id, dir_c, sz, headers, etichetta=tag)
+                    if not ok:
+                        tutti_chiusi = False
+                    time.sleep(0.3)
                 
                 storico = dati.get("storico_wip_trend", [])
                 ora_str = now_it().strftime("%d/%m %H:%M:%S")
@@ -2375,21 +2379,24 @@ def esegui_ciclo_trend():
                         "attivo": False,
                         "stato": "IN_ATTESA_CHIUSURA",
                         "da_chiudere_a_riapertura": True,
-                        "msg_manuale": "⚠️ Mercato chiuso/sospeso su IG. La posizione verrà chiusa automaticamente appena il mercato riapre.",
-                        "storico_wip_trend": storico[-30:]
+                        "msg_manuale": f"⚠️ Impossibile chiudere su IG. Riprovo appena il mercato torna negoziabile."
                     }
-                    if pos_ig_strum and not pos_core:
-                        p0 = pos_ig_strum[0].get('position', {})
-                        d_str = "LONG" if p0.get('direction') == "BUY" else "SHORT"
-                        up_pend["posizioni_core"] = [{
-                            "entry": float(p0.get('level', 0.0)),
-                            "size": float(p0.get('size', size_i)),
-                            "ticket": p0.get('dealId'),
-                            "direction": d_str,
-                            "tipo": "core"
-                        }]
-                        up_pend["direzione"] = d_str
                     aggiorna_memoria(nome, up_pend)
+                continue
+            else:
+                # Nessuna posizione da chiudere: pulisci stato se rimasto sporco ma SENZA inviare notifiche!
+                if pos_core or pos_incr or da_chiudere or stato_corrente != "FLAT":
+                    aggiorna_memoria(nome, {
+                        "attivo": False,
+                        "posizioni_core": [], 
+                        "posizioni_incr": [], 
+                        "trailing_sl_core": None, 
+                        "trailing_sl_incr": None, 
+                        "stato": "FLAT",
+                        "direzione": "",
+                        "da_chiudere_a_riapertura": False,
+                        "msg_manuale": ""
+                    })
                 continue
         
         # Inizializza/Recupera Engine
