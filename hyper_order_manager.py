@@ -53,6 +53,10 @@ class HyperOrderManager:
         self.api_key = None
         self.session_time = 0.0
 
+        # Micro-cache posizioni per prevenire HTTP 403 (Rate Limit / Allowance Overflow)
+        self._positions_cache = None
+        self._positions_cache_time = 0.0
+
         # File storico eseguiti per questo conto
         self.history_file = os.path.join(self.account_dir, "hyper_trades_history.json")
         if not os.path.exists(self.account_dir):
@@ -294,6 +298,7 @@ class HyperOrderManager:
                     if deal_ref:
                         ok, conf_data = self.verify_deal_confirm(deal_ref)
                         if ok:
+                            self._positions_cache_time = 0.0
                             deal_id = conf_data.get("dealId")
                             exec_lvl = float(conf_data.get("level") or 0.0)
                             logger.info(f"✅ Ordine IG ({label}) ESEGUITO! Deal ID: {deal_id}, Livello: {exec_lvl:.2f} €")
@@ -320,6 +325,7 @@ class HyperOrderManager:
                                     dref2 = r_retry.json().get("dealReference")
                                     ok2, conf2 = self.verify_deal_confirm(dref2)
                                     if ok2:
+                                        self._positions_cache_time = 0.0
                                         deal_id2 = conf2.get("dealId")
                                         exec_lvl2 = float(conf2.get("level") or 0.0)
                                         return {
@@ -351,36 +357,45 @@ class HyperOrderManager:
         """Verifica se un dealId è effettivamente ancora aperto su IG."""
         if not deal_id:
             return False
-        try:
-            h = self._get_headers(version="2")
-            r = requests.get(f"{self.base_url}/positions", headers=h, timeout=6)
-            if r.status_code == 200:
-                positions = r.json().get("positions", [])
-                return any(p.get("position", {}).get("dealId") == deal_id for p in positions)
-        except Exception:
-            pass
-        return False
+        positions = self.get_open_positions()
+        if positions is None:
+            # Chiamata IG fallita (403, timeout, rete): per prudenza non consideriamo la posizione chiusa
+            logger.warning(f"⚠️ [ANTI-HEDGING] Impossibile verificare deal {deal_id} su IG (errore API). Trattato prudenzialmente come APERTO.")
+            return True
+        return any(p.get("position", {}).get("dealId") == deal_id for p in positions)
 
-    def get_open_positions(self, epic: str = None) -> list:
-        """Restituisce la lista reale delle posizioni aperte su IG dal vivo, opzionalmente filtrate per epic o strumento."""
-        try:
-            h = self._get_headers(version="2")
-            r = requests.get(f"{self.base_url}/positions", headers=h, timeout=6)
-            if r.status_code == 200:
-                positions = r.json().get("positions", [])
-                if epic:
-                    ep_u = str(epic).upper()
-                    filtered = []
-                    for p in positions:
-                        p_epic = str(p.get("market", {}).get("epic", "")).upper()
-                        p_name = str(p.get("market", {}).get("instrumentName", "")).upper()
-                        if ep_u in p_epic or p_epic in ep_u or ("GOLD" in ep_u and "GOLD" in p_name) or ("US500" in ep_u and "US 500" in p_name) or ("SPTRD" in ep_u and "SPTRD" in p_epic):
-                            filtered.append(p)
-                    return filtered
-                return positions
-        except Exception as e:
-            logger.warning(f"Errore get_open_positions: {e}")
-        return []
+    def get_open_positions(self, epic: str = None, force_refresh: bool = False):
+        """Restituisce la lista reale delle posizioni aperte su IG dal vivo, opzionalmente filtrate per epic o strumento.
+        Usa una micro-cache di 2.0 secondi per evitare di saturare la quota API di IG (HTTP 403 Allowance Overflow).
+        Ritorna None se la chiamata HTTP/API fallisce (per evitare falsi FLAT e conseguente hedging), altrimenti la lista."""
+        now = time.time()
+        if not force_refresh and self._positions_cache is not None and (now - self._positions_cache_time) < 2.0:
+            positions = self._positions_cache
+        else:
+            try:
+                h = self._get_headers(version="2")
+                r = requests.get(f"{self.base_url}/positions", headers=h, timeout=6)
+                if r.status_code == 200:
+                    positions = r.json().get("positions", [])
+                    self._positions_cache = positions
+                    self._positions_cache_time = now
+                else:
+                    logger.warning(f"⚠️ get_open_positions fallita (HTTP {r.status_code}): {r.text[:120]}")
+                    return None
+            except Exception as e:
+                logger.warning(f"⚠️ Errore get_open_positions: {e}")
+                return None
+
+        if epic:
+            ep_u = str(epic).upper()
+            filtered = []
+            for p in positions:
+                p_epic = str(p.get("market", {}).get("epic", "")).upper()
+                p_name = str(p.get("market", {}).get("instrumentName", "")).upper()
+                if ep_u in p_epic or p_epic in ep_u or ("GOLD" in ep_u and "GOLD" in p_name) or ("US500" in ep_u and "US 500" in p_name) or ("SPTRD" in ep_u and "SPTRD" in p_epic):
+                    filtered.append(p)
+            return filtered
+        return positions
 
     def close_market_deal(self, deal_id: str, direction_open: str, size: float, label: str = "Chiusura", reason_note: str = "") -> dict:
         """Chiude a mercato una posizione aperta su IG tramite DELETE /positions/otc con verifica conferma."""
@@ -423,6 +438,7 @@ class HyperOrderManager:
                     if deal_ref:
                         ok, conf_data = self.verify_deal_confirm(deal_ref)
                         if ok:
+                            self._positions_cache_time = 0.0
                             close_lvl = float(conf_data.get("level") or 0.0)
                             profit = float(conf_data.get("profit") or 0.0)
                             logger.info(f"✅ Chiusura IG completata per {deal_id}! Livello: {close_lvl:.2f} €, P&L: {profit:+.2f} €")

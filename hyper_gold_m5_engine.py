@@ -268,7 +268,9 @@ class HyperGoldM5Engine:
                 pass
 
     def reconcile_with_ig_deals(self):
-        """Verifica se i deal registrati in posizione sono ancora realmente aperti su IG. Se chiusi, resetta a FLAT."""
+        """Verifica lo stato reale dei deal su IG con una singola chiamata REST.
+        Se la chiamata fallisce (None), non tocca lo stato locale.
+        Se ci sono posizioni su IG, non azzera mai self.position prevenendo falsi FLAT ed hedging."""
         with self.lock:
             if not self.position or self.closing_in_progress:
                 return
@@ -278,29 +280,47 @@ class HyperGoldM5Engine:
             active_incs = list(self.increments)
 
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
-        run_open = order_mgr.is_deal_open(deal_run) if deal_run else False
-        banc_open = order_mgr.is_deal_open(deal_banc) if (deal_banc and not tp1_hit) else False
+        real_positions = order_mgr.get_open_positions(epic=EPIC_GOLD)
 
-        # Verifica deal incrementi
-        surviving_incs = []
-        for inc in active_incs:
-            d_id = inc.get("deal_id")
-            if d_id and order_mgr.is_deal_open(d_id):
-                surviving_incs.append(inc)
-            else:
-                logger.info(f"ℹ️ [RECONCILE IG SPOT GOLD] Deal incremento {inc.get('label')} ({d_id}) non aperto su IG. Rimosso.")
+        # Se la chiamata a IG è fallita (None), non tocchiamo nulla per sicurezza
+        if real_positions is None:
+            return
 
-        with self.lock:
-            self.increments = surviving_incs
+        open_deal_ids = {
+            p.get("position", {}).get("dealId")
+            for p in real_positions
+            if p.get("position", {}).get("dealId")
+        }
 
-        if not run_open and not banc_open and not surviving_incs:
-            logger.info(f"ℹ️ [RECONCILE IG SPOT GOLD] I deal {deal_banc} e {deal_run} non risultano più aperti su IG. Reset immediato a FLAT.")
+        # Se IG conferma che NON esiste alcuna posizione aperta per SPOT GOLD
+        if len(real_positions) == 0:
+            logger.info("ℹ️ [RECONCILE IG SPOT GOLD] Nessuna posizione aperta su IG. Reset confermato a FLAT.")
             with self.lock:
                 self.position = None
                 self.increments = []
                 self.save_state()
-        elif len(surviving_incs) != len(active_incs):
-            with self.lock:
+            return
+
+        # Altrimenti, ci sono posizioni aperte su IG!
+        run_open = bool(deal_run and deal_run in open_deal_ids)
+        banc_open = bool(deal_banc and deal_banc in open_deal_ids)
+        surviving_incs = [inc for inc in active_incs if inc.get("deal_id") in open_deal_ids]
+
+        with self.lock:
+            if self.position:
+                if not banc_open and deal_banc and not tp1_hit:
+                    self.position["tp1_hit"] = True
+                    self.position["contracts"] = RUNNER_CONTRACTS
+                    logger.info(f"ℹ️ [RECONCILE IG SPOT GOLD] Bancomat ({deal_banc}) chiuso su IG (TP1). Runner ({deal_run}) ancora attivo.")
+
+                # Se né runner né bancomat combaciano ma ci sono deal su IG, NON azzeriamo!
+                if not run_open and not banc_open and not surviving_incs and len(open_deal_ids) > 0:
+                    logger.warning(f"⚠️ [RECONCILE IG SPOT GOLD] Deal registrati non coincidenti ma aperte {len(real_positions)} posizioni su IG ({open_deal_ids})! Mantenuto stato OCCUPATO anti-hedging.")
+
+            if len(surviving_incs) != len(active_incs):
+                self.increments = surviving_incs
+                self.save_state()
+            elif not banc_open and not tp1_hit:
                 self.save_state()
 
     def save_state(self):
@@ -620,6 +640,15 @@ class HyperGoldM5Engine:
 
     def _trigger_entry(self, direction: str, live_px: float, time_str: str, pivot_sl: float, pivot_opp: float):
         """Innesca l'ingresso a mercato quando tutte le 4 luci sono verdi."""
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+        real_pos = order_mgr.get_open_positions(epic=EPIC_GOLD)
+        if real_pos is None:
+            logger.warning(f"🛑 [ANTI-HEDGING SPOT GOLD] Impossibile verificare posizioni su IG (errore API). Ingresso {direction} BLOCCATO per sicurezza.")
+            return
+        if len(real_pos) > 0:
+            logger.warning(f"🛑 [ANTI-HEDGING SPOT GOLD] Rilevate {len(real_pos)} posizioni già aperte su IG per SPOT GOLD! Ingresso {direction} BLOCCATO.")
+            return
+
         self.entry_in_progress = True
         logger.info(f"[{time_str}] 🚀 [SEMAFORO VERDE 4/4] Innesco ingresso {direction} a {live_px:.2f}!")
 
@@ -649,6 +678,19 @@ class HyperGoldM5Engine:
         """Apre a mercato la posizione divisa in 5c Bancomat + 5c Runner."""
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
         try:
+            # Controllo di sicurezza Anti-Hedging live su IG
+            real_pos = order_mgr.get_open_positions(epic=EPIC_GOLD)
+            if real_pos is None:
+                logger.error(f"🛑 [ANTI-HEDGING SPOT GOLD] Impossibile verificare posizioni su IG (errore API). Ingresso {direction} BLOCCATO per sicurezza.")
+                with self.lock:
+                    self.entry_in_progress = False
+                return
+            if len(real_pos) > 0:
+                logger.error(f"🛑 [ANTI-HEDGING SPOT GOLD] Trovate {len(real_pos)} posizioni già aperte su IG per SPOT GOLD! Ingresso {direction} BLOCCATO.")
+                with self.lock:
+                    self.entry_in_progress = False
+                return
+
             logger.info(f"[{time_str}] 📤 Invio a IG: {direction} {CORE_CONTRACTS} contratti (5c Bancomat TP {tp1_price:.2f} + 5c Runner SL {sl_price:.2f})")
 
             # 1. Apertura Bancomat (5 contratti con TP1 nativo su IG)
@@ -1362,6 +1404,12 @@ class HyperGoldM5Engine:
     def manual_entry_core(self, direction: str) -> dict:
         """Forzatura ingresso manuale dell'utente."""
         norm_dir = "LONG" if direction.upper() in ("LONG", "BUY") else "SHORT"
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+        real_pos = order_mgr.get_open_positions(epic=EPIC_GOLD)
+        if real_pos is None:
+            return {"success": False, "error": "Verifica posizioni IG fallita (errore API)"}
+        if len(real_pos) > 0:
+            return {"success": False, "error": f"Posizioni già aperte su IG ({len(real_pos)} attive)"}
         with self.lock:
             if self.position is not None:
                 return {"success": False, "error": "Posizione già aperta a mercato"}
