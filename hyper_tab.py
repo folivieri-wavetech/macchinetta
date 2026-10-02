@@ -638,9 +638,36 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 st.rerun()
             st.session_state["hyper_target_subtab"] = "5m"
             engine.set_trading(False)
+            # Chiusura forzata immediata a mercato di tutte le posizioni aperte su IG
+            if real_ig_pos:
+                for p in real_ig_pos:
+                    p_info = p.get("position", {})
+                    d_id = p_info.get("dealId")
+                    d_dir = p_info.get("direction")
+                    d_sz = p_info.get("size")
+                    if d_id and d_dir and d_sz:
+                        order_mgr.close_market_deal(d_id, d_dir, d_sz, f"STOP 5M {instr_name}", "STOP Motore")
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<div style='height: 24px; margin-top: 4px;'></div>", unsafe_allow_html=True)
+
+    # Se ci sono posizioni aperte su IG, pulsante rosso evidente di Chiusura Immediata a Mercato (FLAT)
+    if real_ig_pos:
+        st.markdown("<div style='margin-top: 6px; margin-bottom: 6px;'>", unsafe_allow_html=True)
+        if st.button(f"🚨 CHIUDI TUTTE LE POSIZIONI ({instr_name}) A MERCATO", key=f"btn_panic_flat_{btn_sfx}", disabled=(not is_operativo), use_container_width=True):
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
+            for p in real_ig_pos:
+                p_info = p.get("position", {})
+                d_id = p_info.get("dealId")
+                d_dir = p_info.get("direction")
+                d_sz = p_info.get("size")
+                if d_id and d_dir and d_sz:
+                    order_mgr.close_market_deal(d_id, d_dir, d_sz, f"Chiusura FLAT Immediata {instr_name}", "Pulsante FLAT")
+            st.toast(f"Tutte le posizioni su {instr_name} chiuse a mercato!", icon="🚨")
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Pulsanti di Avvio Manuale Core (LONG / SHORT)
     # Condizione: Motore Hyper avviato E strumento FLAT (nessuna posizione e nessun incremento)
@@ -970,10 +997,13 @@ def render_sintesi_hyp(conto_selezionato="DANY_DEMO", is_us500=False, **kwargs):
     mgr = HyperOrderManager.get_instance(conto_attivo)
 
     trades_all = mgr.get_trades_history()
-    # Filtriamo per 10M e 5M (escludendo eventuali residui 30S)
-    trades_active = [t for t in trades_all if t.get("tf") in ("10M", "5M")]
-    if not trades_active:
-        trades_active = [t for t in trades_all if t.get("tf") != "30S"]
+    # Filtriamo ESCLUSIVAMENTE le operazioni del motore 5M (escludendo categoricamente 10M e vecchi residui KJ)
+    trades_active = [
+        t for t in trades_all 
+        if t.get("tf") == "5M" 
+        and "KJ" not in str(t.get("reason", "")).upper() 
+        and "KJ" not in str(t.get("label", "")).upper()
+    ]
 
     def _is_us500_trade(t: dict) -> bool:
         ep = str(t.get("epic", "")).upper()

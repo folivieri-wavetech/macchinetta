@@ -533,7 +533,7 @@ class HyperOrderManager:
                 logger.error(f"❌ Eccezione set_limit_order {deal_id}: {e}")
                 return False
 
-    def set_stop_loss_order(self, deal_id: str, stop_level: float, label: str = "Aggiorna SL") -> bool:
+    def set_stop_loss_order(self, deal_id: str, stop_level: float, label: str = "Aggiorna SL", limit_level: float = None) -> bool:
         """Invia una richiesta PUT a IG per aggiornare lo Stop Loss su una posizione aperta (Breakeven o Trailing Stop)."""
         if not deal_id or stop_level is None:
             return False
@@ -547,6 +547,8 @@ class HyperOrderManager:
                 "stopLevel": round(float(stop_level), 2),
                 "trailingStop": False
             }
+            if limit_level is not None:
+                payload["limitLevel"] = round(float(limit_level), 2)
             h = self._get_headers(version="2")
             try:
                 r = requests.put(url, headers=h, json=payload, timeout=10)

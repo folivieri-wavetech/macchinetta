@@ -537,19 +537,17 @@ class HyperUS500M5Engine:
         self.entry_in_progress = True
         logger.info(f"[{time_str}] 🚀 [SEMAFORO VERDE US500 4/4] Innesco ingresso {direction} a {live_px:.2f}!")
 
-        # Calcolo Stop Loss Strutturale Adattivo (ancorato alla candela d'impulso recente o al pivot)
+        # Calcolo Stop Loss Strutturale Adattivo (ancorato rigorosamente allo swing delle ultime 3 candele M5)
         if direction == "LONG":
             swing_sl = min(c["low"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px - 3.0
-            ref_sl = min(pivot_sl, swing_sl) if pivot_sl else swing_sl
-            sl_raw = ref_sl - SL_BUFFER_PTS
+            sl_raw = swing_sl - SL_BUFFER_PTS
             sl_dist = live_px - sl_raw
             sl_dist = max(SL_MIN_PTS, min(sl_dist, SL_MAX_PTS))
             final_sl = round(live_px - sl_dist, 2)
             final_tp1 = round(live_px + TP1_DEFAULT_PTS, 2)
         else:
             swing_sl = max(c["high"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px + 3.0
-            ref_sl = min(pivot_sl, swing_sl) if pivot_sl else swing_sl
-            sl_raw = ref_sl + SL_BUFFER_PTS
+            sl_raw = swing_sl + SL_BUFFER_PTS
             sl_dist = sl_raw - live_px
             sl_dist = max(SL_MIN_PTS, min(sl_dist, SL_MAX_PTS))
             final_sl = round(live_px + sl_dist, 2)

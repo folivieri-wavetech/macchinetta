@@ -33,10 +33,10 @@ RUNNER_CONTRACTS = 5        # 5 contratti Runner (Trailing Stop strutturale sui 
 
 TP1_DEFAULT_PIPS = 5.0      # Take Profit Bancomat rapido M5: +5 pip (+25.00 € con 5 contratti)
 RUNNER_MAX_GIVEBACK_PIPS = 7.0  # Trailing dal massimo/minimo battuto: max 7 pip di escursione
-CANDLE_BUFFER_PIPS = 2.0        # Cuscinetto sotto/sopra la candela M5 precedente
-SL_BUFFER_PIPS = 3.0        # Cuscinetto oltre il pivot strutturale: 3 pip
-SL_MIN_PIPS = 10.0          # Stop Loss minimo di protezione: 10 pip
-SL_MAX_PIPS = 35.0          # Stop Loss massimo invalicabile (cap di sicurezza): 35 pip
+CANDLE_BUFFER_PIPS = 1.5        # Cuscinetto sotto/sopra la candela M5 precedente
+SL_BUFFER_PIPS = 1.5        # Cuscinetto oltre il minimo/massimo recente: 1.5 pip
+SL_MIN_PIPS = 4.0           # Stop Loss minimo di protezione: 4.0 pip
+SL_MAX_PIPS = 8.0           # Stop Loss massimo invalicabile (cap rigoroso di sicurezza): 8.0 pip
 BE_EXTRA_LOCK_PIPS = 1.0    # Lock sopra il breakeven a protezione spread (+1 pip)
 
 # Costanti di compatibilità per UI dashboard (hyper_tab)
@@ -551,19 +551,17 @@ class HyperGoldM5Engine:
         self.entry_in_progress = True
         logger.info(f"[{time_str}] 🚀 [SEMAFORO VERDE 4/4] Innesco ingresso {direction} a {live_px:.2f}!")
 
-        # Calcolo Stop Loss Strutturale Adattivo (ancorato alla candela d'impulso recente o al pivot)
+        # Calcolo Stop Loss Strutturale Adattivo (ancorato rigorosamente allo swing delle ultime 3 candele M5)
         if direction == "LONG":
-            swing_sl = min(c["low"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px - 20.0
-            ref_sl = min(pivot_sl, swing_sl) if pivot_sl else swing_sl
-            sl_raw = ref_sl - SL_BUFFER_PIPS
+            swing_sl = min(c["low"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px - 6.0
+            sl_raw = swing_sl - SL_BUFFER_PIPS
             sl_dist = live_px - sl_raw
             sl_dist = max(SL_MIN_PIPS, min(sl_dist, SL_MAX_PIPS))
             final_sl = round(live_px - sl_dist, 2)
             final_tp1 = round(live_px + TP1_DEFAULT_PIPS, 2)
         else:
-            swing_sl = max(c["high"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px + 20.0
-            ref_sl = min(pivot_sl, swing_sl) if pivot_sl else swing_sl
-            sl_raw = ref_sl + SL_BUFFER_PIPS
+            swing_sl = max(c["high"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px + 6.0
+            sl_raw = swing_sl + SL_BUFFER_PIPS
             sl_dist = sl_raw - live_px
             sl_dist = max(SL_MIN_PIPS, min(sl_dist, SL_MAX_PIPS))
             final_sl = round(live_px + sl_dist, 2)
