@@ -520,23 +520,22 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     </div>
     """, unsafe_allow_html=True)
 
-    # Semaforo Confluenza M5 (4 Lucette)
+    # Semaforo Confluenza M5 (3 Lucette: Struttura, Breakout, Spinta EMA)
     sem_l1 = semaforo.get("L1_structure", False)
     sem_l2 = semaforo.get("L2_trigger", False)
-    sem_l3 = semaforo.get("L3_volatility", False)
-    sem_l4 = semaforo.get("L4_momentum", False)
+    sem_l3 = semaforo.get("L3_momentum", False)
     sem_bias = semaforo.get("bias", "NEUTRAL")
-    lights_on = sum([1 for l in [sem_l1, sem_l2, sem_l3, sem_l4] if l])
+    lights_on = sum([1 for l in [sem_l1, sem_l2, sem_l3] if l])
 
     if pos:
         sem_badge = f"<span style='color: #38bdf8; font-weight: 800;'>IN TRADE ({pos.get('direction', '')})</span>"
-    elif lights_on == 4:
+    elif lights_on == 3:
         col_b = "#22c55e" if sem_bias == "LONG" else "#ef4444"
-        sem_badge = f"<span style='color: {col_b}; font-weight: 800;'>🟢 4/4 PRONTO ({sem_bias})</span>"
-    elif lights_on >= 2:
-        sem_badge = f"<span style='color: #facc15; font-weight: 700;'>🟡 {lights_on}/4 ATTESA ({sem_bias})</span>"
+        sem_badge = f"<span style='color: {col_b}; font-weight: 800;'>🟢 3/3 PRONTO ({sem_bias})</span>"
+    elif lights_on == 2:
+        sem_badge = f"<span style='color: #facc15; font-weight: 700;'>🟡 2/3 ATTESA ({sem_bias})</span>"
     else:
-        sem_badge = f"<span style='color: #94a3b8; font-weight: 600;'>⚪ {lights_on}/4 SCANSIONE</span>"
+        sem_badge = f"<span style='color: #94a3b8; font-weight: 600;'>⚪ {lights_on}/3 SCANSIONE</span>"
 
     def _b_light(on, title):
         if on:
@@ -544,9 +543,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         return f"<div style='background: rgba(51, 65, 85, 0.25); border: 1px solid #334155; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #64748b; font-weight: 600; font-size: 0.67rem;'>⚪ {title}</span></div>"
 
     b_l1 = _b_light(sem_l1, "L1 Struttura")
-    b_l2 = _b_light(sem_l2, "L2 Trigger")
-    b_l3 = _b_light(sem_l3, "L3 ATR")
-    b_l4 = _b_light(sem_l4, "L4 Flow EMA")
+    b_l2 = _b_light(sem_l2, "L2 Breakout")
+    b_l3 = _b_light(sem_l3, "L3 Spinta EMA")
 
     st.markdown(f"""
     <div style='background: rgba(15, 23, 42, 0.55); border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; margin-bottom: 7px;'>
@@ -554,11 +552,10 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             <span style='font-size: 0.72rem; font-weight: 700; color: #cbd5e1;'>🚦 SEMAFORO CONFLUENZA:</span>
             {sem_badge}
         </div>
-        <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;'>
+        <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;'>
             {b_l1}
             {b_l2}
             {b_l3}
-            {b_l4}
         </div>
     </div>
     """, unsafe_allow_html=True)

@@ -174,12 +174,11 @@ class HyperGoldM5Engine:
         # Storico barre concluse M5
         self.candles = []
 
-        # Semaforo a 4 Lucette (Stato Real-Time)
+        # Semaforo a 3 Lucette (Stato Real-Time: Struttura, Trigger, Spinta EMA)
         self.traffic_light = {
             "l1_structure": {"status": False, "dir": "NEUTRAL", "desc": "Analisi Swings in corso..."},
             "l2_trigger": {"status": False, "dir": "NEUTRAL", "desc": "In attesa di breakout..."},
-            "l3_volatility": {"status": False, "desc": "Calcolo volatilità..."},
-            "l4_momentum": {"status": False, "dir": "NEUTRAL", "desc": "Calcolo EMA Flow..."},
+            "l3_momentum": {"status": False, "dir": "NEUTRAL", "desc": "Calcolo Spinta & Flow EMA..."},
             "direction": "NEUTRAL",
             "all_green": False,
             "last_pivot_high": None,
@@ -266,6 +265,24 @@ class HyperGoldM5Engine:
                 except Exception:
                     time.sleep(0.05)
 
+    @property
+    def semaforo(self):
+        """Espone lo stato del semaforo per la Dashboard e moduli esterni."""
+        with self.lock:
+            tl = getattr(self, "traffic_light", {})
+            return {
+                "L1_structure": tl.get("l1_structure", {}).get("status", False),
+                "L2_trigger": tl.get("l2_trigger", {}).get("status", False),
+                "L3_momentum": tl.get("l3_momentum", {}).get("status", False),
+                "L3_volatility": True,  # Retrocompatibilità
+                "L4_momentum": tl.get("l3_momentum", {}).get("status", False),  # Retrocompatibilità
+                "bias": tl.get("direction", "NEUTRAL"),
+                "all_green": tl.get("all_green", False),
+                "desc_l1": tl.get("l1_structure", {}).get("desc", ""),
+                "desc_l2": tl.get("l2_trigger", {}).get("desc", ""),
+                "desc_l3": tl.get("l3_momentum", {}).get("desc", "")
+            }
+
     def _load_initial_m5_candles(self):
         """Carica storico M5 locale."""
         candidates = [
@@ -330,6 +347,7 @@ class HyperGoldM5Engine:
         recent_candles = self.candles[-35:]
         closes = [c["close"] for c in recent_candles]
         curr_c = recent_candles[-1]
+        prev_c = recent_candles[-2] if len(recent_candles) >= 2 else curr_c
 
         # 1. Calcolo Indicatori di Supporto
         atr = calculate_atr(recent_candles, period=14)
@@ -344,81 +362,100 @@ class HyperGoldM5Engine:
         last_pl = low_pivots[-1]["price"] if low_pivots else None
         prev_pl = low_pivots[-2]["price"] if len(low_pivots) >= 2 else None
 
-        # -------------------------------------------------------------
-        # LUCETTA 1: STRUTTURA DI MERCATO (HH/HL vs LH/LL)
-        # -------------------------------------------------------------
-        l1_long = False
-        l1_short = False
-        l1_desc = "Struttura laterale / Neutra"
-
-        if last_ph and prev_ph and last_pl and prev_pl:
-            if last_ph > prev_ph and last_pl > prev_pl:
-                l1_long = True
-                l1_desc = f"Rialzista: HH {last_ph:.1f} > {prev_ph:.1f} | HL {last_pl:.1f} > {prev_pl:.1f}"
-            elif last_ph < prev_ph and last_pl < prev_pl:
-                l1_short = True
-                l1_desc = f"Ribassista: LH {last_ph:.1f} < {prev_ph:.1f} | LL {last_pl:.1f} < {prev_pl:.1f}"
-            elif last_ph > prev_ph:
-                l1_long = True
-                l1_desc = f"Setup HH {last_ph:.1f} > {prev_ph:.1f} (Pressione Bull)"
-            elif last_pl < prev_pl:
-                l1_short = True
-                l1_desc = f"Setup LL {last_pl:.1f} < {prev_pl:.1f} (Pressione Bear)"
-
-        # -------------------------------------------------------------
-        # LUCETTA 2: TRIGGER / BREAKOUT CON BODY DOMINANCE
-        # -------------------------------------------------------------
-        l2_long = False
-        l2_short = False
-        l2_desc = "In attesa di rottura o candela d'impulso"
-
         live_px = self.live_mid or curr_c["close"]
         body = abs(curr_c["close"] - curr_c["open"])
         c_range = max(curr_c["high"] - curr_c["low"], 0.01)
         body_ratio = body / c_range
 
-        # LONG: Rottura del Pivot High oppure rimbalzo deciso con candela verde (Body > 50%)
-        if last_ph and (live_px > last_ph or (curr_c["close"] > curr_c["open"] and body_ratio >= 0.50 and l1_long)):
-            l2_long = True
-            l2_desc = f"Breakout/Impulso Long: {live_px:.1f} sopra Pivot {last_ph:.1f} (Body {int(body_ratio*100)}%)"
+        # -------------------------------------------------------------
+        # LUCETTA 1: STRUTTURA DI MERCATO (Swings Classici O Micro-Trend 2+ Candele Direzionali)
+        # -------------------------------------------------------------
+        l1_long = False
+        l1_short = False
+        l1_desc = "Struttura laterale / Neutra"
 
-        # SHORT: Rottura del Pivot Low oppure respinta con candela rossa (Body > 50%)
-        if last_pl and (live_px < last_pl or (curr_c["close"] < curr_c["open"] and body_ratio >= 0.50 and l1_short)):
+        # A) Analisi Swings Frattali (con protezione contro la trappola del vecchio massimo/minimo)
+        if last_ph and prev_ph and last_pl and prev_pl:
+            if last_ph > prev_ph and last_pl > prev_pl and (ema21 is None or live_px >= ema21):
+                l1_long = True
+                l1_desc = f"Rialzista: HH {last_ph:.1f} > {prev_ph:.1f} | HL {last_pl:.1f} > {prev_pl:.1f}"
+            elif last_ph < prev_ph and last_pl < prev_pl and (ema21 is None or live_px <= ema21):
+                l1_short = True
+                l1_desc = f"Ribassista: LH {last_ph:.1f} < {prev_ph:.1f} | LL {last_pl:.1f} < {prev_pl:.1f}"
+            elif last_pl < prev_pl and (ema8 is None or live_px <= ema8):
+                l1_short = True
+                l1_desc = f"Setup LL {last_pl:.1f} < {prev_pl:.1f} (Pressione Bear)"
+            elif last_ph > prev_ph and (ema8 is None or live_px >= ema8):
+                l1_long = True
+                l1_desc = f"Setup HH {last_ph:.1f} > {prev_ph:.1f} (Pressione Bull)"
+
+        # B) Micro-Trend da Sequenza Direzionale (2 o più candele consecutive a favore sotto/sopra EMA)
+        c_red_2 = (curr_c["close"] < curr_c["open"]) and (prev_c["close"] < prev_c["open"]) and (curr_c["close"] <= prev_c["close"])
+        c_green_2 = (curr_c["close"] > curr_c["open"]) and (prev_c["close"] > prev_c["open"]) and (curr_c["close"] >= prev_c["close"])
+
+        if c_red_2 and (ema8 is None or live_px <= ema8):
+            l1_short = True
+            l1_long = False
+            l1_desc = f"Trend Impulso Short: 2+ candele rosse sotto EMA ({live_px:.1f})"
+        elif c_green_2 and (ema8 is None or live_px >= ema8):
+            l1_long = True
+            l1_short = False
+            l1_desc = f"Trend Impulso Long: 2+ candele verdi sopra EMA ({live_px:.1f})"
+
+        # -------------------------------------------------------------
+        # LUCETTA 2: TRIGGER / BREAKOUT
+        # -------------------------------------------------------------
+        l2_long = False
+        l2_short = False
+        l2_desc = "In attesa di rottura o candela d'impulso"
+
+        # SHORT: Breakout sotto minimo precedente, breakdown Pivot Low, o candela rossa decisa (Body >= 40%)
+        break_low_prev = bool(live_px < prev_c["low"])
+        is_red_impulse = (curr_c["close"] < curr_c["open"] and body_ratio >= 0.40)
+        break_pivot_low = bool(last_pl and live_px < last_pl)
+
+        if (break_pivot_low or break_low_prev or is_red_impulse) and (live_px < curr_c["open"]):
             l2_short = True
-            l2_desc = f"Breakdown/Impulso Short: {live_px:.1f} sotto Pivot {last_pl:.1f} (Body {int(body_ratio*100)}%)"
+            if break_low_prev:
+                l2_desc = f"Breakout M5: {live_px:.1f} < Minimo Prec {prev_c['low']:.1f}"
+            elif break_pivot_low:
+                l2_desc = f"Breakdown Pivot: {live_px:.1f} < Pivot {last_pl:.1f}"
+            else:
+                l2_desc = f"Impulso Rosso: Body {int(body_ratio*100)}%"
+
+        # LONG: Breakout sopra massimo precedente, breakout Pivot High, o candela verde decisa (Body >= 40%)
+        break_high_prev = bool(live_px > prev_c["high"])
+        is_green_impulse = (curr_c["close"] > curr_c["open"] and body_ratio >= 0.40)
+        break_pivot_high = bool(last_ph and live_px > last_ph)
+
+        if (break_pivot_high or break_high_prev or is_green_impulse) and (live_px > curr_c["open"]):
+            l2_long = True
+            if break_high_prev:
+                l2_desc = f"Breakout M5: {live_px:.1f} > Massimo Prec {prev_c['high']:.1f}"
+            elif break_pivot_high:
+                l2_desc = f"Breakout Pivot: {live_px:.1f} > Pivot {last_ph:.1f}"
+            else:
+                l2_desc = f"Impulso Verde: Body {int(body_ratio*100)}%"
 
         # -------------------------------------------------------------
-        # LUCETTA 3: VOLATILITY GATE (ANTI-TRITACARNE)
+        # LUCETTA 3: SPINTA & FLOW EMA (MOMENTUM CANDELA)
         # -------------------------------------------------------------
-        # La candela corrente (o le ultime 2) deve mostrare range >= 50% dell'ATR
-        l3_ok = False
-        recent_max_range = max(c["high"] - c["low"] for c in recent_candles[-2:])
-        min_required_range = max(atr * 0.50, 4.0)
+        l3_long = False
+        l3_short = False
+        l3_desc = "Flusso in consolidamento"
 
-        if recent_max_range >= min_required_range:
-            l3_ok = True
-            l3_desc = f"Volatilità Attiva: Range {recent_max_range:.1f}p >= soglia {min_required_range:.1f}p (ATR: {atr:.1f}p)"
-        else:
-            l3_desc = f"Fase Compressa/Morta: Range {recent_max_range:.1f}p < soglia {min_required_range:.1f}p (Stand-by)"
+        # SHORT: Prezzo sotto EMA8 e candela corrente che spinge verso il basso (o EMA8 discendente)
+        if ema8 is not None:
+            if live_px < ema8 and (live_px <= curr_c["open"] or (prev_ema8 and ema8 < prev_ema8)):
+                l3_short = True
+                l3_desc = f"Spinta Ribassista: {live_px:.1f} < EMA8 ({ema8:.1f})"
+            elif live_px > ema8 and (live_px >= curr_c["open"] or (prev_ema8 and ema8 > prev_ema8)):
+                l3_long = True
+                l3_desc = f"Spinta Rialzista: {live_px:.1f} > EMA8 ({ema8:.1f})"
 
-        # -------------------------------------------------------------
-        # LUCETTA 4: MOMENTUM & FLOW (EMA 8 / EMA 21)
-        # -------------------------------------------------------------
-        l4_long = False
-        l4_short = False
-        l4_desc = "Medie piatte o incrociate"
-
-        if ema8 is not None and ema21 is not None and prev_ema8 is not None:
-            if ema8 > ema21:
-                l4_long = True
-                l4_desc = f"Flusso Rialzista: EMA8 ({ema8:.1f}) > EMA21 ({ema21:.1f})"
-            elif ema8 < ema21:
-                l4_short = True
-                l4_desc = f"Flusso Ribassista: EMA8 ({ema8:.1f}) < EMA21 ({ema21:.1f})"
-
-        # SINTESI DELLE CONFLUENZE
-        all_green_long = l1_long and l2_long and l3_ok and l4_long
-        all_green_short = l1_short and l2_short and l3_ok and l4_short
+        # SINTESI DELLE CONFLUENZE A 3 LUCETTE (3/3 PRONTO)
+        all_green_long = l1_long and l2_long and l3_long
+        all_green_short = l1_short and l2_short and l3_short
 
         detected_dir = "LONG" if all_green_long else ("SHORT" if all_green_short else "NEUTRAL")
         all_green = all_green_long or all_green_short
@@ -426,8 +463,7 @@ class HyperGoldM5Engine:
         self.traffic_light = {
             "l1_structure": {"status": l1_long or l1_short, "dir": "LONG" if l1_long else ("SHORT" if l1_short else "NEUTRAL"), "desc": l1_desc},
             "l2_trigger": {"status": l2_long or l2_short, "dir": "LONG" if l2_long else ("SHORT" if l2_short else "NEUTRAL"), "desc": l2_desc},
-            "l3_volatility": {"status": l3_ok, "desc": l3_desc},
-            "l4_momentum": {"status": l4_long or l4_short, "dir": "LONG" if l4_long else ("SHORT" if l4_short else "NEUTRAL"), "desc": l4_desc},
+            "l3_momentum": {"status": l3_long or l3_short, "dir": "LONG" if l3_long else ("SHORT" if l3_short else "NEUTRAL"), "desc": l3_desc},
             "direction": detected_dir,
             "all_green": all_green,
             "last_pivot_high": last_ph,
@@ -450,15 +486,19 @@ class HyperGoldM5Engine:
         self.entry_in_progress = True
         logger.info(f"[{time_str}] 🚀 [SEMAFORO VERDE 4/4] Innesco ingresso {direction} a {live_px:.2f}!")
 
-        # Calcolo Stop Loss Strutturale Adattivo
+        # Calcolo Stop Loss Strutturale Adattivo (ancorato alla candela d'impulso recente o al pivot)
         if direction == "LONG":
-            sl_raw = (pivot_sl - SL_BUFFER_PIPS) if pivot_sl else (live_px - 20.0)
+            swing_sl = min(c["low"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px - 20.0
+            ref_sl = min(pivot_sl, swing_sl) if pivot_sl else swing_sl
+            sl_raw = ref_sl - SL_BUFFER_PIPS
             sl_dist = live_px - sl_raw
             sl_dist = max(SL_MIN_PIPS, min(sl_dist, SL_MAX_PIPS))
             final_sl = round(live_px - sl_dist, 2)
             final_tp1 = round(live_px + TP1_DEFAULT_PIPS, 2)
         else:
-            sl_raw = (pivot_sl + SL_BUFFER_PIPS) if pivot_sl else (live_px + 20.0)
+            swing_sl = max(c["high"] for c in self.candles[-3:]) if len(self.candles) >= 3 else live_px + 20.0
+            ref_sl = min(pivot_sl, swing_sl) if pivot_sl else swing_sl
+            sl_raw = ref_sl + SL_BUFFER_PIPS
             sl_dist = sl_raw - live_px
             sl_dist = max(SL_MIN_PIPS, min(sl_dist, SL_MAX_PIPS))
             final_sl = round(live_px + sl_dist, 2)
