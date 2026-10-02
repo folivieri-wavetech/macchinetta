@@ -32,6 +32,8 @@ BANCOMAT_CONTRACTS = 3      # 3 contratti Bancomat (TP1 rapido a R:R 1:1 o 20 pi
 RUNNER_CONTRACTS = 3        # 3 contratti Runner (Trailing Stop strutturale sui minimi/massimi crescenti)
 
 TP1_DEFAULT_PIPS = 5.0      # Take Profit Bancomat rapido M5: +5 pip (+15.00 €)
+RUNNER_MAX_GIVEBACK_PIPS = 7.0  # Trailing dal massimo/minimo battuto: max 7 pip di escursione
+CANDLE_BUFFER_PIPS = 2.0        # Cuscinetto sotto/sopra la candela M5 precedente
 SL_BUFFER_PIPS = 3.0        # Cuscinetto oltre il pivot strutturale: 3 pip
 SL_MIN_PIPS = 10.0          # Stop Loss minimo di protezione: 10 pip
 SL_MAX_PIPS = 35.0          # Stop Loss massimo invalicabile (cap di sicurezza): 35 pip
@@ -679,37 +681,72 @@ class HyperGoldM5Engine:
                 return
 
         # -------------------------------------------------------------
-        # 3. TRAILING STOP STRUTTURALE SUL RUNNER (Dopo TP1)
+        # 3. TRAILING STOP ADATTIVO SUL RUNNER (Dopo TP1)
         # -------------------------------------------------------------
         if tp1_hit:
-            # Verifica stop loss del runner
-            hit_runner_sl = (current_price <= runner_sl) if direction == "LONG" else (current_price >= runner_sl)
-            if hit_runner_sl:
-                logger.info(f"[{time_str}] 🏁 [RUNNER TRAILING HIT] Prezzo {current_price:.2f} ha toccato Trailing SL {runner_sl:.2f}!")
-                self._close_all_to_flat(current_price, time_str, reason=f"Trailing Stop Runner ({runner_sl:.2f})")
-                return
+            # 1. Aggiorna il massimo (o minimo per SHORT) battuto dal trade
+            peak_px = self.position.get("peak_price", open_px)
+            if direction == "LONG":
+                if current_price > peak_px:
+                    peak_px = current_price
+                    self.position["peak_price"] = peak_px
+            else:
+                if current_price < peak_px:
+                    peak_px = current_price
+                    self.position["peak_price"] = peak_px
 
-            # Alza il Trailing SL del Runner se si forma un nuovo pivot a favore
+            # 2. Candidato Candela M5 precedente chiusa
+            candela_sl = None
+            if len(self.candles) >= 2:
+                prev_c = self.candles[-2]
+                if direction == "LONG":
+                    candela_sl = round(prev_c["low"] - CANDLE_BUFFER_PIPS, 2)
+                else:
+                    candela_sl = round(prev_c["high"] + CANDLE_BUFFER_PIPS, 2)
+
+            # 3. Candidato Pivot Frattale
             last_pl = self.traffic_light.get("last_pivot_low")
             last_ph = self.traffic_light.get("last_pivot_high")
-
+            pivot_sl = None
             if direction == "LONG" and last_pl:
-                new_sl = round(last_pl - SL_BUFFER_PIPS, 2)
-                if new_sl > runner_sl:
-                    logger.info(f"[{time_str}] 📈 [TRAILING RUNNER ALZATO] Nuovo Higher Low {last_pl:.2f}. Trailing SL alzato da {runner_sl:.2f} a {new_sl:.2f}")
-                    self.position["runner_sl"] = new_sl
-                    self.save_state()
-                    if deal_run:
-                        threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing HL"), daemon=True).start()
-
+                pivot_sl = round(last_pl - SL_BUFFER_PIPS, 2)
             elif direction == "SHORT" and last_ph:
-                new_sl = round(last_ph + SL_BUFFER_PIPS, 2)
-                if new_sl < runner_sl:
-                    logger.info(f"[{time_str}] 📉 [TRAILING RUNNER ABBASSATO] Nuovo Lower High {last_ph:.2f}. Trailing SL abbassato da {runner_sl:.2f} a {new_sl:.2f}")
-                    self.position["runner_sl"] = new_sl
-                    self.save_state()
-                    if deal_run:
-                        threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing LH"), daemon=True).start()
+                pivot_sl = round(last_ph + SL_BUFFER_PIPS, 2)
+
+            # 4. Candidato Chasing dal Picco (High Watermark Trailing: max 7 pip di ritracciamento)
+            if direction == "LONG":
+                peak_sl = round(peak_px - RUNNER_MAX_GIVEBACK_PIPS, 2)
+                candidates = [runner_sl]
+                if peak_sl: candidates.append(peak_sl)
+                if candela_sl: candidates.append(candela_sl)
+                if pivot_sl: candidates.append(pivot_sl)
+                new_sl = max(candidates)
+            else:
+                peak_sl = round(peak_px + RUNNER_MAX_GIVEBACK_PIPS, 2)
+                candidates = [runner_sl]
+                if peak_sl: candidates.append(peak_sl)
+                if candela_sl: candidates.append(candela_sl)
+                if pivot_sl: candidates.append(pivot_sl)
+                new_sl = min(candidates)
+
+            # Se il nuovo SL si è alzato (per LONG) o abbassato (per SHORT), aggiorna
+            should_update = (new_sl > runner_sl) if direction == "LONG" else (new_sl < runner_sl)
+            if should_update:
+                logger.info(f"[{time_str}] 📈 [TRAILING RUNNER ALZATO] Stop aggiornato da {runner_sl:.2f} a {new_sl:.2f} (Peak: {peak_px:.2f})")
+                self.position["runner_sl"] = new_sl
+                self.save_state()
+                # Invia aggiornamento Stop Loss a IG se c'è variazione di almeno 1 pip
+                last_ig_sl = self.position.get("last_ig_sl", 0.0)
+                if deal_run and abs(new_sl - last_ig_sl) >= 1.0:
+                    self.position["last_ig_sl"] = new_sl
+                    threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing M5"), daemon=True).start()
+
+            # 5. Verifica se il prezzo corrente ha toccato il Trailing Stop
+            hit_runner_sl = (current_price <= self.position["runner_sl"]) if direction == "LONG" else (current_price >= self.position["runner_sl"])
+            if hit_runner_sl:
+                logger.info(f"[{time_str}] 🏁 [RUNNER TRAILING HIT] Prezzo {current_price:.2f} ha toccato Trailing SL {self.position['runner_sl']:.2f}!")
+                self._close_all_to_flat(current_price, time_str, reason=f"Trailing Stop Runner ({self.position['runner_sl']:.2f})")
+                return
 
     def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
         """Chiude tutte le posizioni a mercato e torna a FLAT."""

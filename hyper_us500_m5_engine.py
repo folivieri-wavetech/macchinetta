@@ -32,6 +32,8 @@ BANCOMAT_CONTRACTS = 3      # 3 contratti Bancomat (TP1 rapido a R:R 1:1 o 4 pt)
 RUNNER_CONTRACTS = 3        # 3 contratti Runner (Trailing Stop strutturale sui minimi/massimi crescenti)
 
 TP1_DEFAULT_PTS = 4.0       # Take Profit Bancomat fisso: +4.0 pt (+24.00 € con 3 contratti)
+RUNNER_MAX_GIVEBACK_PTS = 5.0  # Trailing dal massimo/minimo battuto: max 5 pt di ritracciamento
+CANDLE_BUFFER_PTS = 1.5        # Cuscinetto sotto/sopra la candela M5 precedente
 SL_BUFFER_PTS = 1.0         # Cuscinetto oltre il pivot strutturale: 1.0 pt
 SL_MIN_PTS = 2.0            # Stop Loss minimo di protezione: 2.0 pt
 SL_MAX_PTS = 6.0            # Stop Loss massimo invalicabile (cap di sicurezza): 6.0 pt
@@ -648,34 +650,73 @@ class HyperUS500M5Engine:
                 )
                 return
 
-        # 3. Trailing Stop Strutturale sul Runner
+        # -------------------------------------------------------------
+        # 3. TRAILING STOP ADATTIVO SUL RUNNER (Dopo TP1)
+        # -------------------------------------------------------------
         if tp1_hit:
-            hit_runner_sl = (current_price <= runner_sl) if direction == "LONG" else (current_price >= runner_sl)
-            if hit_runner_sl:
-                logger.info(f"[{time_str}] 🏁 [RUNNER TRAILING HIT] US500 {current_price:.2f} ha toccato Trailing SL {runner_sl:.2f}!")
-                self._close_all_to_flat(current_price, time_str, reason=f"Trailing Stop Runner ({runner_sl:.2f})")
-                return
+            # 1. Aggiorna il massimo (o minimo per SHORT) battuto dal trade
+            peak_px = self.position.get("peak_price", open_px)
+            if direction == "LONG":
+                if current_price > peak_px:
+                    peak_px = current_price
+                    self.position["peak_price"] = peak_px
+            else:
+                if current_price < peak_px:
+                    peak_px = current_price
+                    self.position["peak_price"] = peak_px
 
+            # 2. Candidato Candela M5 precedente chiusa
+            candela_sl = None
+            if len(self.candles) >= 2:
+                prev_c = self.candles[-2]
+                if direction == "LONG":
+                    candela_sl = round(prev_c["low"] - CANDLE_BUFFER_PTS, 2)
+                else:
+                    candela_sl = round(prev_c["high"] + CANDLE_BUFFER_PTS, 2)
+
+            # 3. Candidato Pivot Frattale
             last_pl = self.traffic_light.get("last_pivot_low")
             last_ph = self.traffic_light.get("last_pivot_high")
-
+            pivot_sl = None
             if direction == "LONG" and last_pl:
-                new_sl = round(last_pl - SL_BUFFER_PTS, 2)
-                if new_sl > runner_sl:
-                    logger.info(f"[{time_str}] 📈 [TRAILING RUNNER ALZATO] Nuovo HL {last_pl:.2f}. Trailing SL alzato a {new_sl:.2f}")
-                    self.position["runner_sl"] = new_sl
-                    self.save_state()
-                    if deal_run:
-                        threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing HL"), daemon=True).start()
-
+                pivot_sl = round(last_pl - SL_BUFFER_PTS, 2)
             elif direction == "SHORT" and last_ph:
-                new_sl = round(last_ph + SL_BUFFER_PTS, 2)
-                if new_sl < runner_sl:
-                    logger.info(f"[{time_str}] 📉 [TRAILING RUNNER ABBASSATO] Nuovo LH {last_ph:.2f}. Trailing SL abbassato a {new_sl:.2f}")
-                    self.position["runner_sl"] = new_sl
-                    self.save_state()
-                    if deal_run:
-                        threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing LH"), daemon=True).start()
+                pivot_sl = round(last_ph + SL_BUFFER_PTS, 2)
+
+            # 4. Candidato Chasing dal Picco (High Watermark Trailing: max 5 pt di ritracciamento)
+            if direction == "LONG":
+                peak_sl = round(peak_px - RUNNER_MAX_GIVEBACK_PTS, 2)
+                candidates = [runner_sl]
+                if peak_sl: candidates.append(peak_sl)
+                if candela_sl: candidates.append(candela_sl)
+                if pivot_sl: candidates.append(pivot_sl)
+                new_sl = max(candidates)
+            else:
+                peak_sl = round(peak_px + RUNNER_MAX_GIVEBACK_PTS, 2)
+                candidates = [runner_sl]
+                if peak_sl: candidates.append(peak_sl)
+                if candela_sl: candidates.append(candela_sl)
+                if pivot_sl: candidates.append(pivot_sl)
+                new_sl = min(candidates)
+
+            # Se il nuovo SL si è alzato (per LONG) o abbassato (per SHORT), aggiorna
+            should_update = (new_sl > runner_sl) if direction == "LONG" else (new_sl < runner_sl)
+            if should_update:
+                logger.info(f"[{time_str}] 📈 [TRAILING RUNNER ALZATO US500] Stop aggiornato da {runner_sl:.2f} a {new_sl:.2f} (Peak: {peak_px:.2f})")
+                self.position["runner_sl"] = new_sl
+                self.save_state()
+                # Invia aggiornamento Stop Loss a IG se c'è variazione di almeno 1 pt
+                last_ig_sl = self.position.get("last_ig_sl", 0.0)
+                if deal_run and abs(new_sl - last_ig_sl) >= 1.0:
+                    self.position["last_ig_sl"] = new_sl
+                    threading.Thread(target=order_mgr.set_stop_loss_order, args=(deal_run, new_sl, "Trailing M5 US500"), daemon=True).start()
+
+            # 5. Verifica se il prezzo corrente ha toccato il Trailing Stop
+            hit_runner_sl = (current_price <= self.position["runner_sl"]) if direction == "LONG" else (current_price >= self.position["runner_sl"])
+            if hit_runner_sl:
+                logger.info(f"[{time_str}] 🏁 [RUNNER TRAILING HIT] US500 {current_price:.2f} ha toccato Trailing SL {self.position['runner_sl']:.2f}!")
+                self._close_all_to_flat(current_price, time_str, reason=f"Trailing Stop Runner ({self.position['runner_sl']:.2f})")
+                return
 
     def _close_all_to_flat(self, exec_price: float, time_str: str, reason: str):
         with self.lock:
