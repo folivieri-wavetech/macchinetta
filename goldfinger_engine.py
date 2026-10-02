@@ -322,16 +322,26 @@ class GoldfingerEngine:
             r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=payload, timeout=8)
             if r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
-                time.sleep(1.2)
-                r_conf = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=self.get_auth_headers("1"), timeout=8)
-                if r_conf.status_code == 200:
-                    c_data = r_conf.json()
-                    if c_data.get("dealStatus") == "ACCEPTED":
-                        lvl = float(c_data.get("level", 0.0))
-                        pnl = float(c_data.get("profit", 0.0) or 0.0)
-                        print_log(f"✅ Chiuso SHORT ({deal_id}): {size} contratti @ {lvl:.2f} [PnL: {pnl:+.2f} €]")
-                        return True, lvl, pnl
-            print_log(f"⚠️ Errore chiusura SHORT {deal_id}: HTTP {r.status_code} - {r.text}")
+                for tent_conf in range(1, 5):
+                    time.sleep(1.2)
+                    r_conf = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=self.get_auth_headers("1"), timeout=8)
+                    if r_conf.status_code == 200:
+                        c_data = r_conf.json()
+                        st = c_data.get("dealStatus")
+                        if st == "ACCEPTED":
+                            lvl = float(c_data.get("level", 0.0))
+                            pnl = float(c_data.get("profit", 0.0) or 0.0)
+                            print_log(f"✅ Chiuso SHORT ({deal_id}): {size} contratti @ {lvl:.2f} [PnL: {pnl:+.2f} €]")
+                            return True, lvl, pnl
+                        elif st == "REJECTED":
+                            print_log(f"❌ Rifiuto chiusura SHORT {deal_id}: {c_data.get('reason')}")
+                            break
+            else:
+                err_text = r.text.upper()
+                if any(k in err_text for k in ("POSITION_NOT_FOUND", "ALREADY_CLOSED", "ORDER_NOT_FOUND")):
+                    print_log(f"ℹ️ Posizione SHORT {deal_id} già chiusa su IG.")
+                    return True, 0.0, 0.0
+                print_log(f"⚠️ Errore chiusura SHORT {deal_id}: HTTP {r.status_code} - {r.text}")
         except Exception as e:
             print_log(f"⚠️ Eccezione chiusura SHORT {deal_id}: {e}")
         return False, None, None
@@ -519,6 +529,7 @@ class GoldfingerEngine:
             if ask >= soglia_sgancio:
                 print_log(f"💥 RIMBALZO RILEVATO: Prezzo {ask:.2f} >= Minimo ({min_curr:.2f}) + 7 pip ({soglia_sgancio:.2f}). Chiudo tutti gli SHORT all'incasso!")
                 pnl_tot_rimbalzo = 0.0
+                tutti_chiusi = True
                 for sc in aperti:
                     ok, lvl_c, pnl = self.chiudi_short_mercato(sc["deal_id"], sc["size"])
                     if ok:
@@ -533,6 +544,15 @@ class GoldfingerEngine:
                             "pnl": pnl,
                             "motivo": "RIMBALZO_INCASSO"
                         })
+                    else:
+                        tutti_chiusi = False
+                        print_log(f"🚨 ATTENZIONE: Chiusura IG non confermata per difesa {sc['numero']} (Deal {sc.get('deal_id')}). Ritento!")
+
+                if not tutti_chiusi:
+                    print_log("⚠️ Riarmo sospeso: alcune posizioni non sono ancora confermate chiuse su IG. Ritento al prossimo ciclo.")
+                    self.salva_stato()
+                    return
+
                 self.stato["pnl_sessione"] += pnl_tot_rimbalzo
                 self.stato["totale_incassato"] += pnl_tot_rimbalzo
                 self.stato["minimo_precedente"] = min_curr
