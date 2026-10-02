@@ -361,6 +361,27 @@ class HyperOrderManager:
             pass
         return False
 
+    def get_open_positions(self, epic: str = None) -> list:
+        """Restituisce la lista reale delle posizioni aperte su IG dal vivo, opzionalmente filtrate per epic o strumento."""
+        try:
+            h = self._get_headers(version="2")
+            r = requests.get(f"{self.base_url}/positions", headers=h, timeout=6)
+            if r.status_code == 200:
+                positions = r.json().get("positions", [])
+                if epic:
+                    ep_u = str(epic).upper()
+                    filtered = []
+                    for p in positions:
+                        p_epic = str(p.get("market", {}).get("epic", "")).upper()
+                        p_name = str(p.get("market", {}).get("instrumentName", "")).upper()
+                        if ep_u in p_epic or p_epic in ep_u or ("GOLD" in ep_u and "GOLD" in p_name) or ("US500" in ep_u and "US 500" in p_name) or ("SPTRD" in ep_u and "SPTRD" in p_epic):
+                            filtered.append(p)
+                    return filtered
+                return positions
+        except Exception as e:
+            logger.warning(f"Errore get_open_positions: {e}")
+        return []
+
     def close_market_deal(self, deal_id: str, direction_open: str, size: float, label: str = "Chiusura", reason_note: str = "") -> dict:
         """Chiude a mercato una posizione aperta su IG tramite DELETE /positions/otc con verifica conferma."""
         if not deal_id:

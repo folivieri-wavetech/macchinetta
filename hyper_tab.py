@@ -421,7 +421,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         ts_stp = 2.0
         margin_per_c = 220.0
         sig_offset = CANDELA_SEGNALE_OFFSET_PIPS_5M
-        epic_filter = "CS.D.CFDGOLD.CFD.IP"
+        epic_filter = EPIC_GOLD
         btn_sfx = f"gold_{conto_attivo}"
         is_feed_closed = is_gold_feed_suspended()
         is_trade_frozen = is_gold_trading_suspended()
@@ -431,13 +431,15 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     if hasattr(engine, "reconcile_with_ig_deals"):
         engine.reconcile_with_ig_deals()
 
+    # Recupero posizioni REALI dal server IG per questo strumento (Fonte di verità assoluta)
+    real_ig_pos = order_mgr.get_open_positions(epic=epic_filter)
+
     with engine.lock:
         is_conn = engine.ls_connected
         live_mid = engine.live_mid
         total_ticks = engine.total_ticks
         pos = engine.position
         increments = list(getattr(engine, "increments", []))
-        total_contracts = (pos.get("contracts", core_c) + sum(i.get("contracts", inc_c) for i in increments)) if pos else 0
         trading_on = engine.trading_enabled
         curr_bar_t = engine.curr_bar_start_t
         struct = getattr(engine, "current_structure", "NEUTRAL")
@@ -448,7 +450,19 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         ema21_val = getattr(engine, "ema21", None)
         semaforo = getattr(engine, "semaforo", {})
 
-    float_pnl = engine.get_floating_pnl()
+    # Calcolo totale contratti e PnL flottante direttamente dalle posizioni reali su IG (fonte di verità assoluta)
+    if real_ig_pos:
+        total_contracts = sum(int(float(p.get("position", {}).get("size", 0))) for p in real_ig_pos)
+        if live_mid:
+            float_pnl = sum(
+                round(((live_mid - float(p["position"]["level"])) if p["position"]["direction"] == "BUY" else (float(p["position"]["level"]) - live_mid)) * float(p["position"]["size"]) * 1.0, 2)
+                for p in real_ig_pos
+            )
+        else:
+            float_pnl = 0.0
+    else:
+        total_contracts = 0
+        float_pnl = 0.0
     history_inst = [t for t in order_mgr.get_trades_history(epic=epic_filter) if t.get("tf") in ("10M", "5M")]
     today_dt = now_it()
     history_inst_today = [t for t in history_inst if is_trade_today(t, today_dt)]
@@ -566,11 +580,15 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     """, unsafe_allow_html=True)
 
     # Mini Barra Stato: Esposizione, Flottante e Sessione
-    if pos:
-        dir_col = "#22c55e" if pos["direction"] == "LONG" else "#ef4444"
-        dir_icon = "🟢" if pos["direction"] == "LONG" else "🔴"
-        sign_pos_c = "+" if pos["direction"] == "LONG" else "-"
-        pos_str = f"<span style='color: {dir_col}; font-weight: 700;'>{dir_icon} {pos['direction']} {sign_pos_c}{total_contracts}</span> <span style='font-size: 0.68rem; color: #94a3b8;'>@{pos['open_price']:.2f}</span>"
+    if real_ig_pos:
+        p_first = real_ig_pos[0]["position"]
+        dir_first = "LONG" if p_first["direction"] == "BUY" else "SHORT"
+        dir_col = "#22c55e" if dir_first == "LONG" else "#ef4444"
+        dir_icon = "🟢" if dir_first == "LONG" else "🔴"
+        sign_pos_c = "+" if dir_first == "LONG" else "-"
+        tot_sz = sum(float(p["position"]["size"]) for p in real_ig_pos)
+        avg_open = (sum(float(p["position"]["level"]) * float(p["position"]["size"]) for p in real_ig_pos) / tot_sz) if tot_sz > 0 else 0.0
+        pos_str = f"<span style='color: {dir_col}; font-weight: 700;'>{dir_icon} {dir_first} {sign_pos_c}{total_contracts}</span> <span style='font-size: 0.68rem; color: #94a3b8;'>@{avg_open:.2f}</span>"
     else:
         pos_str = "<span style='color: #94a3b8; font-weight: 600;'>⚪ FLAT</span>"
 
@@ -669,11 +687,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     # Posizioni in Portafoglio
     instr_code = "US500" if instr_type == "US500" else "GOLD"
     st.markdown(f"<div style='margin-top: 8px; margin-bottom: 4px; font-size: 0.95rem; font-weight: 700; color: #FFD700;'>💼 Posizioni in Portafoglio - {instr_code}</div>", unsafe_allow_html=True)
-    if pos:
-        dir_pos = pos["direction"]
-        dir_col = "#22c55e" if dir_pos == "LONG" else "#ef4444"
-        dir_badge = f"<span style='color: {dir_col}; font-weight: 700; font-size: 0.72rem; white-space: nowrap;'>{'🟢' if dir_pos == 'LONG' else '🔴'} {dir_pos}</span>"
-
+    if real_ig_pos:
         def _fmt_open_t(t_raw):
             if not t_raw:
                 return "--:--:--"
@@ -684,107 +698,64 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 s = s.split("T")[-1]
             return s[:8]
 
-        core_t_str = _fmt_open_t(pos.get("open_time"))
-        time_core_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{core_t_str}</span>"
-
         p_rows = []
+        for p in real_ig_pos:
+            p_pos = p.get("position", {})
+            d_id = p_pos.get("dealId", "")
+            d_dir = "LONG" if p_pos.get("direction") == "BUY" else "SHORT"
+            d_sz = int(float(p_pos.get("size", 0)))
+            d_lvl = float(p_pos.get("level", 0.0))
+            d_sl = float(p_pos.get("stopLevel")) if p_pos.get("stopLevel") else None
+            d_tp = float(p_pos.get("limitLevel")) if p_pos.get("limitLevel") else None
+            time_str = _fmt_open_t(p_pos.get("createdDate", ""))
+            time_cell = f"<span style='color: #94a3b8; font-size: 0.73rem; font-family: monospace;'>{time_str}</span>"
 
-        # Nuova Logica Apex Swing (Split Bancomat 3c + Runner 3c)
-        if "bancomat_contracts" in pos or "runner_contracts" in pos or "deal_id_bancomat" in pos or "tp1_price" in pos:
-            bco_c = pos.get("bancomat_contracts", 3)
-            run_c = pos.get("runner_contracts", 3)
-            bco_closed = pos.get("tp1_hit", False) or pos.get("bancomat_closed", False)
-            tp_bco = pos.get("tp1_price") or pos.get("tp_bancomat")
-            sl_bco = pos.get("sl_price")
-            run_sl = pos.get("runner_sl") or pos.get("sl_price")
-            run_be = pos.get("runner_be_active", False)
-
-            # 1. Riga BANCOMAT (mostrata solo se ancora attiva a mercato)
-            if not bco_closed:
-                if live_mid is not None:
-                    b_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                    b_pnl = round(b_diff * bco_c * 1.0, 2)
+            # Riconoscimento Ruolo Chirurgico
+            if pos and d_id == pos.get("deal_id_bancomat"):
+                role_label = "<span style='color: #f59e0b; font-weight: 700; font-size: 0.71rem;'>💰 Bancomat</span>"
+            elif pos and d_id == pos.get("deal_id_runner"):
+                role_label = "<span style='color: #38bdf8; font-weight: 700; font-size: 0.71rem;'>🚀 Runner</span>"
+            elif increments and any(inc.get("deal_id") == d_id for inc in increments):
+                lbl_name = next(inc.get("label", "⚡ Speed") for inc in increments if inc.get("deal_id") == d_id)
+                role_label = f"<span style='color: #c084fc; font-weight: 700; font-size: 0.71rem;'>{lbl_name}</span>"
+            else:
+                # Ruolo dedotto dalle impostazioni dell'ordine IG
+                if d_tp:
+                    role_label = "<span style='color: #f59e0b; font-weight: 700; font-size: 0.71rem;'>💰 Bancomat</span>"
                 else:
-                    b_pnl = 0.0
-                col_bp = "#22c55e" if b_pnl >= 0 else "#ef4444"
-                sign_bp = "+" if b_pnl >= 0 else ""
-                tp_str = f"<span style='color: #22c55e; font-weight: 700;'>{tp_bco:.2f}</span>" if tp_bco else "--"
-                sl_str = f"<span style='color: #fa8072; font-weight: 600;'>{sl_bco:.2f}</span>" if sl_bco else "--"
-                sign_c_size = "+" if dir_pos == "LONG" else "-"
-                col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
-                p_rows.append(
-                    f"<tr>"
-                    f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 700; font-size: 0.71rem;'>💰 Bancomat</span></td>"
-                    f"<td style='text-align: center;'>{time_core_cell}</td>"
-                    f"<td style='text-align: center;'><span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{bco_c}</span></td>"
-                    f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                    f"<td style='text-align: center;'>{sl_str}</td>"
-                    f"<td style='text-align: center;'>{tp_str}</td>"
-                    f"<td style='text-align: center; color: {col_bp}; font-weight: 700;'>{sign_bp}{b_pnl:,.2f} €</td>"
-                    f"</tr>"
-                )
+                    role_label = "<span style='color: #38bdf8; font-weight: 700; font-size: 0.71rem;'>🚀 Runner</span>"
 
-            # 2. Riga RUNNER
+            # Calcolo PnL della singola posizione
             if live_mid is not None:
-                r_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                r_pnl = round(r_diff * run_c * 1.0, 2)
+                diff_pts = (live_mid - d_lvl) if d_dir == "LONG" else (d_lvl - live_mid)
+                d_pnl = round(diff_pts * d_sz * 1.0, 2)
             else:
-                r_pnl = 0.0
-            col_rp = "#22c55e" if r_pnl >= 0 else "#ef4444"
-            sign_rp = "+" if r_pnl >= 0 else ""
-            if run_be:
-                ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Break-Even Protetto'>BE {run_sl:.2f}</span>"
-            elif run_sl is not None:
-                ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Trailing Stop M5'>{run_sl:.2f}</span>"
-            else:
-                ts_runner_cell = "<span style='color: #64748b;'>--</span>"
+                d_pnl = 0.0
 
-            sign_r_size = "+" if dir_pos == "LONG" else "-"
-            col_r_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
+            col_p = "#22c55e" if d_pnl >= 0 else "#ef4444"
+            sign_p = "+" if d_pnl >= 0 else ""
+            sign_s = "+" if d_dir == "LONG" else "-"
+            col_s = "#22c55e" if d_dir == "LONG" else "#fa8072"
+            sl_str = f"<span style='color: #fa8072; font-weight: 600;'>{d_sl:.2f}</span>" if d_sl else "--"
+            tp_str = f"<span style='color: #22c55e; font-weight: 700;'>{d_tp:.2f}</span>" if d_tp else "<span style='color: #64748b;'>--</span>"
+
             p_rows.append(
                 f"<tr>"
-                f"<td style='text-align: center;'><span style='color: #38bdf8; font-weight: 700; font-size: 0.71rem;'>🚀 Runner</span></td>"
-                f"<td style='text-align: center;'>{time_core_cell}</td>"
-                f"<td style='text-align: center;'><span style='color: {col_r_size}; font-weight: 700;'>{sign_r_size}{run_c}</span></td>"
-                f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                f"<td style='text-align: center;'>{ts_runner_cell}</td>"
-                f"<td style='text-align: center; color: #64748b;' title='Corsa Libera senza TP fisso'>--</td>"
-                f"<td style='text-align: center; color: {col_rp}; font-weight: 700;'>{sign_rp}{r_pnl:,.2f} €</td>"
-                f"</tr>"
-            )
-        else:
-            # Fallback generico con visualizzazione completa di SL e TP
-            if live_mid is not None:
-                core_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
-                core_pnl_val = round(core_diff * pos.get("contracts", core_c) * 1.0, 2)
-            else:
-                core_pnl_val = 0.0
-            col_core_pnl = "#22c55e" if core_pnl_val >= 0 else "#ef4444"
-            sign_core = "+" if core_pnl_val >= 0 else ""
-            core_c_val = pos.get('contracts', core_c)
-            sign_c_size = "+" if dir_pos == "LONG" else "-"
-            col_c_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
-            size_core_cell = f"<span style='color: {col_c_size}; font-weight: 700;'>{sign_c_size}{core_c_val}</span>"
-            sl_val = pos.get("runner_sl") or pos.get("sl_price")
-            tp_val = pos.get("tp1_price") or pos.get("tp_bancomat") or pos.get("tp_price")
-            sl_cell = f"<span style='color: #fa8072; font-weight: 600;'>{sl_val:.2f}</span>" if sl_val else "--"
-            tp_cell = f"<span style='color: #22c55e; font-weight: 700;'>{tp_val:.2f}</span>" if tp_val else "--"
-            p_rows.append(
-                f"<tr>"
-                f"<td style='text-align: center;'>{dir_badge}</td>"
-                f"<td style='text-align: center;'>{time_core_cell}</td>"
-                f"<td style='text-align: center;'>{size_core_cell}</td>"
-                f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                f"<td style='text-align: center;'>{sl_cell}</td>"
-                f"<td style='text-align: center;'>{tp_cell}</td>"
-                f"<td style='text-align: center; color: {col_core_pnl}; font-weight: 700;'>{sign_core}{core_pnl_val:,.2f} €</td>"
+                f"<td style='text-align: center;'>{role_label}</td>"
+                f"<td style='text-align: center;'>{time_cell}</td>"
+                f"<td style='text-align: center;'><span style='color: {col_s}; font-weight: 700;'>{sign_s}{d_sz}</span></td>"
+                f"<td style='text-align: center; font-weight: 600;'>{d_lvl:.2f}</td>"
+                f"<td style='text-align: center;'>{sl_str}</td>"
+                f"<td style='text-align: center;'>{tp_str}</td>"
+                f"<td style='text-align: center; color: {col_p}; font-weight: 700;'>{sign_p}{d_pnl:,.2f} €</td>"
                 f"</tr>"
             )
 
         col_tot_pnl = "#22c55e" if float_pnl >= 0 else "#ef4444"
         sign_tot = "+" if float_pnl >= 0 else ""
-        sign_tot_size = "+" if dir_pos == "LONG" else "-"
-        col_tot_size = "#22c55e" if dir_pos == "LONG" else "#fa8072"
+        first_dir = "LONG" if real_ig_pos[0]["position"]["direction"] == "BUY" else "SHORT"
+        sign_tot_size = "+" if first_dir == "LONG" else "-"
+        col_tot_size = "#22c55e" if first_dir == "LONG" else "#fa8072"
         size_tot_cell = f"<span style='color: {col_tot_size}; font-weight: 800;'>{sign_tot_size}{total_contracts}</span>"
 
         p_rows.append(
@@ -815,7 +786,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         </table>
         """, unsafe_allow_html=True)
     else:
-        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.76rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (Flat - In attesa del Semaforo 4/4)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='background: rgba(15, 23, 42, 0.3); border: 1px dashed #334155; border-radius: 5px; padding: 6px 10px; font-size: 0.76rem; color: #64748b; text-align: center;'>⚪ Nessuna posizione aperta (FLAT su IG)</div>", unsafe_allow_html=True)
 
     # Expander Regole 5M
     with st.expander(f"⚙️ Assetto & Regole Apex Swing M5 {instr_name}", expanded=False):
@@ -858,22 +829,44 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     # Dati patrimoniali sincronizzati
     acc_data = get_sidebar_account_data(conto_attivo)
 
-    # Flottanti live
-    float_gold = engine_gold.get_floating_pnl()
-    float_us500 = engine_us500.get_floating_pnl()
-    tot_float = float_gold + float_us500
-
-    # Order manager & Storico 10M/5M Reale IG (Filtrato alla data odierna)
+    # Order manager & Interrogazione Reale IG (Fonte di verità assoluta per evitare disallineamenti con Pfoglio)
     today_dt = now_it()
     order_mgr = HyperOrderManager.get_instance(conto_attivo)
+    real_pos_gold = order_mgr.get_open_positions(epic=EPIC_GOLD)
+    real_pos_us500 = order_mgr.get_open_positions(epic=EPIC_US500)
+
+    # Flottanti live DIRETTI da IG
+    if real_pos_gold and engine_gold.live_mid:
+        float_gold = sum(
+            round(((engine_gold.live_mid - float(p["position"]["level"])) if p["position"]["direction"] == "BUY" else (float(p["position"]["level"]) - engine_gold.live_mid)) * float(p["position"]["size"]) * 1.0, 2)
+            for p in real_pos_gold
+        )
+    elif real_pos_gold:
+        float_gold = sum(float(p.get("position", {}).get("upl", 0.0) or 0.0) for p in real_pos_gold)
+    else:
+        float_gold = 0.0
+
+    if real_pos_us500 and engine_us500.live_mid:
+        float_us500 = sum(
+            round(((engine_us500.live_mid - float(p["position"]["level"])) if p["position"]["direction"] == "BUY" else (float(p["position"]["level"]) - engine_us500.live_mid)) * float(p["position"]["size"]) * 1.0, 2)
+            for p in real_pos_us500
+        )
+    elif real_pos_us500:
+        float_us500 = sum(float(p.get("position", {}).get("upl", 0.0) or 0.0) for p in real_pos_us500)
+    else:
+        float_us500 = 0.0
+
+    tot_float = float_gold + float_us500
+
+    # Storico 10M/5M Reale IG (Filtrato alla data odierna)
     hist_gold = [t for t in order_mgr.get_trades_history(epic=EPIC_GOLD) if is_trade_today(t, today_dt) and t.get("tf") in ("10M", "5M")]
-    hist_us500 = [t for t in order_mgr.get_trades_history(epic="IX.D.SPTRD.IBE.IP") if is_trade_today(t, today_dt) and t.get("tf") in ("10M", "5M")]
+    hist_us500 = [t for t in order_mgr.get_trades_history(epic=EPIC_US500) if is_trade_today(t, today_dt) and t.get("tf") in ("10M", "5M")]
     real_gold = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_gold)
     real_us500 = sum(float(t.get("pnl_eur", 0.0) or 0.0) for t in hist_us500)
     tot_real = real_gold + real_us500
     tot_closed = len(hist_gold) + len(hist_us500)
 
-    # Contratti ed esposizione aggregata
+    # Contratti ed esposizione aggregata (ancorati a IG con fallback su motore)
     if hasattr(engine_gold, "sync_state_from_disk_if_needed"):
         engine_gold.sync_state_from_disk_if_needed()
     if hasattr(engine_gold, "reconcile_with_ig_deals"):
@@ -884,17 +877,25 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     if hasattr(engine_us500, "reconcile_with_ig_deals"):
         engine_us500.reconcile_with_ig_deals()
 
-    with engine_gold.lock:
-        pos_g = engine_gold.position
-        inc_g = list(engine_gold.increments)
-        c_gold = (pos_g.get("contracts", CORE_CONTRACTS_5M) + sum(i.get("contracts", INC_CONTRACTS_5M) for i in inc_g)) if pos_g else 0
-        dir_gold = pos_g["direction"] if pos_g else "FLAT"
+    if real_pos_gold:
+        c_gold = sum(int(float(p.get("position", {}).get("size", 0))) for p in real_pos_gold)
+        dir_gold = "LONG" if real_pos_gold[0].get("position", {}).get("direction") == "BUY" else "SHORT"
+    else:
+        with engine_gold.lock:
+            pos_g = engine_gold.position
+            inc_g = list(engine_gold.increments)
+            c_gold = (pos_g.get("contracts", CORE_CONTRACTS_5M) + sum(i.get("contracts", INC_CONTRACTS_5M) for i in inc_g)) if pos_g else 0
+            dir_gold = pos_g["direction"] if pos_g else "FLAT"
 
-    with engine_us500.lock:
-        pos_u = engine_us500.position
-        inc_u = list(engine_us500.increments)
-        c_us500 = (pos_u.get("contracts", CORE_CONTRACTS_US500_5M) + sum(i.get("contracts", INC_CONTRACTS_US500_5M) for i in inc_u)) if pos_u else 0
-        dir_us500 = pos_u["direction"] if pos_u else "FLAT"
+    if real_pos_us500:
+        c_us500 = sum(int(float(p.get("position", {}).get("size", 0))) for p in real_pos_us500)
+        dir_us500 = "LONG" if real_pos_us500[0].get("position", {}).get("direction") == "BUY" else "SHORT"
+    else:
+        with engine_us500.lock:
+            pos_u = engine_us500.position
+            inc_u = list(engine_us500.increments)
+            c_us500 = (pos_u.get("contracts", CORE_CONTRACTS_US500_5M) + sum(i.get("contracts", INC_CONTRACTS_US500_5M) for i in inc_u)) if pos_u else 0
+            dir_us500 = pos_u["direction"] if pos_u else "FLAT"
 
     tot_hyper_margin = (c_gold * 220.0) + (c_us500 * 400.0)
 

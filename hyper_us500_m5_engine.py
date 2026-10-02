@@ -27,11 +27,11 @@ CANDLE_SECONDS = 300    # 5 Minuti (M5) per barra
 STATE_FILE = "hyper_us500_m5_state.json"
 
 # Parametri Operativi Apex Swing M5 per US 500
-CORE_CONTRACTS = 6          # Totale 6 contratti (3 Bancomat + 3 Runner)
-BANCOMAT_CONTRACTS = 3      # 3 contratti Bancomat (TP1 rapido a R:R 1:1 o 4 pt)
-RUNNER_CONTRACTS = 3        # 3 contratti Runner (Trailing Stop strutturale sui minimi/massimi crescenti)
+CORE_CONTRACTS = 8          # Totale 8 contratti (4 Bancomat + 4 Runner)
+BANCOMAT_CONTRACTS = 4      # 4 contratti Bancomat (TP1 rapido a R:R 1:1 o 4 pt)
+RUNNER_CONTRACTS = 4        # 4 contratti Runner (Trailing Stop strutturale sui minimi/massimi crescenti)
 
-TP1_DEFAULT_PTS = 4.0       # Take Profit Bancomat fisso: +4.0 pt (+24.00 € con 3 contratti)
+TP1_DEFAULT_PTS = 4.0       # Take Profit Bancomat fisso: +4.0 pt (+32.00 € con 4 contratti)
 RUNNER_MAX_GIVEBACK_PTS = 5.0  # Trailing dal massimo/minimo battuto: max 5 pt di ritracciamento
 CANDLE_BUFFER_PTS = 1.5        # Cuscinetto sotto/sopra la candela M5 precedente
 SL_BUFFER_PTS = 1.0         # Cuscinetto oltre il pivot strutturale: 1.0 pt
@@ -39,9 +39,12 @@ SL_MIN_PTS = 2.0            # Stop Loss minimo di protezione: 2.0 pt
 SL_MAX_PTS = 6.0            # Stop Loss massimo invalicabile (cap di sicurezza): 6.0 pt
 BE_EXTRA_LOCK_PTS = 0.5     # Lock sopra il breakeven a protezione spread (+0.5 pt)
 
-# Costanti di compatibilità per UI dashboard (hyper_tab)
-INC_CONTRACTS = 3
-MAX_INCREMENTS = 3
+# Costanti Incrementi Speed US 500 (Speed 1 e Speed 2)
+INC_CONTRACTS = 4           # 4 contratti per ciascun incremento Speed (totale massimo 16 contratti US500)
+MAX_SPEED_INCREMENTS = 2    # Massimo 2 incrementi contemporanei (Speed 1 + Speed 2)
+MAX_INCREMENTS = 2
+SPEED_TP_PTS = 3.0          # Take Profit rapido per incrementi Speed (+3.0 pt = +24.00 € su 4c)
+INC_TP_PTS = 3.0
 
 # Orari Sospensione US 500
 def is_us500_feed_suspended(dt: datetime.datetime = None) -> bool:
@@ -224,6 +227,7 @@ class HyperUS500M5Engine:
                     self.balance = float(d.get("balance", self.initial_balance))
                     self.trading_enabled = bool(d.get("trading_enabled", False))
                     self.position = d.get("position")
+                    self.increments = d.get("increments", [])
                     self.trades = d.get("trades", [])
                     if "candles" in d and isinstance(d["candles"], list):
                         self.candles = d["candles"][-500:]
@@ -245,6 +249,7 @@ class HyperUS500M5Engine:
                         d = json.load(f)
                     with self.lock:
                         self.position = d.get("position")
+                        self.increments = d.get("increments", [])
                         self.trading_enabled = bool(d.get("trading_enabled", self.trading_enabled))
             except Exception:
                 pass
@@ -257,15 +262,31 @@ class HyperUS500M5Engine:
             deal_run = self.position.get("deal_id_runner")
             deal_banc = self.position.get("deal_id_bancomat")
             tp1_hit = self.position.get("tp1_hit", False)
+            active_incs = list(self.increments)
 
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
         run_open = order_mgr.is_deal_open(deal_run) if deal_run else False
         banc_open = order_mgr.is_deal_open(deal_banc) if (deal_banc and not tp1_hit) else False
 
-        if not run_open and not banc_open:
+        surviving_incs = []
+        for inc in active_incs:
+            d_id = inc.get("deal_id")
+            if d_id and order_mgr.is_deal_open(d_id):
+                surviving_incs.append(inc)
+            else:
+                logger.info(f"ℹ️ [RECONCILE IG US500] Deal incremento {inc.get('label')} ({d_id}) non aperto su IG. Rimosso.")
+
+        with self.lock:
+            self.increments = surviving_incs
+
+        if not run_open and not banc_open and not surviving_incs:
             logger.info(f"ℹ️ [RECONCILE IG US500] I deal {deal_banc} e {deal_run} non risultano più aperti su IG. Reset immediato a FLAT.")
             with self.lock:
                 self.position = None
+                self.increments = []
+                self.save_state()
+        elif len(surviving_incs) != len(active_incs):
+            with self.lock:
                 self.save_state()
 
     def save_state(self):
@@ -275,7 +296,7 @@ class HyperUS500M5Engine:
                 "balance": self.balance,
                 "trading_enabled": self.trading_enabled,
                 "position": self.position,
-                "increments": [],
+                "increments": self.increments,
                 "traffic_light": self.traffic_light,
                 "trades": self.trades[-100:],
                 "candles": self.candles[-500:]
@@ -501,12 +522,16 @@ class HyperUS500M5Engine:
 
         # INGRESSO AUTOMATICO: CONSENTITO SOLO A CHIUSURA CANDELA CONFERMATA (ALL'INIZIO DELLA NUOVA BARRA M5)
         # Mai a metà candela o appena il bot si connette!
-        if on_candle_close and self.trading_enabled and self.position is None and not self.entry_in_progress:
+        if on_candle_close and self.trading_enabled and not self.entry_in_progress:
             if not is_us500_entry_suspended():
-                if all_green_long:
-                    self._trigger_entry("LONG", live_px, time_str, last_pl, last_ph)
-                elif all_green_short:
-                    self._trigger_entry("SHORT", live_px, time_str, last_ph, last_pl)
+                if self.position is None:
+                    if all_green_long:
+                        self._trigger_entry("LONG", live_px, time_str, last_pl, last_ph)
+                    elif all_green_short:
+                        self._trigger_entry("SHORT", live_px, time_str, last_ph, last_pl)
+                elif not self.closing_in_progress:
+                    # Innesco Incrementi Speed 1 e Speed 2 se il trend M5 riaccende 3/3 luci verdi
+                    self._check_speed_increment_entry(live_px, time_str, all_green_long, all_green_short)
 
     def _trigger_entry(self, direction: str, live_px: float, time_str: str, pivot_sl: float, pivot_opp: float):
         self.entry_in_progress = True
@@ -539,7 +564,7 @@ class HyperUS500M5Engine:
     def _execute_apex_entry(self, direction: str, exec_price: float, sl_price: float, tp1_price: float, time_str: str):
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
         try:
-            logger.info(f"[{time_str}] 📤 Invio a IG: {direction} {CORE_CONTRACTS} contratti US500 (3c Bancomat TP {tp1_price:.2f} + 3c Runner SL {sl_price:.2f})")
+            logger.info(f"[{time_str}] 📤 Invio a IG: {direction} {CORE_CONTRACTS} contratti US500 (4c Bancomat TP {tp1_price:.2f} + 4c Runner SL {sl_price:.2f})")
 
             res_banc = order_mgr.open_market_deal(
                 direction=direction,
@@ -568,6 +593,8 @@ class HyperUS500M5Engine:
                     "direction": direction,
                     "open_price": real_open_px,
                     "contracts": CORE_CONTRACTS,
+                    "bancomat_contracts": BANCOMAT_CONTRACTS,
+                    "runner_contracts": RUNNER_CONTRACTS,
                     "deal_id_bancomat": deal_id_banc,
                     "deal_id_runner": deal_id_run,
                     "tp1_price": tp1_price,
@@ -591,6 +618,95 @@ class HyperUS500M5Engine:
                 self.entry_in_progress = False
                 self.save_state()
 
+    def _check_speed_increment_entry(self, live_px: float, time_str: str, all_green_long: bool, all_green_short: bool):
+        """Verifica se innescare un incremento Speed 1 o Speed 2 a chiusura candela M5 con 3/3 luci verdi."""
+        with self.lock:
+            if not self.position or self.closing_in_progress:
+                return
+            if len(self.increments) >= MAX_SPEED_INCREMENTS:
+                return
+            pos = dict(self.position)
+            curr_incs = list(self.increments)
+
+        dir_pos = pos["direction"]
+        # Verifica concordanza direzione semaforo 3/3
+        matching_signal = (dir_pos == "LONG" and all_green_long) or (dir_pos == "SHORT" and all_green_short)
+        if not matching_signal:
+            return
+
+        # Solo se trade già in profitto (Bancomat incassato o prezzo oltre BE)
+        open_px = pos["open_price"]
+        is_profitable = pos.get("tp1_hit", False) or ((live_px >= open_px + 1.0) if dir_pos == "LONG" else (live_px <= open_px - 1.0))
+        if not is_profitable:
+            return
+
+        # Distanza minima di almeno 1.0 pt dall'ingresso o da altri incrementi attivi
+        if abs(live_px - open_px) < 1.0:
+            return
+        for inc in curr_incs:
+            if abs(live_px - inc.get("open_price", 0.0)) < 1.0:
+                return
+
+        label_num = 1 if len(curr_incs) == 0 else 2
+        label = f"Speed {label_num}"
+
+        # Target Take Profit rapido e Stop Loss alla base della candela M5 precedente
+        if dir_pos == "LONG":
+            tp_px = round(live_px + SPEED_TP_PTS, 2)
+            prev_low = self.candles[-1]["low"] if self.candles else live_px - 3.0
+            sl_px = round(min(prev_low - CANDLE_BUFFER_PTS, live_px - SL_MIN_PTS), 2)
+        else:
+            tp_px = round(live_px - SPEED_TP_PTS, 2)
+            prev_high = self.candles[-1]["high"] if self.candles else live_px + 3.0
+            sl_px = round(max(prev_high + CANDLE_BUFFER_PTS, live_px + SL_MIN_PTS), 2)
+
+        threading.Thread(
+            target=self._execute_speed_entry,
+            args=(label, dir_pos, live_px, sl_px, tp_px, time_str),
+            daemon=True
+        ).start()
+
+    def _execute_speed_entry(self, label: str, direction: str, exec_price: float, sl_price: float, tp_price: float, time_str: str):
+        """Apre a mercato l'ordine di incremento Speed (4 contratti US500)."""
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+        try:
+            logger.info(f"[{time_str}] ⚡ [ACCELERAZIONE {label} US500] Invio a IG: {direction} {INC_CONTRACTS}c | TP: {tp_price:.2f} | SL: {sl_price:.2f}")
+            res = order_mgr.open_market_deal(
+                direction=direction,
+                size=INC_CONTRACTS,
+                limit_level=tp_price,
+                stop_level=sl_price,
+                label=f"Apex {label} US 500 ({direction})",
+                epic=EPIC_US500
+            )
+            deal_id = res.get("deal_id") if res.get("success") else None
+            real_open_px = res.get("level") or exec_price
+
+            inc_entry = {
+                "id": f"speed_{int(time.time()*1000)}",
+                "label": f"⚡ {label}",
+                "deal_id": deal_id,
+                "direction": direction,
+                "open_price": real_open_px,
+                "contracts": INC_CONTRACTS,
+                "tp_price": tp_price,
+                "sl_price": sl_price,
+                "open_time": time_str
+            }
+
+            with self.lock:
+                self.increments.append(inc_entry)
+                self.save_state()
+
+            order_mgr.send_notification(
+                f"⚡ APEX US500: {label} APERTO",
+                f"{direction} {INC_CONTRACTS}c a {real_open_px:.2f} | TP: {tp_price:.2f} | SL: {sl_price:.2f}",
+                "zap"
+            )
+            logger.info(f"[{time_str}] ✅ {label} US500 registrato con successo (Deal: {deal_id})")
+        except Exception as e:
+            logger.error(f"Errore durante apertura incremento US500 {label}: {e}")
+
     def _manage_open_position(self, current_price: float, time_str: str, on_candle_close: bool = False):
         if not self.position or self.closing_in_progress:
             return
@@ -606,22 +722,94 @@ class HyperUS500M5Engine:
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
 
         # -------------------------------------------------------------
-        # 0. Uscita Anticipata: 3 Massimi/Minimi Decrescenti M5 (Esaurimento Spinta)
+        # 0. VERIFICA INVERSIONE STRUTTURALE: 3 MASSIMI E 3 MINIMI DECRESCENTI (DOW THEORY)
         # -------------------------------------------------------------
         if on_candle_close and len(self.candles) >= 3:
             c1 = self.candles[-1]
             c2 = self.candles[-2]
             c3 = self.candles[-3]
 
-            if direction == "LONG" and (c1["high"] < c2["high"] < c3["high"]):
-                logger.info(f"[{time_str}] ⚠️ [USCITA ANTICIPATA US500] Rilevati 3 massimi decrescenti M5 ({c3['high']:.2f} > {c2['high']:.2f} > {c1['high']:.2f}). Chiusura anticipata per esaurimento spinta!")
-                self._close_all_to_flat(current_price, time_str, reason="Uscita Anticipata (3 Massimi Decrescenti M5)")
+            # LONG: 3 massimi decrescenti E 3 minimi decrescenti (Inversione ribassista conclamata)
+            if direction == "LONG" and (c1["high"] < c2["high"] < c3["high"]) and (c1["low"] < c2["low"] < c3["low"]):
+                logger.info(f"[{time_str}] ⚠️ [INVERSIONE RIBASSISTA US500] Rilevati 3 massimi e 3 minimi decrescenti ({c3['high']:.2f}>{c2['high']:.2f}>{c1['high']:.2f} e {c3['low']:.2f}>{c2['low']:.2f}>{c1['low']:.2f}). Chiusura anticipata!")
+                self._close_all_to_flat(current_price, time_str, reason="Inversione Strutturale (3 Massimi e 3 Minimi Decrescenti M5)")
                 return
 
-            elif direction == "SHORT" and (c1["low"] > c2["low"] > c3["low"]):
-                logger.info(f"[{time_str}] ⚠️ [USCITA ANTICIPATA US500] Rilevati 3 minimi crescenti M5 ({c3['low']:.2f} < {c2['low']:.2f} < {c1['low']:.2f}). Chiusura anticipata per esaurimento spinta!")
-                self._close_all_to_flat(current_price, time_str, reason="Uscita Anticipata (3 Minimi Crescenti M5)")
+            # SHORT: 3 minimi crescenti E 3 massimi crescenti (Inversione rialzista conclamata)
+            elif direction == "SHORT" and (c1["low"] > c2["low"] > c3["low"]) and (c1["high"] > c2["high"] > c3["high"]):
+                logger.info(f"[{time_str}] ⚠️ [INVERSIONE RIALZISTA US500] Rilevati 3 minimi e 3 massimi crescenti ({c3['low']:.2f}<{c2['low']:.2f}<{c1['low']:.2f} e {c3['high']:.2f}<{c2['high']:.2f}<{c1['high']:.2f}). Chiusura anticipata!")
+                self._close_all_to_flat(current_price, time_str, reason="Inversione Strutturale (3 Minimi e 3 Massimi Crescenti M5)")
                 return
+
+        # -------------------------------------------------------------
+        # 0B. GESTIONE AUTONOMA INCREMENTI SPEED US500 (TP e SL)
+        # -------------------------------------------------------------
+        with self.lock:
+            curr_incs = list(self.increments)
+
+        for inc in curr_incs:
+            inc_id = inc["id"]
+            inc_deal = inc.get("deal_id")
+            inc_dir = inc["direction"]
+            inc_tp = inc["tp_price"]
+            inc_sl = inc["sl_price"]
+            inc_sz = inc.get("contracts", INC_CONTRACTS)
+            inc_label = inc.get("label", "⚡ Speed")
+            inc_open_t = inc.get("open_time", time_str)
+            inc_open_p = inc.get("open_price", current_price)
+
+            hit_inc_tp = (current_price >= inc_tp) if inc_dir == "LONG" else (current_price <= inc_tp)
+            hit_inc_sl = (current_price <= inc_sl) if inc_dir == "LONG" else (current_price >= inc_sl)
+
+            if hit_inc_tp or hit_inc_sl:
+                reason_inc = "Hit TP Rapido" if hit_inc_tp else "Hit SL Protezione"
+                close_px_inc = inc_tp if hit_inc_tp else inc_sl
+                pts_inc = (close_px_inc - inc_open_p) if inc_dir == "LONG" else (inc_open_p - close_px_inc)
+                est_pnl_inc = round(pts_inc * self.point_value * inc_sz, 2)
+
+                def _close_inc_worker_us500(d_id, d_dir, sz, o_px, cl_px, est_p, rsn, lbl, t_op, i_id):
+                    act_p = est_p
+                    act_cl = cl_px
+                    if d_id:
+                        res = order_mgr.close_market_deal(d_id, d_dir, sz, f"Chiusura {lbl} {rsn}", rsn)
+                        if res.get("success") and float(res.get("profit") or 0.0) != 0.0:
+                            act_p = float(res.get("profit"))
+                        if res.get("close_level"):
+                            act_cl = float(res.get("close_level"))
+                    order_mgr.record_closed_trade(
+                        tf="5M",
+                        direction=d_dir,
+                        contracts=sz,
+                        open_price=o_px,
+                        close_price=act_cl,
+                        pnl_eur=act_p,
+                        deal_id=d_id or "--",
+                        reason=f"{lbl} ({rsn})",
+                        time_open=t_op,
+                        label=f"{lbl} US500",
+                        epic=self.epic
+                    )
+                    with self.lock:
+                        self.balance = round(self.balance + act_p, 2)
+                        self.trades.insert(0, {
+                            "time_open": t_op,
+                            "time_close": now_it().strftime("%H:%M:%S"),
+                            "direction": d_dir,
+                            "open_price": o_px,
+                            "close_price": act_cl,
+                            "contracts": sz,
+                            "pnl_eur": act_p,
+                            "reason": f"{lbl} ({rsn})",
+                            "tf": "5M"
+                        })
+                        self.increments = [i for i in self.increments if i.get("id") != i_id]
+                        self.save_state()
+
+                threading.Thread(
+                    target=_close_inc_worker_us500,
+                    args=(inc_deal, inc_dir, inc_sz, inc_open_p, close_px_inc, est_pnl_inc, reason_inc, inc_label, inc_open_t, inc_id),
+                    daemon=True
+                ).start()
 
         # 1. Stop Loss Iniziale Globale
         if not tp1_hit:
@@ -778,6 +966,8 @@ class HyperUS500M5Engine:
             if not self.position or self.closing_in_progress:
                 return
             self.closing_in_progress = True
+            incs_to_close = list(self.increments)
+            self.increments = []
 
         pos = self.position
         direction = pos["direction"]
@@ -820,8 +1010,8 @@ class HyperUS500M5Engine:
             )
 
             # Se Bancomat non era ancora stato chiuso da TP1, chiudilo e registralo
+            act_pnl_b = pnl_banc
             if not is_tp1_hit:
-                act_pnl_b = pnl_banc
                 act_cl_b = exec_price
                 if deal_banc:
                     res_b = order_mgr.close_market_deal(deal_banc, direction, BANCOMAT_CONTRACTS, f"Chiusura Bancomat {reason}", reason)
@@ -843,8 +1033,41 @@ class HyperUS500M5Engine:
                     epic=self.epic
                 )
 
+            # Chiude eventuali incrementi Speed ancora a mercato su US500
+            act_pnl_incs = 0.0
+            for inc in incs_to_close:
+                inc_deal = inc.get("deal_id")
+                inc_lbl = inc.get("label", "⚡ Speed")
+                inc_sz = inc.get("contracts", INC_CONTRACTS)
+                inc_op = inc.get("open_price", open_px)
+                inc_top = inc.get("open_time", open_t_str)
+                inc_pts = (exec_price - inc_op) if direction == "LONG" else (inc_op - exec_price)
+                act_pnl_inc = round(inc_pts * self.point_value * inc_sz, 2)
+                act_cl_inc = exec_price
+                if inc_deal:
+                    res_i = order_mgr.close_market_deal(inc_deal, direction, inc_sz, f"Chiusura {inc_lbl} {reason}", reason)
+                    if res_i.get("success") and float(res_i.get("profit") or 0.0) != 0.0:
+                        act_pnl_inc = float(res_i.get("profit"))
+                    if res_i.get("close_level"):
+                        act_cl_inc = float(res_i.get("close_level"))
+                order_mgr.record_closed_trade(
+                    tf="5M",
+                    direction=direction,
+                    contracts=inc_sz,
+                    open_price=inc_op,
+                    close_price=act_cl_inc,
+                    pnl_eur=act_pnl_inc,
+                    deal_id=inc_deal or "--",
+                    reason=reason,
+                    time_open=inc_top,
+                    label=f"{inc_lbl} US500",
+                    epic=self.epic
+                )
+                act_pnl_incs += act_pnl_inc
+
+            tot_incassato = act_pnl_run + (act_pnl_b if not is_tp1_hit else 0.0) + act_pnl_incs
             with self.lock:
-                self.balance = round(self.balance + act_pnl_run + (act_pnl_b if not is_tp1_hit else 0.0), 2)
+                self.balance = round(self.balance + tot_incassato, 2)
                 self.trades.insert(0, {
                     "time_open": open_t_str,
                     "time_close": now_it().strftime("%H:%M:%S"),
@@ -857,6 +1080,7 @@ class HyperUS500M5Engine:
                     "tf": "5M"
                 })
                 self.position = None
+                self.increments = []
                 self.closing_in_progress = False
                 self.save_state()
 
