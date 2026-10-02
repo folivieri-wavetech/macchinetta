@@ -576,7 +576,7 @@ class HyperGoldM5Engine:
     # GESTIONE POSIZIONE APERTA (BANCOMAT, BREAKEVEN, RUNNER TRAILING)
     # ==============================================================================
 
-    def _manage_open_position(self, current_price: float, time_str: str):
+    def _manage_open_position(self, current_price: float, time_str: str, on_candle_close: bool = False):
         """Gestisce in continuo su ogni tick la posizione aperta."""
         if not self.position or self.closing_in_progress:
             return
@@ -590,6 +590,24 @@ class HyperGoldM5Engine:
         deal_run = self.position.get("deal_id_runner")
         deal_banc = self.position.get("deal_id_bancomat")
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
+
+        # -------------------------------------------------------------
+        # 0. VERIFICA USCITA ANTICIPATA: 3 MASSIMI/MINIMI DECRESCENTI (Esaurimento Spinta)
+        # -------------------------------------------------------------
+        if not tp1_hit and on_candle_close and len(self.candles) >= 3:
+            c1 = self.candles[-1]
+            c2 = self.candles[-2]
+            c3 = self.candles[-3]
+
+            if direction == "LONG" and (c1["high"] < c2["high"] < c3["high"]):
+                logger.info(f"[{time_str}] ⚠️ [USCITA ANTICIPATA LONG] Rilevati 3 massimi decrescenti M5 ({c3['high']:.2f} > {c2['high']:.2f} > {c1['high']:.2f}). Chiusura anticipata per esaurimento spinta!")
+                self._close_all_to_flat(current_price, time_str, reason="Uscita Anticipata (3 Massimi Decrescenti M5)")
+                return
+
+            elif direction == "SHORT" and (c1["low"] > c2["low"] > c3["low"]):
+                logger.info(f"[{time_str}] ⚠️ [USCITA ANTICIPATA SHORT] Rilevati 3 minimi crescenti M5 ({c3['low']:.2f} < {c2['low']:.2f} < {c1['low']:.2f}). Chiusura anticipata per esaurimento spinta!")
+                self._close_all_to_flat(current_price, time_str, reason="Uscita Anticipata (3 Minimi Crescenti M5)")
+                return
 
         # -------------------------------------------------------------
         # 1. VERIFICA STOP LOSS STRUTTURALE GLOBALE (Se non ancora preso TP1)
@@ -892,8 +910,8 @@ class HyperGoldM5Engine:
             # 1. Valuta Semaforo a 3 Lucette (Ingresso automatico consentito ESCLUSIVAMENTE all'inizio della nuova candela)
             self._evaluate_traffic_lights(time_str, on_candle_close=is_candle_close)
 
-            # 2. Gestisci Posizione Aperta (SL, TP1, Trailing) - sempre attivo tick-by-tick
-            self._manage_open_position(mid, time_str)
+            # 2. Gestisci Posizione Aperta (SL, TP1, Trailing, Uscita Anticipata) - sempre attivo tick-by-tick
+            self._manage_open_position(mid, time_str, on_candle_close=is_candle_close)
 
     def _get_ig_credentials(self):
         user, pwd, api_key = None, None, None
