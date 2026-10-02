@@ -586,12 +586,53 @@ class HyperUS500M5Engine:
                 self.position["contracts"] = RUNNER_CONTRACTS
                 self.save_state()
 
-                if deal_banc:
-                    threading.Thread(
-                        target=order_mgr.close_market_deal,
-                        args=(deal_banc, direction, BANCOMAT_CONTRACTS, "TP1 Bancomat US500", "Hit TP1"),
-                        daemon=True
-                    ).start()
+                # Calcolo PnL stimato Bancomat US500
+                banc_pts = (tp1_px - open_px) if direction == "LONG" else (open_px - tp1_px)
+                est_banc_pnl = round(banc_pts * self.point_value * BANCOMAT_CONTRACTS, 2)
+                open_t_str = self.position.get("open_time", time_str)
+
+                def _close_bancomat_worker_us500(d_id, d_dir, sz, o_px, t_px, est_pnl, t_op):
+                    act_pnl = est_pnl
+                    act_close_px = t_px
+                    if d_id:
+                        res = order_mgr.close_market_deal(d_id, d_dir, sz, "TP1 Bancomat US500", "Hit TP1")
+                        if res.get("success") and float(res.get("profit") or 0.0) != 0.0:
+                            act_pnl = float(res.get("profit"))
+                        if res.get("close_level"):
+                            act_close_px = float(res.get("close_level"))
+                    order_mgr.record_closed_trade(
+                        tf="5M",
+                        direction=d_dir,
+                        contracts=sz,
+                        open_price=o_px,
+                        close_price=act_close_px,
+                        pnl_eur=act_pnl,
+                        deal_id=d_id or "--",
+                        reason="TP1 Bancomat US500",
+                        time_open=t_op,
+                        label="💰 Bancomat US500",
+                        epic=self.epic
+                    )
+                    with self.lock:
+                        self.balance = round(self.balance + act_pnl, 2)
+                        self.trades.insert(0, {
+                            "time_open": t_op,
+                            "time_close": now_it().strftime("%H:%M:%S"),
+                            "direction": d_dir,
+                            "open_price": o_px,
+                            "close_price": act_close_px,
+                            "contracts": sz,
+                            "pnl_eur": act_pnl,
+                            "reason": "TP1 Bancomat US500",
+                            "tf": "5M"
+                        })
+                        self.save_state()
+
+                threading.Thread(
+                    target=_close_bancomat_worker_us500,
+                    args=(deal_banc, direction, BANCOMAT_CONTRACTS, open_px, tp1_px, est_banc_pnl, open_t_str),
+                    daemon=True
+                ).start()
 
                 if deal_run:
                     threading.Thread(
@@ -645,40 +686,85 @@ class HyperUS500M5Engine:
         pos = self.position
         direction = pos["direction"]
         open_px = pos["open_price"]
-        contracts = pos.get("contracts", CORE_CONTRACTS)
         deal_run = pos.get("deal_id_runner")
         deal_banc = pos.get("deal_id_bancomat")
+        is_tp1_hit = pos.get("tp1_hit", False)
+        open_t_str = pos.get("open_time", time_str)
         order_mgr = HyperOrderManager.get_instance(self.account_dir)
 
         pnl_pts = (exec_price - open_px) if direction == "LONG" else (open_px - exec_price)
-        total_pnl = round(pnl_pts * self.point_value * contracts, 2)
+        pnl_run = round(pnl_pts * self.point_value * RUNNER_CONTRACTS, 2)
+        pnl_banc = round(pnl_pts * self.point_value * BANCOMAT_CONTRACTS, 2) if not is_tp1_hit else 0.0
+        total_pnl = pnl_run + pnl_banc
 
-        logger.info(f"[{time_str}] 🛑 CHIUSURA FLAT US500: {direction} {contracts}c a {exec_price:.2f} | PnL: {total_pnl:+.2f} € | Motivo: {reason}")
+        logger.info(f"[{time_str}] 🛑 CHIUSURA FLAT US500: {direction} a {exec_price:.2f} | Runner PnL: {pnl_run:+.2f} € | Motivo: {reason}")
 
-        for deal_id, sz in [(deal_banc, BANCOMAT_CONTRACTS), (deal_run, RUNNER_CONTRACTS)]:
-            if deal_id:
-                threading.Thread(
-                    target=order_mgr.close_market_deal,
-                    args=(deal_id, direction, sz, f"Chiusura FLAT {reason}", reason),
-                    daemon=True
-                ).start()
+        def _close_flat_worker_us500():
+            act_pnl_run = pnl_run
+            act_cl_run = exec_price
+            if deal_run:
+                res_r = order_mgr.close_market_deal(deal_run, direction, RUNNER_CONTRACTS, f"Chiusura Runner {reason}", reason)
+                if res_r.get("success") and float(res_r.get("profit") or 0.0) != 0.0:
+                    act_pnl_run = float(res_r.get("profit"))
+                if res_r.get("close_level"):
+                    act_cl_run = float(res_r.get("close_level"))
 
-        with self.lock:
-            self.balance = round(self.balance + total_pnl, 2)
-            self.trades.append({
-                "time_open": pos["open_time"],
-                "time_close": time_str,
-                "direction": direction,
-                "open_price": open_px,
-                "close_price": exec_price,
-                "contracts": contracts,
-                "pnl_eur": total_pnl,
-                "reason": reason,
-                "tf": "5M"
-            })
-            self.position = None
-            self.closing_in_progress = False
-            self.save_state()
+            order_mgr.record_closed_trade(
+                tf="5M",
+                direction=direction,
+                contracts=RUNNER_CONTRACTS,
+                open_price=open_px,
+                close_price=act_cl_run,
+                pnl_eur=act_pnl_run,
+                deal_id=deal_run or "--",
+                reason=reason,
+                time_open=open_t_str,
+                label="🏃 Runner US500",
+                epic=self.epic
+            )
+
+            # Se Bancomat non era ancora stato chiuso da TP1, chiudilo e registralo
+            if not is_tp1_hit:
+                act_pnl_b = pnl_banc
+                act_cl_b = exec_price
+                if deal_banc:
+                    res_b = order_mgr.close_market_deal(deal_banc, direction, BANCOMAT_CONTRACTS, f"Chiusura Bancomat {reason}", reason)
+                    if res_b.get("success") and float(res_b.get("profit") or 0.0) != 0.0:
+                        act_pnl_b = float(res_b.get("profit"))
+                    if res_b.get("close_level"):
+                        act_cl_b = float(res_b.get("close_level"))
+                order_mgr.record_closed_trade(
+                    tf="5M",
+                    direction=direction,
+                    contracts=BANCOMAT_CONTRACTS,
+                    open_price=open_px,
+                    close_price=act_cl_b,
+                    pnl_eur=act_pnl_b,
+                    deal_id=deal_banc or "--",
+                    reason=reason,
+                    time_open=open_t_str,
+                    label="💰 Bancomat US500",
+                    epic=self.epic
+                )
+
+            with self.lock:
+                self.balance = round(self.balance + act_pnl_run + (act_pnl_b if not is_tp1_hit else 0.0), 2)
+                self.trades.insert(0, {
+                    "time_open": open_t_str,
+                    "time_close": now_it().strftime("%H:%M:%S"),
+                    "direction": direction,
+                    "open_price": open_px,
+                    "close_price": act_cl_run,
+                    "contracts": RUNNER_CONTRACTS,
+                    "pnl_eur": act_pnl_run,
+                    "reason": reason,
+                    "tf": "5M"
+                })
+                self.position = None
+                self.closing_in_progress = False
+                self.save_state()
+
+        threading.Thread(target=_close_flat_worker_us500, daemon=True).start()
 
         order_mgr.send_notification(
             f"🏁 APEX US500 CHIUSURA: {total_pnl:+.2f} €",

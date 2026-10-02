@@ -694,20 +694,8 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             run_sl = pos.get("runner_sl") or pos.get("sl_price")
             run_be = pos.get("runner_be_active", False)
 
-            # 1. Riga BANCOMAT
-            if bco_closed:
-                p_rows.append(
-                    f"<tr style='opacity: 0.7;'>"
-                    f"<td style='text-align: center;'><span style='color: #f59e0b; font-weight: 700; font-size: 0.71rem;'>💰 Bancomat</span></td>"
-                    f"<td style='text-align: center;'>{time_core_cell}</td>"
-                    f"<td style='text-align: center;'><span style='color: #64748b;'>0c</span></td>"
-                    f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
-                    f"<td style='text-align: center; color: #64748b;'>--</td>"
-                    f"<td style='text-align: center; color: #22c55e; font-weight: 700;'>{tp_bco:.2f}</td>"
-                    f"<td style='text-align: center; color: #22c55e; font-weight: 800;'>✅ INCASSATO</td>"
-                    f"</tr>"
-                )
-            else:
+            # 1. Riga BANCOMAT (mostrata solo se ancora attiva a mercato)
+            if not bco_closed:
                 if live_mid is not None:
                     b_diff = (live_mid - pos["open_price"]) if dir_pos == "LONG" else (pos["open_price"] - live_mid)
                     b_pnl = round(b_diff * bco_c * 1.0, 2)
@@ -742,7 +730,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             if run_be:
                 ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Break-Even Protetto'>BE {run_sl:.2f}</span>"
             elif run_sl is not None:
-                ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Trailing Strutturale'>{run_sl:.2f}</span>"
+                ts_runner_cell = f"<span style='color: #38bdf8; font-weight: 700;' title='Trailing Stop M5'>{run_sl:.2f}</span>"
             else:
                 ts_runner_cell = "<span style='color: #64748b;'>--</span>"
 
@@ -755,7 +743,7 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
                 f"<td style='text-align: center;'><span style='color: {col_r_size}; font-weight: 700;'>{sign_r_size}{run_c}</span></td>"
                 f"<td style='text-align: center; font-weight: 600;'>{pos['open_price']:.2f}</td>"
                 f"<td style='text-align: center;'>{ts_runner_cell}</td>"
-                f"<td style='text-align: center;'><span style='color: #38bdf8; font-size: 0.69rem;'>Trailing M5</span></td>"
+                f"<td style='text-align: center; color: #64748b;' title='Corsa Libera senza TP fisso'>--</td>"
                 f"<td style='text-align: center; color: {col_rp}; font-weight: 700;'>{sign_rp}{r_pnl:,.2f} €</td>"
                 f"</tr>"
             )
