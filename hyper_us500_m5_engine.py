@@ -282,10 +282,90 @@ class HyperUS500M5Engine:
 
         # Se IG conferma che NON esiste alcuna posizione aperta per US500
         if len(real_positions) == 0:
-            logger.info("ℹ️ [RECONCILE IG US500] Nessuna posizione aperta su IG. Reset confermato a FLAT.")
+            logger.info("ℹ️ [RECONCILE IG US500] Nessuna posizione aperta su IG. Riconciliazione ed archiviazione a FLAT...")
             with self.lock:
+                pos_to_close = self.position
+                incs_to_close = list(self.increments)
                 self.position = None
                 self.increments = []
+                self.save_state()
+
+            # Archiviazione automatica posizioni chiuse da IG (per tocco SL nativo o TP)
+            if pos_to_close:
+                d_dir = pos_to_close.get("direction", "LONG")
+                o_px = pos_to_close.get("open_price", 0.0)
+                o_t = pos_to_close.get("open_time", "")
+                sl_px = pos_to_close.get("sl_price")
+                run_sl = pos_to_close.get("runner_sl", sl_px)
+
+                # 1. Runner
+                if deal_run:
+                    tx_r = order_mgr.get_closed_deal_details(deal_run, epic=EPIC_US500, open_price=o_px)
+                    cl_r = tx_r.get("close_level", run_sl or o_px) if tx_r else (run_sl or o_px)
+                    pnl_r = tx_r.get("profit") if (tx_r and tx_r.get("profit") is not None) else round(((cl_r - o_px) if d_dir == "LONG" else (o_px - cl_r)) * self.point_value * RUNNER_CONTRACTS, 2)
+                    order_mgr.record_closed_trade(
+                        tf="5M",
+                        direction=d_dir,
+                        contracts=RUNNER_CONTRACTS,
+                        open_price=o_px,
+                        close_price=cl_r,
+                        pnl_eur=pnl_r,
+                        deal_id=deal_run,
+                        reason=f"Chiusura IG (SL/TP nativo a {cl_r:.2f})",
+                        time_open=o_t,
+                        label="🏃 Runner US500",
+                        epic=self.epic
+                    )
+                    with self.lock:
+                        self.balance = round(self.balance + pnl_r, 2)
+
+                # 2. Bancomat (se non già incassato da TP1)
+                if deal_banc and not tp1_hit:
+                    tx_b = order_mgr.get_closed_deal_details(deal_banc, epic=EPIC_US500, open_price=o_px)
+                    cl_b = tx_b.get("close_level", sl_px or o_px) if tx_b else (sl_px or o_px)
+                    pnl_b = tx_b.get("profit") if (tx_b and tx_b.get("profit") is not None) else round(((cl_b - o_px) if d_dir == "LONG" else (o_px - cl_b)) * self.point_value * BANCOMAT_CONTRACTS, 2)
+                    order_mgr.record_closed_trade(
+                        tf="5M",
+                        direction=d_dir,
+                        contracts=BANCOMAT_CONTRACTS,
+                        open_price=o_px,
+                        close_price=cl_b,
+                        pnl_eur=pnl_b,
+                        deal_id=deal_banc,
+                        reason=f"Chiusura IG (SL/TP nativo a {cl_b:.2f})",
+                        time_open=o_t,
+                        label="💰 Bancomat US500",
+                        epic=self.epic
+                    )
+                    with self.lock:
+                        self.balance = round(self.balance + pnl_b, 2)
+
+                # 3. Eventuali incrementi ancora pendenti
+                for inc in incs_to_close:
+                    i_deal = inc.get("deal_id")
+                    if i_deal:
+                        i_sz = inc.get("contracts", 4)
+                        i_op = inc.get("open_price", o_px)
+                        i_top = inc.get("open_time", o_t)
+                        i_lbl = inc.get("label", "⚡ Speed")
+                        tx_i = order_mgr.get_closed_deal_details(i_deal, epic=EPIC_US500, open_price=i_op)
+                        cl_i = tx_i.get("close_level", o_px) if tx_i else o_px
+                        pnl_i = tx_i.get("profit") if (tx_i and tx_i.get("profit") is not None) else round(((cl_i - i_op) if d_dir == "LONG" else (i_op - cl_i)) * self.point_value * i_sz, 2)
+                        order_mgr.record_closed_trade(
+                            tf="5M",
+                            direction=d_dir,
+                            contracts=i_sz,
+                            open_price=i_op,
+                            close_price=cl_i,
+                            pnl_eur=pnl_i,
+                            deal_id=i_deal,
+                            reason=f"Chiusura IG {i_lbl}",
+                            time_open=i_top,
+                            label=f"{i_lbl} US500",
+                            epic=self.epic
+                        )
+                        with self.lock:
+                            self.balance = round(self.balance + pnl_i, 2)
                 self.save_state()
             return
 
@@ -300,6 +380,28 @@ class HyperUS500M5Engine:
                     self.position["tp1_hit"] = True
                     self.position["contracts"] = RUNNER_CONTRACTS
                     logger.info(f"ℹ️ [RECONCILE IG US500] Bancomat ({deal_banc}) chiuso su IG (TP1). Runner ({deal_run}) ancora attivo.")
+                    # Registra chiusura reale Bancomat nello storico
+                    d_dir = self.position.get("direction", "LONG")
+                    o_px = self.position.get("open_price", 0.0)
+                    o_t = self.position.get("open_time", "")
+                    tp1_px = self.position.get("tp1_price", o_px)
+                    tx_b = order_mgr.get_closed_deal_details(deal_banc, epic=EPIC_US500, open_price=o_px)
+                    cl_b = tx_b.get("close_level", tp1_px) if tx_b else tp1_px
+                    pnl_b = tx_b.get("profit") if (tx_b and tx_b.get("profit") is not None) else round(((cl_b - o_px) if d_dir == "LONG" else (o_px - cl_b)) * self.point_value * BANCOMAT_CONTRACTS, 2)
+                    order_mgr.record_closed_trade(
+                        tf="5M",
+                        direction=d_dir,
+                        contracts=BANCOMAT_CONTRACTS,
+                        open_price=o_px,
+                        close_price=cl_b,
+                        pnl_eur=pnl_b,
+                        deal_id=deal_banc,
+                        reason="TP1 Bancomat Incassato (Eseguito IG)",
+                        time_open=o_t,
+                        label="💰 Bancomat US500",
+                        epic=self.epic
+                    )
+                    self.balance = round(self.balance + pnl_b, 2)
 
                 # Se né runner né bancomat combaciano ma ci sono deal su IG, NON azzeriamo!
                 if not run_open and not banc_open and not surviving_incs and len(open_deal_ids) > 0:
