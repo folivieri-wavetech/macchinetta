@@ -229,8 +229,44 @@ class HyperUS500M5Engine:
                         self.candles = d["candles"][-500:]
                     if "traffic_light" in d:
                         self.traffic_light.update(d["traffic_light"])
+                    self._last_disk_mtime = os.path.getmtime(st_file)
             except Exception as e:
                 logger.warning(f"Errore caricamento stato {st_file}: {e}")
+
+    def sync_state_from_disk_if_needed(self):
+        """Ricarica istantaneamente la posizione se il file di stato su disco è stato modificato esternamente."""
+        st_file = self._get_state_file()
+        if os.path.exists(st_file):
+            try:
+                mtime = os.path.getmtime(st_file)
+                if getattr(self, "_last_disk_mtime", 0.0) < mtime:
+                    self._last_disk_mtime = mtime
+                    with open(st_file, "r", encoding="utf-8") as f:
+                        d = json.load(f)
+                    with self.lock:
+                        self.position = d.get("position")
+                        self.trading_enabled = bool(d.get("trading_enabled", self.trading_enabled))
+            except Exception:
+                pass
+
+    def reconcile_with_ig_deals(self):
+        """Verifica se i deal registrati in posizione sono ancora realmente aperti su IG. Se chiusi, resetta a FLAT."""
+        with self.lock:
+            if not self.position or self.closing_in_progress:
+                return
+            deal_run = self.position.get("deal_id_runner")
+            deal_banc = self.position.get("deal_id_bancomat")
+            tp1_hit = self.position.get("tp1_hit", False)
+
+        order_mgr = HyperOrderManager.get_instance(self.account_dir)
+        run_open = order_mgr.is_deal_open(deal_run) if deal_run else False
+        banc_open = order_mgr.is_deal_open(deal_banc) if (deal_banc and not tp1_hit) else False
+
+        if not run_open and not banc_open:
+            logger.info(f"ℹ️ [RECONCILE IG US500] I deal {deal_banc} e {deal_run} non risultano più aperti su IG. Reset immediato a FLAT.")
+            with self.lock:
+                self.position = None
+                self.save_state()
 
     def save_state(self):
         st_file = self._get_state_file()
@@ -249,6 +285,7 @@ class HyperUS500M5Engine:
                     with open(st_file, "w", encoding="utf-8") as f:
                         json.dump(d, f, indent=2, ensure_ascii=False)
                         f.flush()
+                    self._last_disk_mtime = os.path.getmtime(st_file)
                     break
                 except Exception:
                     time.sleep(0.05)

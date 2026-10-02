@@ -426,6 +426,11 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
         is_feed_closed = is_gold_feed_suspended()
         is_trade_frozen = is_gold_trading_suspended()
 
+    if hasattr(engine, "sync_state_from_disk_if_needed"):
+        engine.sync_state_from_disk_if_needed()
+    if hasattr(engine, "reconcile_with_ig_deals"):
+        engine.reconcile_with_ig_deals()
+
     with engine.lock:
         is_conn = engine.ls_connected
         live_mid = engine.live_mid
@@ -869,6 +874,16 @@ def render_hyper_5m(conto_selezionato="DANY_DEMO", **kwargs):
     tot_closed = len(hist_gold) + len(hist_us500)
 
     # Contratti ed esposizione aggregata
+    if hasattr(engine_gold, "sync_state_from_disk_if_needed"):
+        engine_gold.sync_state_from_disk_if_needed()
+    if hasattr(engine_gold, "reconcile_with_ig_deals"):
+        engine_gold.reconcile_with_ig_deals()
+
+    if hasattr(engine_us500, "sync_state_from_disk_if_needed"):
+        engine_us500.sync_state_from_disk_if_needed()
+    if hasattr(engine_us500, "reconcile_with_ig_deals"):
+        engine_us500.reconcile_with_ig_deals()
+
     with engine_gold.lock:
         pos_g = engine_gold.position
         inc_g = list(engine_gold.increments)
