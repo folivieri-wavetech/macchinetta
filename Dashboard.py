@@ -830,6 +830,13 @@ def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict
             return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {inc_idx}</span>"
 
     tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
+    if tipo_strategia != "TREND" and deal_id:
+        try:
+            from trend_deals_manager import get_tutti_deal_trend_account
+            if str(deal_id).strip() in get_tutti_deal_trend_account(None):
+                tipo_strategia = "TREND"
+        except Exception:
+            pass
     
     if tipo_strategia == "TREND":
         tf_val = param_memoria.get("timeframe", "HOUR")
@@ -3168,7 +3175,15 @@ else:
                 totale_pnl_portafoglio += tot_pnl_eur
                 avg_entry = sum_level_size / tot_size
                 
-                is_trend = memoria_attuale.get(nome, {}).get("tipo_strategia", "RANGE") == "TREND"
+                is_trend = (memoria_attuale.get(nome, {}).get("tipo_strategia", "RANGE") == "TREND")
+                if not is_trend and posizioni:
+                    try:
+                        from trend_deals_manager import get_tutti_deal_trend_account
+                        t_deals_acc = get_tutti_deal_trend_account(conto_selezionato)
+                        if any(str(p['position'].get('dealId')).strip() in t_deals_acc for p in posizioni):
+                            is_trend = True
+                    except Exception:
+                        pass
                 trend_color = "#FF8C00" if is_trend else "#FFD700"
                 
                 sign = "+" if dir == "BUY" else "-"
@@ -3180,6 +3195,17 @@ else:
                 if is_trend:
                     kj_val = memoria_attuale.get(nome, {}).get("current_kj")
                     tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                    if kj_val is None or tk_val is None:
+                        try:
+                            rt_d, _ = carica_radar_trend_dash(conto_selezionato)
+                            tf_cur = memoria_attuale.get(nome, {}).get("timeframe", "HOUR")
+                            lbl_cur = "H4" if tf_cur == "HOUR_4" else ("D1" if tf_cur == "DAY" else "H1")
+                            if rt_d and nome in rt_d:
+                                tf_d = rt_d[nome].get("timeframes", {}).get(lbl_cur, {})
+                                if kj_val is None: kj_val = tf_d.get("kj")
+                                if tk_val is None: tk_val = tf_d.get("tk")
+                        except Exception:
+                            pass
                     
                     if kj_val is not None:
                         stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>"

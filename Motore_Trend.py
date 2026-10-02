@@ -2531,6 +2531,22 @@ def esegui_ciclo_trend():
                 if p.get('market', {}).get('epic') == epic
                 and p.get('position', {}).get('dealId') in trend_deals_set
             ]
+            
+            # Autoguarigione: se il registro marchi non conteneva ancora il deal ma lo strumento è attivo in Trend su IG
+            if not pos_ig_strum and is_attivo and stato_corrente in ("LONG", "SHORT"):
+                dir_target = 'BUY' if stato_corrente == 'LONG' else 'SELL'
+                pos_candidati = [
+                    p for p in posizioni_live_ig
+                    if p.get('market', {}).get('epic') == epic
+                    and p.get('position', {}).get('direction') == dir_target
+                ]
+                if pos_candidati:
+                    for pc in pos_candidati:
+                        d_id = pc.get('position', {}).get('dealId')
+                        if d_id:
+                            registra_deal_trend(None, epic, d_id, label=f"Self-Healing {nome}")
+                            trend_deals_set.add(str(d_id).strip())
+                    pos_ig_strum = pos_candidati
             ticket_aperti_epic = {p.get('position', {}).get('dealId') for p in pos_ig_strum}
             storico_aggiornato = False
             storico = dati.get("storico_wip_trend", [])
@@ -2559,6 +2575,8 @@ def esegui_ciclo_trend():
                     engine.pm.core_position = pos_obj
                     engine.is_running = True
                     engine.current_direction = dir_core_str
+                    if deal_id_core:
+                        registra_deal_trend(None, epic, deal_id_core, label=f"Reconcile Core {nome}")
                     
                     # Riaggancia eventuali incrementi residui
                     engine.pm.increments = []
@@ -2573,6 +2591,8 @@ def esegui_ciclo_trend():
                         pos_i_obj = Position(lvl_i_val, sz_i_val, "increment", dir_i_str)
                         pos_i_obj.ticket = deal_id_i
                         engine.pm.increments.append(pos_i_obj)
+                        if deal_id_i:
+                            registra_deal_trend(None, epic, deal_id_i, label=f"Reconcile Incr {nome}")
                     
                     msg_reconcile = f"🛡️ Riconciliazione IG: Riagganciata Core {dir_core_str} ({sz_core_val}) a {lvl_core_val} [ID: {deal_id_core}]"
                     print_log(nome, msg_reconcile)
