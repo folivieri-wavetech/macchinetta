@@ -608,7 +608,7 @@ class HyperUS500M5Engine:
         # -------------------------------------------------------------
         # 0. Uscita Anticipata: 3 Massimi/Minimi Decrescenti M5 (Esaurimento Spinta)
         # -------------------------------------------------------------
-        if not tp1_hit and on_candle_close and len(self.candles) >= 3:
+        if on_candle_close and len(self.candles) >= 3:
             c1 = self.candles[-1]
             c2 = self.candles[-2]
             c3 = self.candles[-3]

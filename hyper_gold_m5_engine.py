@@ -631,7 +631,7 @@ class HyperGoldM5Engine:
         # -------------------------------------------------------------
         # 0. VERIFICA USCITA ANTICIPATA: 3 MASSIMI/MINIMI DECRESCENTI (Esaurimento Spinta)
         # -------------------------------------------------------------
-        if not tp1_hit and on_candle_close and len(self.candles) >= 3:
+        if on_candle_close and len(self.candles) >= 3:
             c1 = self.candles[-1]
             c2 = self.candles[-2]
             c3 = self.candles[-3]
