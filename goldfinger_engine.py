@@ -538,16 +538,28 @@ class GoldfingerEngine:
                 self.stato["minimo_precedente"] = min_curr
                 self.stato["minimo_discesa"] = None
 
-                # RIARMO IMMEDIATO COMPLETO DELLA SECONDA ONDATA (Minimo discesa - 5 pip)
-                # Rigenera SEMPRE TUTTI i 18 contratti (6 difese) a partire da 5 pip sotto il minimo battuto
-                soglia_riarmo = round(min_curr - 5.0, 2)
+                # RIARMO DELLA SECONDA ONDATA (Prima difesa non entrata - 3 pip)
+                # Rigenera SEMPRE TUTTI i 18 contratti (6 difese) a partire dalla prima difesa non entrata meno 3 pip
+                prima_non_entrata = next((s for s in scaglioni if s["stato"] == "IN_ATTESA"), None)
                 passo = float(self.stato.get("passo_pip", 6.0))
                 sz = int(self.stato.get("size_scaglione", 3))
                 delta = int(self.stato.get("delta_totale", 18))
+
+                if prima_non_entrata and prima_non_entrata.get("prezzo_target"):
+                    pz_rif = float(prima_non_entrata["prezzo_target"])
+                    soglia_riarmo = round(pz_rif - 3.0, 2)
+                    desc_riarmo = f"Prima difesa non entrata ({pz_rif:.2f}) - 3 pip"
+                elif min_curr is not None:
+                    soglia_riarmo = round(min_curr - 3.0, 2)
+                    desc_riarmo = f"Minimo discesa ({min_curr:.2f}) - 3 pip"
+                else:
+                    soglia_riarmo = round(float(self.stato.get("livello_1_prezzo", 4128.0)) - 6.0, 2)
+                    desc_riarmo = "Livello precedente - 6 pip"
+
                 self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
                 self.stato["livello_1_prezzo"] = soglia_riarmo
                 print_log(f"💰 Chiusura rimbalzo completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €.")
-                print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} (Minimo {min_curr:.2f} - 5 pip) in giù.")
+                print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù.")
                 invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
                 self.salva_stato()
 
