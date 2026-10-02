@@ -2774,11 +2774,11 @@ else:
                     marg_raw = st_acc.get('margine', 0.0)
                     marg_num = float(marg_raw) if marg_raw not in (None, "") else 0.0
                     if marg_num > 0:
-                        return f":orange[Marg: {formatta_eur(marg_num)} €]"
+                        return f":orange[{formatta_eur(marg_num)} €]"
                     else:
-                        return ":gray[Marg: 0,00 €]"
+                        return ":gray[0,00 €]"
                 except Exception:
-                    return ":gray[Marg: 0,00 €]"
+                    return ":gray[0,00 €]"
 
             vista_side = st.session_state.get("vista_sidebar", "CONTO")
             if conti_demo:
