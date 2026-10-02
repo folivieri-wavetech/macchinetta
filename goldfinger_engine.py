@@ -101,6 +101,15 @@ class GoldfingerEngine:
         except Exception:
             return {}
 
+    def salva_config(self, cfg_data):
+        try:
+            tmp = f"{CONFIG_GOLDFINGER_FILE}.tmp.{os.getpid()}"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(cfg_data, f, indent=4)
+            os.replace(tmp, CONFIG_GOLDFINGER_FILE)
+        except Exception as e:
+            print_log(f"⚠️ Errore salvataggio config_goldfinger: {e}")
+
     def carica_stato(self):
         if os.path.exists(STATO_GOLDFINGER_FILE):
             try:
@@ -541,6 +550,12 @@ class GoldfingerEngine:
                 print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} (Minimo {min_curr:.2f} - 5 pip) in giù.")
                 invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
                 self.salva_stato()
+
+                # Sincronizza config_goldfinger.json per mantenere allineata la UI e non sovrascrivere il riarmo
+                cfg_sync = self.carica_config()
+                cfg_sync["livello_1_prezzo"] = soglia_riarmo
+                cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                self.salva_config(cfg_sync)
                 return
 
         # 8. RIPRISTINO AUTOMATICO COPERTURA TOTALE (Garantisce sempre tutte le 6 difese per 18 contratti)
@@ -558,6 +573,12 @@ class GoldfingerEngine:
             print_log(f"🛡️ RIPRISTINO COPERTURA TOTALE: Riarmo automatico {len(self.stato['scaglioni'])} difese ({delta_richiesto} mini) da {soglia_riarmo:.2f} (Minimo {min_prec:.2f} - 5 pip) in giù.")
             invia_notifica("RIPRISTINO COPERTURA TOTALE", f"Riarmo automatico: {len(self.stato['scaglioni'])} difese ({delta_richiesto} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
             self.salva_stato()
+
+            # Sincronizza config_goldfinger.json
+            cfg_sync = self.carica_config()
+            cfg_sync["livello_1_prezzo"] = soglia_riarmo
+            cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+            self.salva_config(cfg_sync)
 
         # 9. STOP LOSS SINGOLO SU FALSO ALLARME
         if len(aperti) == 1:
