@@ -42,6 +42,7 @@ BE_EXTRA_LOCK_PIPS = 1.0    # Lock sopra il breakeven a protezione spread (+1 pi
 # Costanti di compatibilità per UI dashboard (hyper_tab)
 WARMUP_BARS_KJ = 55
 WARMUP_BARS_TK = 21
+CORE_TS_TRIGGER_PIPS = 10.0
 INC_CONTRACTS = 5           # 5 contratti per ciascun incremento Speed (Speed 1, Speed 2)
 MAX_SPEED_INCREMENTS = 2    # Massimo 2 incrementi Speed attivi (totale massimo 20 contratti su Gold)
 MAX_INCREMENTS = 2
