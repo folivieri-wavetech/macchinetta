@@ -546,12 +546,14 @@ class GoldfingerEngine:
                 delta = int(self.stato.get("delta_totale", 18))
 
                 if prima_non_entrata and prima_non_entrata.get("prezzo_target"):
+                    # REGOLE SERVER: Se l'ultima difesa NON è entrata -> prima non entrata - 3 pip
                     pz_rif = float(prima_non_entrata["prezzo_target"])
                     soglia_riarmo = round(pz_rif - 3.0, 2)
                     desc_riarmo = f"Prima difesa non entrata ({pz_rif:.2f}) - 3 pip"
                 elif min_curr is not None:
-                    soglia_riarmo = round(min_curr - 3.0, 2)
-                    desc_riarmo = f"Minimo discesa ({min_curr:.2f}) - 3 pip"
+                    # REGOLE SERVER: Se l'ultima difesa E' ENTRATA -> Minimo assoluto - 5 pip
+                    soglia_riarmo = round(min_curr - 5.0, 2)
+                    desc_riarmo = f"Minimo assoluto discesa ({min_curr:.2f}) - 5 pip"
                 else:
                     soglia_riarmo = round(float(self.stato.get("livello_1_prezzo", 4128.0)) - 6.0, 2)
                     desc_riarmo = "Livello precedente - 6 pip"
@@ -577,12 +579,19 @@ class GoldfingerEngine:
         delta_richiesto = int(self.stato.get("delta_totale", 18))
 
         if not aperti and delta_in_attesa < delta_richiesto and min_prec is not None:
-            soglia_riarmo = round(min_prec - 5.0, 2)
+            prima_non_entrata = next((s for s in scaglioni if s["stato"] == "IN_ATTESA"), None)
             passo = float(self.stato.get("passo_pip", 6.0))
             sz = int(self.stato.get("size_scaglione", 3))
+
+            if prima_non_entrata and prima_non_entrata.get("prezzo_target"):
+                pz_rif = float(prima_non_entrata["prezzo_target"])
+                soglia_riarmo = round(pz_rif - 3.0, 2)
+            else:
+                soglia_riarmo = round(min_prec - 5.0, 2)
+
             self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta_richiesto)
             self.stato["livello_1_prezzo"] = soglia_riarmo
-            print_log(f"🛡️ RIPRISTINO COPERTURA TOTALE: Riarmo automatico {len(self.stato['scaglioni'])} difese ({delta_richiesto} mini) da {soglia_riarmo:.2f} (Minimo {min_prec:.2f} - 5 pip) in giù.")
+            print_log(f"🛡️ RIPRISTINO COPERTURA TOTALE: Riarmo automatico {len(self.stato['scaglioni'])} difese ({delta_richiesto} mini) da {soglia_riarmo:.2f} in giù.")
             invia_notifica("RIPRISTINO COPERTURA TOTALE", f"Riarmo automatico: {len(self.stato['scaglioni'])} difese ({delta_richiesto} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
             self.salva_stato()
 
