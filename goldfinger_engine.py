@@ -473,22 +473,51 @@ class GoldfingerEngine:
 
         scaglioni = self.stato.get("scaglioni", [])
         
-        # RICONCILIAZIONE CON IG: se un deal aperto non è più presente su IG, allinea a CHIUSO
+        # RICONCILIAZIONE BIDIREZIONALE CON IG:
+        # 1. Non riconcilia deal appena aperti (grace period di 60s o snapshot precedente all'apertura)
+        # 2. Richiede almeno 3 cicli consecutivi di assenza prima di allineare a CHIUSO
+        # 3. Ripristina ad APERTO deal marcati CHIUSO per errore che risultano invece ancora attivi su IG
         if os.path.exists(POSIZIONI_FILE):
             try:
-                with open(POSIZIONI_FILE, "r", encoding="utf-8") as f_pos:
-                    pos_data = json.load(f_pos)
-                    live_deals = {str(p.get("dealId")) for p in pos_data if p.get("dealId")}
-                reconciled = False
-                for s in scaglioni:
-                    if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO") and s.get("deal_id"):
-                        if str(s["deal_id"]) not in live_deals:
-                            print_log(f"🔄 Riconciliazione IG: Difesa {s.get('numero')} [dealId: {s.get('deal_id')}] chiusa a mercato. Allineo stato interno a CHIUSO.")
-                            s["stato"] = "CHIUSO"
-                            reconciled = True
-                if reconciled:
-                    self.salva_stato()
-            except Exception:
+                file_mtime = os.path.getmtime(POSIZIONI_FILE)
+                if (time.time() - file_mtime) < 45.0:
+                    with open(POSIZIONI_FILE, "r", encoding="utf-8") as f_pos:
+                        pos_data = json.load(f_pos)
+                    if isinstance(pos_data, list) and len(pos_data) > 0:
+                        live_deals = {str(p.get("dealId")) for p in pos_data if p.get("dealId")}
+                        reconciled = False
+                        now_ts = time.time()
+                        for s in scaglioni:
+                            deal_id_str = str(s.get("deal_id", "") or "")
+                            if not deal_id_str:
+                                continue
+
+                            # Ripristino: se marcato CHIUSO ma presente live su IG
+                            if s.get("stato") in ("CHIUSO", "RECUPERATO_CHIUSO") and deal_id_str in live_deals:
+                                print_log(f"🔄 Riconciliazione IG: Difesa {s.get('numero')} [dealId: {deal_id_str}] rilevata ancora attiva su IG! Ripristino stato APERTO.")
+                                s["stato"] = "APERTO"
+                                s["missed_count"] = 0
+                                reconciled = True
+
+                            # Chiusura verificata su IG
+                            elif s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                                opened_at = float(s.get("opened_at", 0) or 0)
+                                if (now_ts - opened_at) < 60.0 or file_mtime <= opened_at:
+                                    continue
+
+                                if deal_id_str not in live_deals:
+                                    s["missed_count"] = s.get("missed_count", 0) + 1
+                                    if s["missed_count"] >= 3:
+                                        print_log(f"🔄 Riconciliazione IG: Difesa {s.get('numero')} [dealId: {deal_id_str}] confermata chiusa a mercato. Allineo stato interno a CHIUSO.")
+                                        s["stato"] = "CHIUSO"
+                                        s["missed_count"] = 0
+                                        reconciled = True
+                                else:
+                                    s["missed_count"] = 0
+
+                        if reconciled:
+                            self.salva_stato()
+            except Exception as e_rec:
                 pass
 
         aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
