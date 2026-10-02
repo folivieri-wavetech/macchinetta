@@ -100,19 +100,54 @@ def to_market_dir(d):
     if d_up in ["SELL", "SHORT"]: return "SHORT"
     return str(d)
 
-def invia_notifica(titolo, messaggio, tags="rotating_light"):
+# --- ANTI-FLOOD ENGINE PER NOTIFICHE PUSH ---
+_REGISTRO_NOTIFICHE_RANGE = {}
+_FINESTRA_NOTIFICHE_RANGE = []
+
+def invia_notifica(titolo, messaggio, tags="rotating_light", cooldown_identico_sec=60, max_notifiche_minuto=6):
+    """
+    Invia notifica push NTFY con protezione anti-flood integrata:
+    1. Deduplica: impedisce l'invio dello stesso identico messaggio entro 'cooldown_identico_sec' secondi.
+    2. Rate-limiter a finestra mobile: massimo 'max_notifiche_minuto' notifiche al minuto per processo.
+    """
     topic = config.get("NTFY_TOPIC")
-    if topic:
-        try:
-            orario = now_it().strftime("%H:%M:%S")
-            messaggio_con_orario = f"[{orario}] {messaggio}"
-            headers = {
-                "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
-                "Tags": tags
-            }
-            requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
-        except Exception as e:
-            print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
+    if not topic:
+        return
+
+    now = time.time()
+    
+    # 1. Deduplica messaggi identici
+    chiave = (str(titolo).strip(), str(messaggio).strip())
+    ultimo = _REGISTRO_NOTIFICHE_RANGE.get(chiave, 0)
+    if (now - ultimo) < cooldown_identico_sec:
+        return
+
+    # 2. Finestra mobile rate limiter
+    global _FINESTRA_NOTIFICHE_RANGE
+    _FINESTRA_NOTIFICHE_RANGE = [t for t in _FINESTRA_NOTIFICHE_RANGE if (now - t) < 60]
+    if len(_FINESTRA_NOTIFICHE_RANGE) >= max_notifiche_minuto:
+        print_log("SISTEMA", f"🛡️ [ANTI-FLOOD] Limite di {max_notifiche_minuto} notifiche/min raggiunto. Soppressa: {titolo}")
+        return
+
+    _REGISTRO_NOTIFICHE_RANGE[chiave] = now
+    _FINESTRA_NOTIFICHE_RANGE.append(now)
+
+    # Pulizia memoria registro periodica
+    if len(_REGISTRO_NOTIFICHE_RANGE) > 150:
+        for k, v in list(_REGISTRO_NOTIFICHE_RANGE.items()):
+            if (now - v) > 300:
+                del _REGISTRO_NOTIFICHE_RANGE[k]
+
+    try:
+        orario = now_it().strftime("%H:%M:%S")
+        messaggio_con_orario = f"[{orario}] {messaggio}"
+        headers = {
+            "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
+            "Tags": tags
+        }
+        requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
+    except Exception as e:
+        print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
 
 # --- VOCABOLARIO ---
 CONFIG_STRUMENTI = {

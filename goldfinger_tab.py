@@ -336,6 +336,8 @@ def renderizza_tab_goldfinger(conto):
         st.markdown("<h4 style='color: #38bdf8; margin-bottom: 8px;'>⚙️ Parametri di Ingresso</h4>", unsafe_allow_html=True)
         
         saved_pz1 = float(cfg.get("livello_1_prezzo") or 0.0)
+        saved_passo = float(cfg.get("passo_pip") or 6.0)
+        saved_size = int(cfg.get("size_scaglione") or 3)
         
         # Calcolo Livello Chirurgico Consigliato (Minimi H1 sotto il live con offset -5 pip, sempre ricalcolato anche a guardia già partita)
         sugg_lvl, rif_val, min_stru_val, rif_tipo, l55_val, l21_val, l9_val = calcola_livello_chirurgico_gold(conto, px_live=bid_live)
@@ -411,16 +413,30 @@ def renderizza_tab_goldfinger(conto):
                     st.session_state[ss_key] = float(sugg_lvl)
                     st.rerun()
 
-        # Tasto Salva dedicato subito sotto la casella Livello 1 quando il valore digitato differisce da quello salvato
-        if not has_aperti and abs(float(pz_l1) - float(saved_pz1)) > 0.01:
+        cp, cs = st.columns(2)
+        with cp:
+            passo = st.number_input("Passo Difesa (pip)", min_value=1.0, max_value=50.0, value=float(cfg.get("passo_pip", 6.0)), step=1.0, disabled=(has_aperti or not is_operativo))
+        with cs:
+            size_u = st.number_input("Size Tranche (Interi)", min_value=1, max_value=20, value=int(cfg.get("size_scaglione", 3)), step=1, disabled=(has_aperti or not is_operativo))
+
+        delta_input = st.number_input("Delta Contratti da Coprire", min_value=1, max_value=100, value=int(delta_calcolato if delta_calcolato > 0 else 15), step=1, disabled=(has_aperti or not is_operativo))
+
+        # Rilevamento modifiche a caldo su Livello 1, Passo o Size
+        has_modifiche = not has_aperti and (
+            abs(float(pz_l1) - float(saved_pz1)) > 0.01 or
+            abs(float(passo) - float(saved_passo)) > 0.01 or
+            int(size_u) != int(saved_size)
+        )
+
+        if has_modifiche:
             if is_attivo:
                 if st.button(
-                    f"💾 Salva Nuovo Livello 1 @ {pz_l1:.2f}",
+                    f"💾 Salva Modifiche a Caldo (L1 @ {pz_l1:.2f} • Passo {passo:.1f}p • Size {size_u})",
                     key=f"btn_aggiorna_man_{conto}",
                     type="primary",
                     use_container_width=True,
                     disabled=(not is_operativo),
-                    help=help_gf_viewer or "Conferma e applica immediatamente il nuovo prezzo Livello 1 al robot a mercato"
+                    help=help_gf_viewer or "Conferma e applica immediatamente i nuovi parametri alla guardia Goldfinger attiva"
                 ):
                     if not is_operativo:
                         st.error("🛑 Profilo VIEWER: operatività disabilitata.")
@@ -432,51 +448,55 @@ def renderizza_tab_goldfinger(conto):
                     else:
                         new_cfg = cfg.copy()
                         new_cfg["livello_1_prezzo"] = float(pz_l1)
+                        new_cfg["passo_pip"] = float(passo)
+                        new_cfg["size_scaglione"] = int(size_u)
+                        new_cfg["delta_totale"] = int(delta_input)
                         new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                         scrivi_json_sicuro(paths["config"], new_cfg)
 
                         new_stato = stato.copy()
                         new_stato["livello_1_prezzo"] = float(pz_l1)
+                        new_stato["passo_pip"] = float(passo)
+                        new_stato["size_scaglione"] = int(size_u)
+                        new_stato["delta_totale"] = int(delta_input)
                         new_stato["scaglioni"] = calcola_scaglioni_interi(
                             float(pz_l1),
-                            float(cfg.get("passo_pip", 6.0)),
-                            int(cfg.get("size_scaglione", 3)),
-                            int(cfg.get("delta_totale", 15))
+                            float(passo),
+                            int(size_u),
+                            int(delta_input)
                         )
                         scrivi_json_sicuro(paths["stato"], new_stato)
                         st.session_state[ss_key] = float(pz_l1)
-                        st.success(f"✅ Guardia aggiornata a caldo: Livello 1 spostato a {pz_l1:.2f} con difese ricalcolate!")
+                        st.success(f"✅ Guardia aggiornata a caldo: Livello 1 @ {pz_l1:.2f}, Passo {passo:.1f}p, Size {size_u} con difese ricalcolate!")
                         time.sleep(0.5)
                         st.rerun()
             else:
                 if st.button(
-                    f"💾 Salva Prezzo Livello 1 @ {pz_l1:.2f}",
+                    f"💾 Salva Parametri Configurazione (L1 @ {pz_l1:.2f} • Passo {passo:.1f}p • Size {size_u})",
                     key=f"btn_salva_inattivo_{conto}",
                     type="primary",
                     use_container_width=True,
                     disabled=(not is_operativo),
-                    help=help_gf_viewer or "Salva il prezzo Livello 1 nei parametri di configurazione"
+                    help=help_gf_viewer or "Salva i parametri nei file di configurazione"
                 ):
                     if not is_operativo:
                         st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                         st.rerun()
                     new_cfg = cfg.copy()
                     new_cfg["livello_1_prezzo"] = float(pz_l1)
+                    new_cfg["passo_pip"] = float(passo)
+                    new_cfg["size_scaglione"] = int(size_u)
+                    new_cfg["delta_totale"] = int(delta_input)
                     scrivi_json_sicuro(paths["config"], new_cfg)
                     st.session_state[ss_key] = float(pz_l1)
-                    st.success(f"✅ Prezzo Livello 1 salvato a {pz_l1:.2f}!")
+                    st.success(f"✅ Parametri salvati (L1 @ {pz_l1:.2f}, Passo {passo:.1f}p, Size {size_u})!")
                     time.sleep(0.3)
                     st.rerun()
-        elif is_attivo and saved_pz1 > 0:
-            st.markdown(f"<div style='color: #22c55e; font-size: 0.73rem; margin-top: -6px; margin-bottom: 8px;'>🔒 Livello 1 attualmente armato e operativo a <b>{saved_pz1:.2f}</b></div>", unsafe_allow_html=True)
-
-        cp, cs = st.columns(2)
-        with cp:
-            passo = st.number_input("Passo Difesa (pip)", min_value=1.0, max_value=50.0, value=float(cfg.get("passo_pip", 6.0)), step=1.0, disabled=(is_attivo or not is_operativo))
-        with cs:
-            size_u = st.number_input("Size Tranche (Interi)", min_value=1, max_value=20, value=int(cfg.get("size_scaglione", 3)), step=1, disabled=(is_attivo or not is_operativo))
-
-        delta_input = st.number_input("Delta Contratti da Coprire", min_value=1, max_value=100, value=int(delta_calcolato if delta_calcolato > 0 else 15), step=1, disabled=(is_attivo or not is_operativo))
+        elif is_attivo:
+            if has_aperti:
+                st.markdown(f"<div style='color: #ef4444; font-size: 0.74rem; margin-top: 4px; margin-bottom: 8px;'>🔒 <b>Posizioni operative a mercato</b>: parametri bloccati a protezione della strategia in corso.</div>", unsafe_allow_html=True)
+            elif saved_pz1 > 0:
+                st.markdown(f"<div style='color: #22c55e; font-size: 0.74rem; margin-top: 4px; margin-bottom: 8px;'>🔒 Guardia armata in sentinella: L1 <b>{saved_pz1:.2f}</b> • Passo <b>{saved_passo:.1f}p</b> • Size <b>{saved_size}</b> (Modificabili a caldo finché non ci sono posizioni aperte)</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 

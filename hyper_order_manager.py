@@ -117,11 +117,29 @@ class HyperOrderManager:
                     pass
         return None
 
-    def send_notification(self, titolo: str, messaggio: str, tags: str = "rotating_light"):
-        """Invia notifica push su ntfy.sh usando il topic configurato per questo conto."""
+    def send_notification(self, titolo: str, messaggio: str, tags: str = "rotating_light", cooldown_identico_sec: int = 60, max_notifiche_minuto: int = 6):
+        """Invia notifica push su ntfy.sh con protezione anti-flood e deduplicazione integrata."""
         topic = self._get_ntfy_topic()
         if not topic:
             return
+
+        now = time.time()
+        if not hasattr(self, "_registro_notifiche"):
+            self._registro_notifiche = {}
+            self._finestra_notifiche = []
+
+        chiave = (str(titolo).strip(), str(messaggio).strip())
+        if (now - self._registro_notifiche.get(chiave, 0)) < cooldown_identico_sec:
+            return
+
+        self._finestra_notifiche = [t for t in self._finestra_notifiche if (now - t) < 60]
+        if len(self._finestra_notifiche) >= max_notifiche_minuto:
+            logger.warning(f"🛡️ [ANTI-FLOOD HYPER] Limite notifiche raggiunto. Soppressa: {titolo}")
+            return
+
+        self._registro_notifiche[chiave] = now
+        self._finestra_notifiche.append(now)
+
         try:
             orario = now_it().strftime("%H:%M:%S")
             messaggio_con_orario = f"[{orario}] {messaggio}"

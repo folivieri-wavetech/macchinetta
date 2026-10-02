@@ -49,8 +49,26 @@ def print_log(messaggio):
     except Exception:
         pass
 
-def invia_notifica(titolo, messaggio, tags="trophy"):
+# --- ANTI-FLOOD ENGINE PER NOTIFICHE PUSH GOLDFINGER ---
+_REGISTRO_NOTIFICHE_GF = {}
+_FINESTRA_NOTIFICHE_GF = []
+
+def invia_notifica(titolo, messaggio, tags="trophy", cooldown_identico_sec=60, max_notifiche_minuto=6):
     try:
+        now = time.time()
+        chiave = (str(titolo).strip(), str(messaggio).strip())
+        if (now - _REGISTRO_NOTIFICHE_GF.get(chiave, 0)) < cooldown_identico_sec:
+            return
+
+        global _FINESTRA_NOTIFICHE_GF
+        _FINESTRA_NOTIFICHE_GF = [t for t in _FINESTRA_NOTIFICHE_GF if (now - t) < 60]
+        if len(_FINESTRA_NOTIFICHE_GF) >= max_notifiche_minuto:
+            scrivi_log(f"🛡️ [ANTI-FLOOD GOLDFINGER] Limite notifiche raggiunto. Soppressa: {titolo}")
+            return
+
+        _REGISTRO_NOTIFICHE_GF[chiave] = now
+        _FINESTRA_NOTIFICHE_GF.append(now)
+
         cfg = dotenv_values(ENV_FILE)
         topic = cfg.get("NTFY_TOPIC")
         if topic:
@@ -393,26 +411,31 @@ class GoldfingerEngine:
             print_log(f"🚀 GOLDFINGER AVVIATO: Livello 1 @ {pz_start:.2f}, Passo {passo} pip, Delta {delta} contratti ({len(self.stato['scaglioni'])} difese).")
             invia_notifica("AVVIO GOLDFINGER", f"Guardia avviata: Livello 1 a {pz_start:.2f}, Delta {delta} contratti.", "rocket")
 
-        # 2b. GESTIONE AGGIORNAMENTO LIVELLO O DELTA A CALDO (se non ci sono posizioni aperte)
+        # 2b. GESTIONE AGGIORNAMENTO LIVELLO, PASSO, SIZE O DELTA A CALDO (se non ci sono posizioni aperte)
         if self.stato.get("attivo") and is_attivo_ui:
             cfg_pz1 = config_ui.get("livello_1_prezzo")
             stato_pz1 = self.stato.get("livello_1_prezzo")
             cfg_delta = config_ui.get("delta_totale")
             stato_delta = self.stato.get("delta_totale")
+            cfg_passo = config_ui.get("passo_pip")
+            stato_passo = self.stato.get("passo_pip")
+            cfg_sz = config_ui.get("size_scaglione")
+            stato_sz = self.stato.get("size_scaglione")
 
             diff_pz1 = (cfg_pz1 is not None and stato_pz1 is not None and abs(float(cfg_pz1) - float(stato_pz1)) > 0.01)
             diff_delta = (cfg_delta is not None and stato_delta is not None and int(cfg_delta) != int(stato_delta))
+            diff_passo = (cfg_passo is not None and stato_passo is not None and abs(float(cfg_passo) - float(stato_passo)) > 0.01)
+            diff_sz = (cfg_sz is not None and stato_sz is not None and int(cfg_sz) != int(stato_sz))
 
-            if diff_pz1 or diff_delta:
+            if diff_pz1 or diff_delta or diff_passo or diff_sz:
                 scaglioni_curr = self.stato.get("scaglioni", [])
                 aperti_curr = [s for s in scaglioni_curr if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
                 if not aperti_curr:
                     target_pz1 = float(cfg_pz1) if cfg_pz1 is not None else float(stato_pz1)
                     target_delta = int(cfg_delta) if cfg_delta is not None else int(stato_delta)
-                    passo_c = float(config_ui.get("passo_pip", self.stato.get("passo_pip", 6.0)))
-                    sz_c = int(config_ui.get("size_scaglione", self.stato.get("size_scaglione", 3)))
+                    passo_c = float(cfg_passo) if cfg_passo is not None else float(stato_passo or 6.0)
+                    sz_c = int(cfg_sz) if cfg_sz is not None else int(stato_sz or 3)
 
-                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 = {target_pz1:.2f}, Delta = {target_delta} contratti ({max(1, target_delta // sz_c)} difese)")
                     self.stato["livello_1_prezzo"] = target_pz1
                     self.stato["passo_pip"] = passo_c
                     self.stato["size_scaglione"] = sz_c
@@ -421,7 +444,8 @@ class GoldfingerEngine:
                     self.stato["minimo_discesa"] = None
                     self.stato["minimo_precedente"] = None
                     self.salva_stato()
-                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 @ {target_pz1:.2f}, Delta {target_delta} mini ({len(self.stato['scaglioni'])} difese).", "arrows_counterclockwise")
+                    print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 = {target_pz1:.2f}, Passo = {passo_c} pip, Size = {sz_c}, Delta = {target_delta} contratti ({len(self.stato['scaglioni'])} difese)")
+                    invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 @ {target_pz1:.2f}, Passo {passo_c} pip, Size {sz_c}, Delta {target_delta} ({len(self.stato['scaglioni'])} difese).", "arrows_counterclockwise")
 
         # 3. VERIFICA FINESTRA ROLLOVER
         if self.is_in_rollover():

@@ -173,20 +173,54 @@ def format_price_ig(nome, price):
     dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
     return round(float(price), dec)
 
-def invia_notifica(titolo, messaggio, tags="rotating_light"):
+# --- ANTI-FLOOD ENGINE PER NOTIFICHE PUSH ---
+_REGISTRO_NOTIFICHE_TREND = {}
+_FINESTRA_NOTIFICHE_TREND = []
 
+def invia_notifica(titolo, messaggio, tags="rotating_light", cooldown_identico_sec=60, max_notifiche_minuto=6):
+    """
+    Invia notifica push NTFY con protezione anti-flood integrata:
+    1. Deduplica: impedisce l'invio dello stesso identico messaggio entro 'cooldown_identico_sec' secondi.
+    2. Rate-limiter a finestra mobile: massimo 'max_notifiche_minuto' notifiche al minuto per processo.
+    """
     topic = config.get("NTFY_TOPIC")
-    if topic:
-        try:
-            orario = now_it().strftime("%H:%M:%S")
-            messaggio_con_orario = f"[{orario}] {messaggio}"
-            headers = {
-                "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
-                "Tags": tags
-            }
-            requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
-        except Exception as e:
-            print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
+    if not topic:
+        return
+
+    now = time.time()
+    
+    # 1. Deduplica messaggi identici
+    chiave = (str(titolo).strip(), str(messaggio).strip())
+    ultimo = _REGISTRO_NOTIFICHE_TREND.get(chiave, 0)
+    if (now - ultimo) < cooldown_identico_sec:
+        return
+
+    # 2. Finestra mobile rate limiter
+    global _FINESTRA_NOTIFICHE_TREND
+    _FINESTRA_NOTIFICHE_TREND = [t for t in _FINESTRA_NOTIFICHE_TREND if (now - t) < 60]
+    if len(_FINESTRA_NOTIFICHE_TREND) >= max_notifiche_minuto:
+        print_log("SISTEMA", f"🛡️ [ANTI-FLOOD] Limite di {max_notifiche_minuto} notifiche/min raggiunto. Soppressa: {titolo}")
+        return
+
+    _REGISTRO_NOTIFICHE_TREND[chiave] = now
+    _FINESTRA_NOTIFICHE_TREND.append(now)
+
+    # Pulizia memoria registro periodica
+    if len(_REGISTRO_NOTIFICHE_TREND) > 150:
+        for k, v in list(_REGISTRO_NOTIFICHE_TREND.items()):
+            if (now - v) > 300:
+                del _REGISTRO_NOTIFICHE_TREND[k]
+
+    try:
+        orario = now_it().strftime("%H:%M:%S")
+        messaggio_con_orario = f"[{orario}] {messaggio}"
+        headers = {
+            "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
+            "Tags": tags
+        }
+        requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
+    except Exception as e:
+        print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
 
 FILE_NOTIFICHE_SISTEMA_DEDUP = "notifiche_sistema_dedup.json"
 
