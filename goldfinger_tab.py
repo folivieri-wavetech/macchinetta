@@ -28,14 +28,18 @@ def get_goldfinger_paths(conto):
         "posizioni": os.path.join(base, "posizioni_aperte.json")
     }
 
-def leggi_json_sicuro(path):
+def leggi_json_sicuro(path, default=None):
+    if default is None:
+        default = {}
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
-            return {}
-    return {}
+            return default
+    return default
+
+carica_json_sicuro = leggi_json_sicuro
 
 def calcola_livello_chirurgico_gold(conto, px_live=None):
     """
@@ -656,6 +660,8 @@ def renderizza_tab_goldfinger(conto):
             curr_long = 0
             curr_short = 0
             pos_agg = carica_json_sicuro(paths["posizioni"], [])
+            if not isinstance(pos_agg, list):
+                pos_agg = []
             for p in pos_agg:
                 inst = str(p.get("instrument", "")).upper()
                 epic = str(p.get("epic", "")).upper()

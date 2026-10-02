@@ -23,6 +23,14 @@ from dotenv import dotenv_values
 
 from macchinetta_trend.core_engine import CoreEngine, Candle
 from macchinetta_trend.position_manager import PositionManager, Position
+from trend_deals_manager import (
+    registra_deal_trend,
+    rimuovi_deal_trend,
+    carica_deal_trend,
+    is_deal_trend,
+    get_tutti_deal_trend_account,
+    sincronizza_deal_trend_con_ig
+)
 
 # --- MAPPA TIMEFRAMES (IN MINUTI) ---
 TF_MAP = {
@@ -491,12 +499,13 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                         if confirm_data.get("level") is not None: real_level = float(confirm_data.get("level"))
                         if confirm_data.get("dealId"): deal_id = confirm_data.get("dealId")
 
-                if real_level is None:
+                if real_level is None or deal_id is None:
                     try:
                         time.sleep(1.0)
                         resp_p = ig_api_request('GET', f"{BASE_URL}/positions", headers, timeout=10, logger_func=print_log)
                         if resp_p and resp_p.status_code == 200:
                             p_list = [pos for pos in resp_p.json().get('positions', []) if pos['market']['epic'] == epic and pos['position']['direction'] == dir_ig and abs(float(pos['position']['size']) - float(size)) < 0.001]
+                            p_list.sort(key=lambda x: x.get('position', {}).get('createdDate', ''), reverse=True)
                             if p_list:
                                 real_level = float(p_list[0]['position']['level'])
                                 deal_id = p_list[0]['position']['dealId']
@@ -505,6 +514,8 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                 if real_level is not None: real_level = round(float(real_level), dec)
                 livello_log = f" a {formatta_numero(real_level, dec)}" if real_level is not None else ""
                 print_log(nome_strumento, f"✅ {etichetta} eseguito con successo{livello_log}.")
+                if deal_id:
+                    registra_deal_trend(None, epic, deal_id, label=f"{nome_strumento} {etichetta}")
                 return True, real_level, deal_id
             else:
                 resp_txt = r.text if r else "Nessuna risposta"
@@ -544,6 +555,7 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
                         if "POSITION_NOT_FOUND" in reason or "deal-not-found" in reason or "POSITION_NOT_AVAILABLE_TO_CLOSE" in reason:
                             print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): posizione già chiusa su IG.")
                             attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
+                            rimuovi_deal_trend(None, None, dealId, label=f"{nome_strumento} {etichetta}")
                             return True
                         if tentativo < MAX_TENTATIVI:
                             print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] [IG REJECT] Chiusura {etichetta}: {confirm_data}")
@@ -551,16 +563,19 @@ def chiudi_parziale(nome_strumento, dealId, dir_chiusura, size, headers, etichet
                     else:
                         print_log(nome_strumento, f"✅ Chiusura {etichetta} eseguita con successo.")
                         attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
+                        rimuovi_deal_trend(None, None, dealId, label=f"{nome_strumento} {etichetta}")
                         return True
                 else:
                     print_log(nome_strumento, f"✅ Chiusura {etichetta} inviata.")
                     attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
+                    rimuovi_deal_trend(None, None, dealId, label=f"{nome_strumento} {etichetta}")
                     return True
             else:
                 resp_txt = r.text if r else "Nessuna risposta"
                 if r and r.status_code == 400 and ("deal-not-found" in resp_txt or "POSITION_NOT_FOUND" in resp_txt or "POSITION_NOT_AVAILABLE_TO_CLOSE" in resp_txt):
                     print_log(nome_strumento, f"ℹ️ Chiusura {etichetta} ({dealId}): già liquidata su IG.")
                     attiva_cooldown_operazione("CHIUSURA", id_op, durata_sec=300)
+                    rimuovi_deal_trend(None, None, dealId, label=f"{nome_strumento} {etichetta}")
                     return True
                 if tentativo < MAX_TENTATIVI:
                     print_log(nome_strumento, f"⚠️ [TENTATIVO {tentativo}/{MAX_TENTATIVI}] Errore Chiusura {etichetta} ({dealId}): {resp_txt}")
@@ -591,33 +606,43 @@ def aggiorna_stop_posizione(deal_id, stop_level, headers, nome_strumento=""):
         print_log(nome_strumento, f"⚠️ Eccezione aggiorna_stop_posizione: {e}")
         return False
 
+def filtra_posizioni_trend(pos_list, epic):
+    """Filtra le posizioni per epic includendo SOLO ED ESCLUSIVAMENTE quelle registrate e appartenenti a Trend."""
+    trend_deals = get_tutti_deal_trend_account(None)
+    return [
+        p for p in pos_list
+        if p.get('market', {}).get('epic') == epic
+        and p.get('position', {}).get('dealId') in trend_deals
+    ]
+
 def conta_posizioni_aperte_epic(epic, headers):
-    """Conta quante posizioni reali sono attualmente aperte su IG per questo epic."""
+    """Conta quante posizioni reali appartenenti a TREND sono attualmente aperte su IG per questo epic."""
     try:
         r = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=10, logger_func=print_log)
         if r and r.status_code == 200:
-            pos = [p for p in r.json().get('positions', []) if p['market']['epic'] == epic]
+            pos = filtra_posizioni_trend(r.json().get('positions', []), epic)
             return len(pos)
     except Exception as e:
-        print_log("SISTEMA", f"Errore verifica posizioni IG: {e}")
+        print_log("SISTEMA", f"Errore verifica posizioni IG Trend: {e}")
     return 0
 
 def pulisci_posizioni_epic(nome, epic, headers):
-    """Chiude le posizioni aperte per quell'epic su IG con pacing anti-ingolfamento."""
+    """Chiude ESCLUSIVAMENTE le posizioni TREND per quell'epic su IG con pacing anti-ingolfamento.
+    Non tocca MAI posizioni aperte da Range o manuali."""
     try:
         r = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=10, logger_func=print_log)
         if r and r.status_code == 200:
-            pos_list = [p for p in r.json().get('positions', []) if p.get('market', {}).get('epic') == epic]
+            pos_list = filtra_posizioni_trend(r.json().get('positions', []), epic)
             for p in pos_list:
                 pos_info = p.get('position', {})
                 dir_c = "SELL" if pos_info.get('direction') == "BUY" else "BUY"
                 deal_id = pos_info.get('dealId')
                 sz = pos_info.get('dealSize', pos_info.get('size', 1))
                 if deal_id:
-                    chiudi_parziale(nome, deal_id, dir_c, sz, headers, etichetta="[CLEANUP]")
+                    chiudi_parziale(nome, deal_id, dir_c, sz, headers, etichetta="[CLEANUP_TREND]")
                     time.sleep(1.0)
     except Exception as e:
-        print_log(nome, f"Errore pulizia reversal: {e}")
+        print_log(nome, f"Errore pulizia reversal Trend: {e}")
 
 # --- STATO MOTORE TREND ---
 class StatoMotoreTrend:
@@ -2155,6 +2180,21 @@ def esegui_ciclo_trend():
             parametri = json.load(f)
     except Exception:
         pass
+
+    # Sincronizzazione di sicurezza tra i ticket registrati in memoria e il registro trend_active_deals
+    try:
+        for s_n, s_d in parametri.items():
+            if s_d.get("tipo_strategia") == "TREND":
+                s_ep = CONFIG_STRUMENTI.get(s_n, {}).get("epic")
+                if s_ep:
+                    for p_c in s_d.get("posizioni_core", []):
+                        t_c = p_c.get("ticket")
+                        if t_c: registra_deal_trend(None, s_ep, t_c, label=f"Sync Mem {s_n}")
+                    for p_i in s_d.get("posizioni_incr", []):
+                        t_i = p_i.get("ticket")
+                        if t_i: registra_deal_trend(None, s_ep, t_i, label=f"Sync Mem Incr {s_n}")
+    except Exception:
+        pass
         
     # Verifica e salvaguardia consolidamento venerdì sera se siamo a mercati chiusi
     try:
@@ -2199,6 +2239,10 @@ def esegui_ciclo_trend():
         except Exception:
             pass
 
+    if has_pos_live_data and posizioni_live_ig:
+        live_deal_ids = {str(p.get('position', {}).get('dealId')).strip() for p in posizioni_live_ig if p.get('position', {}).get('dealId')}
+        sincronizza_deal_trend_con_ig(None, live_deal_ids)
+
     for nome, dati in parametri.items():
         if dati.get("tipo_strategia", "RANGE") != "TREND":
             continue
@@ -2232,7 +2276,7 @@ def esegui_ciclo_trend():
         if not is_attivo:
             # Salvaguardia: se ci sono posizioni reali aperte su IG per questo strumento e non è richiesta la chiusura,
             # consentiamo alla sezione di riconciliazione (CASO A) di riagganciare la posizione
-            pos_ig_epic = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic] if has_pos_live_data else []
+            pos_ig_epic = filtra_posizioni_trend(posizioni_live_ig, epic) if has_pos_live_data else []
             da_chiudere = dati.get("da_chiudere_a_riapertura", False) or (stato_corrente == "IN_ATTESA_CHIUSURA")
             if pos_ig_epic and not da_chiudere:
                 pass
@@ -2244,7 +2288,7 @@ def esegui_ciclo_trend():
             # REGOLE FERREE:
             # Trend deve considerare SOLO ED ESCLUSIVAMENTE ticket che appartengono alle sue posizioni core o incr!
             # NON deve MAI toccare o chiudere posizioni generiche su IG che appartengono al motore RANGE!
-            trend_tickets = set()
+            trend_tickets = get_tutti_deal_trend_account(None)
             for p in (pos_core + pos_incr):
                 t_id = p.get("ticket")
                 if t_id:
@@ -2283,6 +2327,15 @@ def esegui_ciclo_trend():
                         sz = p.get("size", size_i)
                         tipo_pos = p.get("tipo", "core")
                         tickets_da_chiudere.append((t_id, dir_c, sz, f"[{tipo_pos.upper()}]"))
+                
+                # Aggiungi eventuali residui registrati a Trend su IG per questo epic
+                tickets_gia_inclusi = {t[0] for t in tickets_da_chiudere}
+                for p_ig in pos_ig_strum:
+                    d_id = p_ig.get('position', {}).get('dealId')
+                    if d_id and d_id not in tickets_gia_inclusi:
+                        d_ig = "SELL" if p_ig.get('position', {}).get('direction') == "BUY" else "BUY"
+                        sz_ig = float(p_ig.get('position', {}).get('dealSize') or p_ig.get('position', {}).get('size', size_i))
+                        tickets_da_chiudere.append((d_id, d_ig, sz_ig, "[RESIDUA_TREND]"))
                 
                 tutti_chiusi = True
                 if tickets_da_chiudere:
@@ -2425,7 +2478,18 @@ def esegui_ciclo_trend():
         # RICONCILIAZIONE AUTOMATICA BIDIREZIONALE CON POSIZIONI REALI SU IG
         # -------------------------------------------------------------
         if has_pos_live_data:
-            pos_ig_strum = [p for p in posizioni_live_ig if p.get('market', {}).get('epic') == epic]
+            trend_deals_set = get_tutti_deal_trend_account(None)
+            for p_c in dati.get("posizioni_core", []):
+                if p_c.get("ticket"): trend_deals_set.add(str(p_c.get("ticket")).strip())
+            for p_i in dati.get("posizioni_incr", []):
+                if p_i.get("ticket"): trend_deals_set.add(str(p_i.get("ticket")).strip())
+
+            # Filtro chirurgico: riconcilia SOLO ed ESCLUSIVAMENTE posizioni appartenenti a Trend!
+            pos_ig_strum = [
+                p for p in posizioni_live_ig
+                if p.get('market', {}).get('epic') == epic
+                and p.get('position', {}).get('dealId') in trend_deals_set
+            ]
             ticket_aperti_epic = {p.get('position', {}).get('dealId') for p in pos_ig_strum}
             storico_aggiornato = False
             storico = dati.get("storico_wip_trend", [])
@@ -2491,6 +2555,8 @@ def esegui_ciclo_trend():
                             msg = f"🛑 Manual IG: Close Core {engine.pm.core_position.direction} ({engine.pm.core_position.size}){pnl_txt}"
                             storico.append(f"[{ora_str}] {msg}")
                             print_log(nome, f"ℹ️ Rilevata chiusura manuale Core ({engine.pm.core_position.ticket}) su IG. Posizione rimossa dal live.")
+                            old_t = engine.pm.core_position.ticket
+                            rimuovi_deal_trend(None, epic, old_t, label=f"{nome} Manual/SL Close Core")
                             engine.pm.core_position = None
                             engine.trailing_sl_core = None
                             storico_aggiornato = True
@@ -2507,6 +2573,7 @@ def esegui_ciclo_trend():
                             msg = f"🛑 Manual IG: Close Incr ({inc.size}){pnl_txt}"
                             storico.append(f"[{ora_str}] {msg}")
                             print_log(nome, f"ℹ️ Rilevata chiusura manuale Incremento ({inc.ticket}) su IG. Rimosso dal live.")
+                            rimuovi_deal_trend(None, epic, inc.ticket, label=f"{nome} Manual/SL Close Incr")
                             engine.pm.increments.remove(inc)
                             storico_aggiornato = True
                     
@@ -2576,6 +2643,11 @@ def esegui_ciclo_trend():
                         msg = f"ℹ️ Riconciliazione IG: Chiusura {nome} confermata a FLAT."
                     print_log(nome, msg)
                     storico.append(f"[{ora_str}] {msg}")
+                    if core_p and core_p.ticket:
+                        rimuovi_deal_trend(None, epic, core_p.ticket, label=f"{nome} Reset to FLAT Core")
+                    for inc in engine.pm.increments:
+                        if inc.ticket:
+                            rimuovi_deal_trend(None, epic, inc.ticket, label=f"{nome} Reset to FLAT Incr")
                     engine.pm.core_position = None
                     engine.pm.increments = []
                     engine.trailing_sl_core = None

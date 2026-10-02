@@ -23,12 +23,22 @@ except ImportError:
     winsound = None
 from dotenv import dotenv_values
 import io
+from trend_deals_manager import get_tutti_deal_trend_account, is_deal_trend
 
 # Fix per console Windows cp1252 (permette la stampa delle emoji nelle finestre nere)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', line_buffering=True)
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def filtra_posizioni_range(pos_list, epic):
+    """Filtra le posizioni per epic escludendo categoricamente qualsiasi dealId appartenente a Trend."""
+    trend_deals = get_tutti_deal_trend_account(None)
+    return [
+        p for p in pos_list
+        if p.get('market', {}).get('epic') == epic
+        and str(p.get('position', {}).get('dealId', '')).strip() not in trend_deals
+    ]
 
 # --- EFFETTI SONORI ---
 def suona_drumroll():
@@ -675,12 +685,13 @@ def invia_ordine_mercato(nome_strumento, epic, valuta, direzione, size, headers,
                         if confirm_data.get("dealId"):
                             deal_id = confirm_data.get("dealId")
 
-                if real_level is None:
+                if real_level is None or deal_id is None:
                     try:
                         time.sleep(1.0)
                         resp_p = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers)
                         if resp_p and resp_p.status_code == 200:
-                            p_list = [pos for pos in resp_p.json().get('positions', []) if pos['market']['epic'] == epic and pos['position']['direction'] == direzione and abs(float(pos['position']['size']) - float(size)) < 0.001]
+                            p_list = [pos for pos in filtra_posizioni_range(resp_p.json().get('positions', []), epic) if pos['position']['direction'] == direzione and abs(float(pos['position']['size']) - float(size)) < 0.001]
+                            p_list.sort(key=lambda x: x.get('position', {}).get('createdDate', ''), reverse=True)
                             if p_list:
                                 real_level = float(p_list[0]['position']['level'])
                                 deal_id = p_list[0]['position']['dealId']
@@ -902,13 +913,12 @@ def pulisci_mercato(epic, headers_auth, nome_strumento, solo_pendenti=False, man
     resp_pos = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers_auth)
     if resp_pos and resp_pos.status_code == 200:
         valuta = CONFIG_STRUMENTI.get(nome_strumento, {}).get("valuta", "USD")
-        for p in resp_pos.json().get('positions', []):
-            if p['market']['epic'] == epic:
-                if mantieni_core_size and float(p['position']['size']) == mantieni_core_size:
-                    continue 
-                dir_chiusura = "SELL" if p['position']['direction'] == "BUY" else "BUY"
-                chiudi_parziale(nome_strumento, p['position']['dealId'], epic, dir_chiusura, p['position']['size'], valuta, headers_auth, etichetta="[ORFANA]")
-                time.sleep(1.5) 
+        for p in filtra_posizioni_range(resp_pos.json().get('positions', []), epic):
+            if mantieni_core_size and float(p['position']['size']) == mantieni_core_size:
+                continue 
+            dir_chiusura = "SELL" if p['position']['direction'] == "BUY" else "BUY"
+            chiudi_parziale(nome_strumento, p['position']['dealId'], epic, dir_chiusura, p['position']['size'], valuta, headers_auth, etichetta="[ORFANA]")
+            time.sleep(1.5) 
 
 # --- FUNZIONE CENTRALIZZATA DI SICUREZZA API ---
 def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target_dir, etichetta, pos_attese=0, no_stop=False):
@@ -924,7 +934,7 @@ def verifica_falso_allarme_ig(nome_strumento, epic, headers, target_size, target
     resp_pos_check = chiamata_api_sicura('GET', f"{BASE_URL}/positions", headers)
     falso_allarme_pos = False
     if resp_pos_check and resp_pos_check.status_code == 200:
-        pos_agg = [p for p in resp_pos_check.json().get('positions', []) if p['market']['epic'] == epic]
+        pos_agg = filtra_posizioni_range(resp_pos_check.json().get('positions', []), epic)
         if no_stop:
             pos_agg = [p for p in pos_agg if p['position'].get('stopLevel') is None]
         if target_dir:
@@ -1183,7 +1193,7 @@ def esegui_motore():
                     stato_mercato = (dm["status"] == 'TRADEABLE') if dm else False
                     ig_min_dist = dm["min_dist"] if dm else 0
 
-                    posizioni = [p for p in posizioni_totali if p['market']['epic'] == epic]
+                    posizioni = filtra_posizioni_range(posizioni_totali, epic)
                     pendenti = [o for o in ordini_totali if o['marketData']['epic'] == epic]
                     
                     min_param_impostato = min(param.get("opp", 0), param.get("dts", 0), param.get("tp", 0) / 4)
@@ -1636,7 +1646,7 @@ def esegui_motore():
                                 if real_t1_lvl is None or new_deal_id is None:
                                     resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
                                     if resp_ticket and resp_ticket.status_code == 200:
-                                        pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == ticket1_dir and float(p['position']['size']) == s_ass]
+                                        pos_t = [p for p in filtra_posizioni_range(resp_ticket.json().get('positions', []), epic) if p['position']['direction'] == ticket1_dir and float(p['position']['size']) == s_ass]
                                         if pos_t:
                                             real_ticket1_lvl = float(pos_t[0]['position']['level'])
                                             new_deal_id = pos_t[0]['position']['dealId']
@@ -1843,7 +1853,7 @@ def esegui_motore():
                                 if real_t1_lvl is None or new_deal_id is None:
                                     resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
                                     if resp_ticket and resp_ticket.status_code == 200:
-                                        pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == nuova_ticket_dir and float(p['position']['size']) == s_mezzo]
+                                        pos_t = [p for p in filtra_posizioni_range(resp_ticket.json().get('positions', []), epic) if p['position']['direction'] == nuova_ticket_dir and float(p['position']['size']) == s_mezzo]
                                         if pos_t:
                                             real_ticket1_lvl = float(pos_t[0]['position']['level'])
                                             new_deal_id = pos_t[0]['position']['dealId']
@@ -1862,7 +1872,7 @@ def esegui_motore():
                         else:
                             time.sleep(3.0)
                             resp_check = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
-                            pos_check = [p for p in resp_check.json().get('positions', []) if p['market']['epic'] == epic]
+                            pos_check = filtra_posizioni_range(resp_check.json().get('positions', []), epic)
                             ticket1_check = [p for p in pos_check if float(p['position']['size']) == s_mezzo and p['position']['direction'] == ticket1_dir]
                             
                             if not ticket1_check:
@@ -2028,7 +2038,7 @@ def esegui_motore():
                             if succ_sat2:
                                 resp_ticket = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
                                 if resp_ticket and resp_ticket.status_code == 200:
-                                    pos_t = [p for p in resp_ticket.json().get('positions', []) if p['market']['epic'] == epic and p['position']['direction'] == sat2_dir and float(p['position']['size']) == s_quarto]
+                                    pos_t = [p for p in filtra_posizioni_range(resp_ticket.json().get('positions', []), epic) if p['market']['epic'] == epic and p['position']['direction'] == sat2_dir and float(p['position']['size']) == s_quarto]
                                     if not pos_t:
                                         print_log(nome, f"⚠️ Posizione [SAT2] non trovata su IG. Motore Sospeso.")
                                         pulisci_mercato(epic, h, nome)
