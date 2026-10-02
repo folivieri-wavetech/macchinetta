@@ -48,7 +48,8 @@ TF_MAP = {
 }
 
 # --- CONFIGURAZIONI GLOBALI ---
-FILE_MEMORIA = "memoria_parametri.json"
+FILE_MEMORIA = "memoria_trend.json"
+FILE_MEMORIA_LEGACY = "memoria_parametri.json"
 FILE_TOKEN = "token_ig.json"
 STATO_SISTEMA = "stato_sistema.json"
 CONSOLE_LOG_FILE = "console_live.log"
@@ -173,29 +174,44 @@ def format_price_ig(nome, price):
     dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
     return round(float(price), dec)
 
-# --- ANTI-FLOOD ENGINE PER NOTIFICHE PUSH ---
+# --- CENTRALIZZAZIONE NOTIFICHE PUSH CON CIRCUIT BREAKER ---
+try:
+    from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+except ImportError:
+    try:
+        from notifiche_manager import invia_notifica as invia_notifica_centralizzata
+    except ImportError:
+        invia_notifica_centralizzata = None
+
 _REGISTRO_NOTIFICHE_TREND = {}
 _FINESTRA_NOTIFICHE_TREND = []
 
-def invia_notifica(titolo, messaggio, tags="rotating_light", cooldown_identico_sec=60, max_notifiche_minuto=6):
-    """
-    Invia notifica push NTFY con protezione anti-flood integrata:
-    1. Deduplica: impedisce l'invio dello stesso identico messaggio entro 'cooldown_identico_sec' secondi.
-    2. Rate-limiter a finestra mobile: massimo 'max_notifiche_minuto' notifiche al minuto per processo.
-    """
+def invia_notifica(titolo, messaggio, tags="rotating_light", cooldown_identico_sec=60, max_notifiche_minuto=20):
+    """Invia notifica push NTFY con Circuit Breaker e Rate Limiting avanzato."""
     topic = config.get("NTFY_TOPIC")
     if not topic:
         return
 
-    now = time.time()
-    
-    # 1. Deduplica messaggi identici
-    chiave = (str(titolo).strip(), str(messaggio).strip())
-    ultimo = _REGISTRO_NOTIFICHE_TREND.get(chiave, 0)
-    if (now - ultimo) < cooldown_identico_sec:
+    if invia_notifica_centralizzata:
+        ok, dett = invia_notifica_centralizzata(
+            topic=topic,
+            titolo=titolo,
+            messaggio=messaggio,
+            tags=tags,
+            prioritario=True,
+            prefisso_conto=NOME_CONTO,
+            cooldown_dedup_sec=cooldown_identico_sec
+        )
+        if not ok and "Sospensione attiva" in dett:
+            print_log("SISTEMA", dett)
         return
 
-    # 2. Finestra mobile rate limiter
+    # Fallback locale
+    now = time.time()
+    chiave = (str(titolo).strip(), str(messaggio).strip())
+    if (now - _REGISTRO_NOTIFICHE_TREND.get(chiave, 0)) < cooldown_identico_sec:
+        return
+
     global _FINESTRA_NOTIFICHE_TREND
     _FINESTRA_NOTIFICHE_TREND = [t for t in _FINESTRA_NOTIFICHE_TREND if (now - t) < 60]
     if len(_FINESTRA_NOTIFICHE_TREND) >= max_notifiche_minuto:
@@ -205,34 +221,39 @@ def invia_notifica(titolo, messaggio, tags="rotating_light", cooldown_identico_s
     _REGISTRO_NOTIFICHE_TREND[chiave] = now
     _FINESTRA_NOTIFICHE_TREND.append(now)
 
-    # Pulizia memoria registro periodica
-    if len(_REGISTRO_NOTIFICHE_TREND) > 150:
-        for k, v in list(_REGISTRO_NOTIFICHE_TREND.items()):
-            if (now - v) > 300:
-                del _REGISTRO_NOTIFICHE_TREND[k]
-
     try:
         orario = now_it().strftime("%H:%M:%S")
-        messaggio_con_orario = f"[{orario}] {messaggio}"
-        headers = {
-            "Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'),
-            "Tags": tags
-        }
-        requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
+        headers = {"Title": f"[{NOME_CONTO}] {titolo}".encode('utf-8'), "Tags": tags}
+        requests.post(f"https://ntfy.sh/{topic}", data=f"[{orario}] {messaggio}".encode('utf-8'), headers=headers, timeout=5)
     except Exception as e:
         print_log("SISTEMA", f"⚠️ Errore invio notifica Push: {e}")
 
 FILE_NOTIFICHE_SISTEMA_DEDUP = "notifiche_sistema_dedup.json"
 
 def invia_notifica_sistema(chiave_evento, titolo, messaggio, tags="information_source", cooldown_sec=14400):
-    """
-    Invia una notifica unificata a livello di MACCHINETTA (de-duplicata per tutti i conti e pod).
-    Se un qualsiasi pod o conto ha già inviato questa notifica entro il cooldown, non viene reinviata.
-    """
+    """Invia notifica unificata di sistema con Circuit Breaker e de-duplicazione globale tra tutti i pod."""
     topic = config.get("NTFY_TOPIC")
     if not topic:
         return
-    
+
+    if invia_notifica_centralizzata:
+        ok, dett = invia_notifica_centralizzata(
+            topic=topic,
+            titolo=titolo,
+            messaggio=messaggio,
+            tags=tags,
+            prioritario=False,
+            prefisso_conto="MACCHINETTA",
+            chiave_dedup=chiave_evento,
+            cooldown_dedup_sec=cooldown_sec
+        )
+        if ok:
+            print_log("SISTEMA", f"📢 Notifica di Sistema inviata: {titolo}")
+        elif "Sospensione attiva" in dett:
+            print_log("SISTEMA", dett)
+        return
+
+    # Fallback locale se notifiche_manager non disponibile
     target_path = None
     for base in ["/data/Logs_e_Cache", "../Logs_e_Cache", "Logs_e_Cache", "."]:
         if os.path.exists(base):
@@ -250,11 +271,9 @@ def invia_notifica_sistema(chiave_evento, titolo, messaggio, tags="information_s
         except Exception:
             stato_notifiche = {}
 
-    last_sent = stato_notifiche.get(chiave_evento, 0)
-    if now_ts - last_sent < cooldown_sec:
+    if (now_ts - stato_notifiche.get(chiave_evento, 0)) < cooldown_sec:
         return
 
-    # Registra subito il timestamp per prevenire race conditions tra pod
     stato_notifiche[chiave_evento] = now_ts
     stato_notifiche = {k: v for k, v in stato_notifiche.items() if (now_ts - v) < 7 * 86400}
     try:
@@ -265,12 +284,8 @@ def invia_notifica_sistema(chiave_evento, titolo, messaggio, tags="information_s
 
     try:
         orario = now_it().strftime("%H:%M:%S")
-        messaggio_con_orario = f"[{orario}] {messaggio}"
-        headers = {
-            "Title": f"[MACCHINETTA] {titolo}".encode('utf-8'),
-            "Tags": tags
-        }
-        requests.post(f"https://ntfy.sh/{topic}", data=messaggio_con_orario.encode('utf-8'), headers=headers, timeout=5)
+        headers = {"Title": f"[MACCHINETTA] {titolo}".encode('utf-8'), "Tags": tags}
+        requests.post(f"https://ntfy.sh/{topic}", data=f"[{orario}] {messaggio}".encode('utf-8'), headers=headers, timeout=5)
         print_log("SISTEMA", f"📢 Notifica di Sistema inviata: {titolo}")
     except Exception as e:
         print_log("SISTEMA", f"⚠️ Errore invio notifica Sistema: {e}")
@@ -1111,9 +1126,37 @@ def scarica_candele(epic, timeframe, limit=60, headers=None):
             print_log("SISTEMA", f"⚠️ [TENTATIVO {CANDLE_FAILURES[k_candle]}/5] Errore fetching prezzi {epic}: {e}")
         return []
 
+def carica_memoria_trend_motore():
+    if os.path.exists(FILE_MEMORIA):
+        try:
+            with open(FILE_MEMORIA, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # Auto-migrazione da FILE_MEMORIA_LEGACY se memoria_trend.json non esiste ancora
+    trend_mem = {}
+    if os.path.exists(FILE_MEMORIA_LEGACY):
+        try:
+            with open(FILE_MEMORIA_LEGACY, "r", encoding="utf-8") as f:
+                d_old = json.load(f)
+            for k, v in d_old.items():
+                if v.get("tipo_strategia") == "TREND":
+                    trend_mem[k] = v
+        except Exception:
+            pass
+    if trend_mem:
+        try:
+            tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}"
+            with open(tmp_f, "w", encoding="utf-8") as f:
+                json.dump(trend_mem, f, indent=4)
+            os.replace(tmp_f, FILE_MEMORIA)
+        except Exception:
+            pass
+    return trend_mem
+
 def aggiorna_memoria(nome, update_dict):
     try:
-        with open(FILE_MEMORIA, "r") as f: p = json.load(f)
+        p = carica_memoria_trend_motore()
         if nome in p:
             for k, v in update_dict.items():
                 p[nome][k] = v
@@ -2208,17 +2251,12 @@ def esegui_ciclo_trend():
         except Exception:
             pass
 
-    parametri = {}
-    try:
-        with open(FILE_MEMORIA, "r") as f: 
-            parametri = json.load(f)
-    except Exception:
-        pass
+    parametri = carica_memoria_trend_motore()
 
     # Sincronizzazione di sicurezza tra i ticket registrati in memoria e il registro trend_active_deals
     try:
         for s_n, s_d in parametri.items():
-            if s_d.get("tipo_strategia") == "TREND":
+            if s_d.get("tipo_strategia", "TREND") == "TREND":
                 s_ep = CONFIG_STRUMENTI.get(s_n, {}).get("epic")
                 if s_ep:
                     for p_c in s_d.get("posizioni_core", []):
@@ -2278,7 +2316,7 @@ def esegui_ciclo_trend():
         sincronizza_deal_trend_con_ig(None, live_deal_ids)
 
     for nome, dati in parametri.items():
-        if dati.get("tipo_strategia", "RANGE") != "TREND":
+        if dati.get("tipo_strategia", "TREND") != "TREND":
             continue
 
         # Operatività Trend disabilitata temporaneamente (riservata ad HYPER)
@@ -2532,13 +2570,19 @@ def esegui_ciclo_trend():
                 and p.get('position', {}).get('dealId') in trend_deals_set
             ]
             
-            # Autoguarigione: se il registro marchi non conteneva ancora il deal ma lo strumento è attivo in Trend su IG
+            # Autoguarigione: se il registro marchi non conteneva ancora il deal ma il ticket è noto in memoria Trend
             if not pos_ig_strum and is_attivo and stato_corrente in ("LONG", "SHORT"):
                 dir_target = 'BUY' if stato_corrente == 'LONG' else 'SELL'
+                ticket_noti_trend = {
+                    str(p.get("ticket")).strip() 
+                    for p in (dati.get("posizioni_core", []) + dati.get("posizioni_incr", [])) 
+                    if p.get("ticket")
+                }
                 pos_candidati = [
                     p for p in posizioni_live_ig
                     if p.get('market', {}).get('epic') == epic
                     and p.get('position', {}).get('direction') == dir_target
+                    and str(p.get('position', {}).get('dealId')).strip() in ticket_noti_trend
                 ]
                 if pos_candidati:
                     for pc in pos_candidati:

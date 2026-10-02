@@ -117,12 +117,30 @@ class HyperOrderManager:
                     pass
         return None
 
-    def send_notification(self, titolo: str, messaggio: str, tags: str = "rotating_light", cooldown_identico_sec: int = 60, max_notifiche_minuto: int = 6):
-        """Invia notifica push su ntfy.sh con protezione anti-flood e deduplicazione integrata."""
+    def send_notification(self, titolo: str, messaggio: str, tags: str = "rotating_light", cooldown_identico_sec: int = 60, max_notifiche_minuto: int = 20):
+        """Invia notifica push su ntfy.sh con Circuit Breaker e Rate Limiter integrati."""
         topic = self._get_ntfy_topic()
         if not topic:
             return
 
+        try:
+            from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+            ok, dett = invia_notifica_centralizzata(
+                topic=topic,
+                titolo=titolo,
+                messaggio=messaggio,
+                tags=tags,
+                prioritario=True,
+                prefisso_conto=self.account_dir,
+                cooldown_dedup_sec=cooldown_identico_sec
+            )
+            if not ok and "Sospensione attiva" in dett:
+                logger.warning(f"🛡️ [CIRCUIT BREAKER HYPER] {dett}")
+            return
+        except Exception:
+            pass
+
+        # Fallback locale
         now = time.time()
         if not hasattr(self, "_registro_notifiche"):
             self._registro_notifiche = {}
@@ -142,17 +160,8 @@ class HyperOrderManager:
 
         try:
             orario = now_it().strftime("%H:%M:%S")
-            messaggio_con_orario = f"[{orario}] {messaggio}"
-            headers = {
-                "Title": f"[{self.account_dir}] {titolo}".encode('utf-8'),
-                "Tags": tags
-            }
-            requests.post(
-                f"https://ntfy.sh/{topic}",
-                data=messaggio_con_orario.encode('utf-8'),
-                headers=headers,
-                timeout=5
-            )
+            headers = {"Title": f"[{self.account_dir}] {titolo}".encode('utf-8'), "Tags": tags}
+            requests.post(f"https://ntfy.sh/{topic}", data=f"[{orario}] {messaggio}".encode('utf-8'), headers=headers, timeout=5)
         except Exception as e:
             logger.warning(f"⚠️ Errore invio notifica Push NTFY: {e}")
 

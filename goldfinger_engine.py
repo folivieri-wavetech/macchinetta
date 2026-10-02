@@ -49,33 +49,36 @@ def print_log(messaggio):
     except Exception:
         pass
 
-# --- ANTI-FLOOD ENGINE PER NOTIFICHE PUSH GOLDFINGER ---
-_REGISTRO_NOTIFICHE_GF = {}
-_FINESTRA_NOTIFICHE_GF = []
-
-def invia_notifica(titolo, messaggio, tags="trophy", cooldown_identico_sec=60, max_notifiche_minuto=6):
+# --- ANTI-FLOOD & CIRCUIT BREAKER ENGINE PER NOTIFICHE PUSH GOLDFINGER ---
+def invia_notifica(titolo, messaggio, tags="trophy", cooldown_identico_sec=60, max_notifiche_minuto=20):
     try:
-        now = time.time()
-        chiave = (str(titolo).strip(), str(messaggio).strip())
-        if (now - _REGISTRO_NOTIFICHE_GF.get(chiave, 0)) < cooldown_identico_sec:
-            return
-
-        global _FINESTRA_NOTIFICHE_GF
-        _FINESTRA_NOTIFICHE_GF = [t for t in _FINESTRA_NOTIFICHE_GF if (now - t) < 60]
-        if len(_FINESTRA_NOTIFICHE_GF) >= max_notifiche_minuto:
-            scrivi_log(f"🛡️ [ANTI-FLOOD GOLDFINGER] Limite notifiche raggiunto. Soppressa: {titolo}")
-            return
-
-        _REGISTRO_NOTIFICHE_GF[chiave] = now
-        _FINESTRA_NOTIFICHE_GF.append(now)
-
         cfg = dotenv_values(ENV_FILE)
         topic = cfg.get("NTFY_TOPIC")
-        if topic:
-            ora = now_it().strftime("%H:%M:%S")
-            body = f"[{ora}] {messaggio}"
-            headers = {"Title": f"[GOLDFINGER] {titolo}".encode('utf-8'), "Tags": tags}
-            requests.post(f"https://ntfy.sh/{topic}", data=body.encode('utf-8'), headers=headers, timeout=5)
+        if not topic:
+            return
+
+        try:
+            from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+            ok, dett = invia_notifica_centralizzata(
+                topic=topic,
+                titolo=titolo,
+                messaggio=messaggio,
+                tags=tags,
+                prioritario=True,
+                prefisso_conto="GOLDFINGER",
+                cooldown_dedup_sec=cooldown_identico_sec
+            )
+            if not ok and "Sospensione attiva" in dett:
+                scrivi_log(f"🛡️ [CIRCUIT BREAKER GF] {dett}")
+            return
+        except Exception:
+            pass
+
+        # Fallback
+        ora = now_it().strftime("%H:%M:%S")
+        body = f"[{ora}] {messaggio}"
+        headers = {"Title": f"[GOLDFINGER] {titolo}".encode('utf-8'), "Tags": tags}
+        requests.post(f"https://ntfy.sh/{topic}", data=body.encode('utf-8'), headers=headers, timeout=5)
     except Exception:
         pass
 

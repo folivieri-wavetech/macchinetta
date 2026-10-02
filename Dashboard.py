@@ -65,6 +65,7 @@ import numpy as np
 
 # --- CONFIGURAZIONI CENTRALI ---
 FILE_MEMORIA = "memoria_parametri.json"
+FILE_MEMORIA_TREND = "memoria_trend.json"
 FILE_TOKEN = "token_ig.json"
 FILE_STORICO = "storico_operazioni.csv"
 CONSOLE_LOG_FILE = "console_live.log"
@@ -980,62 +981,74 @@ def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, 
         ruolo_clean = re.sub(r"<[^>]+>", "", ruolo_label).strip() if ruolo_label else "Manuale"
 
         # 1. Riconciliazione Memoria Locale (Trend, Range)
+        memoria_t = carica_memoria_trend(conto)
         memoria = carica_memoria(conto)
-        if nome_strumento in memoria:
-            dati_inst = memoria[nome_strumento]
-            tipo_strat = dati_inst.get("tipo_strategia", "RANGE")
-            
-            if tipo_strat == "TREND":
-                storico = dati_inst.get("storico_wip_trend", [])
-                pos_core = dati_inst.get("posizioni_core", [])
-                pos_incr = dati_inst.get("posizioni_incr", [])
+        
+        is_deal_t = False
+        try:
+            from trend_deals_manager import is_deal_trend
+            is_deal_t = is_deal_trend(conto, deal_id)
+        except Exception:
+            pass
+        if not is_deal_t and nome_strumento in memoria_t:
+            pos_c_chk = memoria_t[nome_strumento].get("posizioni_core", [])
+            pos_i_chk = memoria_t[nome_strumento].get("posizioni_incr", [])
+            if any(str(p.get("ticket")) == str(deal_id) for p in (pos_c_chk + pos_i_chk)):
+                is_deal_t = True
 
-                is_incr = any(str(p.get("ticket")) == str(deal_id) for p in pos_incr)
-                is_core = any(str(p.get("ticket")) == str(deal_id) for p in pos_core)
+        if is_deal_t and nome_strumento in memoria_t:
+            dati_inst = memoria_t[nome_strumento]
+            storico = dati_inst.get("storico_wip_trend", [])
+            pos_core = dati_inst.get("posizioni_core", [])
+            pos_incr = dati_inst.get("posizioni_incr", [])
 
-                if is_incr:
-                    dati_inst["posizioni_incr"] = [p for p in pos_incr if str(p.get("ticket")) != str(deal_id)]
+            is_incr = any(str(p.get("ticket")) == str(deal_id) for p in pos_incr)
+            is_core = any(str(p.get("ticket")) == str(deal_id) for p in pos_core)
+
+            if is_incr:
+                dati_inst["posizioni_incr"] = [p for p in pos_incr if str(p.get("ticket")) != str(deal_id)]
+                msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
+                storico.append(msg_wip)
+                dati_inst["storico_wip_trend"] = storico[-30:]
+            elif is_core:
+                dati_inst["posizioni_core"] = []
+                dati_inst["trailing_sl_core"] = None
+                if not dati_inst.get("posizioni_incr"):
+                    dati_inst["stato"] = "FLAT"
+                    dati_inst["attivo"] = False
+                    dati_inst["direzione"] = ""
+                    msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €] ➡️ FLAT"
+                else:
                     msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
-                    storico.append(msg_wip)
-                    dati_inst["storico_wip_trend"] = storico[-30:]
-                elif is_core:
+                storico.append(msg_wip)
+                dati_inst["storico_wip_trend"] = storico[-30:]
+            else:
+                core_sz = float(dati_inst.get("size", 1))
+                if abs(sz_num - core_sz) < 0.001 and pos_core:
                     dati_inst["posizioni_core"] = []
-                    dati_inst["trailing_sl_core"] = None
                     if not dati_inst.get("posizioni_incr"):
                         dati_inst["stato"] = "FLAT"
                         dati_inst["attivo"] = False
                         dati_inst["direzione"] = ""
-                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €] ➡️ FLAT"
+                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE Core ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €] ➡️ FLAT"
                     else:
-                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
-                    storico.append(msg_wip)
-                    dati_inst["storico_wip_trend"] = storico[-30:]
+                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE Core ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
                 else:
-                    core_sz = float(dati_inst.get("size", 1))
-                    if abs(sz_num - core_sz) < 0.001 and pos_core:
-                        dati_inst["posizioni_core"] = []
-                        if not dati_inst.get("posizioni_incr"):
-                            dati_inst["stato"] = "FLAT"
-                            dati_inst["attivo"] = False
-                            dati_inst["direzione"] = ""
-                            msg_wip = f"[{ora_str}] 🛑 STOP MANUALE Core ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €] ➡️ FLAT"
-                        else:
-                            msg_wip = f"[{ora_str}] 🛑 STOP MANUALE Core ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
-                    else:
-                        if pos_incr:
-                            dati_inst["posizioni_incr"] = pos_incr[1:]
-                        msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
-                    storico.append(msg_wip)
-                    dati_inst["storico_wip_trend"] = storico[-30:]
-            else:
-                storico = dati_inst.get("storico_wip", [])
-                msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [Parziale: {sign_p}{profit:.0f} €]"
+                    if pos_incr:
+                        dati_inst["posizioni_incr"] = pos_incr[1:]
+                    msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.0f} €]"
                 storico.append(msg_wip)
-                dati_inst["storico_wip"] = storico[-30:]
-                if "SAT" in ruolo_clean.upper() or "OVER" in ruolo_clean.upper():
-                    dati_inst["sat_attivo"] = False
-                    dati_inst.pop("sat_deal_id", None)
-
+                dati_inst["storico_wip_trend"] = storico[-30:]
+            salva_memoria_trend(conto, memoria_t)
+        elif nome_strumento in memoria:
+            dati_inst = memoria[nome_strumento]
+            storico = dati_inst.get("storico_wip", [])
+            msg_wip = f"[{ora_str}] 🛑 STOP MANUALE {ruolo_clean} ({sz_str}c){px_str} [Parziale: {sign_p}{profit:.0f} €]"
+            storico.append(msg_wip)
+            dati_inst["storico_wip"] = storico[-30:]
+            if "SAT" in ruolo_clean.upper() or "OVER" in ruolo_clean.upper():
+                dati_inst["sat_attivo"] = False
+                dati_inst.pop("sat_deal_id", None)
             salva_memoria(conto, memoria)
 
         # 2. Riconciliazione Hyper Gold & US500 (30S e 5M)
@@ -1090,13 +1103,24 @@ def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, 
             cfg_env = dotenv_values(env_p)
             topic = cfg_env.get("NTFY_TOPIC")
             if topic:
-                t_str = ora_dt.strftime("%H:%M:%S")
-                body_notif = f"[{t_str}] [{nome_strumento}] {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.2f} €]"
-                headers_ntfy = {
-                    "Title": f"[{conto}] 🛑 CHIUSURA MANUALE: {nome_strumento}".encode('utf-8'),
-                    "Tags": "octagonal_sign"
-                }
-                requests.post(f"https://ntfy.sh/{topic}", data=body_notif.encode('utf-8'), headers=headers_ntfy, timeout=5)
+                body_notif = f"[{nome_strumento}] {ruolo_clean} ({sz_str}c){px_str} [PnL: {sign_p}{profit:.2f} €]"
+                try:
+                    from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+                    invia_notifica_centralizzata(
+                        topic=topic,
+                        titolo=f"🛑 CHIUSURA MANUALE: {nome_strumento}",
+                        messaggio=body_notif,
+                        tags="octagonal_sign",
+                        prioritario=True,
+                        prefisso_conto=conto
+                    )
+                except Exception:
+                    t_str = ora_dt.strftime("%H:%M:%S")
+                    headers_ntfy = {
+                        "Title": f"[{conto}] 🛑 CHIUSURA MANUALE: {nome_strumento}".encode('utf-8'),
+                        "Tags": "octagonal_sign"
+                    }
+                    requests.post(f"https://ntfy.sh/{topic}", data=f"[{t_str}] {body_notif}".encode('utf-8'), headers=headers_ntfy, timeout=5)
         except Exception:
             pass
 
@@ -1332,7 +1356,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
         dir_trend = st.radio("Direzione Trend", ["LONG", "SHORT"], horizontal=True, key=f"synct_dir_{nome_strumento}")
         
         tf_options = {"HOUR": "H1 (1 Ora)", "HOUR_4": "H4 (4 Ore)"}
-        mem_t_curr = carica_memoria(conto_t).get(nome_strumento, {})
+        mem_t_curr = carica_memoria_trend(conto_t).get(nome_strumento, {})
         tf_curr = mem_t_curr.get("timeframe", "HOUR")
         if tf_curr not in tf_options:
             tf_curr = "HOUR"
@@ -1346,21 +1370,14 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
         dir_color = "#FA8072" if dir_range == "SHORT" else "#00E676"
         st.markdown(f"<div style='margin-top: 15px; margin-bottom: 25px;'><b>Direzione Range automatica:</b> <span style='color: {dir_color}; font-weight: bold; font-size: 1.15rem;'>{dir_range}</span></div>", unsafe_allow_html=True)
         
-    if conto_t == conto_r:
-        st.error("⚠️ Devi selezionare due conti differenti per l'Avvio Multiconto!")
-        if st.button("❌ ANNULLA", key=f"synct_annulla_err_{nome_strumento}"):
-            st.session_state[f"sync_trend_open_{nome_strumento}"] = False
-            st.rerun()
-        return
-        
     # Info parametri di entrambi i conti
-    mem_t = carica_memoria(conto_t).get(nome_strumento, {})
+    mem_t = carica_memoria_trend(conto_t).get(nome_strumento, {})
     mem_r = carica_memoria(conto_r).get(nome_strumento, {})
     
     if mem_t.get("attivo", False) or mem_r.get("attivo", False):
-        msg_t = f"- **{conto_t}** risulta già ATTIVO.\n" if mem_t.get("attivo", False) else ""
-        msg_r = f"- **{conto_r}** risulta già ATTIVO.\n" if mem_r.get("attivo", False) else ""
-        st.error(f"⚠️ **ATTENZIONE: Strumento già occupato!**\n\nPrima di avviare il Multiconto Trend-Range devi spegnere e chiudere {nome_strumento} sui conti selezionati per sistemare il portafoglio:\n{msg_t}{msg_r}")
+        msg_t = f"- **{conto_t} (Trend)** risulta già ATTIVO.\n" if mem_t.get("attivo", False) else ""
+        msg_r = f"- **{conto_r} (Range)** risulta già ATTIVO.\n" if mem_r.get("attivo", False) else ""
+        st.error(f"⚠️ **ATTENZIONE: Strumento già occupato!**\n\nPrima di avviare l'Avvio Trend-Range devi spegnere o attendere la chiusura di {nome_strumento} per le strategie già attive:\n{msg_t}{msg_r}")
         if st.button("❌ ANNULLA", key=f"synct_annulla_occ_{nome_strumento}"):
             st.session_state[f"sync_trend_open_{nome_strumento}"] = False
             st.rerun()
@@ -1439,7 +1456,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
                 st.rerun()
             if blocco_multiconto:
                 st.rerun()
-            full_mem_t = carica_memoria(conto_t)
+            full_mem_t = carica_memoria_trend(conto_t)
             full_mem_r = carica_memoria(conto_r)
             
             full_mem_t[nome_strumento] = {
@@ -1458,7 +1475,7 @@ def dialog_sync_start_trend(conto_partenza, nome_strumento):
                 "trailing_sl_core": None,
                 "trailing_sl_incr": None
             }
-            salva_memoria(conto_t, full_mem_t)
+            salva_memoria_trend(conto_t, full_mem_t)
             
             full_mem_r[nome_strumento] = {
                 **mem_r,
@@ -1860,6 +1877,39 @@ def carica_memoria(conto_selezionato):
 
 def salva_memoria(conto_selezionato, dati):
     path = os.path.join(conto_selezionato, FILE_MEMORIA)
+    tmp_path = f"{path}.tmp.{os.getpid()}"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(dati, f, indent=4)
+        os.replace(tmp_path, path)
+    except Exception:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(dati, f, indent=4)
+
+def carica_memoria_trend(conto_selezionato):
+    path = os.path.join(conto_selezionato, FILE_MEMORIA_TREND)
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f: return json.load(f)
+        except: pass
+    # Auto-migrazione se memoria_trend.json non esiste ancora
+    path_old = os.path.join(conto_selezionato, FILE_MEMORIA)
+    trend_mem = {}
+    if os.path.exists(path_old):
+        try:
+            with open(path_old, "r", encoding="utf-8") as f:
+                d_old = json.load(f)
+            for k, v in d_old.items():
+                if v.get("tipo_strategia") == "TREND":
+                    trend_mem[k] = v
+        except Exception:
+            pass
+    if trend_mem:
+        salva_memoria_trend(conto_selezionato, trend_mem)
+    return trend_mem
+
+def salva_memoria_trend(conto_selezionato, dati):
+    path = os.path.join(conto_selezionato, FILE_MEMORIA_TREND)
     tmp_path = f"{path}.tmp.{os.getpid()}"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
@@ -2395,7 +2445,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 for c_dir in check_dirs:
                     if not c_dir: continue
                     try:
-                        mem_c = carica_memoria(c_dir)
+                        mem_c = carica_memoria_trend(c_dir)
                         mem_s = mem_c.get(s_nome, {})
                         if mem_s.get("attivo", False) and mem_s.get("stato") in ("LONG", "SHORT"):
                             tf_a = mem_s.get("timeframe", "HOUR")
@@ -3046,6 +3096,7 @@ else:
             stato = leggi_stato_sistema(conto_selezionato)
             prezzi_live = stato.get("prezzi_live", {})
             memoria_attuale = carica_memoria(conto_selezionato)
+            memoria_trend_attuale = carica_memoria_trend(conto_selezionato)
 
             # --- Caricamento Stati Hyper Gold (30S e 5M) per riconoscimento ruoli ---
             hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
@@ -3097,12 +3148,21 @@ else:
                 return "Ordine Manuale"
 
             # --- ELABORAZIONE POSIZIONI ---
+            try:
+                from trend_deals_manager import get_tutti_deal_trend_account
+                t_deals_acc = get_tutti_deal_trend_account(conto_selezionato)
+            except Exception:
+                t_deals_acc = set()
+
             gruppi_pos = {}
             for p in pos_data:
                 epic = p['market']['epic']
                 nome = epic_to_name.get(epic, epic)
                 dir = p['position']['direction']
-                key = (nome, dir)
+                d_id = str(p['position'].get('dealId', '')).strip()
+                is_p_trend = (d_id in t_deals_acc)
+                strat = "TREND" if is_p_trend else "RANGE"
+                key = (nome, dir, strat)
                 if key not in gruppi_pos:
                     gruppi_pos[key] = []
                 gruppi_pos[key].append(p)
@@ -3126,13 +3186,16 @@ else:
                 
             items_pos = sorted(gruppi_pos.items(), key=lambda item: (item[0][0], -abs(get_group_total_size(item[1]))))
             
-            for i, ((nome, dir), posizioni) in enumerate(items_pos):
+            for i, ((nome, dir, strat), posizioni) in enumerate(items_pos):
                 c = CONFIG_STRUMENTI.get(nome, {})
                 dec = c.get("decimali", 2)
                 mult = c.get("moltiplicatore", 1)
                 valore_punto = c.get("valore_punto", 1)
                 valuta = c.get("valuta", "USD")
                 
+                is_trend = (strat == "TREND")
+                mem_corrente = memoria_trend_attuale if is_trend else memoria_attuale
+
                 tot_size = 0.0
                 sum_level_size = 0.0
                 tot_pnl_eur = 0.0
@@ -3170,20 +3233,10 @@ else:
                         pts = (prezzo_attuale - lvl)/mult if dir == 'BUY' else (lvl - prezzo_attuale)/mult
                         tot_pnl_eur += (pts * sz * valore_punto * rate)
                         
-                    ruoli_master.add(get_role_pos(nome, dir, sz, memoria_attuale.get(nome, {}), p['position']))
+                    ruoli_master.add(get_role_pos(nome, dir, sz, mem_corrente.get(nome, {}), p['position']))
                 
                 totale_pnl_portafoglio += tot_pnl_eur
                 avg_entry = sum_level_size / tot_size
-                
-                is_trend = (memoria_attuale.get(nome, {}).get("tipo_strategia", "RANGE") == "TREND")
-                if not is_trend and posizioni:
-                    try:
-                        from trend_deals_manager import get_tutti_deal_trend_account
-                        t_deals_acc = get_tutti_deal_trend_account(conto_selezionato)
-                        if any(str(p['position'].get('dealId')).strip() in t_deals_acc for p in posizioni):
-                            is_trend = True
-                    except Exception:
-                        pass
                 trend_color = "#FF8C00" if is_trend else "#FFD700"
                 
                 sign = "+" if dir == "BUY" else "-"
@@ -3193,12 +3246,12 @@ else:
                 lim_str = ""
                 
                 if is_trend:
-                    kj_val = memoria_attuale.get(nome, {}).get("current_kj")
-                    tk_val = memoria_attuale.get(nome, {}).get("current_tk")
+                    kj_val = mem_corrente.get(nome, {}).get("current_kj")
+                    tk_val = mem_corrente.get(nome, {}).get("current_tk")
                     if kj_val is None or tk_val is None:
                         try:
                             rt_d, _ = carica_radar_trend_dash(conto_selezionato)
-                            tf_cur = memoria_attuale.get(nome, {}).get("timeframe", "HOUR")
+                            tf_cur = mem_corrente.get(nome, {}).get("timeframe", "HOUR")
                             lbl_cur = "H4" if tf_cur == "HOUR_4" else ("D1" if tf_cur == "DAY" else "H1")
                             if rt_d and nome in rt_d:
                                 tf_d = rt_d[nome].get("timeframes", {}).get(lbl_cur, {})
@@ -3255,7 +3308,6 @@ else:
                 if not is_first_of_instrument:
                     prezzo_str = ""
 
-                is_trend = memoria_attuale.get(nome, {}).get("tipo_strategia", "RANGE") == "TREND"
                 trend_color = "#FF8C00" if is_trend else None
                 color_style = f"color: {trend_color};" if is_trend else ""
                 u_style = f"border-bottom: 1px solid {trend_color}; text-decoration: none;" if is_trend else ""
@@ -3284,7 +3336,7 @@ else:
                 
                 if has_subrows:
                     if is_trend:
-                        mem_strum = memoria_attuale.get(nome, {})
+                        mem_strum = mem_corrente.get(nome, {})
                         s_core = float(mem_strum.get("size", 3))
                         core_positions = [p for p in posizioni if abs(float(p['position']['size']) - s_core) < 0.001 or any(c.get("ticket") == p['position'].get("dealId") for c in mem_strum.get("posizioni_core", []))]
                         other_positions = [p for p in posizioni if p not in core_positions]
@@ -3314,10 +3366,10 @@ else:
                             l_str = "-"
                             is_core_subrow = (p in core_positions)
                             if is_core_subrow:
-                                trailing_sl_core = memoria_attuale.get(nome, {}).get("trailing_sl_core")
-                                signal_active = memoria_attuale.get(nome, {}).get("signal_candle_active", False)
-                                signal_stop = memoria_attuale.get(nome, {}).get("signal_stop_price")
-                                kj_val = memoria_attuale.get(nome, {}).get("current_kj")
+                                trailing_sl_core = mem_corrente.get(nome, {}).get("trailing_sl_core")
+                                signal_active = mem_corrente.get(nome, {}).get("signal_candle_active", False)
+                                signal_stop = mem_corrente.get(nome, {}).get("signal_stop_price")
+                                kj_val = mem_corrente.get(nome, {}).get("current_kj")
                                 pip_val = c.get("moltiplicatore", 0.0001)
                                 if signal_active and signal_stop is not None:
                                     sl_core = signal_stop
@@ -3335,7 +3387,7 @@ else:
                                     s_str = f"<span style='color: #b0b0b0;' title='{title_core}'>{formatta_numero(sl_core, dec)}</span>"
                                 else:
                                     s_str = "-"
-                                tf_val = memoria_attuale.get(nome, {}).get("timeframe", "HOUR")
+                                tf_val = mem_corrente.get(nome, {}).get("timeframe", "HOUR")
                                 tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
                                 tf_str = tf_map.get(tf_val, tf_val)
                                 dir_str = 'LONG' if dir == 'BUY' else 'SHORT'
@@ -3344,7 +3396,7 @@ else:
                                 incr_idx = other_positions.index(p) + 1
                                 ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
                                 
-                                mem_strum = memoria_attuale.get(nome, {})
+                                mem_strum = mem_corrente.get(nome, {})
                                 deal_p = p['position'].get('dealId')
                                 inc_mem = next((i for i in mem_strum.get("posizioni_incr", []) if i.get("ticket") == deal_p), None)
                                 inc_sl_mem = inc_mem.get("sl_price") if inc_mem else None
@@ -3392,7 +3444,7 @@ else:
                             if p['position'].get('limitLevel'): l_str = formatta_numero(p['position']['limitLevel'], dec)
                             elif p['position'].get('limitDistance'): l_str = "Limite"
                             
-                            raw_ruolo = get_role_pos(nome, dir, sz, memoria_attuale.get(nome, {}), p['position'])
+                            raw_ruolo = get_role_pos(nome, dir, sz, mem_corrente.get(nome, {}), p['position'])
                             ruolo_child = raw_ruolo.replace("Add-On 1", "+1").replace("Add-On 2", "+2")
                         
                         pnl_child_eur = 0.0
@@ -3495,7 +3547,7 @@ else:
         with tab_trend:
             @st.fragment(run_every=15)
             def renderizza_dati_trend():
-                memoria_attuale = carica_memoria(conto_selezionato) 
+                memoria_attuale = carica_memoria_trend(conto_selezionato) 
                 stato = leggi_stato_sistema(conto_selezionato)
                 prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
@@ -3538,7 +3590,7 @@ else:
                         size_max_val = dati_salvati.get("size_max", def_size_max)
                         scala_val = dati_salvati.get("scala", def_scala)
                         auto_restart = dati_salvati.get("auto_restart", False)
-                        tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
+                        tipo_strategia = dati_salvati.get("tipo_strategia", "TREND")
                         
                         tf_map = {"HOUR": "H1", "HOUR_4": "H4", "DAY": "D1"}
                         tf_selected = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
@@ -3656,7 +3708,7 @@ else:
                                 elif not is_trig_attivo:
                                     up_save["trigger_start_prezzo"] = None
                                 memoria_attuale[nome] = up_save
-                                salva_memoria(conto_selezionato, memoria_attuale)
+                                salva_memoria_trend(conto_selezionato, memoria_attuale)
                                 st.rerun()
                         
                         c_r3_sub, c_r4_sub = st.columns(2)
@@ -3678,7 +3730,7 @@ else:
                                     st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                                     st.rerun()
                                 memoria_attuale[nome] = {**dati_salvati, "msg_manuale": "", "errore_avvio": False}
-                                salva_memoria(conto_selezionato, memoria_attuale)
+                                salva_memoria_trend(conto_selezionato, memoria_attuale)
                                 st.session_state[err_key] = ""
                                 st.rerun()
 
@@ -3691,9 +3743,7 @@ else:
                         is_long_bloccato = is_kj_long_bloccato or is_roll or is_wkd
                         is_short_bloccato = is_kj_short_bloccato or is_roll or is_wkd
 
-                        if tipo_strategia == "RANGE" and stato_attivo:
-                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trading Range**.")
-                        elif not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
+                        if not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
                             is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
                             if is_hyper_exclusive:
                                 st.warning("⚡ **Operatività Trend sospesa:** strumento riservato ad HYPER.")
@@ -3727,7 +3777,7 @@ else:
                                         "direzione": "",
                                         "msg_manuale": ""
                                     }
-                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    salva_memoria_trend(conto_selezionato, memoria_attuale)
                                     st.session_state.target_tab = "Trend"
                                     st.rerun()
                             elif is_roll and not has_trigger_input:
@@ -3809,7 +3859,7 @@ else:
                                                 "trailing_sl_core": None,
                                                 "trailing_sl_incr": None
                                             }
-                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            salva_memoria_trend(conto_selezionato, memoria_attuale)
                                             st.session_state.target_tab = "Trend"
                                             st.rerun()
                                         else:
@@ -3849,7 +3899,7 @@ else:
                                                 "trailing_sl_core": None,
                                                 "trailing_sl_incr": None
                                             }
-                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            salva_memoria_trend(conto_selezionato, memoria_attuale)
                                             st.session_state.target_tab = "Trend"
                                             st.rerun()
 
@@ -3917,7 +3967,7 @@ else:
                                                 "trailing_sl_core": None,
                                                 "trailing_sl_incr": None
                                             }
-                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            salva_memoria_trend(conto_selezionato, memoria_attuale)
                                             st.session_state.target_tab = "Trend"
                                             st.rerun()
                                         else:
@@ -3957,7 +4007,7 @@ else:
                                                 "trailing_sl_core": None,
                                                 "trailing_sl_incr": None
                                             }
-                                            salva_memoria(conto_selezionato, memoria_attuale)
+                                            salva_memoria_trend(conto_selezionato, memoria_attuale)
                                             st.session_state.target_tab = "Trend"
                                             st.rerun()
 
@@ -4069,7 +4119,7 @@ else:
                                             "storico_wip_trend": storico[-30:],
                                             "msg_manuale": f"⚠️ Chiusura IG rifiutata ({msg_ig}). La posizione verrà liquidata automaticamente alla riapertura del mercato."
                                         }
-                                    salva_memoria(conto_selezionato, memoria_attuale)
+                                    salva_memoria_trend(conto_selezionato, memoria_attuale)
                                     st.rerun()
                             with c_info:
                                 tf_display = tf_map.get(tf_val, tf_val)
@@ -4105,7 +4155,7 @@ else:
 
             @st.fragment(run_every=15)
             def renderizza_sintesi_trend():
-                memoria = carica_memoria(conto_selezionato)
+                memoria = carica_memoria_trend(conto_selezionato)
                 stato_sys = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato_sys.get("prezzi_live", {})
             
@@ -4145,7 +4195,7 @@ else:
                         incr_count = len(posizioni_incr)
                         incr_avg = sum(p.get("entry", 0) for p in posizioni_incr) / incr_count if incr_count > 0 else 0
                     
-                        tipo_strat = dati.get("tipo_strategia", "RANGE")
+                        tipo_strat = dati.get("tipo_strategia", "TREND")
                     
                         # Colore e stile del pulsante Strumento WIP
                         if dati.get("trigger_start_attivo"):
@@ -4564,9 +4614,14 @@ else:
                     with st.container(border=True):
                         dati_salvati = memoria_attuale.get(nome, {})
                         tipo_strategia = dati_salvati.get("tipo_strategia", "RANGE")
-                        stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
-                        stato_attivo = dati_salvati.get("attivo", False)
-                        direzione = dati_salvati.get("direzione", "")
+                        if tipo_strategia == "TREND":
+                            stato_corrente = "IN_ATTESA"
+                            stato_attivo = False
+                            direzione = ""
+                        else:
+                            stato_corrente = dati_salvati.get("stato", "IN_ATTESA")
+                            stato_attivo = dati_salvati.get("attivo", False)
+                            direzione = dati_salvati.get("direzione", "")
                         modalita_manuale = dati_salvati.get("modalita_manuale", False)
                         is_sospeso_wk = dati_salvati.get("sospeso_weekend", False) and stato_attivo
                         is_sosp_rollover = dati_salvati.get("sospeso_rollover", False) and stato_attivo
@@ -4695,8 +4750,6 @@ else:
                                     memoria_attuale[nome] = {"attivo": False, "direzione": "", "tp": tp, "opp": opp, "dts": dts, "size": size, "stato": "IN_ATTESA", "modalita_manuale": False, "comando_manuale": False, "errore_avvio": False, "errore_ripristino": False, "msg_manuale": ""}
                                     salva_memoria(conto_selezionato, memoria_attuale)
                                     st.rerun()
-                        elif tipo_strategia == "TREND" and stato_attivo:
-                            st.warning("⚠️ L'asset è attualmente configurato e **ATTIVO in Trend**.")
                         elif not stato_attivo:
                             msg_err = dati_salvati.get("msg_manuale") or ("Errore avvio" if dati_salvati.get("errore_avvio") else ("Errore ripristino" if dati_salvati.get("errore_ripristino") else ""))
                             if msg_err:
@@ -4889,9 +4942,13 @@ else:
                 
                     for nome in strumenti_ordinati:
                         dati = memoria.get(nome, {})
-                        stato = dati.get("stato", "IN_ATTESA")
-                        is_attivo = dati.get("attivo", False)
                         tipo_strategia = dati.get("tipo_strategia", "RANGE")
+                        if tipo_strategia == "TREND":
+                            stato = "IN_ATTESA"
+                            is_attivo = False
+                        else:
+                            stato = dati.get("stato", "IN_ATTESA")
+                            is_attivo = dati.get("attivo", False)
                         storico = dati.get("storico_wip", [])
                         prezzo = prezzi_live.get(nome, "In aggiornamento...")
                         spia = ""
@@ -5061,6 +5118,12 @@ else:
                 stato = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato.get("prezzi_live", {})
                 memoria_attuale = carica_memoria(conto_selezionato)
+                memoria_trend_attuale = carica_memoria_trend(conto_selezionato)
+                try:
+                    from trend_deals_manager import get_tutti_deal_trend_account
+                    t_deals_rec = get_tutti_deal_trend_account(conto_selezionato)
+                except Exception:
+                    t_deals_rec = set()
                 hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
                 epic_to_name = {v['epic']: k for k, v in CONFIG_STRUMENTI.items()}
 
@@ -5143,7 +5206,8 @@ else:
                     else:
                         pnl_eur = 0.0
                         
-                    param_inst = memoria_attuale.get(nome, {})
+                    is_deal_t_rec = str(deal_id).strip() in t_deals_rec
+                    param_inst = memoria_trend_attuale.get(nome, {}) if is_deal_t_rec else memoria_attuale.get(nome, {})
                     role_html = calcola_ruolo_posizione(nome, dir_pos, sz, param_inst, pos, hyper_30s_state, hyper_5m_state, pos_data)
                     role_clean = re.sub(r"<[^>]+>", "", role_html).strip()
 

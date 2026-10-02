@@ -13,6 +13,7 @@ def now_it():
     return datetime.datetime.now(TZ_ITALIA)
 
 FILE_TREND_TRADES = "trend_trades_history.json"
+FILE_MEMORIA_TREND = "memoria_trend.json"
 FILE_MEMORIA = "memoria_parametri.json"
 
 TUTTI_STRUMENTI_TREND = [
@@ -25,16 +26,21 @@ def _resolve_history_path(conto: str = None) -> str:
     if conto and os.path.isdir(conto):
         return os.path.join(conto, FILE_TREND_TRADES)
     # Se il conto è già la directory corrente o siamo nel pod del conto
-    if os.path.exists(FILE_MEMORIA) or os.path.exists(FILE_TREND_TRADES):
+    if os.path.exists(FILE_MEMORIA_TREND) or os.path.exists(FILE_MEMORIA) or os.path.exists(FILE_TREND_TRADES):
         return FILE_TREND_TRADES
     if conto:
         return os.path.join(conto, FILE_TREND_TRADES)
     return FILE_TREND_TRADES
 
 def _resolve_memoria_path(conto: str = None) -> str:
-    """Restituisce il percorso di memoria_parametri.json."""
+    """Restituisce il percorso di memoria_trend.json (o fallback a memoria_parametri.json)."""
     if conto and os.path.isdir(conto):
+        p_trend = os.path.join(conto, FILE_MEMORIA_TREND)
+        if os.path.exists(p_trend):
+            return p_trend
         return os.path.join(conto, FILE_MEMORIA)
+    if os.path.exists(FILE_MEMORIA_TREND):
+        return FILE_MEMORIA_TREND
     return FILE_MEMORIA
 
 def salva_trade_chiuso_trend(conto: str, trade_dict: dict) -> bool:

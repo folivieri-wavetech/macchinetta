@@ -76,6 +76,20 @@ def invia_ntfy(titolo, messaggio, tag="arrows_counterclockwise"):
         topic = "Macchinetta_Alert"
         
     try:
+        try:
+            from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+            ok, dett = invia_notifica_centralizzata(
+                topic=topic,
+                titolo=titolo,
+                messaggio=messaggio,
+                tags=tag,
+                prioritario=False,
+                prefisso_conto="MACCHINETTA"
+            )
+            return
+        except Exception:
+            pass
+
         orario = now_it().strftime("%H:%M:%S")
         headers = {
             "Title": f"[MACCHINETTA] {titolo}".encode('utf-8'),
