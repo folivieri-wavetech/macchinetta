@@ -313,20 +313,53 @@ class HyperUS500M5Engine:
 
     @property
     def semaforo(self):
-        """Espone lo stato del semaforo per la Dashboard e moduli esterni."""
+        """Espone lo stato del semaforo per la Dashboard e moduli esterni con concordanza direzionale."""
         with self.lock:
             tl = getattr(self, "traffic_light", {})
+            l1 = tl.get("l1_structure", {})
+            l2 = tl.get("l2_trigger", {})
+            l3 = tl.get("l3_momentum", {})
+
+            dir_l1 = l1.get("dir", "NEUTRAL")
+            dir_l2 = l2.get("dir", "NEUTRAL")
+            dir_l3 = l3.get("dir", "NEUTRAL")
+
+            long_count = sum(1 for d in [dir_l1, dir_l2, dir_l3] if d == "LONG")
+            short_count = sum(1 for d in [dir_l1, dir_l2, dir_l3] if d == "SHORT")
+
+            all_green_long = (long_count == 3)
+            all_green_short = (short_count == 3)
+            all_green = all_green_long or all_green_short
+
+            if all_green_long:
+                bias = "LONG"
+                concordant = 3
+            elif all_green_short:
+                bias = "SHORT"
+                concordant = 3
+            elif long_count >= 2:
+                bias = "LONG"
+                concordant = long_count
+            elif short_count >= 2:
+                bias = "SHORT"
+                concordant = short_count
+            else:
+                bias = "NEUTRAL"
+                concordant = max(long_count, short_count)
+
             return {
-                "L1_structure": tl.get("l1_structure", {}).get("status", False),
-                "L2_trigger": tl.get("l2_trigger", {}).get("status", False),
-                "L3_momentum": tl.get("l3_momentum", {}).get("status", False),
-                "L3_volatility": True,  # Retrocompatibilità
-                "L4_momentum": tl.get("l3_momentum", {}).get("status", False),  # Retrocompatibilità
-                "bias": tl.get("direction", "NEUTRAL"),
-                "all_green": tl.get("all_green", False),
-                "desc_l1": tl.get("l1_structure", {}).get("desc", ""),
-                "desc_l2": tl.get("l2_trigger", {}).get("desc", ""),
-                "desc_l3": tl.get("l3_momentum", {}).get("desc", "")
+                "L1_structure": l1.get("status", False),
+                "L2_trigger": l2.get("status", False),
+                "L3_momentum": l3.get("status", False),
+                "dir_L1": dir_l1,
+                "dir_L2": dir_l2,
+                "dir_L3": dir_l3,
+                "bias": bias,
+                "concordant_lights": concordant,
+                "all_green": all_green,
+                "desc_l1": l1.get("desc", ""),
+                "desc_l2": l2.get("desc", ""),
+                "desc_l3": l3.get("desc", "")
             }
 
     def _load_initial_m5_candles(self):
@@ -424,27 +457,72 @@ class HyperUS500M5Engine:
         l1_desc = "Struttura laterale / Neutra"
 
         # Priorità 1: Struttura a swing consolidata
-        if last_ph and prev_ph and last_pl and prev_pl:
-            if last_ph > prev_ph and last_pl > prev_pl:
-                l1_long = True
-                l1_desc = f"Rialzista: HH {last_ph:.1f} > {prev_ph:.1f} | HL {last_pl:.1f} > {prev_pl:.1f}"
-            elif last_ph < prev_ph and last_pl < prev_pl:
-                l1_short = True
-                l1_desc = f"Ribassista: LH {last_ph:.1f} < {prev_ph:.1f} | LL {last_pl:.1f} < {prev_pl:.1f}"
-            elif last_pl < prev_pl and live_px < last_pl:
-                l1_short = True
-                l1_desc = f"Breakdown LL {last_pl:.1f} < {prev_pl:.1f}"
-            elif last_ph > prev_ph and live_px > last_ph:
-                l1_long = True
-                l1_desc = f"Breakout HH {last_ph:.1f} > {prev_ph:.1f}"
+        # -------------------------------------------------------------
+        # VETI ASSOLUTI DI DIREZIONE (DOW THEORY & REJECTION CANDLE FILTER)
+        # -------------------------------------------------------------
+        long_vetoed = False
+        short_vetoed = False
+        veto_reason = ""
 
-        # Priorità 2 (Micro-trend): Se ci sono 2 candele consecutive decise sotto/sopra l'EMA,
-        # non attendere i frattali lenti che richiedono barre di chiusura successive
-        if c_red_2 and (ema8 is None or live_px <= ema8):
+        if len(recent_candles) >= 3:
+            c1 = recent_candles[-1]  # Ultima candela M5
+            c2 = recent_candles[-2]
+            c3 = recent_candles[-3]
+
+            # VETO 1: Minimi Decrescenti vietano categoricamente il LONG
+            if c1["low"] < c2["low"] < c3["low"] or (c1["low"] < c2["low"] and c1["close"] <= c1["open"]):
+                long_vetoed = True
+                veto_reason = "VETO LONG: Minimi decrescenti (Pressione Ribassista)"
+
+            # VETO 2: Massimi Crescenti vietano categoricamente lo SHORT
+            if c1["high"] > c2["high"] > c3["high"] or (c1["high"] > c2["high"] and c1["close"] >= c1["open"]):
+                short_vetoed = True
+                veto_reason = "VETO SHORT: Massimi crescenti (Pressione Rialzista)"
+
+            # VETO 3: Candela di Setup Rossa o 2+ candele rosse consecutive vietano il LONG
+            if c1["close"] <= c1["open"] or (c1["close"] < c1["open"] and c2["close"] < c2["open"]):
+                long_vetoed = True
+                if not veto_reason: veto_reason = "VETO LONG: Candela di setup chiusa ROSSA"
+
+            # VETO 4: Candela di Setup Verde o 2+ candele verdi consecutive vietano lo SHORT
+            if c1["close"] >= c1["open"] or (c1["close"] > c1["open"] and c2["close"] > c2["open"]):
+                short_vetoed = True
+                if not veto_reason: veto_reason = "VETO SHORT: Candela di setup chiusa VERDE"
+
+            # VETO 5: Rifiuto dei Massimi (Upper Wick >= 35% del range) vieta il LONG
+            r1 = max(c1["high"] - c1["low"], 0.01)
+            upper_wick = (c1["high"] - max(c1["open"], c1["close"])) / r1
+            if upper_wick >= 0.35:
+                long_vetoed = True
+                if not veto_reason: veto_reason = f"VETO LONG: Rifiuto massimi (Ombra {int(upper_wick*100)}%)"
+
+            # VETO 6: Rifiuto dei Minimi (Lower Wick >= 35% del range) vieta lo SHORT
+            lower_wick = (min(c1["open"], c1["close"]) - c1["low"]) / r1
+            if lower_wick >= 0.35:
+                short_vetoed = True
+                if not veto_reason: veto_reason = f"VETO SHORT: Rifiuto minimi (Ombra {int(lower_wick*100)}%)"
+
+        # -------------------------------------------------------------
+        # LUCETTA 1: STRUTTURA DI MERCATO (HH/HL Reale per Long, LH/LL Reale per Short)
+        # -------------------------------------------------------------
+        l1_long = False
+        l1_short = False
+        l1_desc = veto_reason if (long_vetoed and short_vetoed) else "Struttura laterale / Neutra"
+
+        if last_ph and prev_ph and last_pl and prev_pl:
+            if last_ph > prev_ph and last_pl >= prev_pl and (ema21 is None or live_px >= ema21) and not long_vetoed:
+                l1_long = True
+                l1_desc = f"Rialzista: HH {last_ph:.1f} > {prev_ph:.1f} | HL {last_pl:.1f} >= {prev_pl:.1f}"
+            elif last_ph <= prev_ph and last_pl < prev_pl and (ema21 is None or live_px <= ema21) and not short_vetoed:
+                l1_short = True
+                l1_desc = f"Ribassista: LH {last_ph:.1f} <= {prev_ph:.1f} | LL {last_pl:.1f} < {prev_pl:.1f}"
+
+        # Priorità 2 (Micro-trend): 2 candele consecutive decise sotto/sopra l'EMA
+        if c_red_2 and (ema8 is None or live_px <= ema8) and not short_vetoed:
             l1_short = True
             l1_long = False
             l1_desc = f"Trend Impulso Short: 2+ candele rosse sotto EMA ({live_px:.1f})"
-        elif c_green_2 and (ema8 is None or live_px >= ema8):
+        elif c_green_2 and (ema8 is None or live_px >= ema8) and not long_vetoed:
             l1_long = True
             l1_short = False
             l1_desc = f"Trend Impulso Long: 2+ candele verdi sopra EMA ({live_px:.1f})"
@@ -456,12 +534,12 @@ class HyperUS500M5Engine:
         l2_short = False
         l2_desc = "In attesa di rottura o candela d'impulso"
 
-        # SHORT: Breakout sotto minimo precedente, breakdown Pivot Low, o candela rossa decisa (Body >= 40%)
+        # SHORT: Breakout sotto minimo precedente e candela rossa
         break_low_prev = bool(live_px < prev_c["low"])
         is_red_impulse = (curr_c["close"] < curr_c["open"] and body_ratio >= 0.40)
         break_pivot_low = bool(last_pl and live_px < last_pl)
 
-        if (break_pivot_low or break_low_prev or is_red_impulse) and (live_px < curr_c["open"]):
+        if (break_pivot_low or break_low_prev or is_red_impulse) and (live_px < curr_c["open"]) and not short_vetoed:
             l2_short = True
             if break_low_prev:
                 l2_desc = f"Breakout M5: {live_px:.1f} < Minimo Prec {prev_c['low']:.1f}"
@@ -470,12 +548,12 @@ class HyperUS500M5Engine:
             else:
                 l2_desc = f"Impulso Rosso: Body {int(body_ratio*100)}%"
 
-        # LONG: Breakout sopra massimo precedente, breakout Pivot High, o candela verde decisa (Body >= 40%)
+        # LONG: Breakout sopra massimo precedente e candela verde
         break_high_prev = bool(live_px > prev_c["high"])
         is_green_impulse = (curr_c["close"] > curr_c["open"] and body_ratio >= 0.40)
         break_pivot_high = bool(last_ph and live_px > last_ph)
 
-        if (break_pivot_high or break_high_prev or is_green_impulse) and (live_px > curr_c["open"]):
+        if (break_pivot_high or break_high_prev or is_green_impulse) and (live_px > curr_c["open"]) and not long_vetoed:
             l2_long = True
             if break_high_prev:
                 l2_desc = f"Breakout M5: {live_px:.1f} > Massimo Prec {prev_c['high']:.1f}"
@@ -491,18 +569,17 @@ class HyperUS500M5Engine:
         l3_short = False
         l3_desc = "Flusso in consolidamento"
 
-        # SHORT: Prezzo sotto EMA8 e candela corrente che spinge verso il basso (o EMA8 discendente)
         if ema8 is not None:
-            if live_px < ema8 and (live_px <= curr_c["open"] or (prev_ema8 and ema8 < prev_ema8)):
+            if live_px < ema8 and (live_px <= curr_c["open"] or (prev_ema8 and ema8 < prev_ema8)) and not short_vetoed:
                 l3_short = True
                 l3_desc = f"Spinta Ribassista: {live_px:.1f} < EMA8 ({ema8:.1f})"
-            elif live_px > ema8 and (live_px >= curr_c["open"] or (prev_ema8 and ema8 > prev_ema8)):
+            elif live_px > ema8 and (live_px >= curr_c["open"] or (prev_ema8 and ema8 > prev_ema8)) and not long_vetoed:
                 l3_long = True
                 l3_desc = f"Spinta Rialzista: {live_px:.1f} > EMA8 ({ema8:.1f})"
 
-        # SINTESI DELLE CONFLUENZE A 3 LUCETTE (3/3 PRONTO)
-        all_green_long = l1_long and l2_long and l3_long
-        all_green_short = l1_short and l2_short and l3_short
+        # SINTESI DELLE CONFLUENZE A 3 LUCETTE (CON VERIFICA VETI)
+        all_green_long = l1_long and l2_long and l3_long and not long_vetoed
+        all_green_short = l1_short and l2_short and l3_short and not short_vetoed
 
         detected_dir = "LONG" if all_green_long else ("SHORT" if all_green_short else "NEUTRAL")
         all_green = all_green_long or all_green_short
@@ -1116,7 +1193,14 @@ class HyperUS500M5Engine:
                     self.candles.append(closed_bar)
                     if len(self.candles) > 500:
                         self.candles = self.candles[-500:]
-                    is_candle_close = True
+
+                    # La prima barra post-avvio è spesso monca/parziale: trading autorizzato solo dopo la prima barra intera
+                    if not getattr(self, "first_full_bar_completed", False):
+                        self.first_full_bar_completed = True
+                        is_candle_close = False
+                        logger.info(f"[{time_str}] ⏳ Prima barra post-avvio US500 conclusa. Dalla prossima barra M5 completa il trading è attivo al 100%.")
+                    else:
+                        is_candle_close = True
 
                 # Nuova barra M5
                 self.curr_boundary = boundary

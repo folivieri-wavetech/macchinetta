@@ -539,31 +539,34 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
     </div>
     """, unsafe_allow_html=True)
 
-    # Semaforo Confluenza M5 (3 Lucette: Struttura, Breakout, Spinta EMA)
-    sem_l1 = semaforo.get("L1_structure", False)
-    sem_l2 = semaforo.get("L2_trigger", False)
-    sem_l3 = semaforo.get("L3_momentum", False)
+    # Semaforo Confluenza M5 (3 Lucette: Struttura, Trigger, Spinta EMA)
     sem_bias = semaforo.get("bias", "NEUTRAL")
-    lights_on = sum([1 for l in [sem_l1, sem_l2, sem_l3] if l])
+    all_green = semaforo.get("all_green", False)
+    concordant = semaforo.get("concordant_lights", 0)
 
     if pos:
         sem_badge = f"<span style='color: #38bdf8; font-weight: 800;'>IN TRADE ({pos.get('direction', '')})</span>"
-    elif lights_on == 3:
-        col_b = "#22c55e" if sem_bias == "LONG" else "#ef4444"
-        sem_badge = f"<span style='color: {col_b}; font-weight: 800;'>🟢 3/3 PRONTO ({sem_bias})</span>"
-    elif lights_on == 2:
-        sem_badge = f"<span style='color: #facc15; font-weight: 700;'>🟡 2/3 ATTESA ({sem_bias})</span>"
+    elif all_green and sem_bias == "LONG":
+        sem_badge = "<span style='color: #22c55e; font-weight: 800;'>🟢 3/3 PRONTO (LONG)</span>"
+    elif all_green and sem_bias == "SHORT":
+        sem_badge = "<span style='color: #ef4444; font-weight: 800;'>🔴 3/3 PRONTO (SHORT)</span>"
+    elif concordant == 2 and sem_bias == "LONG":
+        sem_badge = "<span style='color: #facc15; font-weight: 700;'>🟡 2/3 ATTESA (LONG)</span>"
+    elif concordant == 2 and sem_bias == "SHORT":
+        sem_badge = "<span style='color: #facc15; font-weight: 700;'>🟡 2/3 ATTESA (SHORT)</span>"
     else:
-        sem_badge = f"<span style='color: #94a3b8; font-weight: 600;'>⚪ {lights_on}/3 SCANSIONE</span>"
+        sem_badge = "<span style='color: #94a3b8; font-weight: 600;'>⚪ NEUTRALE (SCANSIONE)</span>"
 
-    def _b_light(on, title):
-        if on:
-            return f"<div style='background: rgba(34, 197, 94, 0.18); border: 1px solid #22c55e; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #22c55e; font-weight: 700; font-size: 0.67rem;'>🟢 {title}</span></div>"
+    def _b_light(dir_light, title):
+        if dir_light == "LONG":
+            return f"<div style='background: rgba(34, 197, 94, 0.18); border: 1px solid #22c55e; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #22c55e; font-weight: 700; font-size: 0.67rem;'>🟢 {title} ▲</span></div>"
+        elif dir_light == "SHORT":
+            return f"<div style='background: rgba(239, 68, 68, 0.18); border: 1px solid #ef4444; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #ef4444; font-weight: 700; font-size: 0.67rem;'>🔴 {title} ▼</span></div>"
         return f"<div style='background: rgba(51, 65, 85, 0.25); border: 1px solid #334155; border-radius: 4px; padding: 2px 2px; text-align: center;'><span style='color: #64748b; font-weight: 600; font-size: 0.67rem;'>⚪ {title}</span></div>"
 
-    b_l1 = _b_light(sem_l1, "L1 Struttura")
-    b_l2 = _b_light(sem_l2, "L2 Breakout")
-    b_l3 = _b_light(sem_l3, "L3 Spinta EMA")
+    b_l1 = _b_light(semaforo.get("dir_L1", "NEUTRAL"), "L1 Struttura")
+    b_l2 = _b_light(semaforo.get("dir_L2", "NEUTRAL"), "L2 Trigger")
+    b_l3 = _b_light(semaforo.get("dir_L3", "NEUTRAL"), "L3 Spinta EMA")
 
     st.markdown(f"""
     <div style='background: rgba(15, 23, 42, 0.55); border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; margin-bottom: 7px;'>
