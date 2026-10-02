@@ -1628,7 +1628,7 @@ st.markdown("""
             align-items: stretch !important;
             padding: 6px 10px !important;
             border-radius: 8px !important;
-            min-height: 48px !important;
+            min-height: 56px !important;
             height: auto !important;
             margin-bottom: 6px !important;
             white-space: normal !important;
@@ -1654,7 +1654,8 @@ st.markdown("""
             font-size: 0.74rem !important;
             font-weight: 700 !important;
         }
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2),
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) {
             font-size: 0.68rem !important;
             font-weight: 500 !important;
             color: #bbb !important;
@@ -1670,7 +1671,8 @@ st.markdown("""
             white-space: nowrap !important;
             flex-shrink: 0 !important;
         }
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) > span:last-child {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) > span:last-child,
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) > span:last-child {
             margin-left: auto !important;
             text-align: right !important;
             white-space: nowrap !important;
@@ -1679,15 +1681,21 @@ st.markdown("""
             flex-shrink: 0 !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(255, 43, 43)"],
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="red"] {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="red"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(255, 43, 43)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="red"] {
             color: #ef4444 !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(33, 195, 84)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(9, 171, 59)"],
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="green"] {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="green"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(33, 195, 84)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(9, 171, 59)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="green"] {
             color: #22c55e !important;
         }
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="gray"] {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="gray"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="gray"] {
             color: #94a3b8 !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
@@ -2761,6 +2769,17 @@ else:
                 except Exception:
                     return ":gray[0,00 €]"
 
+            def get_margine_tag_conto(st_acc):
+                try:
+                    marg_raw = st_acc.get('margine', 0.0)
+                    marg_num = float(marg_raw) if marg_raw not in (None, "") else 0.0
+                    if marg_num > 0:
+                        return f":orange[Marg: {formatta_eur(marg_num)} €]"
+                    else:
+                        return ":gray[Marg: 0,00 €]"
+                except Exception:
+                    return ":gray[Marg: 0,00 €]"
+
             vista_side = st.session_state.get("vista_sidebar", "CONTO")
             if conti_demo:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #38bdf8; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
@@ -2769,10 +2788,11 @@ else:
                     st_cd = leggi_stato_sistema(cd)
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                     dd_cd = get_dd_tag_conto(st_cd)
+                    marg_cd = get_margine_tag_conto(st_cd)
                     is_sel = (cd == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
-                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}"
+                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}\n\n\u200b {marg_cd}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cd
                         st.session_state.vista_sidebar = "CONTO"
@@ -2786,10 +2806,11 @@ else:
                     st_cr = leggi_stato_sistema(cr)
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                     dd_cr = get_dd_tag_conto(st_cr)
+                    marg_cr = get_margine_tag_conto(st_cr)
                     is_sel = (cr == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cr, st_cr)
                     salute = get_stato_salute(cr)
-                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}"
+                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}\n\n\u200b {marg_cr}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cr
                         st.session_state.vista_sidebar = "CONTO"
