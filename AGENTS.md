@@ -5,6 +5,13 @@
 - **Raggruppamento Modifiche (Batching):** Possiamo accumulare modifiche multiple in locale, verificarle con i test unitari e la compilazione, e sincronizzare il server in un unico passaggio solo quando l'utente decide di rilasciare il pacchetto.
 - **Autorizzazione Implicita al Deploy:** Solo quando l'utente dice esplicitamente "sincronizza server" (o simile, oppure risponde affermativamente alla richiesta di deploy), si procede all'istante: il server è attivo, operativo e i permessi sul namespace `macchinetta` sono abilitati al 100%.
 - **Metodo Ufficiale di Deploy:** Non si usa Docker (la virtualizzazione non è attiva sul PC ed è stata concordata e confermata la modalità diretta PVC/Kubernetes). I pod eseguono il codice direttamente dal volume condiviso Longhorn (`/data`).
+- **"sincronizza server" vs "sincronizza xtrader":**
+  - `sincronizza server` -> aggiornamento COMPLETO con `deploy\sincronizza.ps1` (commit, copia, riavvio pod, health check).
+  - `sincronizza xtrader` -> SOLO copia di `XTrader.xlsx` (e `xtrader.py`) nella PVC, nessun commit, nessun riavvio:
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File .\deploy\sincronizza_xtrader.ps1
+    ```
+    Si esegue subito, senza chiedere conferma.
 - **Comando Unico di Sincronizzazione:**
   Per aggiornare il server, eseguire sempre:
   ```powershell

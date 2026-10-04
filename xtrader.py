@@ -199,6 +199,14 @@ table.xt-tab th.xt-sep, table.xt-tab td.xt-sep { border-left:2px solid #8a7400; 
 .xt-small .xt-title { font-size:1.15rem; margin-bottom:8px; }
 .xt-small table.xt-tab { font-size:0.98rem; }
 .xt-small table.xt-tab th, .xt-small table.xt-tab td { padding:7px 6px; }
+.xt-mini { padding: 6px 10px; margin-bottom: 8px; border-width:1px; box-shadow: 0 0 8px rgba(255,215,0,0.15); }
+.xt-mini .xt-title { font-size:0.85rem; margin-bottom:4px; }
+.xt-mini .xt-title span { font-size:0.8rem; }
+.xt-mini table.xt-tab { font-size:0.75rem; }
+.xt-mini table.xt-tab th, .xt-mini table.xt-tab td { padding:3px 4px; }
+.xt-mini table.xt-tab th { border-bottom-width:1px; }
+.xt-mini table.xt-tab th.xt-mdp { min-width:50px; }
+.xt-sez { color:#FFD700; font-size:0.95rem; font-weight:800; margin:14px 0 8px 2px; letter-spacing:1px; }
 </style>
 """
 
@@ -260,4 +268,11 @@ def renderizza_xtrader():
                           f"{len(giornate)} giornate: dal {prima['data']} al {ultima['data']}{_badge(tot_all)}", totali)
     tot_giorno = (_num(ultima["EXTRA"]["TOT."]) or 0.0) + (_num(ultima["COPILOTA"]["TOT."]) or 0.0)
     html += _tabella_html("🚀 XTRADER", f"Ultima giornata: {ultima['data']}{_badge(tot_giorno)}", ultima, "xt-small")
+
+    if len(giornate) > 1:
+        html += "<div class='xt-sez'>📅 GIORNATE PRECEDENTI</div>"
+        for r0 in reversed(giornate[:-1]):
+            d = estrai_giornata(celle, r0)
+            t = (_num(d["EXTRA"]["TOT."]) or 0.0) + (_num(d["COPILOTA"]["TOT."]) or 0.0)
+            html += _tabella_html(str(d["data"]), _badge(t), d, "xt-mini")
     st.markdown(html, unsafe_allow_html=True)
