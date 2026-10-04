@@ -206,7 +206,24 @@ table.xt-tab th.xt-sep, table.xt-tab td.xt-sep { border-left:2px solid #8a7400; 
 .xt-mini table.xt-tab th, .xt-mini table.xt-tab td { padding:3px 4px; }
 .xt-mini table.xt-tab th { border-bottom-width:1px; }
 .xt-mini table.xt-tab th.xt-mdp { min-width:50px; }
-.xt-sez { color:#FFD700; font-size:0.95rem; font-weight:800; margin:14px 0 8px 2px; letter-spacing:1px; }
+.xt-sez { color:#b8c0cc; font-size:0.95rem; font-weight:800; margin:14px 0 8px 2px; letter-spacing:1px; }
+
+/* Tema ODIERNA: blu acciaio */
+.xt-oggi { border-color:#5b9bd5; background:linear-gradient(145deg,#080d14,#111a26);
+           box-shadow:0 0 18px rgba(91,155,213,0.28); }
+.xt-oggi .xt-title, .xt-oggi td.xt-strat { color:#8fc1ec !important; }
+.xt-oggi table.xt-tab th { color:#8fc1ec; background:#0f1d2e; border-bottom-color:#5b9bd5; }
+.xt-oggi table.xt-tab th.xt-sep, .xt-oggi table.xt-tab td.xt-sep { border-left-color:#3d6f9e; }
+.xt-oggi table.xt-tab tr:hover td { background:#13202f; }
+
+/* Tema PRECEDENTI: argento / grafite */
+.xt-prec { border-color:#6b7280; background:linear-gradient(145deg,#0c0c0e,#151619);
+           box-shadow:0 0 6px rgba(160,170,185,0.12); }
+.xt-prec .xt-title, .xt-prec td.xt-strat { color:#c3c9d2 !important; }
+.xt-prec table.xt-tab th { color:#aab2bd; background:#1a1c20; border-bottom-color:#6b7280; }
+.xt-prec table.xt-tab th.xt-sep, .xt-prec table.xt-tab td.xt-sep { border-left-color:#4b5260; }
+.xt-prec table.xt-tab td { color:#d6d9de; }
+.xt-prec table.xt-tab tr:hover td { background:#1b1d21; }
 </style>
 """
 
@@ -267,12 +284,35 @@ def renderizza_xtrader():
     html += _tabella_html("🚀 XTRADER TOTALI",
                           f"{len(giornate)} giornate: dal {prima['data']} al {ultima['data']}{_badge(tot_all)}", totali)
     tot_giorno = (_num(ultima["EXTRA"]["TOT."]) or 0.0) + (_num(ultima["COPILOTA"]["TOT."]) or 0.0)
-    html += _tabella_html("🚀 XTRADER", f"Ultima giornata: {ultima['data']}{_badge(tot_giorno)}", ultima, "xt-small")
+    html += _tabella_html("🚀 XTRADER", f"Ultima giornata: {etichetta_giornata(ultima['data'])}{_badge(tot_giorno)}",
+                          ultima, "xt-small xt-oggi")
 
     if len(giornate) > 1:
         html += "<div class='xt-sez'>📅 GIORNATE PRECEDENTI</div>"
         for r0 in reversed(giornate[:-1]):
             d = estrai_giornata(celle, r0)
             t = (_num(d["EXTRA"]["TOT."]) or 0.0) + (_num(d["COPILOTA"]["TOT."]) or 0.0)
-            html += _tabella_html(str(d["data"]), _badge(t), d, "xt-mini")
+            html += _tabella_html(etichetta_giornata(d["data"]), _badge(t), d, "xt-mini xt-prec")
     st.markdown(html, unsafe_allow_html=True)
+
+
+_GIORNI = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
+
+
+def etichetta_giornata(data):
+    """'LUN 21/09' -> 'LUN 21/09 - VEN 25/09 (settimana)'; SAB/DOM restano giornate singole."""
+    s = str(data or "").strip()
+    m = re.match(r"^(LUN)\s+(\d{1,2})/(\d{1,2})$", s, re.IGNORECASE)
+    if not m:
+        return s
+    import datetime as _dt
+    oggi = _dt.date.today()
+    g, me = int(m.group(2)), int(m.group(3))
+    try:
+        d0 = _dt.date(oggi.year, me, g)
+        if (d0 - oggi).days > 60:
+            d0 = _dt.date(oggi.year - 1, me, g)
+    except ValueError:
+        return s
+    d1 = d0 + _dt.timedelta(days=4)
+    return f"LUN {d0.day}/{d0.month:02d} - VEN {d1.day}/{d1.month:02d}"
