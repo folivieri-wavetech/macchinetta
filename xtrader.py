@@ -194,27 +194,39 @@ table.xt-tab tr:hover td { background:#1c1c1c; }
 td.xt-strat { color:#FFD700 !important; font-weight:900 !important; text-align:left !important; }
 td.xt-pos { color:#22c55e !important; font-weight:800 !important; }
 td.xt-neg { color:#ef4444 !important; font-weight:800 !important; }
+table.xt-tab th.xt-sep, table.xt-tab td.xt-sep { border-left:2px solid #8a7400; }
+.xt-small { padding: 10px 14px; }
+.xt-small .xt-title { font-size:1.15rem; margin-bottom:8px; }
+.xt-small table.xt-tab { font-size:0.98rem; }
+.xt-small table.xt-tab th, .xt-small table.xt-tab td { padding:7px 6px; }
 </style>
 """
 
 
-def _tabella_html(titolo, sottotitolo, dati):
+def _tabella_html(titolo, sottotitolo, dati, extra_cls=""):
     righe_html = ""
     for strat in ("EXTRA", "COPILOTA"):
         celle_html = f"<td class='xt-strat'>{strat}</td>"
         for col in COLONNE:
             val = _fmt(col, dati[strat][col])
-            cls = ""
+            classi = []
             if col == "TOT.":
                 n = _num(dati[strat][col])
-                if n is not None:
-                    cls = " class='xt-pos'" if n > 0 else (" class='xt-neg'" if n < 0 else "")
+                if n is not None and n != 0:
+                    classi.append("xt-pos" if n > 0 else "xt-neg")
+            if col == "EV W":
+                classi.append("xt-sep")
+            cls = f" class='{' '.join(classi)}'" if classi else ""
             celle_html += f"<td{cls}>{val}</td>"
         righe_html += f"<tr>{celle_html}</tr>"
-    head = "<th>STRATEGIA</th>" + "".join(
-        f"<th class='xt-mdp'>{c}</th>" if c == "MD +" else f"<th>{c}</th>" for c in COLONNE
-    )
-    return (f'<div class="xt-wrap"><div class="xt-title">{titolo} <span>{sottotitolo}</span></div>'
+    def _th(c):
+        if c == "MD +":
+            return f"<th class='xt-mdp'>{c}</th>"
+        if c == "EV W":
+            return f"<th class='xt-sep'>{c}</th>"
+        return f"<th>{c}</th>"
+    head = "<th>STRATEGIA</th>" + "".join(_th(c) for c in COLONNE)
+    return (f'<div class="xt-wrap {extra_cls}"><div class="xt-title">{titolo} <span>{sottotitolo}</span></div>'
             f'<table class="xt-tab"><thead><tr>{head}</tr></thead><tbody>{righe_html}</tbody></table></div>')
 
 
@@ -238,12 +250,14 @@ def renderizza_xtrader():
     ultima = estrai_giornata(celle, giornate[-1])
     prima = estrai_giornata(celle, giornate[0])
 
+    def _badge(v):
+        c = "#22c55e" if v > 0 else ("#ef4444" if v < 0 else "#ccc")
+        return f"<b style='color:{c}; margin-left:18px;'>Totale: {_fmt('TOT.', v)}</b>"
+
+    tot_all = (_num(totali["EXTRA"]["TOT."]) or 0.0) + (_num(totali["COPILOTA"]["TOT."]) or 0.0)
     html = _CSS
     html += _tabella_html("🚀 XTRADER TOTALI",
-                          f"{len(giornate)} giornate: dal {prima['data']} al {ultima['data']}", totali)
+                          f"{len(giornate)} giornate: dal {prima['data']} al {ultima['data']}{_badge(tot_all)}", totali)
     tot_giorno = (_num(ultima["EXTRA"]["TOT."]) or 0.0) + (_num(ultima["COPILOTA"]["TOT."]) or 0.0)
-    col_tot = "#22c55e" if tot_giorno > 0 else ("#ef4444" if tot_giorno < 0 else "#ccc")
-    sott_ultima = (f"Ultima giornata: {ultima['data']}"
-                   f"<b style='color:{col_tot}; margin-left:18px;'>Totale: {_fmt('TOT.', tot_giorno)}</b>")
-    html += _tabella_html("🚀 XTRADER", sott_ultima, ultima)
+    html += _tabella_html("🚀 XTRADER", f"Ultima giornata: {ultima['data']}{_badge(tot_giorno)}", ultima, "xt-small")
     st.markdown(html, unsafe_allow_html=True)
