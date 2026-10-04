@@ -191,7 +191,7 @@ table.xt-tab th.xt-mdp { min-width:80px; }
 table.xt-tab td { color:#f2f2f2; padding:10px 8px; text-align:center; border-bottom:1px solid #333;
                   white-space:nowrap; font-weight:600; }
 table.xt-tab tr:hover td { background:#1c1c1c; }
-td.xt-strat { color:#FFD700 !important; font-weight:900 !important; text-align:left !important; }
+td.xt-strat { color:#FFD700 !important; font-weight:900 !important; text-align:center !important; }
 td.xt-pos { color:#22c55e !important; font-weight:800 !important; }
 td.xt-neg { color:#ef4444 !important; font-weight:800 !important; }
 table.xt-tab th.xt-sep, table.xt-tab td.xt-sep { border-left:2px solid #8a7400; }
@@ -201,7 +201,7 @@ table.xt-tab th.xt-sep, table.xt-tab td.xt-sep { border-left:2px solid #8a7400; 
 .xt-small table.xt-tab th, .xt-small table.xt-tab td { padding:7px 6px; }
 .xt-mini { padding: 6px 10px; margin-bottom: 8px; border-width:1px; box-shadow: 0 0 8px rgba(255,215,0,0.15); }
 .xt-mini .xt-title { font-size:0.85rem; margin-bottom:4px; }
-.xt-mini .xt-title span { font-size:0.8rem; }
+.xt-mini .xt-title span { font-size:0.85rem; font-weight:900; }
 .xt-mini table.xt-tab { font-size:0.75rem; }
 .xt-mini table.xt-tab th, .xt-mini table.xt-tab td { padding:3px 4px; }
 .xt-mini table.xt-tab th { border-bottom-width:1px; }
@@ -224,6 +224,8 @@ table.xt-tab th.xt-sep, table.xt-tab td.xt-sep { border-left:2px solid #8a7400; 
 .xt-prec table.xt-tab th.xt-sep, .xt-prec table.xt-tab td.xt-sep { border-left-color:#4b5260; }
 .xt-prec table.xt-tab td { color:#d6d9de; }
 .xt-prec table.xt-tab tr:hover td { background:#1b1d21; }
+.xt-prec .xt-title { color:#f59e0b !important; }
+.xt-prec table.xt-tab td.xt-pw { color:#facc15 !important; font-weight:700; }
 </style>
 """
 
@@ -241,6 +243,8 @@ def _tabella_html(titolo, sottotitolo, dati, extra_cls=""):
                     classi.append("xt-pos" if n > 0 else "xt-neg")
             if col == "EV W":
                 classi.append("xt-sep")
+            if col == "% W":
+                classi.append("xt-pw")
             cls = f" class='{' '.join(classi)}'" if classi else ""
             celle_html += f"<td{cls}>{val}</td>"
         righe_html += f"<tr>{celle_html}</tr>"
