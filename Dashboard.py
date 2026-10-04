@@ -3053,6 +3053,7 @@ else:
             renderizza_xtrader()
         except Exception as err_xt:
             st.error(f"⚠️ Errore modulo XTrader: {err_xt}")
+        st.stop()
 
     mostra_goldfinger = (conto_selezionato == "DANY_REALE")
     tab_goldfinger = None
