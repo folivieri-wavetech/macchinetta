@@ -354,21 +354,22 @@ def renderizza_tab_goldfinger(conto):
                 diff_sign = f"+{diff_pts:.2f}" if diff_pts >= 0 else f"{diff_pts:.2f}"
                 confronto_armato_html = f"<span style='color: #94a3b8; font-size: 0.74rem; font-weight: 500;'>(In esecuzione @ <b style='color: #facc15;'>{saved_pz1:.2f}</b> • Delta: {diff_sign} pip)</span>"
             
-            st.markdown(f"""
-                <div style='background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;'>
-                    <div style='display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;'>
-                        <span style='color: #38bdf8; font-weight: 700; font-size: 0.84rem;'>🎯 LIVELLO CHIRURGICO:</span>
-                        <div style='display: flex; align-items: baseline; gap: 8px;'>
-                            <span style='color: #FFD700; font-weight: 800; font-size: 1.15rem;'>{sugg_lvl:.2f}</span>
-                            {confronto_armato_html}
-                        </div>
-                    </div>
-                    <div style='margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(56, 189, 248, 0.15); font-size: 0.74rem; color: #94a3b8; line-height: 1.5;'>
-                        <div>Riferimento: <b>{rif_tipo} ({rif_val:.2f}) - 5 pip</b></div>
-                        <div>Minimi: <b>Min21: {min21_str}</b> &nbsp;|&nbsp; <b>Min55: {min55_str}</b> &nbsp;|&nbsp; <b>Min9: {min9_str}</b></div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            html_chirurgico = (
+                f"<div style='background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;'>"
+                f"<div style='display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;'>"
+                f"<span style='color: #38bdf8; font-weight: 700; font-size: 0.84rem;'>🎯 LIVELLO CHIRURGICO:</span>"
+                f"<div style='display: flex; align-items: baseline; gap: 8px;'>"
+                f"<span style='color: #FFD700; font-weight: 800; font-size: 1.15rem;'>{sugg_lvl:.2f}</span>"
+                f"{confronto_armato_html}"
+                f"</div>"
+                f"</div>"
+                f"<div style='margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(56, 189, 248, 0.15); font-size: 0.74rem; color: #94a3b8; line-height: 1.5;'>"
+                f"<div>Riferimento: <b>{rif_tipo} ({rif_val:.2f}) - 5 pip</b></div>"
+                f"<div>Minimi: <b>Min21: {min21_str}</b> &nbsp;|&nbsp; <b>Min55: {min55_str}</b> &nbsp;|&nbsp; <b>Min9: {min9_str}</b></div>"
+                f"</div>"
+                f"</div>"
+            )
+            st.markdown(html_chirurgico, unsafe_allow_html=True)
 
         # Prezzo Livello 1 (Obbligatorio)
         def_pz1 = float(bid_live) if bid_live else 0.0
