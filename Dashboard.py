@@ -2891,14 +2891,14 @@ else:
         # Pulsante RADAR TREND posizionato stabilmente fuori da ogni fragment temporizzato
         st.markdown("""
             <style>
-            div.st-key-btn_radar_sidebar {
+            div.st-key-btn_radar_sidebar, div.st-key-btn_xtrader_sidebar {
                 display: flex !important;
                 justify-content: center !important;
                 align-items: center !important;
                 width: 100% !important;
                 margin: 0 auto !important;
             }
-            div.st-key-btn_radar_sidebar button {
+            div.st-key-btn_radar_sidebar button, div.st-key-btn_xtrader_sidebar button {
                 background-color: #000000 !important;
                 border: 2px solid #FFD700 !important;
                 border-radius: 8px !important;
@@ -2912,10 +2912,10 @@ else:
                 box-shadow: 0 0 16px rgba(255, 215, 0, 0.4) !important;
                 transition: all 0.2s ease-in-out !important;
             }
-            div.st-key-btn_radar_sidebar button div[data-testid="stMarkdownContainer"],
-            div.st-key-btn_radar_sidebar button div,
-            div.st-key-btn_radar_sidebar button p,
-            div.st-key-btn_radar_sidebar button span {
+            div.st-key-btn_radar_sidebar button div[data-testid="stMarkdownContainer"], div.st-key-btn_xtrader_sidebar button div[data-testid="stMarkdownContainer"],
+            div.st-key-btn_radar_sidebar button div, div.st-key-btn_xtrader_sidebar button div,
+            div.st-key-btn_radar_sidebar button p, div.st-key-btn_xtrader_sidebar button p,
+            div.st-key-btn_radar_sidebar button span, div.st-key-btn_xtrader_sidebar button span {
                 display: flex !important;
                 justify-content: center !important;
                 align-items: center !important;
@@ -2930,16 +2930,16 @@ else:
                 padding: 0 !important;
                 line-height: 1.2 !important;
             }
-            div.st-key-btn_radar_sidebar button:hover {
+            div.st-key-btn_radar_sidebar button:hover, div.st-key-btn_xtrader_sidebar button:hover {
                 background-color: #1a1a00 !important;
                 border-color: #FFE55C !important;
                 box-shadow: 0 0 24px rgba(255, 215, 0, 0.65) !important;
                 transform: translateY(-1px);
             }
-            div.st-key-btn_radar_sidebar button:hover div[data-testid="stMarkdownContainer"],
-            div.st-key-btn_radar_sidebar button:hover div,
-            div.st-key-btn_radar_sidebar button:hover p,
-            div.st-key-btn_radar_sidebar button:hover span {
+            div.st-key-btn_radar_sidebar button:hover div[data-testid="stMarkdownContainer"], div.st-key-btn_xtrader_sidebar button:hover div[data-testid="stMarkdownContainer"],
+            div.st-key-btn_radar_sidebar button:hover div, div.st-key-btn_xtrader_sidebar button:hover div,
+            div.st-key-btn_radar_sidebar button:hover p, div.st-key-btn_xtrader_sidebar button:hover p,
+            div.st-key-btn_radar_sidebar button:hover span, div.st-key-btn_xtrader_sidebar button:hover span {
                 color: #FFE55C !important;
             }
             </style>
@@ -2954,6 +2954,17 @@ else:
             else:
                 st.session_state.vista_sidebar = "RADAR"
                 st.session_state.target_tab = "Radar"
+            st.rerun()
+
+        # Pulsante XTRADER (sottomodulo dedicato, stesso stile del Radar Trend)
+        st.markdown("<div style='margin-top: 10px; margin-bottom: 5px;'></div>", unsafe_allow_html=True)
+        is_xtrader_sel = (st.session_state.get("vista_sidebar", "CONTO") == "XTRADER")
+        if st.button("🚀 XTRADER", key="btn_xtrader_sidebar", type="primary" if is_xtrader_sel else "secondary", use_container_width=True):
+            if is_xtrader_sel:
+                st.session_state.vista_sidebar = "CONTO"
+                st.session_state.target_tab = "Pfoglio"
+            else:
+                st.session_state.vista_sidebar = "XTRADER"
             st.rerun()
 
     ruolo = st.session_state.get("ruolo", "VIEWER")
@@ -3035,6 +3046,13 @@ else:
         }
         </style>
     """, unsafe_allow_html=True)
+
+    if st.session_state.get("vista_sidebar", "CONTO") == "XTRADER":
+        try:
+            from xtrader import renderizza_xtrader
+            renderizza_xtrader()
+        except Exception as err_xt:
+            st.error(f"⚠️ Errore modulo XTrader: {err_xt}")
 
     mostra_goldfinger = (conto_selezionato == "DANY_REALE")
     tab_goldfinger = None
