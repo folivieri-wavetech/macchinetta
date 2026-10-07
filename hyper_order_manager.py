@@ -118,7 +118,9 @@ class HyperOrderManager:
         return None
 
     def send_notification(self, titolo: str, messaggio: str, tags: str = "rotating_light", cooldown_identico_sec: int = 60, max_notifiche_minuto: int = 20):
-        """Invia notifica push su ntfy.sh con Circuit Breaker e Rate Limiter integrati."""
+        """Invia notifica push su ntfy.sh con Circuit Breaker e Rate Limiter integrati (DISATTIVATE)."""
+        # Notifiche push disattivate per Hyper su richiesta utente
+        return
         topic = self._get_ntfy_topic()
         if not topic:
             return
@@ -992,10 +994,6 @@ class HyperOrderManager:
                     pass
 
 def invia_notifica_hyper(account_dir: str, titolo: str, messaggio: str, tags: str = "rotating_light"):
-    """Helper globale per invio notifiche push Hyper."""
-    try:
-        mgr = HyperOrderManager.get_instance(account_dir)
-        mgr.send_notification(titolo, messaggio, tags=tags)
-    except Exception as e:
-        logger.warning(f"Errore helper invia_notifica_hyper: {e}")
+    """Helper globale per invio notifiche push Hyper (DISATTIVATE)."""
+    return
 
