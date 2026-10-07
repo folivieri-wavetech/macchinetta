@@ -224,12 +224,27 @@ def esegui_sync_candele(forza=False):
                 prices = r.json().get("prices", [])
                 if len(prices) >= 20:
                     fname = f"candele_{clean}_{tf}.json"
+                    max_keep = 500 if tf == "HOUR" else 60
                     for d in valid_target_dirs:
                         dest = os.path.join(d, fname)
                         try:
+                            merged_list = prices
+                            if os.path.exists(dest):
+                                try:
+                                    with open(dest, "r", encoding="utf-8") as f_old:
+                                        old_data = json.load(f_old)
+                                    if isinstance(old_data, list) and old_data:
+                                        snaps = {c.get("snapshotTime"): c for c in old_data if c.get("snapshotTime")}
+                                        for c in prices:
+                                            s = c.get("snapshotTime")
+                                            if s:
+                                                snaps[s] = c
+                                        merged_list = sorted(snaps.values(), key=lambda x: x.get("snapshotTime", ""))[-max_keep:]
+                                except Exception:
+                                    pass
                             tmp = f"{dest}.tmp.{os.getpid()}"
                             with open(tmp, "w", encoding="utf-8") as f:
-                                json.dump(prices, f, indent=2)
+                                json.dump(merged_list, f, indent=2)
                             os.replace(tmp, dest)
                         except Exception:
                             pass

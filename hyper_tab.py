@@ -242,6 +242,21 @@ def inject_hyper_css():
             opacity: 0.55 !important;
             cursor: not-allowed !important;
         }
+        .btn-reconn-hyper div.stButton > button {
+            background-color: rgba(14, 116, 144, 0.25) !important;
+            border: 1px solid rgba(56, 189, 248, 0.45) !important;
+            color: #38bdf8 !important;
+            height: 30px !important;
+            font-size: 0.74rem !important;
+            font-weight: 700 !important;
+            border-radius: 5px !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-reconn-hyper div.stButton > button:hover:not(:disabled) {
+            background-color: rgba(14, 116, 144, 0.45) !important;
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.35) !important;
+        }
         /* Forza la visibilità di tutte le sottotab di Hyper (5m) */
         div[data-testid="stTabsContent"] div[data-testid="stTabs"] div[role="tablist"] > button,
         div[data-testid="stTabsContent"] div[role="tablist"] > button {
@@ -653,6 +668,17 @@ def _render_instrument_column(engine, instr_type, conto_attivo, order_mgr):
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<div style='height: 24px; margin-top: 4px;'></div>", unsafe_allow_html=True)
+
+    # Pulsante Riconnetti Stream Lightstreamer (sempre accessibile)
+    st.markdown("<div class='btn-reconn-hyper' style='margin-top: 4px; margin-bottom: 6px;'>", unsafe_allow_html=True)
+    lbl_reconn = f"⚡ Riconnetti Stream ({instr_name})" if not is_conn else f"🔄 Riconnetti Stream ({instr_name})"
+    if st.button(lbl_reconn, key=f"btn_reconn_ls_{btn_sfx}", help=f"Forza il riavvio immediato del socket streaming Lightstreamer per {instr_name}", use_container_width=True):
+        if hasattr(engine, "force_reconnect_lightstreamer"):
+            engine.force_reconnect_lightstreamer()
+            st.toast(f"⚡ Riconnessione Lightstreamer forzata per {instr_name}!", icon="🔄")
+            time.sleep(0.4)
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # Se ci sono posizioni aperte su IG, pulsante rosso evidente di Chiusura Immediata a Mercato (FLAT)
     if real_ig_pos:

@@ -113,14 +113,14 @@ class LightstreamerClient(object):
 
         return urlencode(dict([(k, v) for (k, v) in iter(params.items()) if v])).encode("utf-8")
 
-    def _call(self, base_url, url, params):
+    def _call(self, base_url, url, params, timeout=15):
         """Open a network connection and performs HTTP Post with provided params."""
 
         # combines the "base_url" with the required "url" to be used for the specific request
         url = urljoin(base_url.geturl(), url)
         body = self._encode_params(params)
         log.debug("Making a request to <%s> with body <%s>", url, body)
-        return _urlopen(url, data=body)
+        return _urlopen(url, data=body, timeout=timeout)
 
     def _set_control_link_url(self, custom_address=None):
         """Set the address to use for the Control Connection in such cases where Lightstreamer is behind a Load Balancer."""
@@ -206,14 +206,32 @@ class LightstreamerClient(object):
             self._stream_connection_thread = None
             log.debug("Thread terminated")
 
+    def is_alive(self):
+        """Restituisce True se la connessione e il thread di stream sono attivi e in ascolto."""
+        return (
+            self._stream_connection is not None
+            and self._stream_connection_thread is not None
+            and self._stream_connection_thread.is_alive()
+        )
+
     def disconnect(self):
         """Request to close the session previously opened with the connect() invocation."""
 
         if self._stream_connection is not None:
             log.debug("Closing session to <%s>", self._lightstreamer_url.geturl())
-            _ = self._control({"LS_op": OP_DESTROY})
-            # there is no need to explicitly close the connection, since it is handled by thread completion
-            self._join()
+            try:
+                _ = self._control({"LS_op": OP_DESTROY})
+            except Exception:
+                pass
+            try:
+                self._stream_connection.close()
+            except Exception:
+                pass
+            self._stream_connection = None
+            try:
+                self._join()
+            except Exception:
+                pass
             log.info("Closed session to <%s>", self._lightstreamer_url.geturl())
         else:
             log.warning("No connection to Lightstreamer")

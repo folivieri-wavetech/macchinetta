@@ -1335,6 +1335,7 @@ class HyperUS500M5Engine:
             self.live_mid = round((bid + ask) / 2.0, 2)
             self.live_time_str = time_str
             self.total_ticks += 1
+            self.last_tick_timestamp = time.time()
             mid = self.live_mid
 
             now_epoch = int(time.time())
@@ -1405,8 +1406,21 @@ class HyperUS500M5Engine:
         api_key = os.getenv("IG_API_KEY")
         return user, pwd, api_key
 
+    def force_reconnect_lightstreamer(self):
+        """Forza la disconnessione e il riavvio immediato dello streaming Lightstreamer."""
+        logger.info("🔄 [HYPER_US500_M5] Richiesta riconnessione manuale Lightstreamer...")
+        with self.lock:
+            self.ls_connected = False
+        client = getattr(self, "ls_client", None)
+        if client:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+
     def _run_streaming_loop(self):
         """Thread di ascolto streaming Lightstreamer IG."""
+        self.ls_client = None
         while self.running:
             try:
                 if is_us500_feed_suspended():
@@ -1430,6 +1444,7 @@ class HyperUS500M5Engine:
                 payload = {"identifier": user, "password": pwd}
                 r = requests.post(url_session, headers=h_session, json=payload, timeout=10)
                 if r.status_code != 200:
+                    logger.warning(f"⚠️ [HYPER_US500_M5] Errore sessione IG per Lightstreamer (HTTP {r.status_code}): {r.text[:120]}")
                     time.sleep(10)
                     continue
 
@@ -1442,8 +1457,10 @@ class HyperUS500M5Engine:
                 from lightstreamer_client import LightstreamerClient, LightstreamerSubscription
                 ls_client = LightstreamerClient(account_id, f"CST-{cst}|XST-{xst}", endpoint)
                 ls_client.connect()
+                self.ls_client = ls_client
                 with self.lock:
                     self.ls_connected = True
+                    self.last_tick_timestamp = time.time()
 
                 def on_tick(item_update):
                     vals = item_update.get("values", {})
@@ -1469,11 +1486,32 @@ class HyperUS500M5Engine:
 
                 while self.running and self.ls_connected:
                     time.sleep(2)
+                    if not ls_client.is_alive():
+                        logger.warning("⚠️ [HYPER_US500_M5] Thread Lightstreamer non più attivo. Riavvio streaming...")
+                        with self.lock:
+                            self.ls_connected = False
+                        break
+                    if not is_us500_feed_suspended():
+                        last_t = getattr(self, "last_tick_timestamp", None)
+                        if last_t and (time.time() - last_t) > 75.0:
+                            logger.warning(f"⚠️ [HYPER_US500_M5 WATCHDOG] Nessun tick da {int(time.time() - last_t)}s con feed attivo. Riconnessione...")
+                            with self.lock:
+                                self.ls_connected = False
+                            try:
+                                ls_client.disconnect()
+                            except Exception:
+                                pass
+                            break
 
             except Exception as e:
                 logger.warning(f"Errore connessione Lightstreamer US500: {e}")
                 with self.lock:
                     self.ls_connected = False
+                if getattr(self, "ls_client", None):
+                    try:
+                        self.ls_client.disconnect()
+                    except Exception:
+                        pass
                 time.sleep(5)
 
     def _run_rollover_watchdog(self):
