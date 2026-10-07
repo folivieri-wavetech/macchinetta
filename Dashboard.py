@@ -2659,8 +2659,15 @@ if not st.session_state.logged_in:
                 idx_default = lista_utenti.index(ultimo_acc) if ultimo_acc in lista_utenti else 0
                 user = st.selectbox("Account", options=lista_utenti, index=idx_default)
             else:
-                user = st.text_input("Account", value=ultimo_acc)
-            pw = st.text_input("Password", type="password")
+                user = st.text_input("Account", value=ultimo_acc, autocomplete="username")
+            
+            # Campo username associato per consentire a Chrome e ai Password Manager
+            # di mappare correttamente le credenziali senza sovrascrivere la label della Password
+            st.html(f'''<input type="text" name="username" value="{user}" autocomplete="username" 
+                       style="position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; clip: rect(0, 0, 0, 0); overflow: hidden; opacity: 0; pointer-events: none;" 
+                       tabindex="-1" aria-hidden="true" />''')
+            
+            pw = st.text_input("Password", type="password", autocomplete="current-password")
             if st.form_submit_button("Accedi"):
                 res = auth_manager.verifica_login(user, pw)
                 if res.get("success"):

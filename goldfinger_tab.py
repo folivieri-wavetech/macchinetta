@@ -323,7 +323,7 @@ def renderizza_tab_goldfinger(conto):
             f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; min-height: 64px; text-align: center;'>"
             f"<div style='color: #94a3b8; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;'>💰 Cash Incassato</div>"
             f"<div style='color: {pnl_col}; font-size: 1.05rem; font-weight: 700; margin-top: 3px;'>{pnl_inc:+.2f} €</div>"
-            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>Dai rimbalzi (+7 pip)</div>"
+            f"<div style='color: #64748b; font-size: 0.68rem; margin-top: 2px;'>Dai rimbalzi (passo x 2)</div>"
             f"</div>",
             unsafe_allow_html=True
         )
@@ -659,12 +659,14 @@ def renderizza_tab_goldfinger(conto):
             st.markdown(html_table, unsafe_allow_html=True)
             
             min_disc = stato.get("minimo_discesa")
+            passo_attuale = float(stato.get("passo_pip") or cfg.get("passo_pip") or 6.0)
+            delta_rimbalzo = round(passo_attuale * 2.0, 2)
             if min_disc is not None:
-                sgancio = round(min_disc + 7.0, 2)
+                sgancio = round(min_disc + delta_rimbalzo, 2)
                 st.markdown(
                     f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 0.82rem;'>"
                     f"📉 <b>Minimo Discesa Corrente:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span> &nbsp;|&nbsp; "
-                    f"💥 <b>Soglia Chiusura Rimbalzo (+7 pip):</b> <span style='color: #FFD700; font-weight: bold;'>{sgancio:.2f}</span>"
+                    f"💥 <b>Soglia Chiusura Rimbalzo (+{delta_rimbalzo:.1f} pip = passo x 2):</b> <span style='color: #FFD700; font-weight: bold;'>{sgancio:.2f}</span>"
                     f"</div>",
                     unsafe_allow_html=True
                 )

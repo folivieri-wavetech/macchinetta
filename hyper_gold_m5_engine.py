@@ -206,6 +206,9 @@ class HyperGoldM5Engine:
         #           "sl_price": float, "open_time": str, "tp1_hit": bool, "runner_sl": float}
         self.position = None
 
+        # Cooldown Anti-Whipsaw (congelamento nuove entrate dopo Stop Loss o Inversione in perdita)
+        self.cooldown_candles = 0
+
         # Retrocompatibilità interfaccia dashboard
         self.increments = []
         self.trades = []
@@ -242,6 +245,7 @@ class HyperGoldM5Engine:
                     self.trading_enabled = bool(d.get("trading_enabled", False))
                     self.position = d.get("position")
                     self.increments = d.get("increments", [])
+                    self.cooldown_candles = int(d.get("cooldown_candles", 0))
                     self.trades = d.get("trades", [])
                     if "candles" in d and isinstance(d["candles"], list):
                         self.candles = d["candles"][-500:]
@@ -264,6 +268,7 @@ class HyperGoldM5Engine:
                     with self.lock:
                         self.position = d.get("position")
                         self.increments = d.get("increments", [])
+                        self.cooldown_candles = int(d.get("cooldown_candles", getattr(self, "cooldown_candles", 0)))
                         self.trading_enabled = bool(d.get("trading_enabled", self.trading_enabled))
             except Exception:
                 pass
@@ -379,6 +384,11 @@ class HyperGoldM5Engine:
                         )
                         with self.lock:
                             self.balance = round(self.balance + pnl_i, 2)
+                
+                tot_pnl_rec = (pnl_r if deal_run else 0.0) + (pnl_b if (deal_banc and not tp1_hit) else 0.0)
+                if tot_pnl_rec < 0:
+                    self.cooldown_candles = 2
+                    logger.info(f"⏳ [RECONCILE IG SPOT GOLD] Chiusura in perdita ({tot_pnl_rec:+.2f} €). Cooldown attivo: 2 candele M5 di pausa (ingresso alla terza).")
                 self.save_state()
             return
 
@@ -392,7 +402,7 @@ class HyperGoldM5Engine:
                 if not banc_open and deal_banc and not tp1_hit:
                     self.position["tp1_hit"] = True
                     self.position["contracts"] = RUNNER_CONTRACTS
-                    logger.info(f"ℹ️ [RECONCILE IG SPOT GOLD] Bancomat ({deal_banc}) chiuso su IG (TP1). Runner ({deal_run}) ancora attivo.")
+                    logger.info(f"ℹ️ [RECONCILE IG SPOT GOLD] Bancomat ({deal_banc}) chiuso su IG (TP1). Spostamento Runner ({deal_run}) a Breakeven.")
                     # Registra chiusura reale Bancomat nello storico
                     d_dir = self.position.get("direction", "LONG")
                     o_px = self.position.get("open_price", 0.0)
@@ -416,6 +426,22 @@ class HyperGoldM5Engine:
                     )
                     self.balance = round(self.balance + pnl_b, 2)
 
+                    # Sposta subito lo stop del Runner a Breakeven su IG (+1 pip lock)
+                    be_sl = round(o_px + BE_EXTRA_LOCK_PIPS if d_dir == "LONG" else o_px - BE_EXTRA_LOCK_PIPS, 2)
+                    self.position["runner_sl"] = be_sl
+                    if deal_run:
+                        logger.info(f"🛡️ [RECONCILE IG SPOT GOLD] Spostamento Runner ({deal_run}) a BREAKEVEN ({be_sl:.2f}) su IG a Rischio Zero!")
+                        threading.Thread(
+                            target=order_mgr.set_stop_loss_order,
+                            args=(deal_run, be_sl, "Runner a Breakeven da Reconcile"),
+                            daemon=True
+                        ).start()
+                    order_mgr.send_notification(
+                        "🎯 TP1 BANCOMAT INCASSATO (IG)!",
+                        f"Incassato TP1 Gold su IG! Runner spostato a BREAKEVEN ({be_sl:.2f}). Rischio ZERO!",
+                        "moneybag"
+                    )
+
                 # Se né runner né bancomat combaciano ma ci sono deal su IG, NON azzeriamo!
                 if not run_open and not banc_open and not surviving_incs and len(open_deal_ids) > 0:
                     logger.warning(f"⚠️ [RECONCILE IG SPOT GOLD] Deal registrati non coincidenti ma aperte {len(real_positions)} posizioni su IG ({open_deal_ids})! Mantenuto stato OCCUPATO anti-hedging.")
@@ -434,6 +460,7 @@ class HyperGoldM5Engine:
                 "trading_enabled": self.trading_enabled,
                 "position": self.position,
                 "increments": self.increments,
+                "cooldown_candles": getattr(self, "cooldown_candles", 0),
                 "traffic_light": self.traffic_light,
                 "trades": self.trades[-100:],
                 "candles": self.candles[-500:]
@@ -731,7 +758,12 @@ class HyperGoldM5Engine:
         # INGRESSO AUTOMATICO: CONSENTITO SOLO A CHIUSURA CANDELA CONFERMATA (ALL'INIZIO DELLA NUOVA BARRA M5)
         # Mai a metà candela o appena il bot si connette!
         if on_candle_close and self.trading_enabled and not self.entry_in_progress:
-            if not is_gold_entry_suspended():
+            # Cooldown Anti-Whipsaw: 2 candele M5 di congelamento dopo SL/Inversione (ingresso alla terza candela)
+            if self.cooldown_candles > 0:
+                self.cooldown_candles -= 1
+                logger.info(f"[{time_str}] ⏳ [COOLDOWN ANTI-WHIPSAW SPOT GOLD] Candela M5 saltata. Candele di attesa rimanenti: {self.cooldown_candles} (ingresso consentito alla terza).")
+                self.save_state()
+            elif not is_gold_entry_suspended():
                 if self.position is None:
                     if all_green_long:
                         self._trigger_entry("LONG", live_px, time_str, last_pl, last_ph)
@@ -1343,6 +1375,9 @@ class HyperGoldM5Engine:
                 self.position = None
                 self.increments = []
                 self.closing_in_progress = False
+                if tot_incassato < 0 or "Stop Loss" in reason or "Inversione" in reason or "SL" in reason:
+                    self.cooldown_candles = 2
+                    logger.info(f"⏳ [COOLDOWN ANTI-WHIPSAW SPOT GOLD] Posizione chiusa in perdita ({tot_incassato:+.2f} €, {reason}). Attivato congelamento: 2 candele M5 di pausa (ingresso alla terza candela).")
                 self.save_state()
 
         threading.Thread(target=_close_flat_worker, daemon=True).start()

@@ -578,12 +578,14 @@ class GoldfingerEngine:
                         self.salva_stato()
                     break # Gestisci un livello per tick
 
-        # 7. CHIUSURA TOTALE SHORT SUL RIMBALZO (7 pip dal minimo)
+        # 7. CHIUSURA TOTALE SHORT SUL RIMBALZO (passo * 2 pip dal minimo)
         min_curr = self.stato.get("minimo_discesa")
         if aperti and min_curr is not None:
-            soglia_sgancio = min_curr + 7.0
+            passo = float(self.stato.get("passo_pip", 6.0))
+            delta_rimbalzo = round(passo * 2.0, 2)
+            soglia_sgancio = round(min_curr + delta_rimbalzo, 2)
             if ask >= soglia_sgancio:
-                print_log(f"💥 RIMBALZO RILEVATO: Prezzo {ask:.2f} >= Minimo ({min_curr:.2f}) + 7 pip ({soglia_sgancio:.2f}). Chiudo tutti gli SHORT all'incasso!")
+                print_log(f"💥 RIMBALZO RILEVATO: Prezzo {ask:.2f} >= Minimo ({min_curr:.2f}) + {delta_rimbalzo:.1f} pip (passo {passo:.1f} x 2 = {soglia_sgancio:.2f}). Chiudo tutti gli SHORT all'incasso!")
                 pnl_tot_rimbalzo = 0.0
                 tutti_chiusi = True
                 for sc in aperti:
