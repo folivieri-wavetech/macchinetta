@@ -20,7 +20,7 @@
   Questo script si occupa in automatico di:
   1. Verificare la sintassi Python (`py_compile`).
   2. Eseguire commit e push su GitHub (`master`).
-  3. Copiare i file modificati (`Dashboard.py`, `Motore.py`, `Motore_Trend.py`, `hyper_tab.py`, `macchinetta_trend/`, `Sistema/`, ecc.) nella PVC `/data/` tramite `kubectl cp`.
+  3. Copiare i file modificati (`Dashboard.py`, `Motore.py`, `Motore_Trend.py`, `goldfinger_tab.py`, `macchinetta_trend/`, `Sistema/`, ecc.) nella PVC `/data/` tramite `kubectl cp`.
   4. Riavviare i deployment (`kubectl rollout restart`).
   5. Eseguire l'health check HTTP su `https://macchinetta.wavetech.it`.
 

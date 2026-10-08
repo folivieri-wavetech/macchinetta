@@ -161,8 +161,6 @@ CONFIG_STRUMENTI = {
     "CHF/JPY": {"epic": "CS.D.CHFJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "tp_kj_distance_h1": 100}
 }
 
-# Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
-STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold", "US 500 Cash"]
 
 def pips_to_price(nome, pips):
     """Restituisce il delta di prezzo corrispondente a N pips reali per lo strumento."""
@@ -2319,9 +2317,6 @@ def esegui_ciclo_trend():
         if dati.get("tipo_strategia", "TREND") != "TREND":
             continue
 
-        # Operatività Trend disabilitata temporaneamente (riservata ad HYPER)
-        if nome in STRUMENTI_ESCLUSIVI_HYPER:
-            continue
             
         epic = CONFIG_STRUMENTI.get(nome, {}).get("epic")
         if not epic: continue

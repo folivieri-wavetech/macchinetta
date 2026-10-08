@@ -171,8 +171,6 @@ CONFIG_STRUMENTI = {
     "CHF/JPY": {"epic": "CS.D.CHFJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100}
 }
 
-# Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
-STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold", "US 500 Cash"]
 
 # --- STATO GLOBALE ---
 falsi_allarmi_tracker = {}
@@ -1210,9 +1208,6 @@ def esegui_motore():
                     if param.get("tipo_strategia", "RANGE") == "TREND":
                         continue
 
-                    # Operatività Range disabilitata temporaneamente (riservata ad HYPER)
-                    if nome in STRUMENTI_ESCLUSIVI_HYPER:
-                        continue
                         
                     # Se lo strumento è in modalità TREND, il motore Range non deve interferire
                     if param.get("tipo_strategia") == "TREND":

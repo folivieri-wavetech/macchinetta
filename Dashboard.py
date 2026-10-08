@@ -88,9 +88,6 @@ CONFIG_STRUMENTI = {
     "CHF/JPY": {"epic": "CS.D.CHFJPY.MINI.IP", "moltiplicatore": 0.01, "decimali": 3, "valuta": "JPY", "valore_punto": 100, "margine_unitario": 290, "tp_kj_distance_h1": 100}
 }
 
-# Strumenti con operatività sospesa nei motori classici (esclusivi per HYPER)
-STRUMENTI_ESCLUSIVI_HYPER = ["Spot Gold", "US 500 Cash"]
-
 
 config = dotenv_values(".env")
 DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
@@ -98,28 +95,6 @@ DEV_MODE = config.get("DEV_MODE", "False").lower() == "true"
 st.set_page_config(page_title="Macchinetta IG", layout="wide", initial_sidebar_state="expanded")
 if DEV_MODE:
     st.error("⚠️ **MODALITÀ SVILUPPO (DEV_MODE) ATTIVA** - I motori stanno scrivendo messaggi fittizi. Le connessioni API a IG sono sospese.")
-
-# --- AVVIO AUTOMATICO BACKGROUND DAEMON HYPER M5 H24 ---
-_hyper_init_started = False
-_hyper_init_lock = threading.Lock()
-
-def _avvia_hyper_h24_background():
-    global _hyper_init_started
-    with _hyper_init_lock:
-        if not _hyper_init_started:
-            _hyper_init_started = True
-            def _worker():
-                try:
-                    time.sleep(1.0)
-                    from hyper_gold_m5_engine import HyperGoldM5Engine
-                    from hyper_us500_m5_engine import HyperUS500M5Engine
-                    HyperGoldM5Engine.get_instance("DANY_DEMO")
-                    HyperUS500M5Engine.get_instance("DANY_DEMO")
-                except Exception:
-                    pass
-            threading.Thread(target=_worker, daemon=True, name="HyperH24InitThread").start()
-
-_avvia_hyper_h24_background()
 
 # --- FUNZIONI HELPER MULTI-CONTO ---
 def get_accounts():
@@ -723,137 +698,9 @@ def scrivi_console_log(messaggio, conto):
     except Exception:
         pass
 
-def carica_stati_hyper(conto):
-    hyper_30s_state = {}
-    hyper_5m_state = {}
-    for p_30s in [os.path.join(conto, "hyper_gold_state.json"), "hyper_gold_state.json"]:
-        if os.path.exists(p_30s):
-            try:
-                with open(p_30s, "r", encoding="utf-8") as f:
-                    hyper_30s_state = json.load(f)
-                    if hyper_30s_state: break
-            except Exception: pass
-
-    for p_5m in [os.path.join(conto, "hyper_gold_m5_state.json"), "hyper_gold_m5_state.json", os.path.join(conto, "hyper_gold_m1_state.json"), "hyper_gold_m1_state.json"]:
-        if os.path.exists(p_5m):
-            try:
-                with open(p_5m, "r", encoding="utf-8") as f:
-                    hyper_5m_state = json.load(f)
-                    if hyper_5m_state: break
-            except Exception: pass
-
-    # US 500
-    hyper_us500_30s = {}
-    for p_u30 in [os.path.join(conto, "hyper_us500_state.json"), "hyper_us500_state.json"]:
-        if os.path.exists(p_u30):
-            try:
-                with open(p_u30, "r", encoding="utf-8") as f:
-                    hyper_us500_30s = json.load(f)
-                    if hyper_us500_30s: break
-            except Exception: pass
-
-    hyper_us500_5m = {}
-    for p_u5 in [os.path.join(conto, "hyper_us500_m5_state.json"), "hyper_us500_m5_state.json"]:
-        if os.path.exists(p_u5):
-            try:
-                with open(p_u5, "r", encoding="utf-8") as f:
-                    hyper_us500_5m = json.load(f)
-                    if hyper_us500_5m: break
-            except Exception: pass
-
-    hyper_30s_state["us500"] = hyper_us500_30s
-    hyper_5m_state["us500"] = hyper_us500_5m
-
-    return hyper_30s_state, hyper_5m_state
-
-def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state=None, hyper_5m_state=None, pos_data=None):
-    if hyper_30s_state is None: hyper_30s_state = {}
-    if hyper_5m_state is None: hyper_5m_state = {}
+def calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, *args, pos_data=None, **kwargs):
     if pos_data is None: pos_data = []
     deal_id = pos_dict.get("dealId") or pos_dict.get("deal_id")
-    is_gold = (
-        nome_strum in ("Spot Gold", "ORO")
-        or "GOLD" in str(nome_strum).upper()
-        or "CFEGOLD" in str(pos_dict.get("epic", ""))
-    )
-
-    is_us500 = (
-        "US 500" in str(nome_strum).upper()
-        or "US500" in str(nome_strum).upper()
-        or "SP500" in str(nome_strum).upper()
-        or "USA500" in str(pos_dict.get("epic", ""))
-    )
-
-    # --- 0. RICONOSCIMENTO SPECIFICO BLOCCO HYPER (Spot Gold e US 500) ---
-    pos_30s = hyper_30s_state.get("position") or {}
-    incs_30s = hyper_30s_state.get("increments") or []
-    pos_5m = hyper_5m_state.get("position") or {}
-    incs_5m = hyper_5m_state.get("increments") or []
-
-    u_pos_30s = (hyper_30s_state.get("us500") or {}).get("position") or {}
-    u_pos_5m = (hyper_5m_state.get("us500") or {}).get("position") or {}
-    u_incs_5m = (hyper_5m_state.get("us500") or {}).get("increments") or []
-
-    if deal_id:
-        if deal_id == pos_30s.get("deal_id") or deal_id == pos_30s.get("deal_id_runner"):
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
-        for idx_30, inc in enumerate(incs_30s):
-            if inc.get("deal_id") == deal_id:
-                st_num = inc.get("step_idx", idx_30 + 1)
-                return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {st_num}</span>"
-
-        # Gold Hyper 5M
-        if deal_id == pos_5m.get("deal_id_bancomat"):
-            return "<span style='color: #f59e0b; font-weight: bold;'>Hyper-Bco</span>"
-        if deal_id == pos_5m.get("deal_id_runner"):
-            return "<span style='color: #38bdf8; font-weight: bold;'>Hyper-Run</span>"
-        if deal_id == pos_5m.get("deal_id"):
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5M</span>"
-        for idx_5, inc in enumerate(incs_5m):
-            if inc.get("deal_id") == deal_id:
-                lbl_name = inc.get("label", f"Hyper-Speed {idx_5 + 1}")
-                return f"<span style='color: #c084fc; font-weight: bold;'>{lbl_name}</span>"
-
-        # US500 Hyper 30S
-        if deal_id == u_pos_30s.get("deal_id") or deal_id == u_pos_30s.get("deal_id_runner"):
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S (US500)</span>"
-
-        # US500 Hyper 5M
-        if deal_id == u_pos_5m.get("deal_id_bancomat"):
-            return "<span style='color: #f59e0b; font-weight: bold;'>Hyper-Bco</span>"
-        if deal_id == u_pos_5m.get("deal_id_runner"):
-            return "<span style='color: #38bdf8; font-weight: bold;'>Hyper-Run</span>"
-        if deal_id == u_pos_5m.get("deal_id"):
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 5M (US500)</span>"
-        for idx_u5, inc in enumerate(u_incs_5m):
-            if inc.get("deal_id") == deal_id:
-                lbl_name = inc.get("label", f"Hyper-Speed US500 {idx_u5 + 1}")
-                return f"<span style='color: #c084fc; font-weight: bold;'>{lbl_name}</span>"
-
-    if is_gold:
-        if abs(sz_pos - 2.0) < 0.001:
-            return "<span style='color: #FFD700; font-weight: bold;'>Core hyper 30S</span>"
-        elif abs(sz_pos - 4.0) < 0.001:
-            matching_4c = [p for p in pos_data if abs(float(p['position']['size']) - 4.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
-            try:
-                sc_idx = matching_4c.index(next(p for p in matching_4c if p['position'].get('dealId') == deal_id)) + 1
-            except Exception:
-                sc_idx = 1
-            return f"<span style='color: #38bdf8; font-weight: bold;'>scalino n. {sc_idx}</span>"
-        elif abs(sz_pos - 3.0) < 0.001:
-            matching_3c = [p for p in pos_data if abs(float(p['position']['size']) - 3.0) < 0.001 and (p['market']['epic'] == "CS.D.CFEGOLD.CBE.IP" or "GOLD" in p['market']['epic'])]
-            try:
-                inc_idx = matching_3c.index(next(p for p in matching_3c if p['position'].get('dealId') == deal_id)) + 1
-            except Exception:
-                inc_idx = 1
-            return f"<span style='color: #38bdf8; font-weight: bold;'>incremento n. {inc_idx}</span>"
-
-    if is_gold or is_us500:
-        has_tp = bool(pos_dict.get('limitLevel') or pos_dict.get('limitDistance'))
-        if has_tp:
-            return "<span style='color: #f59e0b; font-weight: bold;'>Hyper-Bco</span>"
-        else:
-            return "<span style='color: #38bdf8; font-weight: bold;'>Hyper-Run</span>"
 
     tipo_strategia = param_memoria.get("tipo_strategia", "RANGE")
     if tipo_strategia != "TREND" and deal_id:
@@ -930,7 +777,7 @@ get_role_pos = calcola_ruolo_posizione
 def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, size, ruolo_label=""):
     """
     Chiude a mercato una singola posizione su IG tramite DELETE /positions/otc con verifica conferma,
-    riconciliazione della memoria (Core / Incr per Trend, Hyper, Range), registrazione in storico CSV,
+    riconciliazione della memoria (Core / Incr per Trend e Range), registrazione in storico CSV,
     aggiornamento del diario WIP per la Sintesi Trend e invio notifica push.
     """
     h = get_ig_headers(conto)
@@ -1076,33 +923,6 @@ def chiudi_singola_posizione_ig(conto, deal_id, nome_strumento, direction_open, 
                 dati_inst.pop("sat_deal_id", None)
             salva_memoria(conto, memoria)
 
-        # 2. Riconciliazione Hyper Gold & US500 (30S e 5M)
-        for f_hyp, is_m1 in [
-            ("hyper_gold_state.json", False),
-            ("hyper_gold_m5_state.json", True),
-            ("hyper_gold_m1_state.json", True),
-            ("hyper_us500_state.json", False),
-            ("hyper_us500_m5_state.json", True)
-        ]:
-            for p_hyp in [os.path.join(conto, f_hyp), f_hyp]:
-                if os.path.exists(p_hyp):
-                    try:
-                        with open(p_hyp, "r", encoding="utf-8") as fh:
-                            hyp_st = json.load(fh)
-                        modified = False
-                        pos_h = hyp_st.get("position") or {}
-                        if str(pos_h.get("deal_id")) == str(deal_id):
-                            hyp_st["position"] = None
-                            modified = True
-                        incs_h = hyp_st.get("increments") or []
-                        if any(str(i.get("deal_id")) == str(deal_id) for i in incs_h):
-                            hyp_st["increments"] = [i for i in incs_h if str(i.get("deal_id")) != str(deal_id)]
-                            modified = True
-                        if modified:
-                            with open(p_hyp, "w", encoding="utf-8") as fh:
-                                json.dump(hyp_st, fh, indent=2)
-                    except Exception:
-                        pass
 
         # 3. Scrittura su storico_operazioni.csv
         path_csv = os.path.join(conto, FILE_STORICO)
@@ -3067,18 +2887,18 @@ else:
 
     if is_regista:
         if mostra_goldfinger:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
         else:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
         if mostra_goldfinger:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
         else:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_report = tabs
         tab_restore = tab_posizioni = tab_console = tab_autorizzazioni = tab_statistiche = None
 
 
@@ -3106,11 +2926,6 @@ else:
                             }}
                         }} else if (target === "Radar") {{
                             if (txt.includes("Radar")) {{
-                                t.click();
-                                break;
-                            }}
-                        }} else if (target === "Hyper") {{
-                            if (txt.includes("Hyper")) {{
                                 t.click();
                                 break;
                             }}
@@ -3170,12 +2985,10 @@ else:
             memoria_attuale = carica_memoria(conto_selezionato)
             memoria_trend_attuale = carica_memoria_trend(conto_selezionato)
 
-            # --- Caricamento Stati Hyper Gold (30S e 5M) per riconoscimento ruoli ---
-            hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
             
             # --- HELPER: Riconoscimento Ruolo Chirurgico ---
             def get_role_pos(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict):
-                return calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, hyper_30s_state, hyper_5m_state, pos_data)
+                return calcola_ruolo_posizione(nome_strum, dir_pos, sz_pos, param_memoria, pos_dict, {}, {}, pos_data)
 
             def get_role_ord(nome_strum, dir_pos, sz_pos, param_memoria, ord_dict):
                 is_gold = (
@@ -3188,10 +3001,6 @@ else:
                         return "<span style='color: #38bdf8;'>TP scalino</span>"
                     elif abs(sz_pos - 3.0) < 0.001:
                         return "<span style='color: #38bdf8;'>TP incremento</span>"
-                    elif abs(sz_pos - 2.0) < 0.001:
-                        return "<span style='color: #FFD700;'>Ordine hyper 30S</span>"
-                    elif abs(sz_pos - 5.0) < 0.001:
-                        return "<span style='color: #FFD700;'>Ordine hyper 5M</span>"
 
                 s_c = float(param_memoria.get("size", 0))
                 if s_c <= 0: return "-"
@@ -3358,14 +3167,7 @@ else:
                 pnl_str = f"{tot_pnl_eur:.0f} €"
                 
                 if len(posizioni) > 1:
-                    is_gold = (nome in ("Spot Gold", "ORO") or "GOLD" in str(nome).upper())
-                    is_us500 = ("US 500" in str(nome).upper() or "US500" in str(nome).upper() or "SP500" in str(nome).upper())
-                    if is_gold:
-                        ruolo_master_str = "<span style='color: #FFD700; font-weight: bold;'>Hyper Gold</span>"
-                    elif is_us500:
-                        ruolo_master_str = "<span style='color: #FFD700; font-weight: bold;'>Hyper US 500</span>"
-                    else:
-                        ruolo_master_str = ""
+                    ruolo_master_str = ""
                 else:
                     ruolo_master_str = list(ruoli_master)[0] if ruoli_master else "-"
                 
@@ -3825,10 +3627,7 @@ else:
                         is_short_bloccato = is_kj_short_bloccato or is_roll or is_wkd
 
                         if not stato_attivo and not dati_salvati.get("da_chiudere_a_riapertura", False):
-                            is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
-                            if is_hyper_exclusive:
-                                st.warning("⚡ **Operatività Trend sospesa:** strumento riservato ad HYPER.")
-                            elif is_trig_attivo:
+                            if is_trig_attivo:
                                 # Visualizzazione TRIGGER ATTIVO con pulsante di annullamento
                                 tr_p_att = float(dati_salvati.get("trigger_start_prezzo", 0.0) or 0.0)
                                 tr_d_att = dati_salvati.get("trigger_start_direzione", "")
@@ -3877,10 +3676,7 @@ else:
                             if not is_trig_attivo:
                                 c_btn1, c_btn2 = st.columns(2)
                                 with c_btn1:
-                                    if is_hyper_exclusive:
-                                        help_l = "Operatività disabilitata: strumento riservato ad HYPER."
-                                        dis_l = True
-                                    elif not is_operativo:
+                                    if not is_operativo:
                                         help_l = "Disabilitato: profilo Viewer non operativo."
                                         dis_l = True
                                     elif has_trigger_input:
@@ -3904,9 +3700,6 @@ else:
                                     if st.button(btn_l_label, key=f"TL_{conto_selezionato}_{nome}", width="stretch", disabled=dis_l, help=help_l):
                                         if not is_operativo:
                                             st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                                            st.rerun()
-                                        if is_hyper_exclusive:
-                                            st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                             st.rerun()
                                         
                                         tf_sel = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
@@ -3985,10 +3778,7 @@ else:
                                             st.rerun()
 
                                 with c_btn2:
-                                    if is_hyper_exclusive:
-                                        help_s = "Operatività disabilitata: strumento riservato ad HYPER."
-                                        dis_s = True
-                                    elif not is_operativo:
+                                    if not is_operativo:
                                         help_s = "Disabilitato: profilo Viewer non operativo."
                                         dis_s = True
                                     elif has_trigger_input:
@@ -4012,9 +3802,6 @@ else:
                                     if st.button(btn_s_label, key=f"TS_{conto_selezionato}_{nome}", width="stretch", disabled=dis_s, help=help_s):
                                         if not is_operativo:
                                             st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                                            st.rerun()
-                                        if is_hyper_exclusive:
-                                            st.error("🛑 Operatività disabilitata: strumento riservato ad HYPER.")
                                             st.rerun()
                                         
                                         tf_sel = st.session_state.get(f"tf_{conto_selezionato}_{nome}", tf_val)
@@ -4092,8 +3879,8 @@ else:
                                             st.session_state.target_tab = "Trend"
                                             st.rerun()
 
-                                dis_sync_t_btn = is_hyper_exclusive or (not is_operativo)
-                                help_sync_t_btn = "Disabilitato: profilo Viewer non operativo" if not is_operativo else ("Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else None)
+                                dis_sync_t_btn = not is_operativo
+                                help_sync_t_btn = "Disabilitato: profilo Viewer non operativo" if not is_operativo else None
                                 if st.button("⚖️ AVVIO MULTICONTO (Trend + Range)", key=f"SYNC_TREND_BTN_{conto_selezionato}_{nome}", use_container_width=True, disabled=dis_sync_t_btn, help=help_sync_t_btn):
                                     if not is_operativo:
                                         st.error("🛑 Profilo VIEWER: operatività disabilitata.")
@@ -4436,8 +4223,6 @@ else:
                                 tf_lbl_s = tf_map_s.get(tf_raw_s, tf_raw_s)
                                 dec_s = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 5)
                                 c2.markdown(f"<div style='display: flex; align-items: center; gap: 8px;'><span style='background-color: rgba(234, 179, 8, 0.15); color: #fde047; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; white-space: nowrap;'>🎯 TRIGGER LIVE ({tr_d_s} {tf_lbl_s})</span><span style='color:#fef08a; font-size:0.8rem; white-space: nowrap;'>Attesa tocco @ {tr_p_s:.{dec_s}f}</span></div>", unsafe_allow_html=True)
-                            elif nome in STRUMENTI_ESCLUSIVI_HYPER:
-                                c2.markdown("<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⚡ RISERVATO HYPER</span>", unsafe_allow_html=True)
                             else:
                                 c2.markdown("<span style='background-color: rgba(108,117,125,0.1); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold;'>⏸️ SPENTO</span>", unsafe_allow_html=True)
                         
@@ -4846,16 +4631,13 @@ else:
                             is_roll_r = is_rollover_active()
                             is_wkd_r = is_weekend_active()
 
-                            is_hyper_exclusive = nome in STRUMENTI_ESCLUSIVI_HYPER
-                            if is_hyper_exclusive:
-                                st.warning("⚡ **Operatività Range sospesa:** strumento riservato ad HYPER.")
-                            elif is_roll_r:
+                            if is_roll_r:
                                 st.warning("🌙 Avvio disabilitato fino alle 00:15.")
                             elif is_wkd_r:
                                 st.info("🏖️ **Mercati Chiusi (Weekend):** Avvio disabilitato fino alla riapertura.")
 
-                            dis_btn_range = is_hyper_exclusive or is_roll_r or is_wkd_r or (not is_operativo)
-                            help_range = "Disabilitato: profilo Viewer non operativo." if not is_operativo else ("Operatività disabilitata: strumento riservato ad HYPER." if is_hyper_exclusive else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None)))
+                            dis_btn_range = is_roll_r or is_wkd_r or (not is_operativo)
+                            help_range = "Disabilitato: profilo Viewer non operativo." if not is_operativo else ("Avvio disabilitato fino alle 00:15." if is_roll_r else ("Avvio disabilitato durante il Weekend (mercati chiusi)." if is_wkd_r else None))
 
                             col_l, col_s = st.columns(2)
                             with col_l:
@@ -5081,9 +4863,7 @@ else:
                                 if stato == "FASE_2_STANDBY":
                                     stato_visivo = f"<span style='background-color: #FFD700; color: #000000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏳ STANDBY (Attesa Rientro)</span>"
                         else:
-                            if nome in STRUMENTI_ESCLUSIVI_HYPER:
-                                stato_visivo = f"<span style='background-color: rgba(234, 179, 8, 0.15); color: #eab308; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚡ RISERVATO HYPER</span>"
-                            elif stato == "MANUALE":
+                            if stato == "MANUALE":
                                 stato_visivo = f"<span style='background-color: rgba(220, 53, 69, 0.15); color: #ff4b4b; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⚠️ MANUALE</span>"
                             else:
                                 stato_visivo = f"<span style='background-color: rgba(108, 117, 125, 0.15); color: #adb5bd; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.82rem;'>⏸️ IN ATTESA</span>"
@@ -5163,10 +4943,6 @@ else:
             with sub_rng_sin:
                 renderizza_sintesi()
 
-    if tab_hyper is not None:
-        with tab_hyper:
-            import hyper_tab
-            hyper_tab.render_hyper_tab(conto_selezionato=conto_selezionato)
 
     if tab_goldfinger is not None:
         with tab_goldfinger:
@@ -5205,7 +4981,6 @@ else:
                     t_deals_rec = get_tutti_deal_trend_account(conto_selezionato)
                 except Exception:
                     t_deals_rec = set()
-                hyper_30s_state, hyper_5m_state = carica_stati_hyper(conto_selezionato)
                 epic_to_name = {v['epic']: k for k, v in CONFIG_STRUMENTI.items()}
 
                 c_top1, c_top2 = st.columns([4, 1], vertical_alignment="center")
@@ -5289,7 +5064,7 @@ else:
                         
                     is_deal_t_rec = str(deal_id).strip() in t_deals_rec
                     param_inst = memoria_trend_attuale.get(nome, {}) if is_deal_t_rec else memoria_attuale.get(nome, {})
-                    role_html = calcola_ruolo_posizione(nome, dir_pos, sz, param_inst, pos, hyper_30s_state, hyper_5m_state, pos_data)
+                    role_html = calcola_ruolo_posizione(nome, dir_pos, sz, param_inst, pos, {}, {}, pos_data)
                     role_clean = re.sub(r"<[^>]+>", "", role_html).strip()
 
                     with st.container(border=True):

@@ -2,7 +2,7 @@
 """
 Sistema/notifiche_manager.py - Guardiano Quota e Circuit Breaker per notifiche Push (ntfy.sh).
 Protegge l'IP della Macchinetta da ban Fail2Ban e rate-limiting (HTTP 429).
-Condiviso tra tutti i processi (Motore Range, Motore Trend, Hyper, Goldfinger, Dashboard).
+Condiviso tra tutti i processi (Motore Range, Motore Trend, Goldfinger, Dashboard).
 """
 
 import os
