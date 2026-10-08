@@ -1469,7 +1469,8 @@ class HyperUS500M5Engine:
                     time.sleep(5)
                     continue
 
-                url_session = "https://demo-api.ig.com/gateway/deal/session"
+                is_real = "_REALE" in str(getattr(self, "account_dir", "") or "").upper()
+                url_session = "https://api.ig.com/gateway/deal/session" if is_real else "https://demo-api.ig.com/gateway/deal/session"
                 h_session = {
                     "X-IG-API-KEY": api_key,
                     "Version": "2",
@@ -1479,7 +1480,7 @@ class HyperUS500M5Engine:
                 payload = {"identifier": user, "password": pwd}
                 r = requests.post(url_session, headers=h_session, json=payload, timeout=10)
                 if r.status_code != 200:
-                    logger.warning(f"⚠️ [HYPER_US500_M5] Errore sessione IG per Lightstreamer (HTTP {r.status_code}): {r.text[:120]}")
+                    logger.warning(f"⚠️ [HYPER_US500_M5 ({self.account_dir})] Errore sessione IG per Lightstreamer (HTTP {r.status_code}): {r.text[:120]}")
                     time.sleep(10)
                     continue
 

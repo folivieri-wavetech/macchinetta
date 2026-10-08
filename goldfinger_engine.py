@@ -578,6 +578,9 @@ class GoldfingerEngine:
                         self.salva_stato()
                     break # Gestisci un livello per tick
 
+        # Ricalcola le posizioni aperte post-ingresso nel tick corrente
+        aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+
         # 7. CHIUSURA TOTALE SHORT SUL RIMBALZO (passo * 2 pip dal minimo)
         min_curr = self.stato.get("minimo_discesa")
         if aperti and min_curr is not None:
@@ -617,7 +620,7 @@ class GoldfingerEngine:
                 self.stato["minimo_discesa"] = None
 
                 # RIARMO DELLA SECONDA ONDATA (Prima difesa non entrata - 3 pip)
-                # Rigenera SEMPRE TUTTI i 18 contratti (6 difese) a partire dalla prima difesa non entrata meno 3 pip
+                # Rigenera SEMPRE TUTTI i contratti (6 difese) a partire dalla prima difesa non entrata meno 3 pip
                 prima_non_entrata = next((s for s in scaglioni if s["stato"] == "IN_ATTESA"), None)
                 passo = float(self.stato.get("passo_pip", 6.0))
                 sz = int(self.stato.get("size_scaglione", 3))
@@ -649,35 +652,6 @@ class GoldfingerEngine:
                 cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                 self.salva_config(cfg_sync)
                 return
-
-        # 8. RIPRISTINO AUTOMATICO COPERTURA TOTALE (Garantisce sempre tutte le 6 difese per 18 contratti)
-        min_prec = self.stato.get("minimo_precedente")
-        difese_in_attesa = [s for s in scaglioni if s["stato"] == "IN_ATTESA"]
-        delta_in_attesa = sum(s["size"] for s in difese_in_attesa)
-        delta_richiesto = int(self.stato.get("delta_totale", 18))
-
-        if not aperti and delta_in_attesa < delta_richiesto and min_prec is not None:
-            prima_non_entrata = next((s for s in scaglioni if s["stato"] == "IN_ATTESA"), None)
-            passo = float(self.stato.get("passo_pip", 6.0))
-            sz = int(self.stato.get("size_scaglione", 3))
-
-            if prima_non_entrata and prima_non_entrata.get("prezzo_target"):
-                pz_rif = float(prima_non_entrata["prezzo_target"])
-                soglia_riarmo = round(pz_rif - 3.0, 2)
-            else:
-                soglia_riarmo = round(min_prec - 5.0, 2)
-
-            self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta_richiesto)
-            self.stato["livello_1_prezzo"] = soglia_riarmo
-            print_log(f"🛡️ RIPRISTINO COPERTURA TOTALE: Riarmo automatico {len(self.stato['scaglioni'])} difese ({delta_richiesto} mini) da {soglia_riarmo:.2f} in giù.")
-            invia_notifica("RIPRISTINO COPERTURA TOTALE", f"Riarmo automatico: {len(self.stato['scaglioni'])} difese ({delta_richiesto} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
-            self.salva_stato()
-
-            # Sincronizza config_goldfinger.json
-            cfg_sync = self.carica_config()
-            cfg_sync["livello_1_prezzo"] = soglia_riarmo
-            cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-            self.salva_config(cfg_sync)
 
         # 9. STOP LOSS SINGOLO SU FALSO ALLARME
         if len(aperti) == 1:

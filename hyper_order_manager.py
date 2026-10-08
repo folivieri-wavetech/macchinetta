@@ -245,10 +245,12 @@ class HyperOrderManager:
         self.last_request_time = time.time()
 
     def _get_headers(self, version="2"):
+        if not self.api_key:
+            _, _, self.api_key = self._get_credentials_from_env()
         return {
-            "X-IG-API-KEY": self.api_key,
-            "CST": self.cst,
-            "X-SECURITY-TOKEN": self.xst,
+            "X-IG-API-KEY": self.api_key or "",
+            "CST": self.cst or "",
+            "X-SECURITY-TOKEN": self.xst or "",
             "Version": str(version),
             "Content-Type": "application/json; charset=UTF-8",
             "Accept": "application/json; charset=UTF-8"
@@ -402,12 +404,33 @@ class HyperOrderManager:
             positions = self._positions_cache
         else:
             try:
+                if not self._ensure_session():
+                    logger.warning(f"⚠️ Impossibile verificare sessione IG per {self.account_dir} in get_open_positions")
+                    return None
                 h = self._get_headers(version="2")
                 r = requests.get(f"{self.base_url}/positions", headers=h, timeout=6)
                 if r.status_code == 200:
                     positions = r.json().get("positions", [])
                     self._positions_cache = positions
                     self._positions_cache_time = now
+                elif r.status_code in (400, 401, 403):
+                    # Token scaduto, invalido o header respinto: forza rinnovo sessione e riprova subito
+                    logger.warning(f"⚠️ get_open_positions HTTP {r.status_code} ({r.text[:80]}). Tentativo rinnovo forzato sessione...")
+                    self.session_time = 0.0
+                    self.cst = None
+                    self.xst = None
+                    if self._ensure_session():
+                        h_retry = self._get_headers(version="2")
+                        r_retry = requests.get(f"{self.base_url}/positions", headers=h_retry, timeout=6)
+                        if r_retry.status_code == 200:
+                            positions = r_retry.json().get("positions", [])
+                            self._positions_cache = positions
+                            self._positions_cache_time = time.time()
+                        else:
+                            logger.warning(f"⚠️ get_open_positions retry fallita (HTTP {r_retry.status_code}): {r_retry.text[:120]}")
+                            return None
+                    else:
+                        return None
                 else:
                     logger.warning(f"⚠️ get_open_positions fallita (HTTP {r.status_code}): {r.text[:120]}")
                     return None

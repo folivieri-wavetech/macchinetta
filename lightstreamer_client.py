@@ -345,4 +345,11 @@ class LightstreamerClient(object):
             self._current_subscription_key = 0
         else:
             log.debug("Binding to this active session")
-            self.bind()
+            try:
+                self.bind()
+            except Exception as e:
+                log.warning("Errore rebind Lightstreamer (%s). Chiusura stream per riavvio pulito dal watchdog.", e)
+                self._stream_connection = None
+                self._session.clear()
+                self._subscriptions.clear()
+                self._current_subscription_key = 0
