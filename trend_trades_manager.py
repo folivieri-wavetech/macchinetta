@@ -134,12 +134,16 @@ def deduplica_trades_trend(trades: list) -> list:
 
     wips_filtrati = []
     for w in wips:
+        w_pnl = float(w.get("pnl_eur", 0.0) or 0.0)
+        # Scarta record fittizi con PnL aberrante (es. bug storico open price 0 su forex)
+        if abs(w_pnl) > 5000:
+            continue
+
         w_inst = w.get("instrument")
         try:
             w_time = datetime.datetime.fromisoformat(w.get("time_close", ""))
         except Exception:
             w_time = None
-        w_pnl = float(w.get("pnl_eur", 0.0) or 0.0)
 
         is_clone = False
         if w_time is not None:

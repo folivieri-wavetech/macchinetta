@@ -450,8 +450,8 @@ class CoreEngine:
     def check_live_stops(self, current_price):
         """
         Valuta Stop Loss in tempo reale (intracandela):
-        - Core: KJ +- 15 pip o Trailing SL Core o Candela Segnale Min/Max +- 5 pip
-        - Incrementi Stop: Paracadute TK +- 15 pip o Candela Segnale TK Min/Max +- 5 pip
+        - Core: KJ +- 10 pip o Trailing SL Core o Candela Segnale Min/Max +- 5 pip
+        - Incrementi Stop: Paracadute TK +- 10 pip o Candela Segnale TK Min/Max +- 5 pip
         (Nota: il Take Profit Incrementi TK ± 50 pip viene valutato a fine candela)
         """
         events = []
@@ -478,10 +478,11 @@ class CoreEngine:
         is_h1 = ("HOUR" in tf_val or "H1" in tf_val) and not ("HOUR_4" in tf_val or "H4" in tf_val)
 
         nome_str = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
-        sl_core_pips = 15
+        sl_core_pips = self.config.get("sl_core_paracadute_pips", 10)
+        sl_incr_pips = self.config.get("sl_incr_paracadute_pips", 10)
 
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 15 pip
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 10 pip
             sl_core_base = kj - (sl_core_pips * pip_val)
             if current_price <= (sl_core_base + 1e-7):
                 self.trailing_sl_core = None
@@ -515,9 +516,9 @@ class CoreEngine:
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK - 15 pip solo se forbice ampia > soglia
+            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK - 10 pip solo se forbice ampia > soglia
             if len(self.pm.increments) > 0 and proteggi_su_tk:
-                sl_incr_base = tk - (15 * pip_val)
+                sl_incr_base = tk - (sl_incr_pips * pip_val)
                 if current_price <= (sl_incr_base + 1e-7):
                     self.signal_candle_tk_active = False
                     self.signal_stop_price_tk = None
@@ -608,7 +609,7 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 15 pip
+            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 10 pip
             sl_core_base = kj + (sl_core_pips * pip_val)
             if current_price >= (sl_core_base - 1e-7):
                 self.trailing_sl_core = None
@@ -642,9 +643,9 @@ class CoreEngine:
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK + 15 pip solo se forbice ampia > soglia
+            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK + 10 pip solo se forbice ampia > soglia
             if len(self.pm.increments) > 0 and proteggi_su_tk:
-                sl_incr_base = tk + (15 * pip_val)
+                sl_incr_base = tk + (sl_incr_pips * pip_val)
                 if current_price >= (sl_incr_base - 1e-7):
                     self.signal_candle_tk_active = False
                     self.signal_stop_price_tk = None

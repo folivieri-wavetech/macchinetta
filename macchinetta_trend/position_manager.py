@@ -43,11 +43,15 @@ class Position:
             self.is_closed = True
             self.close_price = current_price
             
-            # Calcolo PNL bi-direzionale
-            if self.direction == "LONG":
-                self.pnl = (self.close_price - self.entry_price) * self.size
+            # Protezione: se entry_price e' 0 o non valido, non calcolare delta fittizio rispetto a zero
+            if not self.entry_price or self.entry_price <= 0:
+                self.pnl = 0.0
             else:
-                self.pnl = (self.entry_price - self.close_price) * self.size
+                # Calcolo PNL bi-direzionale
+                if self.direction == "LONG":
+                    self.pnl = (self.close_price - self.entry_price) * self.size
+                else:
+                    self.pnl = (self.entry_price - self.close_price) * self.size
                 
         return self.pnl
 
