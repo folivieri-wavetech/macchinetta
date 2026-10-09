@@ -77,13 +77,11 @@ def salva_trade_chiuso_trend(conto: str, trade_dict: dict) -> bool:
             except Exception:
                 trades = []
 
-        # Evita duplicati identici se già salvato negli ultimi secondi
+        # Evita duplicati identici se già salvato
         is_dup = False
-        for t in trades[:10]:
-            if (t.get("instrument") == item["instrument"] and 
-                t.get("deal_id") == item["deal_id"] and 
-                item["deal_id"] != "--" and 
-                item["deal_id"] != ""):
+        for t in trades:
+            if (item["deal_id"] not in ("--", "") and 
+                t.get("deal_id") == item["deal_id"]):
                 is_dup = True
                 break
             if (t.get("instrument") == item["instrument"] and 
@@ -95,7 +93,7 @@ def salva_trade_chiuso_trend(conto: str, trade_dict: dict) -> bool:
 
         if not is_dup:
             trades.insert(0, item)
-            trades = trades[:2000] # Limite max 2000 trade
+            trades = deduplica_trades_trend(trades)[:2000] # Limite max 2000 trade
 
             tmp_path = f"{filepath}.tmp.{os.getpid()}"
             try:
@@ -109,6 +107,68 @@ def salva_trade_chiuso_trend(conto: str, trade_dict: dict) -> bool:
     except Exception as e:
         print(f"Errore salvataggio trade Trend in {filepath}: {e}")
         return False
+
+def deduplica_trades_trend(trades: list) -> list:
+    """
+    Rimuove trade duplicati:
+    1. Se per lo stesso strumento e periodo (entro 300 secondi) esistono sia un trade reale (con deal_id o id nativo)
+       sia un trade estratto da WIP (id fittizio 'wip_...'), tiene esclusivamente il trade reale.
+    2. Se per lo stesso deal_id valido esistono più record, tiene solo il primo.
+    3. Se due record hanno stesso strumento, time_close, pnl_eur e reason, tiene solo il primo.
+    """
+    if not trades:
+        return []
+
+    reals = [t for t in trades if not str(t.get("id", "")).startswith("wip_")]
+    wips = [t for t in trades if str(t.get("id", "")).startswith("wip_")]
+
+    visti_deal = set()
+    reals_unici = []
+    for r in reals:
+        d_id = r.get("deal_id", "--")
+        if d_id and d_id != "--":
+            if d_id in visti_deal:
+                continue
+            visti_deal.add(d_id)
+        reals_unici.append(r)
+
+    wips_filtrati = []
+    for w in wips:
+        w_inst = w.get("instrument")
+        try:
+            w_time = datetime.datetime.fromisoformat(w.get("time_close", ""))
+        except Exception:
+            w_time = None
+        w_pnl = float(w.get("pnl_eur", 0.0) or 0.0)
+
+        is_clone = False
+        if w_time is not None:
+            for r in reals_unici:
+                if r.get("instrument") != w_inst:
+                    continue
+                try:
+                    r_time = datetime.datetime.fromisoformat(r.get("time_close", ""))
+                except Exception:
+                    continue
+                r_pnl = float(r.get("pnl_eur", 0.0) or 0.0)
+                # Stesso strumento entro 300s e PnL entro 3.0 €
+                if abs((r_time - w_time).total_seconds()) <= 300 and abs(r_pnl - w_pnl) <= 3.0:
+                    is_clone = True
+                    break
+        if not is_clone:
+            wips_filtrati.append(w)
+
+    unione = reals_unici + wips_filtrati
+    visti_chiavi = set()
+    risultato = []
+    for t in sorted(unione, key=lambda x: str(x.get("time_close", "")), reverse=True):
+        k = (t.get("instrument"), t.get("time_close"), round(float(t.get("pnl_eur", 0.0) or 0.0), 2), t.get("reason"))
+        if k in visti_chiavi:
+            continue
+        visti_chiavi.add(k)
+        risultato.append(t)
+
+    return risultato
 
 def _estrai_trades_da_storico_wip(conto: str = None) -> list:
     """Estrae lo storico delle chiusure registrate in storico_wip_trend di ciascuno strumento."""
@@ -170,9 +230,7 @@ def _estrai_trades_da_storico_wip(conto: str = None) -> list:
             contracts = float(m_sz.group(1)) if m_sz else sz_default
 
             # Estrai motivo
-            # Rimuovi prefisso data/ora
             clean_msg = re.sub(r"^\[.*?\]\s*", "", riga).strip()
-            # Rimuovi suffisso PnL
             clean_msg = re.sub(r"\s*\[PnL:.*?\]", "", clean_msg).strip()
             clean_msg = clean_msg.replace("➡️ FLAT", "").strip()
 
@@ -207,32 +265,30 @@ def carica_trades_trend(conto: str = None) -> list:
         except Exception:
             trades = []
 
-    # Se lo storico è vuoto o vogliamo assicurarci di avere i dati pregressi di memoria_parametri.json
-    wip_trades = _estrai_trades_da_storico_wip(conto)
-    if wip_trades:
-        # Crea un set di chiavi esistenti (strumento + time_close + pnl_eur)
-        keys_exist = {
-            f"{t.get('instrument')}_{t.get('time_close')}_{round(float(t.get('pnl_eur', 0.0)), 2)}"
-            for t in trades
-        }
-        nuovi = []
-        for wt in wip_trades:
-            k = f"{wt.get('instrument')}_{wt.get('time_close')}_{round(float(wt.get('pnl_eur', 0.0)), 2)}"
-            if k not in keys_exist:
-                nuovi.append(wt)
-                keys_exist.add(k)
-        if nuovi:
-            trades.extend(nuovi)
-            # Salva la lista aggiornata
+    # Bootstrap da storico_wip solo se l'archivio è completamente vuoto
+    if not trades:
+        wip_trades = _estrai_trades_da_storico_wip(conto)
+        if wip_trades:
+            trades = wip_trades
+
+    # Deduplica sempre per proteggere da cloni o disallineamenti
+    trades_puliti = deduplica_trades_trend(trades)
+
+    # Se la lista è cambiata (es. duplicati rimossi o bootstrap iniziale), aggiorna il file su disco
+    if len(trades_puliti) != len(trades) or (not os.path.exists(filepath) and trades_puliti):
+        try:
+            tmp_path = f"{filepath}.tmp.{os.getpid()}"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(trades_puliti, f, indent=2)
+            os.replace(tmp_path, filepath)
+        except Exception:
             try:
                 with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(trades, f, indent=2)
+                    json.dump(trades_puliti, f, indent=2)
             except Exception:
                 pass
 
-    # Ordina cronologicamente: l'operazione più recente in cima (riga 1), la più vecchia in fondo
-    trades_ordinati = sorted(trades, key=lambda x: str(x.get("time_close", "")), reverse=True)
-    return trades_ordinati
+    return trades_puliti
 
 def azzera_trades_trend(conto: str = None, strumento: str = None) -> bool:
     """Azzera l'archivio trade (globale o per singolo strumento)."""
