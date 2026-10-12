@@ -26,17 +26,19 @@ function Invia-Ntfy([string]$Titolo, [string]$Messaggio, [string]$Tag) {
     }
 }
 
-$POD_DASH = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>&1)
-if ($LASTEXITCODE -ne 0 -or -not $POD_DASH -or $POD_DASH -match "error|Unauthorized|credentials") {
-    Write-Host "Impossibile trovare il pod Dashboard: $POD_DASH" -ForegroundColor Red
-    if ("$POD_DASH" -match "Unauthorized|credentials|401") {
+$errFile = [System.IO.Path]::GetTempFileName()
+$POD_DASH = "$(& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>$errFile)".Trim()
+$errTxt = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+Remove-Item $errFile -ErrorAction SilentlyContinue
+if ($POD_DASH -notmatch '^macchinetta-dashboard-[a-z0-9-]+$') {
+    Write-Host "Impossibile trovare il pod Dashboard: $errTxt" -ForegroundColor Red
+    if ("$errTxt" -match "Unauthorized|credentials|401") {
         Invia-Ntfy "SYNC XTRADER FALLITA" "Token kubeconfig scaduto (401). Serve nuovo KubeConfig da Rancher." "warning"
     } else {
         Invia-Ntfy "SYNC XTRADER FALLITA" "Pod Dashboard non trovato." "warning"
     }
     exit 1
 }
-$POD_DASH = "$POD_DASH".Trim()
 Write-Host "Pod Dashboard: $POD_DASH" -ForegroundColor Yellow
 
 Push-Location $ROOT

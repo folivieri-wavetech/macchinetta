@@ -38,20 +38,29 @@ $attesaSecondi = 10
 $POD_DASH = ""
 
 for ($i = 1; $i -le $maxTentativi; $i++) {
-    $out = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>&1)
-    if ($LASTEXITCODE -eq 0 -and $out -and -not ($out -match "Forbidden|Error|error")) {
-        $POD_DASH = $out.Trim()
+    $errFile = [System.IO.Path]::GetTempFileName()
+    $out = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}" 2>$errFile)
+    if ("$out".Trim() -match '^macchinetta-dashboard-[a-z0-9-]+$') {
+        $POD_DASH = "$out".Trim()
+        Remove-Item $errFile -ErrorAction SilentlyContinue
         break
     }
     
     # Fallback se in fase di rollout
-    $outFallback = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard -o jsonpath="{.items[0].metadata.name}" 2>&1)
-    if ($LASTEXITCODE -eq 0 -and $outFallback -and -not ($outFallback -match "Forbidden|Error|error")) {
-        $POD_DASH = $outFallback.Trim()
+    $outFallback = (& $KUBECTL --kubeconfig=$KUBECONFIG get pod -n macchinetta -l component=dashboard -o jsonpath="{.items[0].metadata.name}" 2>>$errFile)
+    if ("$outFallback".Trim() -match '^macchinetta-dashboard-[a-z0-9-]+$') {
+        $POD_DASH = "$outFallback".Trim()
+        Remove-Item $errFile -ErrorAction SilentlyContinue
         break
     }
 
-    if ($out -match "Forbidden" -or $outFallback -match "Forbidden") {
+    $errTxt = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+    Remove-Item $errFile -ErrorAction SilentlyContinue
+    if ($errTxt -match "Unauthorized|provide credentials") {
+        Write-Host "Token kubeconfig scaduto (401). Serve nuovo KubeConfig da Rancher." -ForegroundColor Red
+        exit 1
+    }
+    if ($errTxt -match "Forbidden") {
         Write-Host "Server in fase di allineamento sessione/cache (tentativo $i di $maxTentativi). Attendo $attesaSecondi secondi..." -ForegroundColor Yellow
     } else {
         Write-Host "In attesa disponibilità pod Dashboard (tentativo $i di $maxTentativi)..." -ForegroundColor Yellow
