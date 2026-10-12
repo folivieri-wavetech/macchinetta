@@ -283,40 +283,99 @@ def renderizza_xtrader():
         c = "#22c55e" if v > 0 else ("#ef4444" if v < 0 else "#ccc")
         return f"<b style='color:{c}; margin-left:18px;'>Totale: {_fmt('TOT.', v)}</b>"
 
+    raw_g = [estrai_giornata(celle, r0)["data"] for r0 in giornate]
+    date_g = date_giornate(raw_g)
+
+    def _lbl(i):
+        if date_g[i] is None:
+            return str(raw_g[i] or "").strip()
+        return etichetta_periodo(date_g[i], date_g[i + 1] if i + 1 < len(date_g) else None)
+
+    def _giorno(i):
+        return _fmt_giorno(date_g[i]) if date_g[i] else str(raw_g[i] or "").strip()
+
     tot_all = (_num(totali["EXTRA"]["TOT."]) or 0.0) + (_num(totali["COPILOTA"]["TOT."]) or 0.0)
     html = _CSS
     html += _tabella_html("🚀 XTRADER TOTALI",
-                          f"{len(giornate)} giornate: dal {prima['data']} al {ultima['data']}{_badge(tot_all)}", totali)
+                          f"{len(giornate)} giornate: da {_giorno(0)} a {_giorno(-1)}{_badge(tot_all)}", totali)
     tot_giorno = (_num(ultima["EXTRA"]["TOT."]) or 0.0) + (_num(ultima["COPILOTA"]["TOT."]) or 0.0)
-    html += _tabella_html("🚀 XTRADER", f"Ultima giornata: {etichetta_giornata(ultima['data'])}{_badge(tot_giorno)}",
+    html += _tabella_html("🚀 XTRADER", f"Giornata in corso: {_lbl(len(giornate) - 1)}{_badge(tot_giorno)}",
                           ultima, "xt-small xt-oggi")
 
     if len(giornate) > 1:
         html += "<div class='xt-sez'>📅 GIORNATE PRECEDENTI</div>"
-        for r0 in reversed(giornate[:-1]):
-            d = estrai_giornata(celle, r0)
+        for i in reversed(range(len(giornate) - 1)):
+            d = estrai_giornata(celle, giornate[i])
             t = (_num(d["EXTRA"]["TOT."]) or 0.0) + (_num(d["COPILOTA"]["TOT."]) or 0.0)
-            html += _tabella_html(etichetta_giornata(d["data"]), _badge(t), d, "xt-mini xt-prec")
+            html += _tabella_html(_lbl(i), _badge(t), d, "xt-mini xt-prec")
     st.markdown(html, unsafe_allow_html=True)
 
 
 _GIORNI = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
 
 
-def etichetta_giornata(data):
-    """'LUN 21/09' -> 'LUN 21/09 - VEN 25/09 (settimana)'; SAB/DOM restano giornate singole."""
-    s = str(data or "").strip()
-    m = re.match(r"^(LUN)\s+(\d{1,2})/(\d{1,2})$", s, re.IGNORECASE)
+def _parse_giorno_mese(data):
+    """'05/10', 'LUN 5/10' o '05/10/2026' -> (giorno, mese, anno o None)."""
+    m = re.search(r"(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?", str(data or ""))
     if not m:
-        return s
+        return None
+    anno = m.group(3)
+    if anno is not None:
+        anno = int(anno)
+        if anno < 100:
+            anno += 2000
+    return int(m.group(1)), int(m.group(2)), anno
+
+
+def _crea_data(anno, mese, giorno):
     import datetime as _dt
-    oggi = _dt.date.today()
-    g, me = int(m.group(2)), int(m.group(3))
     try:
-        d0 = _dt.date(oggi.year, me, g)
-        if (d0 - oggi).days > 60:
-            d0 = _dt.date(oggi.year - 1, me, g)
+        return _dt.date(anno, mese, giorno)
     except ValueError:
-        return s
-    d1 = d0 + _dt.timedelta(days=4)
-    return f"LUN {d0.day}/{d0.month:02d} - VEN {d1.day}/{d1.month:02d}"
+        return None
+
+
+def date_giornate(lista_raw):
+    """Converte le date delle Giornate (senza anno) in datetime.date.
+    L'ultima Giornata prende l'anno corrente (o il precedente se cadrebbe oltre 60 gg nel futuro);
+    le precedenti si deducono a ritroso: se una data risulta successiva alla Giornata seguente,
+    appartiene all'anno prima (gestione passaggio dicembre -> gennaio)."""
+    import datetime as _dt
+    parsed = [_parse_giorno_mese(x) for x in lista_raw]
+    risultato = [None] * len(parsed)
+    oggi = _dt.date.today()
+    succ = None
+    for i in reversed(range(len(parsed))):
+        p = parsed[i]
+        if p is None:
+            continue
+        g, me, anno = p
+        if anno is not None:
+            d = _crea_data(anno, me, g)
+        elif succ is None:
+            d = _crea_data(oggi.year, me, g)
+            if d is not None and (d - oggi).days > 60:
+                d = _crea_data(oggi.year - 1, me, g)
+        else:
+            d = _crea_data(succ.year, me, g)
+            if d is not None and d > succ:
+                d = _crea_data(succ.year - 1, me, g)
+        risultato[i] = d
+        if d is not None:
+            succ = d
+    return risultato
+
+
+def _fmt_giorno(d):
+    return f"{_GIORNI[d.weekday()]} {d.day}/{d.month:02d}/{d.year}"
+
+
+def etichetta_periodo(d0, d_next=None):
+    """Una tabella copre dalla sua data fino al giorno prima della tabella successiva.
+    5/10 + 10/10 -> 'da LUN 5/10/2026 a VEN 9/10/2026'; 10/10 + 11/10 -> 'SAB 10/10/2026'."""
+    import datetime as _dt
+    if d_next is not None:
+        d1 = d_next - _dt.timedelta(days=1)
+        if d1 > d0:
+            return f"da {_fmt_giorno(d0)} a {_fmt_giorno(d1)}"
+    return _fmt_giorno(d0)
