@@ -678,13 +678,13 @@ def renderizza_tab_goldfinger(conto):
             aperti_gf = [s for s in scaglioni if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
             ts_attivi = [s.get("sl_price") for s in aperti_gf if s.get("sl_price")]
             min_disc = stato.get("minimo_discesa")
-            
+            min_disc_str = f"{min_disc:.2f}" if min_disc is not None else "--"
             if ts_attivi:
                 ts_target = min(ts_attivi)
                 st.markdown(
                     f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.82rem;'>"
                     f"🛡️ <b>Trailing Stop Attivo (Ratchet):</b> <span style='color: #FFD700; font-weight: bold;'>{ts_target:.2f}</span> &nbsp;|&nbsp; "
-                    f"📉 <b>Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc:.2f if min_disc is not None else '--'}</span> &nbsp;|&nbsp; "
+                    f"📉 <b>Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc_str}</span> &nbsp;|&nbsp; "
                     f"Posizioni a mercato: <span style='color: #38bdf8; font-weight: bold;'>{len(aperti_gf)}</span>"
                     f"</div>",
                     unsafe_allow_html=True
