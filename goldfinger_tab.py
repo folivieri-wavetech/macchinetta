@@ -387,10 +387,10 @@ def renderizza_tab_goldfinger(conto):
             else:
                 val_default = 0.0
 
-        # Controllo posizioni già a mercato per sblocco modifiche a caldo
+        # Controllo posizioni già a mercato per blocco parametri (solo se Goldfinger è ATTIVO)
         scaglioni_att = stato.get("scaglioni", [])
         aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
-        has_aperti = len(aperti_att) > 0
+        has_aperti = is_attivo and len(aperti_att) > 0
 
         col_inp, col_btn_sugg = st.columns([7, 5], vertical_alignment="bottom")
         with col_inp:
@@ -604,8 +604,8 @@ def renderizza_tab_goldfinger(conto):
             st.markdown("<h4 style='color: #FFD700; margin-bottom: 8px;'>📋 Scaletta Difesa e Monitoraggio</h4>", unsafe_allow_html=True)
         
         scaglioni = stato.get("scaglioni", [])
-        if not scaglioni and pz_l1 > 0:
-            # Calcolo preview scala
+        if (not is_attivo or not scaglioni) and pz_l1 > 0:
+            # Calcolo preview pulita per la nuova sessione
             num_sc = max(1, int(delta_input) // int(size_u))
             sizes = [int(size_u)] * num_sc
             res = int(delta_input) - sum(sizes)
@@ -616,7 +616,9 @@ def renderizza_tab_goldfinger(conto):
                     "numero": i + 1,
                     "prezzo_target": round(pz_l1 - (i * passo), 2),
                     "size": sz,
-                    "stato": "IN_ATTESA"
+                    "stato": "IN_ATTESA",
+                    "open_price": None,
+                    "sl_price": None
                 })
             scaglioni = preview_sc
 

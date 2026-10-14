@@ -377,6 +377,8 @@ class GoldfingerEngine:
                 print_log("🛑 Rilevato comando STOP da Dashboard. Goldfinger si arresta e passa il controllo a manuale.")
                 self.stato["attivo"] = False
                 self.stato["stato_operativo"] = "IDLE"
+                self.stato["scaglioni"] = []
+                self.stato["minimo_discesa"] = None
                 self.salva_stato()
             return
 
@@ -496,7 +498,7 @@ class GoldfingerEngine:
                 if (time.time() - file_mtime) < 45.0:
                     with open(POSIZIONI_FILE, "r", encoding="utf-8") as f_pos:
                         pos_data = json.load(f_pos)
-                    if isinstance(pos_data, list) and len(pos_data) > 0:
+                    if isinstance(pos_data, list):
                         live_deals = {str(p.get("dealId")) for p in pos_data if p.get("dealId")}
                         reconciled = False
                         now_ts = time.time()
@@ -569,8 +571,8 @@ class GoldfingerEngine:
                             print_log(f"🛡️ Difesa 1 aperta @ {lvl:.2f}. TS iniziale: {sc['sl_price']:.2f} (Max ora: {max_ora:.2f}, dist: {dist:.1f} pip)")
                         else:
                             # Difese successive (idx >= 1):
-                            # Tutte le difese aperte allineano il proprio TS al prezzo reale di apertura della difesa precedente!
-                            sc_prev = scaglioni[idx - 1]
+                            # Tutte le difese aperte allineano il proprio TS al prezzo reale di apertura dell'ultima difesa aperta precedente
+                            sc_prev = next((s for s in reversed(scaglioni[:idx]) if s.get("open_price")), scaglioni[idx - 1])
                             pz_rif = sc_prev.get("open_price") or sc_prev.get("prezzo_target") or lvl
                             target_sl = round(float(pz_rif), 2)
                             
@@ -666,6 +668,11 @@ class GoldfingerEngine:
                     else:
                         soglia_riarmo = round(float(self.stato.get("livello_1_prezzo", 4128.0)) - 6.0, 2)
                         desc_riarmo = "Livello precedente - 6 pip"
+
+                    # Salvaguardia anti-trigger immediato: la nuova scala deve essere sempre sotto il bid attuale
+                    if bid and soglia_riarmo >= bid:
+                        soglia_riarmo = round(bid - passo, 2)
+                        desc_riarmo += f" (adeguato a {soglia_riarmo:.2f} sotto Bid live {bid:.2f})"
 
                     self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
                     self.stato["livello_1_prezzo"] = soglia_riarmo
