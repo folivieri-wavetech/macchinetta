@@ -154,6 +154,9 @@ class GoldfingerEngine:
             "storico_operazioni": [],
             "ultimo_prezzo_bid": None,
             "ultimo_prezzo_ask": None,
+            "massimo_ora_in_corso": None,
+            "massimo_ora_chiusa": None,
+            "ora_corrente_h1": None,
             "ultimo_aggiornamento": now_it().strftime("%Y-%m-%d %H:%M:%S")
         }
 
@@ -486,13 +489,12 @@ class GoldfingerEngine:
                 aperti_ora = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
                 if aperti_ora:
                     ts_candela_chiusa = round(max_chiuso + 3.0, 2)
-                    print_log(f"⏰ CANDELA ORARIA CHIUSA (H1): Massimo definitivo = {max_chiuso:.2f}. Nuovo TS a fine candela = {ts_candela_chiusa:.2f}")
+                    print_log(f"⏰ CANDELA ORARIA CHIUSA (H1): Massimo definitivo = {max_chiuso:.2f}. Nuovo TS equiparato per tutte le difese = {ts_candela_chiusa:.2f}")
                     for s in aperti_ora:
-                        if s.get("sl_price") is None or ts_candela_chiusa < s["sl_price"]:
-                            s["sl_price"] = ts_candela_chiusa
-                            s["stato"] = "PROTETTO_BE"
+                        s["sl_price"] = ts_candela_chiusa
+                        s["stato"] = "PROTETTO_BE"
                     self.salva_stato()
-                    invia_notifica("CHIUSURA CANDELA H1", f"Candela chiusa (Max: {max_chiuso:.2f}). TS allineato per {len(aperti_ora)} difese a {ts_candela_chiusa:.2f}", "bell")
+                    invia_notifica("CHIUSURA CANDELA H1", f"Candela chiusa (Max: {max_chiuso:.2f}). TS equiparato per {len(aperti_ora)} difese a {ts_candela_chiusa:.2f}", "bell")
 
             self.stato["massimo_ora_in_corso"] = bid
             self.stato["ora_corrente_h1"] = ora_attuale
@@ -574,20 +576,31 @@ class GoldfingerEngine:
                         sc["open_price"] = lvl
                         sc["opened_at"] = time.time()
                         
-                        # STOP LOSS DELLA DIFESA ANCORATO ALLA CANDELA H1 IN CORSO:
-                        # Ancorato rigorosamente al massimo dell'ora (+3 pip) o passo minimo di respiro
-                        max_ora = self.stato.get("massimo_ora_in_corso", lvl)
-                        dist = max_ora - lvl
-                        if dist < passo:
+                        # STOP LOSS DELLA DIFESA ANCORATO AL MASSIMO DELLA CANDELA H1 PRECEDENTE:
+                        # Riferimento: Massimo candela precedente chiusa (+3 pip). Cap massimo di respiro: 20 pip da livello entry.
+                        max_prec = self.stato.get("massimo_ora_chiusa")
+                        if max_prec is None:
+                            max_prec = self.stato.get("massimo_ora_in_corso", lvl)
+
+                        target_ts = round(max_prec + 3.0, 2)
+                        distanza_prec = round(target_ts - lvl, 2)
+
+                        if distanza_prec > 20.0:
+                            sc["sl_price"] = round(lvl + 20.0, 2)
+                            desc_ts = f"Cap 20 pip da entry ({lvl:.2f} + 20p = {sc['sl_price']:.2f}, Max prec + 3p distava {distanza_prec:.1f}p)"
+                        elif distanza_prec < passo:
                             sc["sl_price"] = round(lvl + passo, 2)
+                            desc_ts = f"Passo minimo ({passo}p da entry = {sc['sl_price']:.2f})"
                         else:
-                            sc["sl_price"] = round(max_ora + 3.0, 2)
+                            sc["sl_price"] = target_ts
+                            desc_ts = f"Max prec + 3p ({max_prec:.2f} + 3p = {sc['sl_price']:.2f}, dist: {distanza_prec:.1f}p)"
+
                         if ask and sc["sl_price"] <= ask:
                             sc["sl_price"] = round(ask + passo, 2)
 
                         # REGOLE SCENARIO B: I TS DELLE DIFESE NON SI TOCCANO IN CORSO D'ORA!
                         # Rimangono invariati per tutta l'ora e si allineano solo al cambio ora (:00:00).
-                        print_log(f"🛡️ Difesa {sc['numero']} aperta @ {lvl:.2f}. TS assegnato: {sc['sl_price']:.2f} (Max ora: {max_ora:.2f}). Difese precedenti INVARIATE fino a fine candela H1.")
+                        print_log(f"🛡️ Difesa {sc['numero']} aperta @ {lvl:.2f}. TS assegnato: {sc['sl_price']:.2f} [{desc_ts}]. Difese precedenti INVARIATE fino a fine candela H1.")
 
                         invia_notifica("DIFESA SHORT ESEGUITA", f"Agganciata Difesa {sc['numero']} ({sc['size']} mini) @ {lvl:.2f} [TS: {sc['sl_price']:.2f}]", "heavy_minus_sign")
                         self.salva_stato()
