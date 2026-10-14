@@ -568,13 +568,26 @@ class GoldfingerEngine:
                                 sc["sl_price"] = round(lvl + passo, 2)
                             else:
                                 sc["sl_price"] = round(max_ora + 3.0, 2)
+                            if ask and sc["sl_price"] <= ask:
+                                sc["sl_price"] = round(ask + passo, 2)
                             print_log(f"🛡️ Difesa 1 aperta @ {lvl:.2f}. TS iniziale: {sc['sl_price']:.2f} (Max ora: {max_ora:.2f}, dist: {dist:.1f} pip)")
                         else:
                             # Difese successive (idx >= 1):
-                            # Tutte le difese aperte allineano il proprio TS al prezzo reale di apertura dell'ultima difesa aperta precedente
+                            # Allinea il TS alla difesa precedente MA CON VINCOLO INVIOLABILE: deve stare SOPRA l'Ask attuale!
                             sc_prev = next((s for s in reversed(scaglioni[:idx]) if s.get("open_price")), scaglioni[idx - 1])
                             pz_rif = sc_prev.get("open_price") or sc_prev.get("prezzo_target") or lvl
                             target_sl = round(float(pz_rif), 2)
+                            
+                            # SALVAGUARDIA MATEMATICA: Per uno SHORT, il TS DEVE essere > Ask
+                            # Se target_sl <= ask (es. slippage/spike), mantieni il TS precedente che stava sopra il mercato
+                            prev_sl = sc_prev.get("sl_price")
+                            if ask and target_sl <= ask:
+                                if prev_sl and float(prev_sl) > ask:
+                                    target_sl = float(prev_sl)
+                                    print_log(f"🛡️ [SALVAGUARDIA TS] Entry precedente ({pz_rif:.2f}) <= Ask ({ask:.2f}): mantengo TS alto a {target_sl:.2f}")
+                                else:
+                                    target_sl = round(ask + passo, 2)
+                                    print_log(f"🛡️ [SALVAGUARDIA TS] Entry precedente ({pz_rif:.2f}) <= Ask ({ask:.2f}): imposto TS ad Ask + passo = {target_sl:.2f}")
                             
                             sc["sl_price"] = target_sl
                             for p_idx in range(idx):
@@ -582,7 +595,7 @@ class GoldfingerEngine:
                                 if sc_p["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
                                     sc_p["sl_price"] = target_sl
                                     sc_p["stato"] = "PROTETTO_BE"
-                            print_log(f"🛡️ RATCHET ATTIVO: Agganciata Difesa {sc['numero']} @ {lvl:.2f}. Allineato TS di TUTTE le difese aperte a {target_sl:.2f} (entry Difesa {sc_prev['numero']})!")
+                            print_log(f"🛡️ RATCHET ATTIVO: Agganciata Difesa {sc['numero']} @ {lvl:.2f}. Allineato TS di TUTTE le difese aperte a {target_sl:.2f}!")
 
                         invia_notifica("DIFESA SHORT ESEGUITA", f"Agganciata Difesa {sc['numero']} ({sc['size']} mini) @ {lvl:.2f} [TS: {sc['sl_price']:.2f}]", "heavy_minus_sign")
                         self.salva_stato()
