@@ -477,8 +477,23 @@ class GoldfingerEngine:
         ora_attuale = now_it().hour
         ora_memorizzata = self.stato.get("ora_corrente_h1")
         if ora_memorizzata != ora_attuale:
+            # CAMBIO ORA: LA CANDELA H1 PRECEDENTE SI È CHIUSA!
             if self.stato.get("massimo_ora_in_corso") is not None:
-                self.stato["massimo_ora_chiusa"] = self.stato["massimo_ora_in_corso"]
+                max_chiuso = self.stato["massimo_ora_in_corso"]
+                self.stato["massimo_ora_chiusa"] = max_chiuso
+                
+                # ALLINEAMENTO TS DI TUTTE LE DIFESE APERTE SOLO E SOLTANTO A FINE CANDELA CHIUSA!
+                aperti_ora = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+                if aperti_ora:
+                    ts_candela_chiusa = round(max_chiuso + 3.0, 2)
+                    print_log(f"⏰ CANDELA ORARIA CHIUSA (H1): Massimo definitivo = {max_chiuso:.2f}. Nuovo TS a fine candela = {ts_candela_chiusa:.2f}")
+                    for s in aperti_ora:
+                        if s.get("sl_price") is None or ts_candela_chiusa < s["sl_price"]:
+                            s["sl_price"] = ts_candela_chiusa
+                            s["stato"] = "PROTETTO_BE"
+                    self.salva_stato()
+                    invia_notifica("CHIUSURA CANDELA H1", f"Candela chiusa (Max: {max_chiuso:.2f}). TS allineato per {len(aperti_ora)} difese a {ts_candela_chiusa:.2f}", "bell")
+
             self.stato["massimo_ora_in_corso"] = bid
             self.stato["ora_corrente_h1"] = ora_attuale
         else:
@@ -559,43 +574,20 @@ class GoldfingerEngine:
                         sc["open_price"] = lvl
                         sc["opened_at"] = time.time()
                         
-                        # LOGICA RATCHET:
-                        if idx == 0:
-                            # Prima difesa: stop iniziale sopra il massimo dell'ora (o passo minimo di respiro)
-                            max_ora = self.stato.get("massimo_ora_in_corso", lvl)
-                            dist = max_ora - lvl
-                            if dist < passo:
-                                sc["sl_price"] = round(lvl + passo, 2)
-                            else:
-                                sc["sl_price"] = round(max_ora + 3.0, 2)
-                            if ask and sc["sl_price"] <= ask:
-                                sc["sl_price"] = round(ask + passo, 2)
-                            print_log(f"🛡️ Difesa 1 aperta @ {lvl:.2f}. TS iniziale: {sc['sl_price']:.2f} (Max ora: {max_ora:.2f}, dist: {dist:.1f} pip)")
+                        # STOP LOSS DELLA DIFESA ANCORATO ALLA CANDELA H1 IN CORSO:
+                        # Ancorato rigorosamente al massimo dell'ora (+3 pip) o passo minimo di respiro
+                        max_ora = self.stato.get("massimo_ora_in_corso", lvl)
+                        dist = max_ora - lvl
+                        if dist < passo:
+                            sc["sl_price"] = round(lvl + passo, 2)
                         else:
-                            # Difese successive (idx >= 1):
-                            # Allinea il TS alla difesa precedente MA CON VINCOLO INVIOLABILE: deve stare SOPRA l'Ask attuale!
-                            sc_prev = next((s for s in reversed(scaglioni[:idx]) if s.get("open_price")), scaglioni[idx - 1])
-                            pz_rif = sc_prev.get("open_price") or sc_prev.get("prezzo_target") or lvl
-                            target_sl = round(float(pz_rif), 2)
-                            
-                            # SALVAGUARDIA MATEMATICA: Per uno SHORT, il TS DEVE essere > Ask
-                            # Se target_sl <= ask (es. slippage/spike), mantieni il TS precedente che stava sopra il mercato
-                            prev_sl = sc_prev.get("sl_price")
-                            if ask and target_sl <= ask:
-                                if prev_sl and float(prev_sl) > ask:
-                                    target_sl = float(prev_sl)
-                                    print_log(f"🛡️ [SALVAGUARDIA TS] Entry precedente ({pz_rif:.2f}) <= Ask ({ask:.2f}): mantengo TS alto a {target_sl:.2f}")
-                                else:
-                                    target_sl = round(ask + passo, 2)
-                                    print_log(f"🛡️ [SALVAGUARDIA TS] Entry precedente ({pz_rif:.2f}) <= Ask ({ask:.2f}): imposto TS ad Ask + passo = {target_sl:.2f}")
-                            
-                            sc["sl_price"] = target_sl
-                            for p_idx in range(idx):
-                                sc_p = scaglioni[p_idx]
-                                if sc_p["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
-                                    sc_p["sl_price"] = target_sl
-                                    sc_p["stato"] = "PROTETTO_BE"
-                            print_log(f"🛡️ RATCHET ATTIVO: Agganciata Difesa {sc['numero']} @ {lvl:.2f}. Allineato TS di TUTTE le difese aperte a {target_sl:.2f}!")
+                            sc["sl_price"] = round(max_ora + 3.0, 2)
+                        if ask and sc["sl_price"] <= ask:
+                            sc["sl_price"] = round(ask + passo, 2)
+
+                        # REGOLE SCENARIO B: I TS DELLE DIFESE NON SI TOCCANO IN CORSO D'ORA!
+                        # Rimangono invariati per tutta l'ora e si allineano solo al cambio ora (:00:00).
+                        print_log(f"🛡️ Difesa {sc['numero']} aperta @ {lvl:.2f}. TS assegnato: {sc['sl_price']:.2f} (Max ora: {max_ora:.2f}). Difese precedenti INVARIATE fino a fine candela H1.")
 
                         invia_notifica("DIFESA SHORT ESEGUITA", f"Agganciata Difesa {sc['numero']} ({sc['size']} mini) @ {lvl:.2f} [TS: {sc['sl_price']:.2f}]", "heavy_minus_sign")
                         self.salva_stato()
