@@ -633,13 +633,29 @@ def renderizza_tab_goldfinger(conto):
                 else:
                     st_badge = "<span style='color: #94a3b8; font-weight: 500;'>In attesa</span>"
                 
-                pz_tgt = f"{s.get('prezzo_target', 0):.2f}"
+                # Se la difesa è entrata (o chiusa), riporta il prezzo reale di entrata; altrimenti il trigger stimato
+                op_pz = s.get("open_price")
+                if op_pz and float(op_pz) > 0 and st_code in ("APERTO", "PROTETTO_BE", "RECUPERATO", "CHIUSO", "RECUPERATO_CHIUSO"):
+                    pz_display = f"<span style='color: #4ade80; font-weight: bold;' title='Eseguito a mercato'>{float(op_pz):.2f}</span>"
+                else:
+                    pz_display = f"{s.get('prezzo_target', 0):.2f}"
+                
+                # Livello Trailing Stop della singola difesa
+                sl_pz = s.get("sl_price")
+                if sl_pz and float(sl_pz) > 0 and st_code in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                    ts_display = f"<span style='color: #f59e0b; font-weight: bold;'>{float(sl_pz):.2f}</span>"
+                elif st_code in ("CHIUSO", "RECUPERATO_CHIUSO"):
+                    ts_display = "<span style='color: #64748b;'>Chiuso</span>"
+                else:
+                    ts_display = "<span style='color: #64748b;'>--</span>"
+                
                 tab_rows += (
                     f"<tr style='border-bottom: 1px solid #334155; text-align: center;'>"
                     f"<td style='padding: 6px; font-weight: bold; text-align: center;'>Difesa {s.get('numero')}</td>"
-                    f"<td style='padding: 6px; color: #f8fafc; text-align: center;'>{pz_tgt}</td>"
+                    f"<td style='padding: 6px; text-align: center;'>{pz_display}</td>"
                     f"<td style='padding: 6px; color: #38bdf8; font-weight: bold; text-align: center;'>-{s.get('size')} mini</td>"
                     f"<td style='padding: 6px; text-align: center;'>{st_badge}</td>"
+                    f"<td style='padding: 6px; text-align: center;'>{ts_display}</td>"
                     f"</tr>"
                 )
 
@@ -651,6 +667,7 @@ def renderizza_tab_goldfinger(conto):
                 "<th style='text-align: center; padding: 6px;'>Trigger Prezzo</th>"
                 "<th style='text-align: center; padding: 6px;'>Size Short</th>"
                 "<th style='text-align: center; padding: 6px;'>Stato</th>"
+                "<th style='text-align: center; padding: 6px;'>TS</th>"
                 "</tr>"
                 "</thead>"
                 f"<tbody>{tab_rows}</tbody>"
@@ -658,15 +675,25 @@ def renderizza_tab_goldfinger(conto):
             )
             st.markdown(html_table, unsafe_allow_html=True)
             
+            aperti_gf = [s for s in scaglioni if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+            ts_attivi = [s.get("sl_price") for s in aperti_gf if s.get("sl_price")]
             min_disc = stato.get("minimo_discesa")
-            passo_attuale = float(stato.get("passo_pip") or cfg.get("passo_pip") or 6.0)
-            delta_rimbalzo = round(passo_attuale * 2.0, 2)
-            if min_disc is not None:
-                sgancio = round(min_disc + delta_rimbalzo, 2)
+            
+            if ts_attivi:
+                ts_target = min(ts_attivi)
+                st.markdown(
+                    f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.82rem;'>"
+                    f"🛡️ <b>Trailing Stop Attivo (Ratchet):</b> <span style='color: #FFD700; font-weight: bold;'>{ts_target:.2f}</span> &nbsp;|&nbsp; "
+                    f"📉 <b>Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc:.2f if min_disc is not None else '--'}</span> &nbsp;|&nbsp; "
+                    f"Posizioni a mercato: <span style='color: #38bdf8; font-weight: bold;'>{len(aperti_gf)}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+            elif min_disc is not None:
                 st.markdown(
                     f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 0.82rem;'>"
-                    f"📉 <b>Minimo Discesa Corrente:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span> &nbsp;|&nbsp; "
-                    f"💥 <b>Soglia Chiusura Rimbalzo (+{delta_rimbalzo:.1f} pip = passo x 2):</b> <span style='color: #FFD700; font-weight: bold;'>{sgancio:.2f}</span>"
+                    f"📉 <b>Ultimo Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span> &nbsp;|&nbsp; "
+                    f"In attesa di nuovo trigger difese..."
                     f"</div>",
                     unsafe_allow_html=True
                 )

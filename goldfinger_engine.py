@@ -471,6 +471,19 @@ class GoldfingerEngine:
         self.stato["ultimo_prezzo_bid"] = bid
         self.stato["ultimo_prezzo_ask"] = ask
 
+        # Tracciamento del massimo della candela oraria in corso dai tick live (zero chiamate storiche API)
+        ora_attuale = now_it().hour
+        ora_memorizzata = self.stato.get("ora_corrente_h1")
+        if ora_memorizzata != ora_attuale:
+            if self.stato.get("massimo_ora_in_corso") is not None:
+                self.stato["massimo_ora_chiusa"] = self.stato["massimo_ora_in_corso"]
+            self.stato["massimo_ora_in_corso"] = bid
+            self.stato["ora_corrente_h1"] = ora_attuale
+        else:
+            max_in_corso = self.stato.get("massimo_ora_in_corso")
+            if max_in_corso is None or bid > max_in_corso:
+                self.stato["massimo_ora_in_corso"] = bid
+
         scaglioni = self.stato.get("scaglioni", [])
         
         # RICONCILIAZIONE BIDIREZIONALE CON IG:
@@ -531,7 +544,8 @@ class GoldfingerEngine:
                     self.stato["minimo_discesa"] = bid
             self.salva_stato()
 
-        # 6. VERIFICA ENTRATE A SCAGLIONI IN DISCESA
+        # 6. VERIFICA ENTRATE A SCAGLIONI IN DISCESA (RATCHET A GRADINI)
+        passo = float(self.stato.get("passo_pip", 6.0))
         for idx, sc in enumerate(scaglioni):
             if sc["stato"] == "IN_ATTESA":
                 if bid <= sc["prezzo_target"]:
@@ -541,17 +555,34 @@ class GoldfingerEngine:
                         sc["stato"] = "APERTO"
                         sc["deal_id"] = deal_id
                         sc["open_price"] = lvl
-                        sc["sl_price"] = lvl + 6.0 # SL iniziale per falso allarme
                         sc["opened_at"] = time.time()
                         
-                        # Protezione a Break-Even + 1 pip della difesa precedente!
-                        if idx > 0 and scaglioni[idx - 1]["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                        # LOGICA RATCHET:
+                        if idx == 0:
+                            # Prima difesa: stop iniziale sopra il massimo dell'ora (o passo minimo di respiro)
+                            max_ora = self.stato.get("massimo_ora_in_corso", lvl)
+                            dist = max_ora - lvl
+                            if dist < passo:
+                                sc["sl_price"] = round(lvl + passo, 2)
+                            else:
+                                sc["sl_price"] = round(max_ora + 3.0, 2)
+                            print_log(f"🛡️ Difesa 1 aperta @ {lvl:.2f}. TS iniziale: {sc['sl_price']:.2f} (Max ora: {max_ora:.2f}, dist: {dist:.1f} pip)")
+                        else:
+                            # Difese successive (idx >= 1):
+                            # Tutte le difese aperte allineano il proprio TS al prezzo reale di apertura della difesa precedente!
                             sc_prev = scaglioni[idx - 1]
-                            sc_prev["stato"] = "PROTETTO_BE"
-                            sc_prev["sl_price"] = sc_prev["open_price"] - 1.0 # 1 pip sotto l'entrata SHORT = profitto blindato
-                            print_log(f"🛡️ Difesa {sc_prev['numero']} protetta a Break-Even+1 @ {sc_prev['sl_price']:.2f}")
+                            pz_rif = sc_prev.get("open_price") or sc_prev.get("prezzo_target") or lvl
+                            target_sl = round(float(pz_rif), 2)
+                            
+                            sc["sl_price"] = target_sl
+                            for p_idx in range(idx):
+                                sc_p = scaglioni[p_idx]
+                                if sc_p["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                                    sc_p["sl_price"] = target_sl
+                                    sc_p["stato"] = "PROTETTO_BE"
+                            print_log(f"🛡️ RATCHET ATTIVO: Agganciata Difesa {sc['numero']} @ {lvl:.2f}. Allineato TS di TUTTE le difese aperte a {target_sl:.2f} (entry Difesa {sc_prev['numero']})!")
 
-                        invia_notifica("DIFESA SHORT ESEGUITA", f"Agganciata Difesa {sc['numero']} ({sc['size']} mini) @ {lvl:.2f}", "heavy_minus_sign")
+                        invia_notifica("DIFESA SHORT ESEGUITA", f"Agganciata Difesa {sc['numero']} ({sc['size']} mini) @ {lvl:.2f} [TS: {sc['sl_price']:.2f}]", "heavy_minus_sign")
                         self.salva_stato()
 
                         # CONTROLLO RECUPERO DIFESE ROSSE PRECEDENTI
@@ -563,9 +594,9 @@ class GoldfingerEngine:
                                 sc_r["stato"] = "RECUPERATO"
                                 sc_r["deal_id"] = deal_id_rec
                                 sc_r["open_price"] = lvl_rec
-                                sc_r["sl_price"] = lvl_rec + 6.0
+                                sc_r["sl_price"] = sc["sl_price"]
                                 sc_r["opened_at"] = time.time()
-                                print_log(f"🟡 [RECUPERO COMPLETATO] Difesa {sc_r['numero']} recuperata con successo a {lvl_rec:.2f} [ID: {deal_id_rec}]! Segnato GIALLO.")
+                                print_log(f"🟡 [RECUPERO COMPLETATO] Difesa {sc_r['numero']} recuperata a {lvl_rec:.2f} [ID: {deal_id_rec}]! Segnato GIALLO.")
                                 invia_notifica("RECUPERO DIFESA", f"Difesa {sc_r['numero']} recuperata a mercato @ {lvl_rec:.2f}", "arrows_counterclockwise")
                                 self.salva_stato()
                             else:
@@ -581,99 +612,74 @@ class GoldfingerEngine:
         # Ricalcola le posizioni aperte post-ingresso nel tick corrente
         aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
 
-        # 7. CHIUSURA TOTALE SHORT SUL RIMBALZO (passo * 2 pip dal minimo)
-        min_curr = self.stato.get("minimo_discesa")
-        if aperti and min_curr is not None:
-            passo = float(self.stato.get("passo_pip", 6.0))
-            delta_rimbalzo = round(passo * 2.0, 2)
-            soglia_sgancio = round(min_curr + delta_rimbalzo, 2)
-            if ask >= soglia_sgancio:
-                print_log(f"💥 RIMBALZO RILEVATO: Prezzo {ask:.2f} >= Minimo ({min_curr:.2f}) + {delta_rimbalzo:.1f} pip (passo {passo:.1f} x 2 = {soglia_sgancio:.2f}). Chiudo tutti gli SHORT all'incasso!")
-                pnl_tot_rimbalzo = 0.0
-                tutti_chiusi = True
-                for sc in aperti:
-                    ok, lvl_c, pnl = self.chiudi_short_mercato(sc["deal_id"], sc["size"])
-                    if ok:
-                        sc["stato"] = "RECUPERATO_CHIUSO" if sc.get("stato") == "RECUPERATO" else "CHIUSO"
-                        pnl_tot_rimbalzo += pnl
-                        self.stato["storico_operazioni"].append({
-                            "data": now_it().strftime("%d/%m %H:%M:%S"),
-                            "scaglione": sc["numero"],
-                            "size": sc["size"],
-                            "open": sc["open_price"],
-                            "close": lvl_c,
-                            "pnl": pnl,
-                            "motivo": "RIMBALZO_INCASSO"
-                        })
-                    else:
-                        tutti_chiusi = False
-                        print_log(f"🚨 ATTENZIONE: Chiusura IG non confermata per difesa {sc['numero']} (Deal {sc.get('deal_id')}). Ritento!")
+        # 7. CHIUSURA TOTALE SHORT SU TRAILING STOP (RATCHET)
+        if aperti:
+            sl_list = [float(s["sl_price"]) for s in aperti if s.get("sl_price") is not None]
+            if sl_list:
+                ts_attivo = min(sl_list)
+                if ask >= ts_attivo:
+                    print_log(f"💥 RIMBALZO RILEVATO (TRAILING STOP): Prezzo Ask {ask:.2f} >= TS Attivo {ts_attivo:.2f}. Chiudo TUTTI gli SHORT all'istante!")
+                    pnl_tot_rimbalzo = 0.0
+                    tutti_chiusi = True
+                    for sc in aperti:
+                        ok, lvl_c, pnl = self.chiudi_short_mercato(sc["deal_id"], sc["size"])
+                        if ok:
+                            sc["stato"] = "RECUPERATO_CHIUSO" if sc.get("stato") == "RECUPERATO" else "CHIUSO"
+                            pnl_tot_rimbalzo += pnl
+                            self.stato["storico_operazioni"].append({
+                                "data": now_it().strftime("%d/%m %H:%M:%S"),
+                                "scaglione": sc["numero"],
+                                "size": sc["size"],
+                                "open": sc["open_price"],
+                                "close": lvl_c,
+                                "pnl": pnl,
+                                "motivo": "TS_RATCHET"
+                            })
+                        else:
+                            tutti_chiusi = False
+                            print_log(f"🚨 ATTENZIONE: Chiusura IG non confermata per difesa {sc['numero']} (Deal {sc.get('deal_id')}). Ritento!")
 
-                if not tutti_chiusi:
-                    print_log("⚠️ Riarmo sospeso: alcune posizioni non sono ancora confermate chiuse su IG. Ritento al prossimo ciclo.")
-                    self.salva_stato()
-                    return
+                    if not tutti_chiusi:
+                        print_log("⚠️ Riarmo sospeso: alcune posizioni non sono ancora confermate chiuse su IG. Ritento al prossimo ciclo.")
+                        self.salva_stato()
+                        return
 
-                self.stato["pnl_sessione"] += pnl_tot_rimbalzo
-                self.stato["totale_incassato"] += pnl_tot_rimbalzo
-                self.stato["minimo_precedente"] = min_curr
-                self.stato["minimo_discesa"] = None
-
-                # RIARMO DELLA SECONDA ONDATA (Prima difesa non entrata - 3 pip)
-                # Rigenera SEMPRE TUTTI i contratti (6 difese) a partire dalla prima difesa non entrata meno 3 pip
-                prima_non_entrata = next((s for s in scaglioni if s["stato"] == "IN_ATTESA"), None)
-                passo = float(self.stato.get("passo_pip", 6.0))
-                sz = int(self.stato.get("size_scaglione", 3))
-                delta = int(self.stato.get("delta_totale", 18))
-
-                if prima_non_entrata and prima_non_entrata.get("prezzo_target"):
-                    # REGOLE SERVER: Se l'ultima difesa NON è entrata -> prima non entrata - 3 pip
-                    pz_rif = float(prima_non_entrata["prezzo_target"])
-                    soglia_riarmo = round(pz_rif - 3.0, 2)
-                    desc_riarmo = f"Prima difesa non entrata ({pz_rif:.2f}) - 3 pip"
-                elif min_curr is not None:
-                    # REGOLE SERVER: Se l'ultima difesa E' ENTRATA -> Minimo assoluto - 5 pip
-                    soglia_riarmo = round(min_curr - 5.0, 2)
-                    desc_riarmo = f"Minimo assoluto discesa ({min_curr:.2f}) - 5 pip"
-                else:
-                    soglia_riarmo = round(float(self.stato.get("livello_1_prezzo", 4128.0)) - 6.0, 2)
-                    desc_riarmo = "Livello precedente - 6 pip"
-
-                self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
-                self.stato["livello_1_prezzo"] = soglia_riarmo
-                print_log(f"💰 Chiusura rimbalzo completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €.")
-                print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù.")
-                invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
-                self.salva_stato()
-
-                # Sincronizza config_goldfinger.json per mantenere allineata la UI e non sovrascrivere il riarmo
-                cfg_sync = self.carica_config()
-                cfg_sync["livello_1_prezzo"] = soglia_riarmo
-                cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                self.salva_config(cfg_sync)
-                return
-
-        # 9. STOP LOSS SINGOLO SU FALSO ALLARME
-        if len(aperti) == 1:
-            sc_unica = aperti[0]
-            if sc_unica.get("sl_price") and ask >= sc_unica["sl_price"]:
-                print_log(f"🛑 Falso allarme Difesa {sc_unica['numero']}: Colpito Stop Loss a {ask:.2f}. Chiudo in minima perdita.")
-                ok, lvl_c, pnl = self.chiudi_short_mercato(sc_unica["deal_id"], sc_unica["size"])
-                if ok:
-                    sc_unica["stato"] = "RECUPERATO_CHIUSO" if sc_unica.get("stato") == "RECUPERATO" else "CHIUSO"
-                    self.stato["pnl_sessione"] += pnl
+                    self.stato["pnl_sessione"] += pnl_tot_rimbalzo
+                    self.stato["totale_incassato"] += pnl_tot_rimbalzo
+                    min_curr = self.stato.get("minimo_discesa")
+                    self.stato["minimo_precedente"] = min_curr
                     self.stato["minimo_discesa"] = None
-                    self.stato["storico_operazioni"].append({
-                        "data": now_it().strftime("%d/%m %H:%M:%S"),
-                        "scaglione": sc_unica["numero"],
-                        "size": sc_unica["size"],
-                        "open": sc_unica["open_price"],
-                        "close": lvl_c,
-                        "pnl": pnl,
-                        "motivo": "SL_FALSO_ALLARME"
-                    })
-                    invia_notifica("STOP LOSS FALSO ALLARME", f"Difesa {sc_unica['numero']} ({sc_unica['size']} mini) chiusa a {lvl_c:.2f}. PnL: {pnl:+.2f} €", "warning")
+
+                    # RIARMO DELLA SECONDA ONDATA (Prima difesa non entrata - 3 pip)
+                    prima_non_entrata = next((s for s in scaglioni if s["stato"] == "IN_ATTESA"), None)
+                    passo = float(self.stato.get("passo_pip", 6.0))
+                    sz = int(self.stato.get("size_scaglione", 3))
+                    delta = int(self.stato.get("delta_totale", 18))
+
+                    if prima_non_entrata and prima_non_entrata.get("prezzo_target"):
+                        pz_rif = float(prima_non_entrata["prezzo_target"])
+                        soglia_riarmo = round(pz_rif - 3.0, 2)
+                        desc_riarmo = f"Prima difesa non entrata ({pz_rif:.2f}) - 3 pip"
+                    elif min_curr is not None:
+                        soglia_riarmo = round(min_curr - 5.0, 2)
+                        desc_riarmo = f"Minimo assoluto discesa ({min_curr:.2f}) - 5 pip"
+                    else:
+                        soglia_riarmo = round(float(self.stato.get("livello_1_prezzo", 4128.0)) - 6.0, 2)
+                        desc_riarmo = "Livello precedente - 6 pip"
+
+                    self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
+                    self.stato["livello_1_prezzo"] = soglia_riarmo
+                    print_log(f"💰 Chiusura TS completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €.")
+                    print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù.")
+                    invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
                     self.salva_stato()
+
+                    # Sincronizza config_goldfinger.json per mantenere allineata la UI e non sovrascrivere il riarmo
+                    cfg_sync = self.carica_config()
+                    cfg_sync["livello_1_prezzo"] = soglia_riarmo
+                    cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                    self.salva_config(cfg_sync)
+                    return
 
     def avvia_loop(self):
         print_log(f"🚀 Modulo Goldfinger Engine avviato in ascolto permanente per {self.target_account_id}...")
