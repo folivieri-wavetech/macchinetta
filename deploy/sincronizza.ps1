@@ -91,6 +91,18 @@ try {
     if (Test-Path "goldfinger_tab.py") {
         & $KUBECTL --kubeconfig=$KUBECONFIG cp goldfinger_tab.py "macchinetta/${POD_DASH}:/data/goldfinger_tab.py"
     }
+    if (Test-Path "hyper_tab.py") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_tab.py "macchinetta/${POD_DASH}:/data/hyper_tab.py"
+    }
+    if (Test-Path "hyper_gold_m8_engine.py") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_gold_m8_engine.py "macchinetta/${POD_DASH}:/data/hyper_gold_m8_engine.py"
+    }
+    if (Test-Path "hyper_us500_m8_engine.py") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_us500_m8_engine.py "macchinetta/${POD_DASH}:/data/hyper_us500_m8_engine.py"
+    }
+    if (Test-Path "hyper_order_manager.py") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp hyper_order_manager.py "macchinetta/${POD_DASH}:/data/hyper_order_manager.py"
+    }
     if (Test-Path "xtrader.py") {
         & $KUBECTL --kubeconfig=$KUBECONFIG cp xtrader.py "macchinetta/${POD_DASH}:/data/xtrader.py"
     }

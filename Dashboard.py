@@ -2884,21 +2884,22 @@ else:
 
     mostra_goldfinger = (conto_selezionato == "DANY_REALE")
     tab_goldfinger = None
+    tab_hyper = None
 
     if is_regista:
         if mostra_goldfinger:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
         else:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
         if mostra_goldfinger:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
         else:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
         tab_restore = tab_posizioni = tab_console = tab_autorizzazioni = tab_statistiche = None
 
 
@@ -4943,6 +4944,14 @@ else:
             with sub_rng_sin:
                 renderizza_sintesi()
 
+
+    if tab_hyper is not None:
+        with tab_hyper:
+            try:
+                import hyper_tab
+                hyper_tab.render_hyper_tab(conto_selezionato=conto_selezionato)
+            except Exception as e_hyp:
+                st.error(f"Errore caricamento Hyper: {e_hyp}")
 
     if tab_goldfinger is not None:
         with tab_goldfinger:
