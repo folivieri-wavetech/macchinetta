@@ -392,27 +392,17 @@ def renderizza_tab_goldfinger(conto):
         aperti_att = [s for s in scaglioni_att if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
         has_aperti = is_attivo and len(aperti_att) > 0
 
-        col_inp, col_btn_sugg = st.columns([7, 5], vertical_alignment="bottom")
-        with col_inp:
-            pz_l1 = st.number_input(
-                "🎯 Prezzo Livello 1 (Partenza)",
-                min_value=0.0,
-                max_value=10000.0,
-                value=float(val_default),
-                step=1.0,
-                format="%.2f",
-                key=f"input_{ss_key}",
-                disabled=(has_aperti or not is_operativo),
-                help="Prezzo a cui scatterà la prima Difesa SHORT a mercato. Modificabile a caldo finché non ci sono posizioni aperte."
-            )
-        with col_btn_sugg:
-            if sugg_lvl is not None:
-                if st.button(f"🎯 Usa {sugg_lvl:.2f}", key=f"btn_sugg_{conto}", use_container_width=True, disabled=(has_aperti or not is_operativo), help=help_gf_viewer or "Applica il prezzo chirurgico consigliato al Livello 1"):
-                    if not is_operativo:
-                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                        st.rerun()
-                    st.session_state[ss_key] = float(sugg_lvl)
-                    st.rerun()
+        pz_l1 = st.number_input(
+            "🎯 Prezzo Livello 1 (Partenza)",
+            min_value=0.0,
+            max_value=10000.0,
+            value=float(val_default),
+            step=1.0,
+            format="%.2f",
+            key=f"input_{ss_key}",
+            disabled=(has_aperti or not is_operativo),
+            help="Prezzo a cui scatterà la prima Difesa SHORT a mercato. Modificabile a caldo finché non ci sono posizioni aperte."
+        )
 
         cp, cs = st.columns(2)
         with cp:
@@ -433,7 +423,7 @@ def renderizza_tab_goldfinger(conto):
         if is_ts_man_active:
             st.markdown(
                 f"<div style='background: rgba(245, 158, 11, 0.12); border-left: 3px solid #f59e0b; border-radius: 4px; padding: 6px 10px; margin-bottom: 8px; font-size: 0.76rem; color: #fbbf24;'>"
-                f"⚡ <b>TS Manuale Attivo @ {saved_ts:.2f}</b> • Calcolo automatico H1 disabilitato"
+                f"⚡ <b>TS manuale salvato @ {saved_ts:.2f}</b> • Calcolo automatico H1 disabilitato"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -447,6 +437,12 @@ def renderizza_tab_goldfinger(conto):
 
         ts_form_key = f"form_ts_man_{conto}"
         ts_inp_key = f"input_ts_man_{conto}"
+        last_ts_sync_key = f"last_synced_ts_{conto}"
+
+        # Sincronizzazione automatica se il TS manuale è stato azzerato dal Trailing Stop o resettato
+        if st.session_state.get(last_ts_sync_key) != saved_ts:
+            st.session_state[ts_inp_key] = saved_ts
+            st.session_state[last_ts_sync_key] = saved_ts
 
         with st.form(key=ts_form_key, clear_on_submit=False):
             ts_manuale_inp = st.number_input(
@@ -460,8 +456,9 @@ def renderizza_tab_goldfinger(conto):
                 disabled=(not is_operativo),
                 help="Scrivi il prezzo desiderato e clicca SALVA per renderlo operativo. Se lo lasci vuoto e clicchi SALVA (o premi Svuota), il TS virtuale viene ricalcolato dalla candela precedente."
             )
+            btn_label = "✅ TS manuale salvato" if is_ts_man_active else "💾 Salva TS Manuale"
             btn_salva_ts = st.form_submit_button(
-                "💾 SALVA TS MANUALE",
+                btn_label,
                 type="primary",
                 use_container_width=True,
                 disabled=(not is_operativo)
@@ -488,6 +485,7 @@ def renderizza_tab_goldfinger(conto):
                         s["sl_price"] = new_val
                         aperti_mod += 1
                 scrivi_json_sicuro(paths["stato"], new_stato)
+                st.session_state[last_ts_sync_key] = new_val
                 st.success(f"✅ TS Manuale salvato e reso operativo a {new_val:.2f} per {aperti_mod} difese in posizione!")
                 time.sleep(0.4)
                 st.rerun()
@@ -516,6 +514,7 @@ def renderizza_tab_goldfinger(conto):
                             aperti_mod += 1
                 scrivi_json_sicuro(paths["stato"], new_stato)
                 st.session_state[ts_inp_key] = None
+                st.session_state[last_ts_sync_key] = None
                 st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese in posizione!")
                 time.sleep(0.4)
                 st.rerun()
@@ -550,6 +549,7 @@ def renderizza_tab_goldfinger(conto):
                             aperti_mod += 1
                 scrivi_json_sicuro(paths["stato"], new_stato)
                 st.session_state[ts_inp_key] = None
+                st.session_state[last_ts_sync_key] = None
                 st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese in posizione!")
                 time.sleep(0.4)
                 st.rerun()
@@ -860,7 +860,8 @@ def renderizza_tab_goldfinger(conto):
                                     s["sl_price"] = ts_ripristinato
                                     aperti_mod += 1
                         scrivi_json_sicuro(paths["stato"], new_stato)
-                        st.session_state[f"input_{ts_man_key}"] = None
+                        st.session_state[f"input_ts_man_{conto}"] = None
+                        st.session_state[f"last_synced_ts_{conto}"] = None
                         st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese in posizione!")
                         time.sleep(0.4)
                         st.rerun()

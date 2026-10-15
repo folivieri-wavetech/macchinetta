@@ -751,14 +751,16 @@ class GoldfingerEngine:
 
                     self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
                     self.stato["livello_1_prezzo"] = soglia_riarmo
+                    self.stato["ts_manuale"] = None
                     print_log(f"💰 Chiusura TS completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €.")
-                    print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù.")
-                    invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù.", "shield")
+                    print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù. TS manuale azzerato.")
+                    invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù. TS manuale azzerato.", "shield")
                     self.salva_stato()
 
                     # Sincronizza config_goldfinger.json per mantenere allineata la UI e non sovrascrivere il riarmo
                     cfg_sync = self.carica_config()
                     cfg_sync["livello_1_prezzo"] = soglia_riarmo
+                    cfg_sync["ts_manuale"] = None
                     cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                     self.salva_config(cfg_sync)
                     return
