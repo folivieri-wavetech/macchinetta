@@ -147,6 +147,7 @@ class GoldfingerEngine:
             "size_scaglione": 3,
             "delta_totale": 0,
             "scaglioni": [],
+            "ts_manuale": None,
             "minimo_discesa": None,
             "minimo_precedente": None,
             "pnl_sessione": 0.0,
@@ -382,6 +383,7 @@ class GoldfingerEngine:
                 self.stato["stato_operativo"] = "IDLE"
                 self.stato["scaglioni"] = []
                 self.stato["minimo_discesa"] = None
+                self.stato["ts_manuale"] = None
                 self.salva_stato()
             return
 
@@ -455,6 +457,53 @@ class GoldfingerEngine:
                     print_log(f"🔄 Aggiornamento a caldo Goldfinger: Livello 1 = {target_pz1:.2f}, Passo = {passo_c} pip, Size = {sz_c}, Delta = {target_delta} contratti ({len(self.stato['scaglioni'])} difese)")
                     invia_notifica("AGGIORNAMENTO GOLDFINGER", f"Guardia ricalcolata a caldo: Livello 1 @ {target_pz1:.2f}, Passo {passo_c} pip, Size {sz_c}, Delta {target_delta} ({len(self.stato['scaglioni'])} difese).", "arrows_counterclockwise")
 
+        # 2c. GESTIONE TS MANUALE (Override del Trailing Stop virtuale)
+        cfg_ts_man = config_ui.get("ts_manuale")
+        if cfg_ts_man is not None and str(cfg_ts_man).strip() != "":
+            try:
+                cfg_ts_man = round(float(cfg_ts_man), 2)
+                if cfg_ts_man <= 0:
+                    cfg_ts_man = None
+            except (ValueError, TypeError):
+                cfg_ts_man = None
+        else:
+            cfg_ts_man = None
+
+        stato_ts_man = self.stato.get("ts_manuale")
+        if stato_ts_man is not None:
+            try:
+                stato_ts_man = round(float(stato_ts_man), 2)
+            except (ValueError, TypeError):
+                stato_ts_man = None
+
+        # CASO 1: TS MANUALE INSERITO O MODIFICATO DA CONFIG
+        if cfg_ts_man is not None and (stato_ts_man is None or abs(cfg_ts_man - stato_ts_man) > 0.01):
+            self.stato["ts_manuale"] = cfg_ts_man
+            aperti_man = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+            for s in aperti_man:
+                s["sl_price"] = cfg_ts_man
+            self.salva_stato()
+            print_log(f"🎯 TS Manuale impostato a {cfg_ts_man:.2f}. Calcolo TS virtuale automatico DISABILITATO. Assegnato a {len(aperti_man)} difese in posizione.")
+            invia_notifica("TS MANUALE ATTIVATO", f"TS Manuale impostato a {cfg_ts_man:.2f} per {len(aperti_man)} difese. Calcolo automatico disabilitato.", "dart")
+
+        # CASO 2: ERA PIENO E TORNA VUOTO -> RICALCOLO DA CANDELA PRECEDENTE
+        elif stato_ts_man is not None and cfg_ts_man is None:
+            max_prec = self.stato.get("massimo_ora_chiusa")
+            if max_prec is None:
+                max_prec = self.stato.get("massimo_ora_in_corso")
+            if max_prec is None:
+                bid_tmp, _ = self.ottieni_prezzo_live_gold()
+                max_prec = bid_tmp or 0.0
+
+            ts_virtuale = round(float(max_prec) + 3.0, 2)
+            self.stato["ts_manuale"] = None
+            aperti_man = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+            for s in aperti_man:
+                s["sl_price"] = ts_virtuale
+            self.salva_stato()
+            print_log(f"🔄 TS Manuale disattivato (tornato vuoto). Ricalcolato TS virtuale da candela precedente (Max {float(max_prec):.2f} + 3p = {ts_virtuale:.2f}) per {len(aperti_man)} difese in posizione. Calcolo automatico RIABILITATO.")
+            invia_notifica("TS AUTOMATICO RIPRISTINATO", f"TS Manuale rimosso. Ricalcolato TS virtuale da candela precedente a {ts_virtuale:.2f} per {len(aperti_man)} difese.", "arrows_counterclockwise")
+
         # 3. VERIFICA FINESTRA ROLLOVER
         if self.is_in_rollover():
             if self.stato.get("stato_operativo") != "ARMED_ROLLOVER":
@@ -485,16 +534,19 @@ class GoldfingerEngine:
                 max_chiuso = self.stato["massimo_ora_in_corso"]
                 self.stato["massimo_ora_chiusa"] = max_chiuso
                 
-                # ALLINEAMENTO TS DI TUTTE LE DIFESE APERTE SOLO E SOLTANTO A FINE CANDELA CHIUSA!
-                aperti_ora = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
-                if aperti_ora:
-                    ts_candela_chiusa = round(max_chiuso + 3.0, 2)
-                    print_log(f"⏰ CANDELA ORARIA CHIUSA (H1): Massimo definitivo = {max_chiuso:.2f}. Nuovo TS equiparato per tutte le difese = {ts_candela_chiusa:.2f}")
-                    for s in aperti_ora:
-                        s["sl_price"] = ts_candela_chiusa
-                        s["stato"] = "PROTETTO_BE"
-                    self.salva_stato()
-                    invia_notifica("CHIUSURA CANDELA H1", f"Candela chiusa (Max: {max_chiuso:.2f}). TS equiparato per {len(aperti_ora)} difese a {ts_candela_chiusa:.2f}", "bell")
+                # ALLINEAMENTO TS DI TUTTE LE DIFESE APERTE SOLO E SOLTANTO A FINE CANDELA CHIUSA (SE NON DISABILITATO DA TS MANUALE)
+                if self.stato.get("ts_manuale") is not None:
+                    print_log(f"⏰ CANDELA CHIUSA (H1): Massimo definitivo = {max_chiuso:.2f}. TS Manuale ATTIVO ({float(self.stato['ts_manuale']):.2f}): calcolo automatico TS DISABILITATO, difese invariate.")
+                else:
+                    aperti_ora = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+                    if aperti_ora:
+                        ts_candela_chiusa = round(max_chiuso + 3.0, 2)
+                        print_log(f"⏰ CANDELA ORARIA CHIUSA (H1): Massimo definitivo = {max_chiuso:.2f}. Nuovo TS equiparato per tutte le difese = {ts_candela_chiusa:.2f}")
+                        for s in aperti_ora:
+                            s["sl_price"] = ts_candela_chiusa
+                            s["stato"] = "PROTETTO_BE"
+                        self.salva_stato()
+                        invia_notifica("CHIUSURA CANDELA H1", f"Candela chiusa (Max: {max_chiuso:.2f}). TS equiparato per {len(aperti_ora)} difese a {ts_candela_chiusa:.2f}", "bell")
 
             self.stato["massimo_ora_in_corso"] = bid
             self.stato["ora_corrente_h1"] = ora_attuale
@@ -576,27 +628,32 @@ class GoldfingerEngine:
                         sc["open_price"] = lvl
                         sc["opened_at"] = time.time()
                         
-                        # STOP LOSS DELLA DIFESA ANCORATO AL MASSIMO DELLA CANDELA H1 PRECEDENTE:
-                        # Riferimento: Massimo candela precedente chiusa (+3 pip). Cap massimo di respiro: 20 pip da livello entry.
-                        max_prec = self.stato.get("massimo_ora_chiusa")
-                        if max_prec is None:
-                            max_prec = self.stato.get("massimo_ora_in_corso", lvl)
-
-                        target_ts = round(max_prec + 3.0, 2)
-                        distanza_prec = round(target_ts - lvl, 2)
-
-                        if distanza_prec > 20.0:
-                            sc["sl_price"] = round(lvl + 20.0, 2)
-                            desc_ts = f"Cap 20 pip da entry ({lvl:.2f} + 20p = {sc['sl_price']:.2f}, Max prec + 3p distava {distanza_prec:.1f}p)"
-                        elif distanza_prec < passo:
-                            sc["sl_price"] = round(lvl + passo, 2)
-                            desc_ts = f"Passo minimo ({passo}p da entry = {sc['sl_price']:.2f})"
+                        # STOP LOSS DELLA DIFESA:
+                        if self.stato.get("ts_manuale") is not None:
+                            sc["sl_price"] = float(self.stato["ts_manuale"])
+                            desc_ts = f"TS Manuale attivo ({sc['sl_price']:.2f})"
                         else:
-                            sc["sl_price"] = target_ts
-                            desc_ts = f"Max prec + 3p ({max_prec:.2f} + 3p = {sc['sl_price']:.2f}, dist: {distanza_prec:.1f}p)"
+                            # STOP LOSS DELLA DIFESA ANCORATO AL MASSIMO DELLA CANDELA H1 PRECEDENTE:
+                            # Riferimento: Massimo candela precedente chiusa (+3 pip). Cap massimo di respiro: 20 pip da livello entry.
+                            max_prec = self.stato.get("massimo_ora_chiusa")
+                            if max_prec is None:
+                                max_prec = self.stato.get("massimo_ora_in_corso", lvl)
 
-                        if ask and sc["sl_price"] <= ask:
-                            sc["sl_price"] = round(ask + passo, 2)
+                            target_ts = round(max_prec + 3.0, 2)
+                            distanza_prec = round(target_ts - lvl, 2)
+
+                            if distanza_prec > 20.0:
+                                sc["sl_price"] = round(lvl + 20.0, 2)
+                                desc_ts = f"Cap 20 pip da entry ({lvl:.2f} + 20p = {sc['sl_price']:.2f}, Max prec + 3p distava {distanza_prec:.1f}p)"
+                            elif distanza_prec < passo:
+                                sc["sl_price"] = round(lvl + passo, 2)
+                                desc_ts = f"Passo minimo ({passo}p da entry = {sc['sl_price']:.2f})"
+                            else:
+                                sc["sl_price"] = target_ts
+                                desc_ts = f"Max prec + 3p ({max_prec:.2f} + 3p = {sc['sl_price']:.2f}, dist: {distanza_prec:.1f}p)"
+
+                            if ask and sc["sl_price"] <= ask:
+                                sc["sl_price"] = round(ask + passo, 2)
 
                         # REGOLE SCENARIO B: I TS DELLE DIFESE NON SI TOCCANO IN CORSO D'ORA!
                         # Rimangono invariati per tutta l'ora e si allineano solo al cambio ora (:00:00).
