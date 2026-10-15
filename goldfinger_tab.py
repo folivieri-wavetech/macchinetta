@@ -428,20 +428,6 @@ def renderizza_tab_goldfinger(conto):
 
         saved_ts_raw = cfg.get("ts_manuale")
         saved_ts = float(saved_ts_raw) if (saved_ts_raw is not None and str(saved_ts_raw).strip() != "" and float(saved_ts_raw) > 0) else None
-        
-        ts_man_key = f"gf_ts_man_{conto}"
-        ts_manuale_inp = st.number_input(
-            "🎯 TS Manuale",
-            min_value=0.0,
-            max_value=10000.0,
-            value=saved_ts,
-            step=0.5,
-            format="%.2f",
-            key=f"input_{ts_man_key}",
-            disabled=(not is_operativo),
-            help="Campo vuoto = Calcolo automatico (Max candela H1 prec + 3 pip). Inserisci un prezzo per disabilitare il calcolo automatico e impostare il TS manuale per tutte le difese in posizione. Se svuoti il campo, il TS virtuale viene ricalcolato dalla candela precedente."
-        )
-
         is_ts_man_active = (saved_ts is not None)
 
         if is_ts_man_active:
@@ -451,127 +437,122 @@ def renderizza_tab_goldfinger(conto):
                 f"</div>",
                 unsafe_allow_html=True
             )
-            col_ts_a, col_ts_b = st.columns(2)
-            with col_ts_a:
-                if st.button("🔄 Ripristina Auto (Svuota)", key=f"btn_svuota_ts_{conto}", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Svuota il TS Manuale e ricalcola il TS virtuale dalla candela precedente"):
-                    if not is_operativo:
-                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                        st.rerun()
-                    
-                    # 1. Ricalcolo TS virtuale da candela precedente
-                    max_prec = stato.get("massimo_ora_chiusa")
-                    if max_prec is None:
-                        max_prec = stato.get("massimo_ora_in_corso")
-                    if max_prec is None and bid_live:
-                        max_prec = float(bid_live)
-                    ts_ripristinato = round(float(max_prec) + 3.0, 2) if max_prec is not None else None
-
-                    # 2. Aggiornamento config
-                    new_cfg = cfg.copy()
-                    new_cfg["ts_manuale"] = None
-                    new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                    scrivi_json_sicuro(paths["config"], new_cfg)
-
-                    # 3. Aggiornamento stato per ogni difesa in posizione
-                    new_stato = stato.copy()
-                    new_stato["ts_manuale"] = None
-                    aperti_mod = 0
-                    if ts_ripristinato is not None:
-                        for s in new_stato.get("scaglioni", []):
-                            if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
-                                s["sl_price"] = ts_ripristinato
-                                aperti_mod += 1
-                    scrivi_json_sicuro(paths["stato"], new_stato)
-                    st.session_state[f"input_{ts_man_key}"] = None
-                    st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese in posizione!")
-                    time.sleep(0.4)
-                    st.rerun()
-
-            with col_ts_b:
-                has_ts_edit = (ts_manuale_inp is not None and abs(float(ts_manuale_inp) - float(saved_ts)) > 0.01)
-                is_emptied_in_input = (ts_manuale_inp is None or float(ts_manuale_inp) <= 0)
-                if is_emptied_in_input:
-                    if st.button("💾 Applica Svuotamento", key=f"btn_svuota_inp_ts_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo)):
-                        if not is_operativo:
-                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                            st.rerun()
-                        max_prec = stato.get("massimo_ora_chiusa")
-                        if max_prec is None:
-                            max_prec = stato.get("massimo_ora_in_corso")
-                        if max_prec is None and bid_live:
-                            max_prec = float(bid_live)
-                        ts_ripristinato = round(float(max_prec) + 3.0, 2) if max_prec is not None else None
-
-                        new_cfg = cfg.copy()
-                        new_cfg["ts_manuale"] = None
-                        new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                        scrivi_json_sicuro(paths["config"], new_cfg)
-
-                        new_stato = stato.copy()
-                        new_stato["ts_manuale"] = None
-                        aperti_mod = 0
-                        if ts_ripristinato is not None:
-                            for s in new_stato.get("scaglioni", []):
-                                if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
-                                    s["sl_price"] = ts_ripristinato
-                                    aperti_mod += 1
-                        scrivi_json_sicuro(paths["stato"], new_stato)
-                        st.session_state[f"input_{ts_man_key}"] = None
-                        st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese!")
-                        time.sleep(0.4)
-                        st.rerun()
-                elif has_ts_edit:
-                    if st.button(f"💾 Salva TS ({float(ts_manuale_inp):.2f})", key=f"btn_mod_ts_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo)):
-                        if not is_operativo:
-                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                            st.rerun()
-                        new_val = round(float(ts_manuale_inp), 2)
-                        new_cfg = cfg.copy()
-                        new_cfg["ts_manuale"] = new_val
-                        new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                        scrivi_json_sicuro(paths["config"], new_cfg)
-
-                        new_stato = stato.copy()
-                        new_stato["ts_manuale"] = new_val
-                        aperti_mod = 0
-                        for s in new_stato.get("scaglioni", []):
-                            if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
-                                s["sl_price"] = new_val
-                                aperti_mod += 1
-                        scrivi_json_sicuro(paths["stato"], new_stato)
-                        st.success(f"✅ TS Manuale aggiornato a {new_val:.2f} per {aperti_mod} difese in posizione!")
-                        time.sleep(0.4)
-                        st.rerun()
         else:
             st.markdown(
                 f"<div style='font-size: 0.73rem; color: #94a3b8; margin-bottom: 6px;'>"
-                f"🤖 <i>Calcolo automatico attivo (Candela H1 prec + 3 pip). Inserisci un prezzo sopra per passare a TS manuale.</i>"
+                f"🤖 <i>Calcolo automatico attivo (Candela H1 prec + 3 pip). Inserisci un prezzo e clicca SALVA per renderlo operativo.</i>"
                 f"</div>",
                 unsafe_allow_html=True
             )
-            has_new_ts = (ts_manuale_inp is not None and float(ts_manuale_inp) > 0)
-            if has_new_ts:
-                if st.button(f"🎯 Imposta TS Manuale ({float(ts_manuale_inp):.2f})", key=f"btn_set_ts_{conto}", type="primary", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Disabilita il calcolo automatico e fissa il TS virtuale manuale per tutte le difese in posizione"):
-                    if not is_operativo:
-                        st.error("🛑 Profilo VIEWER: operatività disabilitata.")
-                        st.rerun()
-                    new_val = round(float(ts_manuale_inp), 2)
-                    new_cfg = cfg.copy()
-                    new_cfg["ts_manuale"] = new_val
-                    new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                    scrivi_json_sicuro(paths["config"], new_cfg)
 
-                    new_stato = stato.copy()
-                    new_stato["ts_manuale"] = new_val
-                    aperti_mod = 0
+        ts_form_key = f"form_ts_man_{conto}"
+        ts_inp_key = f"input_ts_man_{conto}"
+
+        with st.form(key=ts_form_key, clear_on_submit=False):
+            ts_manuale_inp = st.number_input(
+                "🎯 Prezzo TS Manuale",
+                min_value=0.0,
+                max_value=10000.0,
+                value=saved_ts,
+                step=0.5,
+                format="%.2f",
+                key=ts_inp_key,
+                disabled=(not is_operativo),
+                help="Scrivi il prezzo desiderato e clicca SALVA per renderlo operativo. Se lo lasci vuoto e clicchi SALVA (o premi Svuota), il TS virtuale viene ricalcolato dalla candela precedente."
+            )
+            btn_salva_ts = st.form_submit_button(
+                "💾 SALVA TS MANUALE",
+                type="primary",
+                use_container_width=True,
+                disabled=(not is_operativo)
+            )
+
+        if btn_salva_ts:
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
+
+            # CASO 1: Inserito un prezzo valido > 0
+            if ts_manuale_inp is not None and float(ts_manuale_inp) > 0:
+                new_val = round(float(ts_manuale_inp), 2)
+                new_cfg = cfg.copy()
+                new_cfg["ts_manuale"] = new_val
+                new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                scrivi_json_sicuro(paths["config"], new_cfg)
+
+                new_stato = stato.copy()
+                new_stato["ts_manuale"] = new_val
+                aperti_mod = 0
+                for s in new_stato.get("scaglioni", []):
+                    if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                        s["sl_price"] = new_val
+                        aperti_mod += 1
+                scrivi_json_sicuro(paths["stato"], new_stato)
+                st.success(f"✅ TS Manuale salvato e reso operativo a {new_val:.2f} per {aperti_mod} difese in posizione!")
+                time.sleep(0.4)
+                st.rerun()
+
+            # CASO 2: Campo vuoto / 0 mentre era attivo -> Torna ad automatico ("era pieno e torna vuoto")
+            elif is_ts_man_active:
+                max_prec = stato.get("massimo_ora_chiusa")
+                if max_prec is None:
+                    max_prec = stato.get("massimo_ora_in_corso")
+                if max_prec is None and bid_live:
+                    max_prec = float(bid_live)
+                ts_ripristinato = round(float(max_prec) + 3.0, 2) if max_prec is not None else None
+
+                new_cfg = cfg.copy()
+                new_cfg["ts_manuale"] = None
+                new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                scrivi_json_sicuro(paths["config"], new_cfg)
+
+                new_stato = stato.copy()
+                new_stato["ts_manuale"] = None
+                aperti_mod = 0
+                if ts_ripristinato is not None:
                     for s in new_stato.get("scaglioni", []):
                         if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
-                            s["sl_price"] = new_val
+                            s["sl_price"] = ts_ripristinato
                             aperti_mod += 1
-                    scrivi_json_sicuro(paths["stato"], new_stato)
-                    st.success(f"✅ TS Manuale impostato a {new_val:.2f}! Calcolo automatico disabilitato ({aperti_mod} difese aggiornate).")
-                    time.sleep(0.4)
+                scrivi_json_sicuro(paths["stato"], new_stato)
+                st.session_state[ts_inp_key] = None
+                st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese in posizione!")
+                time.sleep(0.4)
+                st.rerun()
+            else:
+                st.info("ℹ️ Il TS è già in modalità automatica.")
+
+        # Tasto rapido aggiuntivo per svuotare con 1 click se il manuale è attivo
+        if is_ts_man_active:
+            if st.button("🔄 Ripristina Auto (Svuota)", key=f"btn_svuota_ts_{conto}", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Svuota il TS Manuale e ricalcola il TS virtuale dalla candela precedente"):
+                if not is_operativo:
+                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                     st.rerun()
+                max_prec = stato.get("massimo_ora_chiusa")
+                if max_prec is None:
+                    max_prec = stato.get("massimo_ora_in_corso")
+                if max_prec is None and bid_live:
+                    max_prec = float(bid_live)
+                ts_ripristinato = round(float(max_prec) + 3.0, 2) if max_prec is not None else None
+
+                new_cfg = cfg.copy()
+                new_cfg["ts_manuale"] = None
+                new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                scrivi_json_sicuro(paths["config"], new_cfg)
+
+                new_stato = stato.copy()
+                new_stato["ts_manuale"] = None
+                aperti_mod = 0
+                if ts_ripristinato is not None:
+                    for s in new_stato.get("scaglioni", []):
+                        if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                            s["sl_price"] = ts_ripristinato
+                            aperti_mod += 1
+                scrivi_json_sicuro(paths["stato"], new_stato)
+                st.session_state[ts_inp_key] = None
+                st.success(f"✅ TS Manuale rimosso. Ricalcolato TS automatico a {ts_ripristinato:.2f} per {aperti_mod} difese in posizione!")
+                time.sleep(0.4)
+                st.rerun()
 
         # Rilevamento modifiche a caldo su Livello 1, Passo o Size
         has_modifiche = not has_aperti and (
