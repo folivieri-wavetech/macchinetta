@@ -123,8 +123,15 @@ class CoreEngine:
 
     def _get_tk_increment_filters(self):
         """Restituisce (tolleranza_tk, max_dist_tk, min_dist_incr, min_candle_body) in pip/punti."""
-        nome = str(self.config.get("nome", "") or self.config.get("symbol", "")).strip().lower()
-        return 5, 20, 10, 1 # Per tutti: 5p, 20p, 10p, 1p
+        tf_val = str(self.config.get("timeframe", "HOUR")).upper()
+        if "HOUR_4" in tf_val or "H4" in tf_val:
+            max_dist_tk = self.config.get("max_tk_dist_pips", 40)
+        else:
+            max_dist_tk = self.config.get("max_tk_dist_pips", 20)
+        tolleranza_tk = self.config.get("tolleranza_tk_pips", 5)
+        min_dist_incr = self.config.get("min_dist_incr_pips", 10)
+        min_body = self.config.get("min_body_pips", 1)
+        return tolleranza_tk, max_dist_tk, min_dist_incr, min_body
 
     def _get_max_kj_tk_threshold_pips(self):
         """Restituisce la soglia di forbice Kijun-Tenkan in pip per Timeframe: H1=30, H4=40, D1=50."""
