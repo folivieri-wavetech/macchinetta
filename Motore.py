@@ -551,7 +551,19 @@ def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=4):
     headers_req["Version"] = "2"
     return ig_api_request(metodo, url, headers_req, payload=payload, timeout=10, logger_func=print_log)
 
+_COOLDOWN_LOGIN_IG_FINO_A = 0
+_ULTIMO_AVVISO_COOLDOWN_LOGIN = 0
+
 def esegui_login_ig():
+    global _COOLDOWN_LOGIN_IG_FINO_A, _ULTIMO_AVVISO_COOLDOWN_LOGIN
+    ora = time.time()
+    if ora < _COOLDOWN_LOGIN_IG_FINO_A:
+        if ora - _ULTIMO_AVVISO_COOLDOWN_LOGIN >= 60:
+            rimanenti = int(_COOLDOWN_LOGIN_IG_FINO_A - ora)
+            print_log("SISTEMA", f"⏸️ Login IG sospeso per cooldown di sicurezza ({rimanenti}s rimanenti).")
+            _ULTIMO_AVVISO_COOLDOWN_LOGIN = ora
+        return False
+
     h = {"X-IG-API-KEY": config.get("IG_API_KEY"), "Version": "2", "Content-Type": "application/json"}
     p = {"identifier": config.get("IG_USERNAME"), "password": config.get("IG_PASSWORD")}
     
@@ -560,13 +572,20 @@ def esegui_login_ig():
         if r and r.status_code == 200:
             with open(FILE_TOKEN, "w") as f:
                 json.dump({"CST": r.headers.get('CST'), "X-SECURITY-TOKEN": r.headers.get('X-SECURITY-TOKEN')}, f)
+            _COOLDOWN_LOGIN_IG_FINO_A = 0
             return True
         else:
             msg = f"{r.status_code} - {r.text}" if r else "Nessuna risposta"
             print_log("SISTEMA", f"⚠️ IG Rifiuta Login: {msg}")
+            if r and "client-suspended" in r.text:
+                print_log("SISTEMA", "🚨 Profilo IG sospeso (client-suspended). Attesa di 15 minuti prima di riprovare.")
+                _COOLDOWN_LOGIN_IG_FINO_A = time.time() + 900
+            else:
+                _COOLDOWN_LOGIN_IG_FINO_A = time.time() + 300
             return False
     except Exception as e:
         print_log("SISTEMA", f"⚠️ Errore Rete al Login: {e}")
+        _COOLDOWN_LOGIN_IG_FINO_A = time.time() + 60
         return False
 
 def ottieni_dati_mercati_batch(h):
@@ -1148,18 +1167,21 @@ def esegui_motore():
                     richiede_rinnovo = True
             
             if richiede_rinnovo:
-                esegui_login_ig()
-                if os.path.exists(FILE_TOKEN):
-                    with open(FILE_TOKEN, "r") as f:
-                        token_dati = json.load(f)
-                    h = {
-                        "X-IG-API-KEY": config.get("IG_API_KEY"), 
-                        "CST": token_dati.get("CST"), 
-                        "X-SECURITY-TOKEN": token_dati.get("X-SECURITY-TOKEN"), 
-                        "Version": "1", 
-                        "Accept": "application/json"
-                    }
-                    invia_notifica(f"🔄 TOKEN RINNOVATO: {NOME_CONTO}", f"Il token di sessione IG per il conto {NOME_CONTO} è stato rinnovato o rigenerato con successo.", "arrows_counterclockwise")
+                if esegui_login_ig():
+                    if os.path.exists(FILE_TOKEN):
+                        with open(FILE_TOKEN, "r") as f:
+                            token_dati = json.load(f)
+                        h = {
+                            "X-IG-API-KEY": config.get("IG_API_KEY"), 
+                            "CST": token_dati.get("CST"), 
+                            "X-SECURITY-TOKEN": token_dati.get("X-SECURITY-TOKEN"), 
+                            "Version": "1", 
+                            "Accept": "application/json"
+                        }
+                        invia_notifica(f"🔄 TOKEN RINNOVATO: {NOME_CONTO}", f"Il token di sessione IG per il conto {NOME_CONTO} è stato rinnovato o rigenerato con successo.", "arrows_counterclockwise")
+                else:
+                    time.sleep(10)
+                    continue
 
             if is_weekend_active():
                 if ora_attuale - ultimo_controllo_saldo >= 30:

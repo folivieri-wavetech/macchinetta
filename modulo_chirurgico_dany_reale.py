@@ -59,6 +59,8 @@ class ModuloChirurgicoDanyReale:
         self.ultimo_gold_bid_ask = None
         self.gf_engine = None
         self.th_gf = None
+        self.cooldown_fino_a = 0
+        self.ultimo_avviso_cooldown = 0
         
     def calcola_durata_sessione(self):
         if not os.path.exists(TOKEN_FILE):
@@ -99,6 +101,14 @@ class ModuloChirurgicoDanyReale:
             return self.login()
 
     def login(self):
+        ora = time.time()
+        if ora < self.cooldown_fino_a:
+            if ora - self.ultimo_avviso_cooldown >= 60:
+                rimasti = int(self.cooldown_fino_a - ora)
+                print_log(f"⏸️ Tentativo login IG bloccato da cooldown di sicurezza ({rimasti}s rimanenti prima del prossimo tentativo).")
+                self.ultimo_avviso_cooldown = ora
+            return False
+
         h = {
             "X-IG-API-KEY": self.api_key,
             "Version": "2",
@@ -115,6 +125,7 @@ class ModuloChirurgicoDanyReale:
                 self.cst = r.headers.get("CST")
                 self.xst = r.headers.get("X-SECURITY-TOKEN")
                 self.t_login = time.time()
+                self.cooldown_fino_a = 0
                 
                 tok_data = {
                     "CST": self.cst,
@@ -129,9 +140,16 @@ class ModuloChirurgicoDanyReale:
                 return True
             else:
                 print_log(f"⚠️ Errore autenticazione IG: HTTP {r.status_code} - {r.text}")
+                if "client-suspended" in r.text:
+                    print_log("🚨 Profilo IG sospeso (client-suspended). Attesa di sicurezza di 15 minuti prima di riprovare il login.")
+                    self.cooldown_fino_a = time.time() + 900
+                else:
+                    print_log("⚠️ Login fallito: cooldown di sicurezza di 5 minuti prima di riprovare.")
+                    self.cooldown_fino_a = time.time() + 300
                 return False
         except Exception as e:
             print_log(f"⚠️ Eccezione di rete durante il login IG: {e}")
+            self.cooldown_fino_a = time.time() + 60
             return False
 
     def get_auth_headers(self, version="1"):
@@ -144,6 +162,8 @@ class ModuloChirurgicoDanyReale:
         }
 
     def aggiorna_saldo(self):
+        if not self.cst or not self.xst:
+            return False
         try:
             r = requests.get(f"{BASE_URL}/accounts", headers=self.get_auth_headers("1"), timeout=10)
             if r.status_code == 401:
@@ -199,6 +219,8 @@ class ModuloChirurgicoDanyReale:
             return False
 
     def aggiorna_posizioni(self):
+        if not self.cst or not self.xst:
+            return False
         try:
             r = requests.get(f"{BASE_URL}/positions", headers=self.get_auth_headers("2"), timeout=10)
             if r.status_code == 200:
@@ -286,10 +308,17 @@ class ModuloChirurgicoDanyReale:
                 else:
                     tempo_creazione = os.path.getmtime(TOKEN_FILE)
                     if (time.time() - tempo_creazione) > (70 * 3600):
-                        print_log("⚠️ Sessione vicina alle 72h: Rinnovo automatico preventivo del Token IG (regola 70 ore).")
                         richiede_rinnovo = True
+
                 if richiede_rinnovo:
-                    self.login()
+                    if time.time() >= self.cooldown_fino_a:
+                        print_log("⚠️ Sessione vicina alle 72h: Rinnovo automatico preventivo del Token IG (regola 70 ore).")
+                        if not self.login():
+                            time.sleep(10)
+                            continue
+                    else:
+                        time.sleep(10)
+                        continue
                     
                 self.aggiorna_saldo()
                 self.aggiorna_posizioni()
