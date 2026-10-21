@@ -123,6 +123,10 @@ try {
             & $KUBECTL --kubeconfig=$KUBECONFIG cp "hull_trend.json" "macchinetta/${POD_DASH}:/data/$acc/hull_trend.json"
         }
     }
+    if (Test-Path "DANY_REALE/.env") {
+        & $KUBECTL --kubeconfig=$KUBECONFIG cp "DANY_REALE/.env" "macchinetta/${POD_DASH}:/data/DANY_REALE/.env"
+        & $KUBECTL --kubeconfig=$KUBECONFIG exec -n macchinetta $POD_DASH -c dashboard -- rm -f /data/DANY_REALE/token_ig.json
+    }
     Write-Host "File propagati correttamente nella PVC condivisa (/data)." -ForegroundColor Green
 } finally {
     Pop-Location
