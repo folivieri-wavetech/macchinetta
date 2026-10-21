@@ -45,6 +45,21 @@ def print_log(messaggio):
     except Exception:
         pass
 
+try:
+    from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+except Exception:
+    try:
+        from notifiche_manager import invia_notifica as invia_notifica_centralizzata
+    except Exception:
+        invia_notifica_centralizzata = None
+
+def invia_notifica(titolo, messaggio, tags="rotating_light"):
+    if invia_notifica_centralizzata:
+        try:
+            invia_notifica_centralizzata("macchinetta", titolo, messaggio, tags=tags)
+        except Exception:
+            pass
+
 class ModuloChirurgicoDanyReale:
     def __init__(self):
         self.cfg = dotenv_values(ENV_FILE)
@@ -59,8 +74,6 @@ class ModuloChirurgicoDanyReale:
         self.ultimo_gold_bid_ask = None
         self.gf_engine = None
         self.th_gf = None
-        self.cooldown_fino_a = 0
-        self.ultimo_avviso_cooldown = 0
         
     def calcola_durata_sessione(self):
         if not os.path.exists(TOKEN_FILE):
@@ -73,12 +86,12 @@ class ModuloChirurgicoDanyReale:
 
     def verifica_token_ig(self):
         if not os.path.exists(TOKEN_FILE):
-            return self.login()
+            return False
             
         tempo_creazione = os.path.getmtime(TOKEN_FILE)
         if (time.time() - tempo_creazione) > (70 * 3600):
-            print_log("⚠️ Token sul disco vicino alle 72h (> 70h): eseguo rinnovo completo...")
-            return self.login()
+            print_log("⚠️ Token sul disco vicino alle 72h (> 70h): richiede rinnovo...")
+            return False
 
         try:
             with open(TOKEN_FILE, "r", encoding="utf-8") as f:
@@ -86,7 +99,7 @@ class ModuloChirurgicoDanyReale:
             self.cst = d.get("CST")
             self.xst = d.get("X-SECURITY-TOKEN")
             if not self.cst or not self.xst:
-                return self.login()
+                return False
 
             # Test rapido validità sessione esistente
             r = requests.get(f"{BASE_URL}/accounts", headers=self.get_auth_headers("1"), timeout=8)
@@ -94,21 +107,27 @@ class ModuloChirurgicoDanyReale:
                 print_log(f"✅ Sessione IG Reale persistente ripristinata dal token (Durata: {self.calcola_durata_sessione()}).")
                 return True
             else:
-                print_log("🔄 Token persistente scaduto su IG (HTTP 401): eseguo nuovo login...")
-                return self.login()
+                print_log("🔄 Token persistente scaduto su IG (HTTP 401).")
+                return False
         except Exception as e:
-            print_log(f"⚠️ Errore verifica token persistente: {e}, procedo con login...")
-            return self.login()
-
-    def login(self):
-        ora = time.time()
-        if ora < self.cooldown_fino_a:
-            if ora - self.ultimo_avviso_cooldown >= 60:
-                rimasti = int(self.cooldown_fino_a - ora)
-                print_log(f"⏸️ Tentativo login IG bloccato da cooldown di sicurezza ({rimasti}s rimanenti prima del prossimo tentativo).")
-                self.ultimo_avviso_cooldown = ora
+            print_log(f"⚠️ Errore verifica token persistente: {e}")
             return False
 
+    def esegui_rinnovo_con_limite(self, motivo="Rinnovo"):
+        for tentativo in range(1, 6):
+            print_log(f"🔄 [{motivo}] Tentativo rinnovo Token IG ({tentativo}/5)...")
+            if self.login():
+                return True
+            if tentativo < 5:
+                print_log(f"⚠️ Tentativo {tentativo}/5 fallito. Attesa 10 secondi prima del prossimo tentativo...")
+                time.sleep(10)
+        
+        msg = f"🛑 Token IG NON rinnovato dopo 5 tentativi ({motivo}). Macchina fermata."
+        print_log(msg)
+        invia_notifica("🚨 RINNOVO TOKEN FALLITO: DANY_REALE", msg, "rotating_light")
+        return False
+
+    def login(self):
         h = {
             "X-IG-API-KEY": self.api_key,
             "Version": "2",
@@ -125,7 +144,6 @@ class ModuloChirurgicoDanyReale:
                 self.cst = r.headers.get("CST")
                 self.xst = r.headers.get("X-SECURITY-TOKEN")
                 self.t_login = time.time()
-                self.cooldown_fino_a = 0
                 
                 tok_data = {
                     "CST": self.cst,
@@ -140,16 +158,9 @@ class ModuloChirurgicoDanyReale:
                 return True
             else:
                 print_log(f"⚠️ Errore autenticazione IG: HTTP {r.status_code} - {r.text}")
-                if "client-suspended" in r.text:
-                    print_log("🚨 Profilo IG sospeso (client-suspended). Attesa di sicurezza di 15 minuti prima di riprovare il login.")
-                    self.cooldown_fino_a = time.time() + 900
-                else:
-                    print_log("⚠️ Login fallito: cooldown di sicurezza di 5 minuti prima di riprovare.")
-                    self.cooldown_fino_a = time.time() + 300
                 return False
         except Exception as e:
             print_log(f"⚠️ Eccezione di rete durante il login IG: {e}")
-            self.cooldown_fino_a = time.time() + 60
             return False
 
     def get_auth_headers(self, version="1"):
@@ -168,10 +179,12 @@ class ModuloChirurgicoDanyReale:
             r = requests.get(f"{BASE_URL}/accounts", headers=self.get_auth_headers("1"), timeout=10)
             if r.status_code == 401:
                 print_log("🔄 Token scaduto, esecuzione rinnovo credenziali...")
-                if self.login():
+                if self.esegui_rinnovo_con_limite(motivo="401 su /accounts"):
                     r = requests.get(f"{BASE_URL}/accounts", headers=self.get_auth_headers("1"), timeout=10)
                 else:
-                    return False
+                    print_log("🛑 Modulo fermato definitivamente per mancato rinnovo token.")
+                    while True:
+                        time.sleep(3600)
                     
             if r.status_code == 200:
                 dati = r.json()
@@ -275,10 +288,12 @@ class ModuloChirurgicoDanyReale:
     def avvia_loop(self):
         print_log(f"🚀 Modulo Chirurgico DANY_REALE avviato per conto {self.target_account_id}")
         
-        # Ripristino token persistente o login iniziale con retry
-        while not self.verifica_token_ig():
-            print_log("❌ Autenticazione iniziale fallita. Attesa prudente di 30 secondi prima di riprovare...")
-            time.sleep(30)
+        # Ripristino token persistente o tentativi di login iniziale (max 5)
+        if not self.verifica_token_ig():
+            if not self.esegui_rinnovo_con_limite(motivo="Autenticazione iniziale"):
+                print_log("🛑 Modulo fermato definitivamente per mancato rinnovo token. Nessuna ulteriore chiamata.")
+                while True:
+                    time.sleep(3600)
                 
         ultimo_log_hb = 0
         # Avvio iniziale thread dedicato per il motore Goldfinger
@@ -311,14 +326,10 @@ class ModuloChirurgicoDanyReale:
                         richiede_rinnovo = True
 
                 if richiede_rinnovo:
-                    if time.time() >= self.cooldown_fino_a:
-                        print_log("⚠️ Sessione vicina alle 72h: Rinnovo automatico preventivo del Token IG (regola 70 ore).")
-                        if not self.login():
-                            time.sleep(10)
-                            continue
-                    else:
-                        time.sleep(10)
-                        continue
+                    if not self.esegui_rinnovo_con_limite(motivo="Regola 70 ore"):
+                        print_log("🛑 Modulo fermato definitivamente per mancato rinnovo token. Nessuna ulteriore chiamata.")
+                        while True:
+                            time.sleep(3600)
                     
                 self.aggiorna_saldo()
                 self.aggiorna_posizioni()
