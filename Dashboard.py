@@ -573,6 +573,55 @@ def get_ig_headers(conto_selezionato):
     except:
         return None
 
+def riavvia_deployment_motore(nome_conto):
+    """
+    Riavvia il deployment Kubernetes associato al singolo conto selezionato.
+    Riavvia ESCLUSIVAMENTE il pod del conto selezionato, lasciando intatti tutti gli altri.
+    """
+    conto_upper = nome_conto.upper()
+    mappa_deployments = {
+        "DANY_DEMO": "macchinetta-motore-dany",
+        "DANY_REALE": "macchinetta-motore-dany",
+        "BONGIOLO_DEMO": "macchinetta-motore-bongiolo",
+        "FIORDOK_DEMO": "macchinetta-motore-fiordok"
+    }
+    dep_name = mappa_deployments.get(conto_upper)
+    if not dep_name:
+        return False, f"Nessun deployment associato al conto {nome_conto}"
+    
+    token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    if not os.path.exists(token_file):
+        return False, "Operazione disponibile solo su server Kubernetes (in locale il cluster non è presente)"
+    
+    try:
+        with open(token_file, "r") as f:
+            token = f.read().strip()
+        url = f"https://kubernetes.default.svc/apis/apps/v1/namespaces/macchinetta/deployments/{dep_name}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/strategic-merge-patch+json"
+        }
+        ora_iso = datetime.now(timezone.utc).isoformat()
+        payload = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": ora_iso
+                        }
+                    }
+                }
+            }
+        }
+        r = requests.patch(url, headers=headers, json=payload, verify=ca_file, timeout=10)
+        if r.status_code in (200, 201):
+            return True, f"Riavvio pod avviato per {dep_name}. Il motore si ricollega in pochi secondi."
+        else:
+            return False, f"Errore Kubernetes ({r.status_code}): {r.text[:150]}"
+    except Exception as e:
+        return False, f"Errore durante la richiesta al cluster: {e}"
+
 def chiudi_posizioni_trend_su_ig(conto, nome_strumento):
     """Chiude immediatamente a mercato tutte le posizioni reali su IG aperte per lo strumento dato."""
     h = get_ig_headers(conto)
@@ -3435,11 +3484,24 @@ else:
                 stato = leggi_stato_sistema(conto_selezionato)
                 prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
-                col_titolo_main, col_btn_restart = st.columns([5, 1])
+                col_titolo_main, col_btn_restart = st.columns([4, 1.4])
                 with col_titolo_main:
                     st.markdown("<h1 style='color: #00BFFF; margin-top: -15px; white-space: nowrap;'>📈 Dashboard Trend (KJ55 / TK21)</h1>", unsafe_allow_html=True)
                 with col_btn_restart:
                     st.write("") 
+                    help_rst = "Disabilitato: profilo Viewer non operativo" if not is_operativo else f"Riavvia il pod/motore dedicato esclusivamente al conto {conto_selezionato}"
+                    if st.button(f"🚀 Riavvia {conto_selezionato}", help=help_rst, width="stretch", key=f"RESTART_TREND_{conto_selezionato}", disabled=(not is_operativo)):
+                        if not is_operativo:
+                            st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                            st.rerun()
+                        with st.spinner(f"Riavvio motore {conto_selezionato} in corso..."):
+                            ok, msg = riavvia_deployment_motore(conto_selezionato)
+                            if ok:
+                                st.success(f"✅ {msg}")
+                                time.sleep(1.5)
+                            else:
+                                st.error(f"❌ {msg}")
+                        st.rerun()
 
                 st.markdown("---")
 
@@ -4446,18 +4508,23 @@ else:
                 prezzi_live = stato.get("prezzi_live", {})
                 prezzi_bid_ask = stato.get("prezzi_bid_ask", {})
             
-                col_titolo_main, col_btn_restart = st.columns([5, 1])
+                col_titolo_main, col_btn_restart = st.columns([4, 1.4])
                 with col_titolo_main:
                     st.markdown("<h1 style='color: #FFD700; margin-top: -15px; white-space: nowrap;'>⚙️ Dashboard Trading Range</h1>", unsafe_allow_html=True)
                 with col_btn_restart:
                     st.write("") 
-                    help_rst_vm = "Disabilitato: profilo Viewer non operativo" if not is_operativo else "Elimina il token attuale e forza il rinnovo della sessione IG"
-                    if st.button("🔄 RESTART VM", help=help_rst_vm, width="stretch", key=f"RESTART_{conto_selezionato}", disabled=(not is_operativo)):
+                    help_rst = "Disabilitato: profilo Viewer non operativo" if not is_operativo else f"Riavvia il pod/motore dedicato esclusivamente al conto {conto_selezionato}"
+                    if st.button(f"🚀 Riavvia {conto_selezionato}", help=help_rst, width="stretch", key=f"RESTART_{conto_selezionato}", disabled=(not is_operativo)):
                         if not is_operativo:
                             st.error("🛑 Profilo VIEWER: operatività disabilitata.")
                             st.rerun()
-                        path_token = os.path.join(conto_selezionato, FILE_TOKEN)
-                        if os.path.exists(path_token): os.remove(path_token) 
+                        with st.spinner(f"Riavvio motore {conto_selezionato} in corso..."):
+                            ok, msg = riavvia_deployment_motore(conto_selezionato)
+                            if ok:
+                                st.success(f"✅ {msg}")
+                                time.sleep(1.5)
+                            else:
+                                st.error(f"❌ {msg}")
                         st.rerun()
 
                 try:
