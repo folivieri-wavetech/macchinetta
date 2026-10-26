@@ -5,10 +5,18 @@ import json
 import requests
 import datetime
 try:
-    import zoneinfo
-    TZ_ITALIA = zoneinfo.ZoneInfo("Europe/Rome")
-except Exception:
-    TZ_ITALIA = datetime.timezone(datetime.timedelta(hours=2))
+    from Sistema.fuso_orario import TZ_ITALIA, now_it
+except ImportError:
+    try:
+        from fuso_orario import TZ_ITALIA, now_it
+    except ImportError:
+        try:
+            import zoneinfo
+            TZ_ITALIA = zoneinfo.ZoneInfo("Europe/Rome")
+        except Exception:
+            TZ_ITALIA = datetime.timezone(datetime.timedelta(hours=1))
+        def now_it():
+            return datetime.datetime.now(TZ_ITALIA)
 from dotenv import dotenv_values
 
 sys.stdout.reconfigure(encoding='utf-8')

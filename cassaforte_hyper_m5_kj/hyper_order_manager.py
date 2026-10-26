@@ -7,14 +7,19 @@ import datetime
 import requests
 
 try:
-    from zoneinfo import ZoneInfo
-    TZ_ITALIA = ZoneInfo("Europe/Rome")
-except Exception:
-    from datetime import timezone, timedelta
-    TZ_ITALIA = timezone(timedelta(hours=2))
-
-def now_it():
-    return datetime.datetime.now(TZ_ITALIA)
+    from Sistema.fuso_orario import TZ_ITALIA, now_it
+except ImportError:
+    try:
+        from fuso_orario import TZ_ITALIA, now_it
+    except ImportError:
+        try:
+            from zoneinfo import ZoneInfo
+            TZ_ITALIA = ZoneInfo("Europe/Rome")
+        except Exception:
+            from datetime import timezone, timedelta
+            TZ_ITALIA = timezone(timedelta(hours=1))
+        def now_it():
+            return datetime.datetime.now(TZ_ITALIA)
 
 logger = logging.getLogger("HyperOrderManager")
 if not logger.handlers:

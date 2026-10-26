@@ -37,10 +37,20 @@ DURATA_BLOCCO_RETE_SEC = 300  # 5 minuti di stop se la rete verso ntfy fallisce
 FILE_RATE_LIMITER = "notifiche_rate_limiter.json"
 _LOCK_LOCALE = threading.Lock()
 
-def now_it():
-    """Ritorna datetime corrente nel fuso di Roma (UTC+1 o UTC+2)."""
-    utc_now = datetime.now(timezone.utc)
-    return utc_now.astimezone(timezone(timedelta(hours=2)))  # CEST (+2) o standard
+try:
+    from Sistema.fuso_orario import TZ_ITALIA, now_it
+except ImportError:
+    try:
+        from fuso_orario import TZ_ITALIA, now_it
+    except ImportError:
+        from datetime import timezone
+        try:
+            from zoneinfo import ZoneInfo
+            TZ_ITALIA = ZoneInfo("Europe/Rome")
+        except Exception:
+            TZ_ITALIA = timezone(timedelta(hours=1))
+        def now_it():
+            return datetime.now(TZ_ITALIA)
 
 def _get_shared_file_path():
     for base in ["/data/Logs_e_Cache", "../Logs_e_Cache", "Logs_e_Cache", "/data", "."]:

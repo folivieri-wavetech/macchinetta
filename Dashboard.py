@@ -12,13 +12,18 @@ import requests
 import re
 from datetime import datetime, timedelta, timezone, time as dt_time
 try:
-    from zoneinfo import ZoneInfo
-    TZ_ITALIA = ZoneInfo("Europe/Rome")
-except Exception:
-    TZ_ITALIA = timezone(timedelta(hours=2))
-
-def now_it():
-    return datetime.now(TZ_ITALIA)
+    from Sistema.fuso_orario import TZ_ITALIA, now_it
+except ImportError:
+    try:
+        from fuso_orario import TZ_ITALIA, now_it
+    except ImportError:
+        try:
+            from zoneinfo import ZoneInfo
+            TZ_ITALIA = ZoneInfo("Europe/Rome")
+        except Exception:
+            TZ_ITALIA = timezone(timedelta(hours=1))
+        def now_it():
+            return datetime.now(TZ_ITALIA)
 
 def is_rollover_active():
     """

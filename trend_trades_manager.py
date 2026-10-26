@@ -4,13 +4,18 @@ import re
 import time
 import datetime
 try:
-    from zoneinfo import ZoneInfo
-    TZ_ITALIA = ZoneInfo("Europe/Rome")
-except Exception:
-    TZ_ITALIA = datetime.timezone(datetime.timedelta(hours=2))
-
-def now_it():
-    return datetime.datetime.now(TZ_ITALIA)
+    from Sistema.fuso_orario import TZ_ITALIA, now_it
+except ImportError:
+    try:
+        from fuso_orario import TZ_ITALIA, now_it
+    except ImportError:
+        try:
+            from zoneinfo import ZoneInfo
+            TZ_ITALIA = ZoneInfo("Europe/Rome")
+        except Exception:
+            TZ_ITALIA = datetime.timezone(datetime.timedelta(hours=1))
+        def now_it():
+            return datetime.datetime.now(TZ_ITALIA)
 
 FILE_TREND_TRADES = "trend_trades_history.json"
 FILE_MEMORIA_TREND = "memoria_trend.json"
