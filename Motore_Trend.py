@@ -1915,7 +1915,10 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                 sz = ev.get('size', size_i)
                 is_bancomat = (ev.get('reason') == 'bancomat')
                 etichetta_tag = "[TP_INCR]" if tipo == 'tp_increment' else ("[BANCOMAT]" if is_bancomat else f"[{tipo.upper()}]")
-                chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
+                chiuso_ok = chiudi_parziale(nome, deal_id, dir_chiusura, sz, headers, etichetta=etichetta_tag)
+                if not chiuso_ok:
+                    print_log(nome, f"⚠️ Chiusura {etichetta_tag} su IG non riuscita (o in cooldown) per deal {deal_id}. Notifica sospesa.")
+                    continue
                 
                 raw_diff = ev.get('pnl', 0)
                 c_cfg = CONFIG_STRUMENTI.get(nome, {})
