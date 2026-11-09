@@ -172,6 +172,7 @@ def calcola_scaglioni_interi(pz_start, passo, size_unit, delta_tot):
             "deal_id": None,
             "open_price": None,
             "sl_price": None,
+            "tp_price": None,
             "opened_at": None
         })
     return scaglioni
@@ -559,6 +560,132 @@ def renderizza_tab_goldfinger(conto):
                 time.sleep(0.4)
                 st.rerun()
 
+        # --- SEZIONE TP VIRTUALE MANUALE ---
+        st.markdown("<hr style='margin: 10px 0 8px 0; border-color: #334155;'>", unsafe_allow_html=True)
+        st.markdown("<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'><span style='color: #22c55e; font-weight: 700; font-size: 0.84rem;'>🏆 Take Profit (TP) Manuale</span></div>", unsafe_allow_html=True)
+
+        saved_tp_raw = cfg.get("tp_manuale")
+        saved_tp = float(saved_tp_raw) if (saved_tp_raw is not None and str(saved_tp_raw).strip() != "" and float(saved_tp_raw) > 0) else None
+        is_tp_man_active = (saved_tp is not None)
+
+        if is_tp_man_active:
+            dist_tp_str = f" (distanza: {float(ask_live) - saved_tp:.1f} pip)" if (ask_live and float(ask_live) > saved_tp) else ""
+            st.markdown(
+                f"<div style='background: rgba(34, 197, 94, 0.12); border-left: 3px solid #22c55e; border-radius: 4px; padding: 6px 10px; margin-bottom: 8px; font-size: 0.76rem; color: #4ade80;'>"
+                f"⚡ <b>TP manuale salvato @ {saved_tp:.2f}</b>{dist_tp_str} • Chiusura a mercato di tutte le difese al tocco (Scelta A)"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"<div style='font-size: 0.73rem; color: #94a3b8; margin-bottom: 6px;'>"
+                f"🎯 <i>Opzionale: inserisci un livello inferiore al prezzo live e clicca SALVA per chiudere tutte le difese in guadagno al raggiungimento del target.</i>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+        tp_form_key = f"form_tp_man_{conto}"
+        tp_inp_key = f"input_tp_man_{conto}"
+        last_tp_sync_key = f"last_synced_tp_{conto}"
+
+        # Sincronizzazione automatica se il TP manuale è stato azzerato o modificato esternamente
+        if st.session_state.get(last_tp_sync_key) != saved_tp:
+            st.session_state[tp_inp_key] = saved_tp
+            st.session_state[last_tp_sync_key] = saved_tp
+
+        with st.form(key=tp_form_key, clear_on_submit=False):
+            tp_manuale_inp = st.number_input(
+                "🎯 Prezzo TP Manuale",
+                min_value=0.0,
+                max_value=10000.0,
+                value=saved_tp,
+                step=0.5,
+                format="%.2f",
+                key=tp_inp_key,
+                disabled=(not is_operativo),
+                help="Prezzo target a cui chiudere tutte le difese Goldfinger in profitto. Trattandosi di posizioni Short, il TP deve essere inferiore al prezzo di mercato."
+            )
+            btn_tp_label = "✅ TP manuale salvato" if is_tp_man_active else "💾 Salva TP Manuale"
+            btn_salva_tp = st.form_submit_button(
+                btn_tp_label,
+                type="primary",
+                use_container_width=True,
+                disabled=(not is_operativo)
+            )
+
+        if btn_salva_tp:
+            if not is_operativo:
+                st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                st.rerun()
+
+            # CASO 1: Inserito un prezzo valido > 0
+            if tp_manuale_inp is not None and float(tp_manuale_inp) > 0:
+                new_tp_val = round(float(tp_manuale_inp), 2)
+                if bid_live and new_tp_val >= float(bid_live):
+                    st.error(f"🛑 ERRORE DI SICUREZZA: Per posizioni SHORT il Take Profit ({new_tp_val:.2f}) deve essere RIGOROSAMENTE INFERIORE al prezzo live ({float(bid_live):.2f})!")
+                else:
+                    new_cfg = cfg.copy()
+                    new_cfg["tp_manuale"] = new_tp_val
+                    new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                    scrivi_json_sicuro(paths["config"], new_cfg)
+
+                    new_stato = stato.copy()
+                    new_stato["tp_manuale"] = new_tp_val
+                    aperti_mod_tp = 0
+                    for s in new_stato.get("scaglioni", []):
+                        if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                            s["tp_price"] = new_tp_val
+                            aperti_mod_tp += 1
+                    scrivi_json_sicuro(paths["stato"], new_stato)
+                    st.session_state[last_tp_sync_key] = new_tp_val
+                    st.success(f"✅ TP Manuale salvato e reso operativo a {new_tp_val:.2f} per {aperti_mod_tp} difese in posizione!")
+                    time.sleep(0.4)
+                    st.rerun()
+
+            # CASO 2: Svuotato mentre era attivo
+            elif is_tp_man_active:
+                new_cfg = cfg.copy()
+                new_cfg["tp_manuale"] = None
+                new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                scrivi_json_sicuro(paths["config"], new_cfg)
+
+                new_stato = stato.copy()
+                new_stato["tp_manuale"] = None
+                for s in new_stato.get("scaglioni", []):
+                    if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                        s["tp_price"] = None
+                scrivi_json_sicuro(paths["stato"], new_stato)
+                st.session_state[tp_inp_key] = None
+                st.session_state[last_tp_sync_key] = None
+                st.success("✅ TP Manuale rimosso. Le difese proseguono verso il Trailing Stop.")
+                time.sleep(0.4)
+                st.rerun()
+            else:
+                st.info("ℹ️ Nessun TP impostato.")
+
+        # Tasto rapido per disattivare con 1 click se il TP è attivo
+        if is_tp_man_active:
+            if st.button("🔄 Disattiva TP (Svuota)", key=f"btn_svuota_tp_{conto}", use_container_width=True, disabled=(not is_operativo), help=help_gf_viewer or "Svuota e disattiva il Take Profit Manuale"):
+                if not is_operativo:
+                    st.error("🛑 Profilo VIEWER: operatività disabilitata.")
+                    st.rerun()
+                new_cfg = cfg.copy()
+                new_cfg["tp_manuale"] = None
+                new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                scrivi_json_sicuro(paths["config"], new_cfg)
+
+                new_stato = stato.copy()
+                new_stato["tp_manuale"] = None
+                for s in new_stato.get("scaglioni", []):
+                    if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                        s["tp_price"] = None
+                scrivi_json_sicuro(paths["stato"], new_stato)
+                st.session_state[tp_inp_key] = None
+                st.session_state[last_tp_sync_key] = None
+                st.success("✅ TP Manuale rimosso.")
+                time.sleep(0.4)
+                st.rerun()
+
         # Rilevamento modifiche a caldo su Livello 1, Passo o Size
         has_modifiche = not has_aperti and (
             abs(float(pz_l1) - float(saved_pz1)) > 0.01 or
@@ -658,6 +785,7 @@ def renderizza_tab_goldfinger(conto):
                         "size_scaglione": int(size_u),
                         "delta_totale": int(delta_input),
                         "ts_manuale": round(float(ts_manuale_inp), 2) if (ts_manuale_inp is not None and float(ts_manuale_inp) > 0) else None,
+                        "tp_manuale": round(float(tp_manuale_inp), 2) if (tp_manuale_inp is not None and float(tp_manuale_inp) > 0) else None,
                         "avviato_il": now_it().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     scrivi_json_sicuro(paths["config"], new_cfg)
@@ -733,10 +861,12 @@ def renderizza_tab_goldfinger(conto):
                         new_cfg = cfg.copy()
                         new_cfg["attivo"] = False
                         new_cfg["ts_manuale"] = None
+                        new_cfg["tp_manuale"] = None
                         new_cfg["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                         scrivi_json_sicuro(paths["config"], new_cfg)
                         new_stato = stato.copy()
                         new_stato["ts_manuale"] = None
+                        new_stato["tp_manuale"] = None
                         scrivi_json_sicuro(paths["stato"], new_stato)
                         st.info("🛑 GOLDFINGER ARRESTATO. Le posizioni aperte rimangono intatte sotto gestione manuale.")
                         time.sleep(0.5)
@@ -760,7 +890,8 @@ def renderizza_tab_goldfinger(conto):
                     "size": sz,
                     "stato": "IN_ATTESA",
                     "open_price": None,
-                    "sl_price": None
+                    "sl_price": None,
+                    "tp_price": None
                 })
             scaglioni = preview_sc
 
@@ -793,6 +924,13 @@ def renderizza_tab_goldfinger(conto):
                     ts_display = "<span style='color: #64748b;'>Chiuso</span>"
                 else:
                     ts_display = "<span style='color: #64748b;'>--</span>"
+
+                # Livello Take Profit della singola difesa
+                tp_pz = s.get("tp_price") or stato.get("tp_manuale")
+                if tp_pz and float(tp_pz) > 0 and st_code in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
+                    tp_display = f"<span style='color: #22c55e; font-weight: bold;'>{float(tp_pz):.2f}</span>"
+                else:
+                    tp_display = "<span style='color: #64748b;'>--</span>"
                 
                 tab_rows += (
                     f"<tr style='border-bottom: 1px solid #334155; text-align: center;'>"
@@ -801,6 +939,7 @@ def renderizza_tab_goldfinger(conto):
                     f"<td style='padding: 6px; color: #38bdf8; font-weight: bold; text-align: center;'>-{s.get('size')} mini</td>"
                     f"<td style='padding: 6px; text-align: center;'>{st_badge}</td>"
                     f"<td style='padding: 6px; text-align: center;'>{ts_display}</td>"
+                    f"<td style='padding: 6px; text-align: center;'>{tp_display}</td>"
                     f"</tr>"
                 )
 
@@ -813,6 +952,7 @@ def renderizza_tab_goldfinger(conto):
                 "<th style='text-align: center; padding: 6px;'>Size Short</th>"
                 "<th style='text-align: center; padding: 6px;'>Stato</th>"
                 "<th style='text-align: center; padding: 6px;'>TS</th>"
+                "<th style='text-align: center; padding: 6px;'>TP</th>"
                 "</tr>"
                 "</thead>"
                 f"<tbody>{tab_rows}</tbody>"
@@ -828,11 +968,13 @@ def renderizza_tab_goldfinger(conto):
             max_prec_str = f"{max_prec:.2f}" if max_prec is not None else "--"
             is_ts_man = (stato.get("ts_manuale") is not None)
             mode_badge = "<span style='color: #f59e0b; font-weight: bold; background: rgba(245,158,11,0.2); padding: 1px 5px; border-radius: 3px; font-size: 0.70rem;'>MANUALE</span>" if is_ts_man else "<span style='color: #4ade80; font-weight: bold; background: rgba(74,222,128,0.15); padding: 1px 5px; border-radius: 3px; font-size: 0.70rem;'>AUTO</span>"
+            tp_attivo_val = stato.get("tp_manuale")
+            tp_badge_html = f" &nbsp;|&nbsp; 🏆 <b>TP Attivo:</b> <span style='color: #22c55e; font-weight: bold;'>{float(tp_attivo_val):.2f}</span>" if tp_attivo_val is not None else ""
             if ts_attivi:
                 ts_target = min(ts_attivi)
                 st.markdown(
                     f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.82rem;'>"
-                    f"🛡️ <b>Trailing Stop Attivo:</b> <span style='color: #FFD700; font-weight: bold;'>{ts_target:.2f}</span> {mode_badge} &nbsp;|&nbsp; "
+                    f"🛡️ <b>Trailing Stop Attivo:</b> <span style='color: #FFD700; font-weight: bold;'>{ts_target:.2f}</span> {mode_badge}{tp_badge_html} &nbsp;|&nbsp; "
                     f"🕯️ <b>Max Candela Prec (H1):</b> <span style='color: #a78bfa; font-weight: bold;'>{max_prec_str}</span> &nbsp;|&nbsp; "
                     f"📉 <b>Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc_str}</span> &nbsp;|&nbsp; "
                     f"Posizioni a mercato: <span style='color: #38bdf8; font-weight: bold;'>{len(aperti_gf)}</span>"
@@ -874,7 +1016,7 @@ def renderizza_tab_goldfinger(conto):
                 st.markdown(
                     f"<div style='margin-top: 10px; padding: 8px 12px; background-color: #0f172a; border-left: 3px solid #38bdf8; border-radius: 4px; font-size: 0.82rem;'>"
                     f"🕯️ <b>Max Candela Prec (H1):</b> <span style='color: #a78bfa; font-weight: bold;'>{max_prec_str}</span> &nbsp;|&nbsp; "
-                    f"📉 <b>Ultimo Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span> &nbsp;|&nbsp; "
+                    f"📉 <b>Ultimo Minimo Discesa:</b> <span style='color: #f8fafc;'>{min_disc:.2f}</span>{tp_badge_html} &nbsp;|&nbsp; "
                     f"In attesa di nuovo trigger difese..."
                     f"</div>",
                     unsafe_allow_html=True

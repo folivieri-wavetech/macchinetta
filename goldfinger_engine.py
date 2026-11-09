@@ -153,6 +153,7 @@ class GoldfingerEngine:
             "delta_totale": 0,
             "scaglioni": [],
             "ts_manuale": None,
+            "tp_manuale": None,
             "minimo_discesa": None,
             "minimo_precedente": None,
             "pnl_sessione": 0.0,
@@ -204,6 +205,7 @@ class GoldfingerEngine:
                 "deal_id": None,
                 "open_price": None,
                 "sl_price": None,
+                "tp_price": None,
                 "opened_at": None
             })
         return scaglioni
@@ -389,6 +391,7 @@ class GoldfingerEngine:
                 self.stato["scaglioni"] = []
                 self.stato["minimo_discesa"] = None
                 self.stato["ts_manuale"] = None
+                self.stato["tp_manuale"] = None
                 self.salva_stato()
             return
 
@@ -422,6 +425,8 @@ class GoldfingerEngine:
             self.stato["scaglioni"] = self.calcola_scaglioni_interi(pz_start, passo, sz, delta)
             self.stato["minimo_discesa"] = None
             self.stato["minimo_precedente"] = None
+            cfg_tp_init = config_ui.get("tp_manuale")
+            self.stato["tp_manuale"] = float(cfg_tp_init) if (cfg_tp_init is not None and str(cfg_tp_init).strip() != "" and float(cfg_tp_init) > 0) else None
             self.salva_stato()
             print_log(f"🚀 GOLDFINGER AVVIATO: Livello 1 @ {pz_start:.2f}, Passo {passo} pip, Delta {delta} contratti ({len(self.stato['scaglioni'])} difese).")
             invia_notifica("AVVIO GOLDFINGER", f"Guardia avviata: Livello 1 a {pz_start:.2f}, Delta {delta} contratti.", "rocket")
@@ -508,6 +513,45 @@ class GoldfingerEngine:
             self.salva_stato()
             print_log(f"🔄 TS Manuale disattivato (tornato vuoto). Ricalcolato TS virtuale da candela precedente (Max {float(max_prec):.2f} + 3p = {ts_virtuale:.2f}) per {len(aperti_man)} difese in posizione. Calcolo automatico RIABILITATO.")
             invia_notifica("TS AUTOMATICO RIPRISTINATO", f"TS Manuale rimosso. Ricalcolato TS virtuale da candela precedente a {ts_virtuale:.2f} per {len(aperti_man)} difese.", "arrows_counterclockwise")
+
+        # 2d. GESTIONE TP MANUALE (Take Profit Virtuale su posizioni SHORT)
+        cfg_tp_man = config_ui.get("tp_manuale")
+        if cfg_tp_man is not None and str(cfg_tp_man).strip() != "":
+            try:
+                cfg_tp_man = round(float(cfg_tp_man), 2)
+                if cfg_tp_man <= 0:
+                    cfg_tp_man = None
+            except (ValueError, TypeError):
+                cfg_tp_man = None
+        else:
+            cfg_tp_man = None
+
+        stato_tp_man = self.stato.get("tp_manuale")
+        if stato_tp_man is not None:
+            try:
+                stato_tp_man = round(float(stato_tp_man), 2)
+            except (ValueError, TypeError):
+                stato_tp_man = None
+
+        # CASO 1: TP MANUALE INSERITO O MODIFICATO DA CONFIG
+        if cfg_tp_man is not None and (stato_tp_man is None or abs(cfg_tp_man - stato_tp_man) > 0.01):
+            self.stato["tp_manuale"] = cfg_tp_man
+            aperti_tp = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+            for s in aperti_tp:
+                s["tp_price"] = cfg_tp_man
+            self.salva_stato()
+            print_log(f"🎯 TP Manuale impostato a {cfg_tp_man:.2f} per {len(aperti_tp)} difese. Chiusura a mercato al raggiungimento del target.")
+            invia_notifica("TP MANUALE ATTIVATO", f"TP Manuale impostato a {cfg_tp_man:.2f} per {len(aperti_tp)} difese.", "dart")
+
+        # CASO 2: ERA PIENO E TORNA VUOTO -> DISATTIVAZIONE TP
+        elif stato_tp_man is not None and cfg_tp_man is None:
+            self.stato["tp_manuale"] = None
+            aperti_tp = [s for s in self.stato.get("scaglioni", []) if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
+            for s in aperti_tp:
+                s["tp_price"] = None
+            self.salva_stato()
+            print_log("🔄 TP Manuale disattivato (tornato vuoto). Difese lasciate libere di correre verso il Trailing Stop.")
+            invia_notifica("TP DISATTIVATO", "TP Manuale rimosso.", "arrows_counterclockwise")
 
         # 3. VERIFICA FINESTRA ROLLOVER
         if self.is_in_rollover():
@@ -632,6 +676,8 @@ class GoldfingerEngine:
                         sc["deal_id"] = deal_id
                         sc["open_price"] = lvl
                         sc["opened_at"] = time.time()
+                        if self.stato.get("tp_manuale") is not None:
+                            sc["tp_price"] = float(self.stato["tp_manuale"])
                         
                         # STOP LOSS DELLA DIFESA:
                         if self.stato.get("ts_manuale") is not None:
@@ -677,6 +723,8 @@ class GoldfingerEngine:
                                 sc_r["deal_id"] = deal_id_rec
                                 sc_r["open_price"] = lvl_rec
                                 sc_r["sl_price"] = sc["sl_price"]
+                                if self.stato.get("tp_manuale") is not None:
+                                    sc_r["tp_price"] = float(self.stato["tp_manuale"])
                                 sc_r["opened_at"] = time.time()
                                 print_log(f"🟡 [RECUPERO COMPLETATO] Difesa {sc_r['numero']} recuperata a {lvl_rec:.2f} [ID: {deal_id_rec}]! Segnato GIALLO.")
                                 invia_notifica("RECUPERO DIFESA", f"Difesa {sc_r['numero']} recuperata a mercato @ {lvl_rec:.2f}", "arrows_counterclockwise")
@@ -694,7 +742,62 @@ class GoldfingerEngine:
         # Ricalcola le posizioni aperte post-ingresso nel tick corrente
         aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
 
-        # 7. CHIUSURA TOTALE SHORT SU TRAILING STOP (RATCHET)
+        # 7a. CHIUSURA TOTALE SHORT SU TAKE PROFIT MANUALE (SCELTA A: Arresto in IDLE a protezione del gain)
+        if aperti and self.stato.get("tp_manuale") is not None:
+            tp_attivo = float(self.stato["tp_manuale"])
+            if ask <= tp_attivo:
+                print_log(f"🏆 TAKE PROFIT RAGGIUNTO: Prezzo Ask {ask:.2f} <= TP {tp_attivo:.2f}. Chiudo TUTTI gli SHORT in profitto all'istante!")
+                pnl_tot_tp = 0.0
+                tutti_chiusi = True
+                for sc in aperti:
+                    ok, lvl_c, pnl = self.chiudi_short_mercato(sc["deal_id"], sc["size"])
+                    if ok:
+                        sc["stato"] = "RECUPERATO_CHIUSO" if sc.get("stato") == "RECUPERATO" else "CHIUSO"
+                        pnl_tot_tp += pnl
+                        self.stato["storico_operazioni"].append({
+                            "data": now_it().strftime("%d/%m %H:%M:%S"),
+                            "scaglione": sc["numero"],
+                            "size": sc["size"],
+                            "open": sc["open_price"],
+                            "close": lvl_c,
+                            "pnl": pnl,
+                            "motivo": "TP_MANUALE"
+                        })
+                    else:
+                        tutti_chiusi = False
+                        print_log(f"🚨 ATTENZIONE: Chiusura IG non confermata per difesa {sc['numero']} (Deal {sc.get('deal_id')}) su TP. Ritento!")
+
+                if not tutti_chiusi:
+                    print_log("⚠️ Chiusura TP sospesa: alcune posizioni non sono ancora confermate chiuse su IG. Ritento al prossimo ciclo.")
+                    self.salva_stato()
+                    return
+
+                self.stato["pnl_sessione"] += pnl_tot_tp
+                self.stato["totale_incassato"] += pnl_tot_tp
+                self.stato["tp_manuale"] = None
+                self.stato["ts_manuale"] = None
+                self.stato["attivo"] = False
+                self.stato["stato_operativo"] = "IDLE"
+                self.stato["scaglioni"] = []
+                self.stato["minimo_discesa"] = None
+                self.stato["minimo_precedente"] = None
+                self.salva_stato()
+
+                # Sincronizza config_goldfinger.json per mantenere allineata la Dashboard in IDLE
+                cfg_sync = self.carica_config()
+                cfg_sync["attivo"] = False
+                cfg_sync["tp_manuale"] = None
+                cfg_sync["ts_manuale"] = None
+                cfg_sync["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                cfg_sync["motivo_stop"] = "TAKE_PROFIT_RAGGIUNTO"
+                cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
+                self.salva_config(cfg_sync)
+
+                print_log(f"💰 Take Profit completato con successo! Incassati netti: {pnl_tot_tp:+.2f} €. Goldfinger fermato in IDLE a protezione del guadagno.")
+                invia_notifica("TAKE PROFIT COMPLETATO", f"Target {tp_attivo:.2f} raggiunto! Incassati netti: {pnl_tot_tp:+.2f} €. Posizioni chiuse e robot fermato.", "trophy")
+                return
+
+        # 7b. CHIUSURA TOTALE SHORT SU TRAILING STOP (RATCHET)
         if aperti:
             sl_list = [float(s["sl_price"]) for s in aperti if s.get("sl_price") is not None]
             if sl_list:
@@ -757,15 +860,17 @@ class GoldfingerEngine:
                     self.stato["scaglioni"] = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
                     self.stato["livello_1_prezzo"] = soglia_riarmo
                     self.stato["ts_manuale"] = None
+                    self.stato["tp_manuale"] = None
                     print_log(f"💰 Chiusura TS completata. Incassati netti: {pnl_tot_rimbalzo:+.2f} €.")
-                    print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù. TS manuale azzerato.")
-                    invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù. TS manuale azzerato.", "shield")
+                    print_log(f"🛡️ SECONDA ONDATA ARMATA: Generate {len(self.stato['scaglioni'])} difese ({delta} mini) da {soglia_riarmo:.2f} [{desc_riarmo}] in giù. TS e TP manuali azzerati.")
+                    invia_notifica("SECONDA ONDATA ARMATA", f"Rigenerata scala completa: {len(self.stato['scaglioni'])} difese ({delta} contratti) da {soglia_riarmo:.2f} in giù. TS e TP manuali azzerati.", "shield")
                     self.salva_stato()
 
                     # Sincronizza config_goldfinger.json per mantenere allineata la UI e non sovrascrivere il riarmo
                     cfg_sync = self.carica_config()
                     cfg_sync["livello_1_prezzo"] = soglia_riarmo
                     cfg_sync["ts_manuale"] = None
+                    cfg_sync["tp_manuale"] = None
                     cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                     self.salva_config(cfg_sync)
                     return
