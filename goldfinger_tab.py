@@ -439,13 +439,6 @@ def renderizza_tab_goldfinger(conto):
                     f"</div>",
                     unsafe_allow_html=True
                 )
-            else:
-                st.markdown(
-                    f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 6px 10px; min-height: 54px; margin-bottom: 8px; font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center;'>"
-                    f"<div>🤖 <i>Auto H1 prec + 3p attivo.<br>Digita e Salva per renderlo manuale.</i></div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
 
             ts_form_key = f"form_ts_man_{conto}"
             ts_inp_key = f"input_ts_man_{conto}"
@@ -582,13 +575,6 @@ def renderizza_tab_goldfinger(conto):
                 st.markdown(
                     f"<div style='background: rgba(34, 197, 94, 0.12); border-left: 3px solid #22c55e; border-radius: 4px; padding: 6px 10px; min-height: 54px; margin-bottom: 8px; font-size: 0.74rem; color: #4ade80; display: flex; align-items: center;'>"
                     f"<div>⚡ <b>TP salvato @ {saved_tp:.2f}</b>{dist_tp_str}<br><span style='font-size: 0.68rem; color: #86efac;'>Riarma difesa @ <b>{riarmo_preview}</b></span></div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f"<div style='background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 6px 10px; min-height: 54px; margin-bottom: 8px; font-size: 0.72rem; color: #94a3b8; display: flex; align-items: center;'>"
-                    f"<div>🎯 <i>Al tocco chiude gli Short e riarma la difesa a TP - 5 pip.</i></div>"
                     f"</div>",
                     unsafe_allow_html=True
                 )
