@@ -570,16 +570,17 @@ def renderizza_tab_goldfinger(conto):
 
         if is_tp_man_active:
             dist_tp_str = f" (distanza: {float(ask_live) - saved_tp:.1f} pip)" if (ask_live and float(ask_live) > saved_tp) else ""
+            riarmo_preview = f"{saved_tp - 5.0:.2f}"
             st.markdown(
                 f"<div style='background: rgba(34, 197, 94, 0.12); border-left: 3px solid #22c55e; border-radius: 4px; padding: 6px 10px; margin-bottom: 8px; font-size: 0.76rem; color: #4ade80;'>"
-                f"⚡ <b>TP manuale salvato @ {saved_tp:.2f}</b>{dist_tp_str} • Chiusura a mercato di tutte le difese al tocco (Scelta A)"
+                f"⚡ <b>TP manuale salvato @ {saved_tp:.2f}</b>{dist_tp_str} • Chiude TUTTI gli Short a mercato e riarma la difesa a <b>{riarmo_preview}</b> (TP - 5 pip)"
                 f"</div>",
                 unsafe_allow_html=True
             )
         else:
             st.markdown(
                 f"<div style='font-size: 0.73rem; color: #94a3b8; margin-bottom: 6px;'>"
-                f"🎯 <i>Opzionale: inserisci un livello inferiore al prezzo live e clicca SALVA per chiudere tutte le difese in guadagno al raggiungimento del target.</i>"
+                f"🎯 <i>Imposta un livello di TP: al raggiungimento, chiude tutti gli Short e riarma in automatico la difesa a TP - 5 pip.</i>"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -603,7 +604,7 @@ def renderizza_tab_goldfinger(conto):
                 format="%.2f",
                 key=tp_inp_key,
                 disabled=(not is_operativo),
-                help="Prezzo target a cui chiudere tutte le difese Goldfinger in profitto. Trattandosi di posizioni Short, il TP deve essere inferiore al prezzo di mercato."
+                help="Al tocco del TP, chiude tutte le posizioni Short aperte (manuali o automatiche) e riarma all'istante la difesa a TP - 5 pip coprendo il Delta Long scoperto."
             )
             btn_tp_label = "✅ TP manuale salvato" if is_tp_man_active else "💾 Salva TP Manuale"
             btn_salva_tp = st.form_submit_button(
@@ -626,11 +627,14 @@ def renderizza_tab_goldfinger(conto):
                 else:
                     new_cfg = cfg.copy()
                     new_cfg["tp_manuale"] = new_tp_val
+                    new_cfg["attivo"] = True
                     new_cfg["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                     scrivi_json_sicuro(paths["config"], new_cfg)
 
                     new_stato = stato.copy()
                     new_stato["tp_manuale"] = new_tp_val
+                    new_stato["attivo"] = True
+                    new_stato["stato_operativo"] = "RUNNING"
                     aperti_mod_tp = 0
                     for s in new_stato.get("scaglioni", []):
                         if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO"):
@@ -638,7 +642,7 @@ def renderizza_tab_goldfinger(conto):
                             aperti_mod_tp += 1
                     scrivi_json_sicuro(paths["stato"], new_stato)
                     st.session_state[last_tp_sync_key] = new_tp_val
-                    st.success(f"✅ TP Manuale salvato e reso operativo a {new_tp_val:.2f} per {aperti_mod_tp} difese in posizione!")
+                    st.success(f"✅ TP Manuale salvato a {new_tp_val:.2f}! Al tocco chiuderà tutti gli Short e riarmerà la difesa a {new_tp_val - 5.0:.2f}.")
                     time.sleep(0.4)
                     st.rerun()
 

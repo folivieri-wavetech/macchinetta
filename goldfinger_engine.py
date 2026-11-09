@@ -403,6 +403,18 @@ class GoldfingerEngine:
             delta = int(config_ui.get("delta_totale", 15))
 
             if pz_start is None or pz_start <= 0:
+                if config_ui.get("tp_manuale"):
+                    # Avvio in modalità sentinella TP su posizioni Short aperte
+                    self.stato["attivo"] = True
+                    self.stato["stato_operativo"] = "RUNNING"
+                    self.stato["tp_manuale"] = float(config_ui.get("tp_manuale"))
+                    self.stato["passo_pip"] = passo
+                    self.stato["size_scaglione"] = sz
+                    self.stato["delta_totale"] = delta
+                    self.stato["scaglioni"] = []
+                    self.salva_stato()
+                    print_log(f"🚀 Goldfinger armato in sentinella TP Manuale @ {self.stato['tp_manuale']:.2f} su posizioni Short aperte.")
+                    return
                 print_log("🛑 Errore: Livello 1 non impostato o non valido. Avvio annullato.")
                 config_ui["attivo"] = False
                 with open(CONFIG_GOLDFINGER_FILE, "w", encoding="utf-8") as f:
@@ -742,30 +754,82 @@ class GoldfingerEngine:
         # Ricalcola le posizioni aperte post-ingresso nel tick corrente
         aperti = [s for s in scaglioni if s["stato"] in ("APERTO", "PROTETTO_BE", "RECUPERATO")]
 
-        # 7a. CHIUSURA TOTALE SHORT SU TAKE PROFIT MANUALE (SCELTA A: Arresto in IDLE a protezione del gain)
-        if aperti and self.stato.get("tp_manuale") is not None:
+        # 7a. CHIUSURA TOTALE SHORT SU TAKE PROFIT MANUALE E RIARMO A TP - 5 PIP (OPZIONE 2)
+        if self.stato.get("tp_manuale") is not None:
             tp_attivo = float(self.stato["tp_manuale"])
-            if ask <= tp_attivo:
-                print_log(f"🏆 TAKE PROFIT RAGGIUNTO: Prezzo Ask {ask:.2f} <= TP {tp_attivo:.2f}. Chiudo TUTTI gli SHORT in profitto all'istante!")
+
+            # Raccoglie TUTTE le posizioni SHORT aperte su Spot Gold (sia manuali che Goldfinger)
+            pos_short_da_chiudere = []
+            seen_deals = set()
+            tot_long_gold = 0
+
+            if os.path.exists(POSIZIONI_FILE):
+                try:
+                    with open(POSIZIONI_FILE, "r", encoding="utf-8") as f_pos:
+                        pos_arr = json.load(f_pos)
+                        if isinstance(pos_arr, list):
+                            for p in pos_arr:
+                                inst = str(p.get("instrument", "")).upper()
+                                epic = str(p.get("epic", "")).upper()
+                                if "GOLD" in inst or "CFEGOLD" in epic:
+                                    sz = int(float(p.get("size", 1)))
+                                    d = str(p.get("direction", "")).upper()
+                                    if d in ("BUY", "LONG"):
+                                        tot_long_gold += sz
+                                    elif d in ("SELL", "SHORT"):
+                                        d_id = str(p.get("dealId", "")).strip()
+                                        if d_id and d_id not in seen_deals:
+                                            seen_deals.add(d_id)
+                                            pos_short_da_chiudere.append({
+                                                "deal_id": d_id,
+                                                "size": sz,
+                                                "open_price": float(p.get("openLevel", 0.0) or 0.0),
+                                                "scaglione_num": None
+                                            })
+                except Exception:
+                    pass
+
+            for sc in aperti:
+                d_id = str(sc.get("deal_id", "") or "").strip()
+                if d_id and d_id not in seen_deals:
+                    seen_deals.add(d_id)
+                    pos_short_da_chiudere.append({
+                        "deal_id": d_id,
+                        "size": int(float(sc.get("size", 1))),
+                        "open_price": float(sc.get("open_price", 0.0) or 0.0),
+                        "scaglione_num": sc.get("numero")
+                    })
+                elif d_id:
+                    for item in pos_short_da_chiudere:
+                        if item["deal_id"] == d_id and item["scaglione_num"] is None:
+                            item["scaglione_num"] = sc.get("numero")
+
+            if pos_short_da_chiudere and ask <= tp_attivo:
+                tot_size_chiusa = sum(p["size"] for p in pos_short_da_chiudere)
+                print_log(f"🏆 TAKE PROFIT RAGGIUNTO: Prezzo Ask {ask:.2f} <= TP {tp_attivo:.2f}. Chiudo TUTTE le {len(pos_short_da_chiudere)} posizioni SHORT ({tot_size_chiusa} contratti) all'istante!")
                 pnl_tot_tp = 0.0
                 tutti_chiusi = True
-                for sc in aperti:
-                    ok, lvl_c, pnl = self.chiudi_short_mercato(sc["deal_id"], sc["size"])
+                for p_sh in pos_short_da_chiudere:
+                    ok, lvl_c, pnl = self.chiudi_short_mercato(p_sh["deal_id"], p_sh["size"])
                     if ok:
-                        sc["stato"] = "RECUPERATO_CHIUSO" if sc.get("stato") == "RECUPERATO" else "CHIUSO"
                         pnl_tot_tp += pnl
+                        lbl_num = p_sh["scaglione_num"] if p_sh["scaglione_num"] is not None else "Manuale"
                         self.stato["storico_operazioni"].append({
                             "data": now_it().strftime("%d/%m %H:%M:%S"),
-                            "scaglione": sc["numero"],
-                            "size": sc["size"],
-                            "open": sc["open_price"],
+                            "scaglione": lbl_num,
+                            "size": p_sh["size"],
+                            "open": p_sh["open_price"],
                             "close": lvl_c,
                             "pnl": pnl,
                             "motivo": "TP_MANUALE"
                         })
                     else:
                         tutti_chiusi = False
-                        print_log(f"🚨 ATTENZIONE: Chiusura IG non confermata per difesa {sc['numero']} (Deal {sc.get('deal_id')}) su TP. Ritento!")
+                        print_log(f"🚨 ATTENZIONE: Chiusura IG non confermata per deal {p_sh['deal_id']} su TP. Ritento!")
+
+                # Allinea gli scaglioni interni a CHIUSO
+                for sc in aperti:
+                    sc["stato"] = "RECUPERATO_CHIUSO" if sc.get("stato") == "RECUPERATO" else "CHIUSO"
 
                 if not tutti_chiusi:
                     print_log("⚠️ Chiusura TP sospesa: alcune posizioni non sono ancora confermate chiuse su IG. Ritento al prossimo ciclo.")
@@ -774,27 +838,55 @@ class GoldfingerEngine:
 
                 self.stato["pnl_sessione"] += pnl_tot_tp
                 self.stato["totale_incassato"] += pnl_tot_tp
+
+                # RIARMO DELLA DIFESA A TP - 5 PIP (OPZIONE 2: RICALCOLO DELTA DAL PORTAFOGLIO LONG)
+                passo = float(self.stato.get("passo_pip") or config_ui.get("passo_pip", 6.0))
+                sz = int(self.stato.get("size_scaglione") or config_ui.get("size_scaglione", 3))
+
+                # Opzione 2: Il delta scoperto corrisponde ai contratti Long residui in portafoglio
+                if tot_long_gold > 0:
+                    delta = int(tot_long_gold)
+                else:
+                    delta = int(self.stato.get("delta_totale") or config_ui.get("delta_totale", 15) or tot_size_chiusa)
+                delta = max(delta, sz)
+
+                soglia_riarmo = round(tp_attivo - 5.0, 2)
+                desc_riarmo = f"TP ({tp_attivo:.2f}) - 5 pip"
+
+                # Salvaguardia anti-trigger immediato: la nuova scala deve essere sempre sotto il bid attuale
+                if bid and soglia_riarmo >= bid:
+                    soglia_riarmo = round(bid - passo, 2)
+                    desc_riarmo += f" (adeguato a {soglia_riarmo:.2f} sotto Bid live {bid:.2f})"
+
+                nuovi_scaglioni = self.calcola_scaglioni_interi(soglia_riarmo, passo, sz, delta)
+
+                self.stato["attivo"] = True
+                self.stato["stato_operativo"] = "RUNNING"
+                self.stato["livello_1_prezzo"] = soglia_riarmo
+                self.stato["passo_pip"] = passo
+                self.stato["size_scaglione"] = sz
+                self.stato["delta_totale"] = delta
+                self.stato["scaglioni"] = nuovi_scaglioni
+                self.stato["minimo_discesa"] = None
+                self.stato["minimo_precedente"] = tp_attivo
                 self.stato["tp_manuale"] = None
                 self.stato["ts_manuale"] = None
-                self.stato["attivo"] = False
-                self.stato["stato_operativo"] = "IDLE"
-                self.stato["scaglioni"] = []
-                self.stato["minimo_discesa"] = None
-                self.stato["minimo_precedente"] = None
                 self.salva_stato()
 
-                # Sincronizza config_goldfinger.json per mantenere allineata la Dashboard in IDLE
+                # Sincronizza config_goldfinger.json per mantenere allineata la Dashboard in RUNNING
                 cfg_sync = self.carica_config()
-                cfg_sync["attivo"] = False
+                cfg_sync["attivo"] = True
+                cfg_sync["livello_1_prezzo"] = soglia_riarmo
+                cfg_sync["delta_totale"] = delta
                 cfg_sync["tp_manuale"] = None
                 cfg_sync["ts_manuale"] = None
-                cfg_sync["fermato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
-                cfg_sync["motivo_stop"] = "TAKE_PROFIT_RAGGIUNTO"
+                cfg_sync["ultimo_tp_eseguito"] = tp_attivo
                 cfg_sync["aggiornato_il"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
                 self.salva_config(cfg_sync)
 
-                print_log(f"💰 Take Profit completato con successo! Incassati netti: {pnl_tot_tp:+.2f} €. Goldfinger fermato in IDLE a protezione del guadagno.")
-                invia_notifica("TAKE PROFIT COMPLETATO", f"Target {tp_attivo:.2f} raggiunto! Incassati netti: {pnl_tot_tp:+.2f} €. Posizioni chiuse e robot fermato.", "trophy")
+                print_log(f"💰 Take Profit completato con successo: chiusi {tot_size_chiusa} contratti SHORT! Incassati netti: {pnl_tot_tp:+.2f} €.")
+                print_log(f"🛡️ GUARDIA RIARMATA A TP - 5 PIP: Generata nuova scaletta da {soglia_riarmo:.2f} [{desc_riarmo}] in giù con Passo {passo}p, Size {sz}, Delta {delta} contratti da Long scoperti ({len(nuovi_scaglioni)} difese).")
+                invia_notifica("TP RAGGIUNTO & DIFESA RIARMATA", f"Target {tp_attivo:.2f} raggiunto (Chiusi {tot_size_chiusa} SHORT, Gain: {pnl_tot_tp:+.2f} €). Guardia riarmata da {soglia_riarmo:.2f} (Delta {delta} contratti).", "shield")
                 return
 
         # 7b. CHIUSURA TOTALE SHORT SU TRAILING STOP (RATCHET)
