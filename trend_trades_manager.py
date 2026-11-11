@@ -3,6 +3,7 @@ import json
 import re
 import time
 import datetime
+import uuid
 try:
     from Sistema.fuso_orario import TZ_ITALIA, now_it
 except ImportError:
@@ -100,7 +101,7 @@ def salva_trade_chiuso_trend(conto: str, trade_dict: dict) -> bool:
             trades.insert(0, item)
             trades = deduplica_trades_trend(trades)[:2000] # Limite max 2000 trade
 
-            tmp_path = f"{filepath}.tmp.{os.getpid()}"
+            tmp_path = f"{filepath}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             try:
                 with open(tmp_path, "w", encoding="utf-8") as f:
                     json.dump(trades, f, indent=2)
@@ -286,7 +287,7 @@ def carica_trades_trend(conto: str = None) -> list:
     # Se la lista è cambiata (es. duplicati rimossi o bootstrap iniziale), aggiorna il file su disco
     if len(trades_puliti) != len(trades) or (not os.path.exists(filepath) and trades_puliti):
         try:
-            tmp_path = f"{filepath}.tmp.{os.getpid()}"
+            tmp_path = f"{filepath}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(trades_puliti, f, indent=2)
             os.replace(tmp_path, filepath)

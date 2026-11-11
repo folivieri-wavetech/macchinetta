@@ -1,6 +1,7 @@
 import json
 import time
 import os
+import uuid
 import re
 import requests
 import traceback
@@ -106,7 +107,7 @@ def salva_live_tracker():
         for (nome, tf), val in LIVE_OHLC_TRACKER.items():
             k_str = f"{nome}__{tf}"
             data[k_str] = val
-        tmp = f"{FILE_LIVE_TRACKER}.tmp.{os.getpid()}"
+        tmp = f"{FILE_LIVE_TRACKER}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         os.replace(tmp, FILE_LIVE_TRACKER)
@@ -115,7 +116,7 @@ def salva_live_tracker():
         for cache_dir in ["../Logs_e_Cache", "/data/Logs_e_Cache"]:
             if os.path.isdir(cache_dir):
                 dst = os.path.join(cache_dir, FILE_LIVE_TRACKER)
-                tmp_c = f"{dst}.tmp.{os.getpid()}"
+                tmp_c = f"{dst}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
                 with open(tmp_c, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
                 os.replace(tmp_c, dst)
@@ -426,7 +427,7 @@ def aggiorna_cache_ultimo_kj_motore(nome, tf_lbl, riga):
         if nome not in data:
             data[nome] = {}
         data[nome][tf_lbl] = riga
-        tmp = f"{CACHE_ULTIMI_KJ_FILE}.tmp.{os.getpid()}"
+        tmp = f"{CACHE_ULTIMI_KJ_FILE}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         os.replace(tmp, CACHE_ULTIMI_KJ_FILE)
@@ -1070,7 +1071,7 @@ def salva_candele_locali(nome, tf, candele_list):
                 except Exception:
                     pass
             try:
-                tmp = f"{dest}.tmp.{os.getpid()}"
+                tmp = f"{dest}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
                 with open(tmp, "w", encoding="utf-8") as f:
                     json.dump(salvataggio_locale, f, indent=2)
                 os.replace(tmp, dest)
@@ -1149,7 +1150,7 @@ def carica_memoria_trend_motore():
             pass
     if trend_mem:
         try:
-            tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}"
+            tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             with open(tmp_f, "w", encoding="utf-8") as f:
                 json.dump(trend_mem, f, indent=4)
             os.replace(tmp_f, FILE_MEMORIA)
@@ -1163,7 +1164,7 @@ def aggiorna_memoria(nome, update_dict):
         if nome in p:
             for k, v in update_dict.items():
                 p[nome][k] = v
-            tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}"
+            tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             with open(tmp_f, "w", encoding="utf-8") as f:
                 json.dump(p, f, indent=4)
             os.replace(tmp_f, FILE_MEMORIA)
@@ -1329,7 +1330,7 @@ def salva_hull_trend_motore(nome, hull_info):
         if os.path.exists(d) and os.path.isdir(d):
             dest = os.path.join(d, HULL_TREND_FILE)
             try:
-                tmp = f"{dest}.tmp.{os.getpid()}"
+                tmp = f"{dest}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
                 with open(tmp, "w", encoding="utf-8") as f:
                     json.dump(dati_hull, f, indent=2)
                 os.replace(tmp, dest)
@@ -1521,7 +1522,7 @@ def aggiorna_radar_trend(prezzi_live, memoria_attuale):
                 
     ts_radar = now_it().strftime("%d/%m/%Y %H:%M:%S")
     try:
-        tmp_r = f"radar_trend.json.tmp.{os.getpid()}"
+        tmp_r = f"radar_trend.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
         with open(tmp_r, "w", encoding="utf-8") as f_r:
             json.dump({"radar_trend": radar_data, "radar_trend_ts": ts_radar}, f_r, indent=4)
         os.replace(tmp_r, "radar_trend.json")

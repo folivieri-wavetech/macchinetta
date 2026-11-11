@@ -1,6 +1,7 @@
 import json
 import time
 import os
+import uuid
 import requests
 import traceback
 import datetime
@@ -452,7 +453,7 @@ def aggiorna_memoria(nome_strumento, aggiornamenti, log_wip=None):
                     ora = now_it().strftime("%d/%m %H:%M:%S")
                     dati[nome_strumento]["storico_wip"].append(f"[{ora}] {log_wip}")
                 
-                tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}"
+                tmp_f = f"{FILE_MEMORIA}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
                 with open(tmp_f, "w", encoding="utf-8") as f:
                     json.dump(dati, f, indent=4)
                 os.replace(tmp_f, FILE_MEMORIA)
@@ -544,7 +545,40 @@ def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezz
         "prezzi_bid_ask": prezzi_bid_ask or {}
     })
     try:
-        tmp_st = f"stato_sistema.json.tmp.{os.getpid()}"
+        tmp_st = f"stato_sistema.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
+        with open(tmp_st, "w", encoding="utf-8") as f:
+            json.dump(dati, f, indent=4)
+        os.replace(tmp_st, "stato_sistema.json")
+    except Exception:
+        pass
+
+def tocca_heartbeat_stato_sistema(prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None):
+    """
+    Aggiorna regolarmente il battito cardiaco (mtime e ultimo_aggiornamento) in stato_sistema.json.
+    Mantiene intatti tutti i dati contabili esistenti e aggiorna i prezzi live se forniti.
+    Garantisce che la Dashboard veda il motore sempre '🟢 Connesso' anche in caso di micro-ritardo API di IG.
+    """
+    dati = {}
+    if os.path.exists("stato_sistema.json"):
+        try:
+            with open("stato_sistema.json", "r", encoding="utf-8") as f:
+                dati = json.load(f)
+        except Exception:
+            dati = {}
+    
+    dati["ultimo_aggiornamento"] = now_it().strftime("%H:%M:%S")
+    dati["durata_sessione"] = calcola_durata_sessione()
+    if not dati.get("messaggio"):
+        dati["messaggio"] = "Mercati Chiusi (Weekend)" if is_weekend_active() else "Sistema Online"
+    if prezzi_live:
+        dati["prezzi_live"] = prezzi_live
+    if distanze_minime:
+        dati["distanze_minime"] = distanze_minime
+    if prezzi_bid_ask:
+        dati["prezzi_bid_ask"] = prezzi_bid_ask
+        
+    try:
+        tmp_st = f"stato_sistema.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
         with open(tmp_st, "w", encoding="utf-8") as f:
             json.dump(dati, f, indent=4)
         os.replace(tmp_st, "stato_sistema.json")
@@ -638,8 +672,11 @@ def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=No
             
             msg = "Mercati Chiusi (Weekend)" if is_weekend_active() else "Sistema Online"
             scrivi_stato_sistema(bal, disp, marg, dd, msg, prezzi_live, dist_min, prezzi_bid_ask)
+        else:
+            # Fallback heartbeat per garantire che la Dashboard veda sempre il motore connesso
+            tocca_heartbeat_stato_sistema(prezzi_live, dist_min, prezzi_bid_ask)
     except Exception:
-        pass
+        tocca_heartbeat_stato_sistema(prezzi_live, dist_min, prezzi_bid_ask)
 
 def verifica_token_ig():
     if not os.path.exists(FILE_TOKEN):
@@ -1186,6 +1223,8 @@ def esegui_motore():
                 if ora_attuale - ultimo_controllo_saldo >= 30:
                     ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
                     ultimo_controllo_saldo = ora_attuale
+                else:
+                    tocca_heartbeat_stato_sistema(prezzi_live, distanze_minime, prezzi_bid_ask)
                 time.sleep(15)
                 continue
 
@@ -1205,6 +1244,8 @@ def esegui_motore():
             if ora_attuale - ultimo_controllo_saldo >= 45:
                 ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
                 ultimo_controllo_saldo = ora_attuale
+            else:
+                tocca_heartbeat_stato_sistema(prezzi_live, distanze_minime, prezzi_bid_ask)
 
             resp_pos_global = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
             if resp_pos_global and resp_pos_global.status_code == 200:

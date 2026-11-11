@@ -7,6 +7,7 @@ import os
 import threading
 import requests
 import json
+import uuid
 from collections import deque
 from tenacity import Retrying, wait_exponential, retry_if_exception_type, stop_after_attempt
 
@@ -19,7 +20,7 @@ class IGRateLimiter:
     Gatekeeper centralizzato per prevenire tassativamente il superamento dei limiti IG.
     - Spaziatura minima ferrea di 1.5s tra chiamate consecutive.
     - Finestra mobile: massimo 22 chiamate al minuto (ampiamente sotto la soglia di 30 req/min di IG).
-    - Supporta sincronizzazione cross-process tramite ledger condiviso su file.
+    - Supporta sincronizzazione cross-process tramite ledger condiviso su file con fallback in-memory.
     - Se si tenta una chiamata troppo ravvicinata o oltre soglia, il thread/processo attende LOCALMENTE
       senza mai inviare traffico ad alto rischio verso IG.
     """
@@ -43,19 +44,33 @@ class IGRateLimiter:
         return []
 
     def _write_ledger(self, timestamps):
+        tmp = None
         try:
-            tmp = f"{self.ledger_file}.tmp.{os.getpid()}"
+            tmp = f"{self.ledger_file}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(timestamps, f)
             os.replace(tmp, self.ledger_file)
         except Exception:
-            pass
+            if tmp and os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except Exception:
+                    pass
 
     def acquire(self):
         with self.lock:
-            # Sincronizzazione con ledger su disco per coordinare più processi (Motore + Motore_Trend)
-            ledger = self._read_ledger()
             now = time.time()
+            
+            # Pulizia in-memory history (> 60s)
+            while self.call_history and (now - self.call_history[0]) > 60.0:
+                self.call_history.popleft()
+
+            # Sincronizzazione con ledger su disco per coordinare più processi (Motore + Motore_Trend)
+            disk_ledger = self._read_ledger()
+            disk_ledger = [t for t in disk_ledger if (now - t) <= 60.0]
+            
+            # Unione armoniosa tra cronologia disco e cronologia in-memory
+            ledger = sorted(list(set(disk_ledger + list(self.call_history))))
             
             # 1. Filtra timestamp più vecchi di 60s
             ledger = [t for t in ledger if (now - t) <= 60.0]
@@ -76,6 +91,7 @@ class IGRateLimiter:
                 now = time.time()
 
             self.last_call_time = now
+            self.call_history.append(now)
             ledger.append(now)
             self._write_ledger(ledger[-50:])
 

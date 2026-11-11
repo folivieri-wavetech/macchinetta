@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import json
+import uuid
 import requests
 import datetime
 from dotenv import dotenv_values
@@ -129,7 +130,7 @@ class GoldfingerEngine:
 
     def salva_config(self, cfg_data):
         try:
-            tmp = f"{CONFIG_GOLDFINGER_FILE}.tmp.{os.getpid()}"
+            tmp = f"{CONFIG_GOLDFINGER_FILE}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(cfg_data, f, indent=4)
             os.replace(tmp, CONFIG_GOLDFINGER_FILE)
@@ -170,7 +171,7 @@ class GoldfingerEngine:
     def salva_stato(self):
         self.stato["ultimo_aggiornamento"] = now_it().strftime("%Y-%m-%d %H:%M:%S")
         try:
-            tmp = f"{STATO_GOLDFINGER_FILE}.tmp.{os.getpid()}"
+            tmp = f"{STATO_GOLDFINGER_FILE}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.stato, f, indent=4)
             os.replace(tmp, STATO_GOLDFINGER_FILE)

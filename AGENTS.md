@@ -77,3 +77,11 @@ Alla ricezione di questo comando, devo:
   2. L'utente fa fare una verifica preventiva delle quote.
   3. Solo dopo l'esplicita autorizzazione dell'utente si può procedere; **altrimenti si sta fermi**.
 - **UNICO CONTO AUTORIZZATO:** Quando autorizzato, l'unico ed esclusivo conto da utilizzare è **FIORDOK_DEMO** (MAI `DANY_DEMO` o altri conti). Nessun rischio di 403, poiché IG contatta direttamente l'utente via telefono.
+
+---
+
+## 📊 7. Parametri Ichimoku Ufficiali del Progetto: KJ 55 e TK 21
+- **DIVIETO VALORI STANDARD 9 e 26:** Non menzionare MAI più i valori teorici standard (9 e 26). Nel contesto di questo progetto non esistono.
+- **VALORI ESCLUSIVI DEL PROGETTO:**
+  - **KJ (Kijun-sen)**: è **SEMPRE a 55 periodi** (`KJ55`).
+  - **TK (Tenkan-sen)**: è **SEMPRE a 21 periodi** (`TK21`).

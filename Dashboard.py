@@ -4,6 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import json
 import os
+import uuid
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 import time
 import threading
@@ -75,7 +76,7 @@ FILE_TOKEN = "token_ig.json"
 FILE_STORICO = "storico_operazioni.csv"
 CONSOLE_LOG_FILE = "console_live.log"
 STATO_SISTEMA = "stato_sistema.json"
-TIMEOUT_STATO_SISTEMA_SEC = 120
+TIMEOUT_STATO_SISTEMA_SEC = 180
 import Sistema.auth_manager as auth_manager
 
 # --- VOCABOLARIO ---
@@ -1121,7 +1122,7 @@ def estrai_valori_kj_tk_riga(riga):
 def salva_cache_ultimi_kj(conto, cache):
     target = os.path.join(conto, CACHE_ULTIMI_KJ_FILE) if conto else CACHE_ULTIMI_KJ_FILE
     try:
-        tmp = f"{target}.tmp.{os.getpid()}"
+        tmp = f"{target}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2)
         os.replace(tmp, target)
@@ -1784,7 +1785,7 @@ def carica_memoria(conto_selezionato):
 
 def salva_memoria(conto_selezionato, dati):
     path = os.path.join(conto_selezionato, FILE_MEMORIA)
-    tmp_path = f"{path}.tmp.{os.getpid()}"
+    tmp_path = f"{path}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(dati, f, indent=4)
@@ -1817,7 +1818,7 @@ def carica_memoria_trend(conto_selezionato):
 
 def salva_memoria_trend(conto_selezionato, dati):
     path = os.path.join(conto_selezionato, FILE_MEMORIA_TREND)
-    tmp_path = f"{path}.tmp.{os.getpid()}"
+    tmp_path = f"{path}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(dati, f, indent=4)
@@ -1836,7 +1837,7 @@ def carica_preferenze(conto_selezionato):
 
 def salva_preferenze(conto_selezionato, prefs):
     path = os.path.join(conto_selezionato, "preferenze_ui.json")
-    tmp_path = f"{path}.tmp.{os.getpid()}"
+    tmp_path = f"{path}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(prefs, f, indent=4)

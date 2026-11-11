@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import uuid
 import requests
 import datetime
 from dotenv import dotenv_values
@@ -224,7 +225,7 @@ class ModuloChirurgicoDanyReale:
                         "prezzi_bid_ask": prezzi_ba
                     }
                     
-                    tmp_st = f"{STATO_FILE}.tmp.{os.getpid()}"
+                    tmp_st = f"{STATO_FILE}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
                     with open(tmp_st, "w", encoding="utf-8") as f:
                         json.dump(stato, f, indent=4)
                     os.replace(tmp_st, STATO_FILE)
@@ -268,7 +269,7 @@ class ModuloChirurgicoDanyReale:
                         "upl": p.get("upl"),
                         "currency": p.get("currency")
                     })
-                tmp_p = f"{POSIZIONI_FILE}.tmp.{os.getpid()}"
+                tmp_p = f"{POSIZIONI_FILE}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
                 with open(tmp_p, "w", encoding="utf-8") as f:
                     json.dump(posizioni_salvate, f, indent=4)
                 os.replace(tmp_p, POSIZIONI_FILE)

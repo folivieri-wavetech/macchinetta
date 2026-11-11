@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import uuid
 import datetime
 import streamlit as st
 from dotenv import dotenv_values
@@ -179,7 +180,7 @@ def calcola_scaglioni_interi(pz_start, passo, size_unit, delta_tot):
 
 def scrivi_json_sicuro(path, dati):
     try:
-        tmp = f"{path}.tmp.{os.getpid()}"
+        tmp = f"{path}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(dati, f, indent=4)
         os.replace(tmp, path)
