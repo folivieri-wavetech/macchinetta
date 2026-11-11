@@ -1705,10 +1705,10 @@ st.markdown("""
             }
             /* Bottoni Selezione Conto Sidebar */
             section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-                padding: 2px 6px !important;
+                padding: 4px 6px !important;
                 font-size: 0.72rem !important;
-                min-height: 28px !important;
-                height: 28px !important;
+                min-height: 52px !important;
+                height: auto !important;
             }
             section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
                 font-size: 0.72rem !important;
@@ -2662,6 +2662,14 @@ else:
                 except Exception:
                     return ":gray[0,00 €]"
 
+            def get_disp_tag_conto(st_acc):
+                try:
+                    disp_raw = st_acc.get('disponibile', 0.0)
+                    disp_num = float(disp_raw) if disp_raw not in (None, "") else 0.0
+                    return f"⚪ Disp : {formatta_eur(disp_num)} €"
+                except Exception:
+                    return "⚪ Disp : 0,00 €"
+
             vista_side = st.session_state.get("vista_sidebar", "CONTO")
             if conti_demo:
                 st.markdown("<p style='font-size: 0.78rem; font-weight: 700; color: #38bdf8; margin: 8px 0 4px 0; letter-spacing: 0.8px;'>🔵 CONTI DEMO</p>", unsafe_allow_html=True)
@@ -2671,10 +2679,11 @@ else:
                     cap_cd = formatta_eur(st_cd.get('saldo', '0'))
                     dd_cd = get_dd_tag_conto(st_cd)
                     marg_cd = get_margine_tag_conto(st_cd)
+                    disp_cd = get_disp_tag_conto(st_cd)
                     is_sel = (cd == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
-                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}\n\n\u200b {marg_cd}"
+                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}\n\n{disp_cd} {marg_cd}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cd
                         st.session_state.vista_sidebar = "CONTO"
@@ -2689,10 +2698,11 @@ else:
                     cap_cr = formatta_eur(st_cr.get('saldo', '0'))
                     dd_cr = get_dd_tag_conto(st_cr)
                     marg_cr = get_margine_tag_conto(st_cr)
+                    disp_cr = get_disp_tag_conto(st_cr)
                     is_sel = (cr == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cr, st_cr)
                     salute = get_stato_salute(cr)
-                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}\n\n\u200b {marg_cr}"
+                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}\n\n{disp_cr} {marg_cr}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cr
                         st.session_state.vista_sidebar = "CONTO"
