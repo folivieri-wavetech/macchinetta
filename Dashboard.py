@@ -1563,11 +1563,18 @@ st.markdown("""
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(33, 195, 84)"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="color: rgb(9, 171, 59)"],
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="green"],
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(33, 195, 84)"],
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(9, 171, 59)"],
-        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="green"] {
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="green"] {
             color: #22c55e !important;
+        }
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) > span:first-of-type,
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(33, 195, 84)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color:rgb(33, 195, 84)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color: rgb(9, 171, 59)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="color:rgb(9, 171, 59)"],
+        section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="green"] {
+            color: #00E676 !important;
+            font-weight: normal !important;
+            margin-left: 0 !important;
         }
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(2) span[style*="gray"],
         section[data-testid="stSidebar"] div[data-testid="stButton"] > button p:nth-child(3) span[style*="gray"] {
@@ -2666,9 +2673,9 @@ else:
                 try:
                     disp_raw = st_acc.get('disponibile', 0.0)
                     disp_num = float(disp_raw) if disp_raw not in (None, "") else 0.0
-                    return f"⚪ Disp : {formatta_eur(disp_num)} €"
+                    return f"⚪ Disp : :green[{formatta_eur(disp_num)} €]"
                 except Exception:
-                    return "⚪ Disp : 0,00 €"
+                    return "⚪ Disp : :green[0,00 €]"
 
             vista_side = st.session_state.get("vista_sidebar", "CONTO")
             if conti_demo:
