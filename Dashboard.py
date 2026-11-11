@@ -2624,7 +2624,7 @@ else:
 
             def get_stato_salute(acc):
                 path_memoria = os.path.join(acc, FILE_MEMORIA)
-                if not os.path.exists(path_memoria): return "⚪"
+                if not os.path.exists(path_memoria): return ""
                 try:
                     with open(path_memoria, "r", encoding="utf-8") as f:
                         memoria = json.load(f)
@@ -2641,9 +2641,9 @@ else:
                             
                         if emergenza: return "🔴"
                         if dati.get("alert_falso_allarme"): has_yellow = True
-                    return "🟡" if has_yellow else "🟢"
+                    return "🟡" if has_yellow else ""
                 except:
-                    return "🟢"
+                    return ""
 
             def get_dd_tag_conto(st_acc):
                 try:
@@ -2690,7 +2690,8 @@ else:
                     is_sel = (cd == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cd, st_cd)
                     salute = get_stato_salute(cd)
-                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn} {salute} {dd_cd}\n\n{disp_cd} {marg_cd}"
+                    salute_str = f" {salute}" if salute else ""
+                    label_cd = f"🔵 {nome_cd_clean} :blue[{cap_cd} €]\n\n{tempo_conn}{salute_str} {dd_cd}\n\n{disp_cd} {marg_cd}"
                     if st.button(label_cd, key=f"side_acc_{cd}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cd
                         st.session_state.vista_sidebar = "CONTO"
@@ -2709,7 +2710,8 @@ else:
                     is_sel = (cr == conto_attivo and vista_side == "CONTO")
                     tempo_conn = get_tempo_connessione(cr, st_cr)
                     salute = get_stato_salute(cr)
-                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn} {salute} {dd_cr}\n\n{disp_cr} {marg_cr}"
+                    salute_str = f" {salute}" if salute else ""
+                    label_cr = f"🟡 {nome_cr_clean} :orange[{cap_cr} €]\n\n{tempo_conn}{salute_str} {dd_cr}\n\n{disp_cr} {marg_cr}"
                     if st.button(label_cr, key=f"side_acc_{cr}", type="primary" if is_sel else "secondary", use_container_width=True):
                         st.session_state.conto_selezionato = cr
                         st.session_state.vista_sidebar = "CONTO"
