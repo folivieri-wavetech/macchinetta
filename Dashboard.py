@@ -2957,13 +2957,18 @@ else:
         st.stop()
 
     mostra_goldfinger = (conto_selezionato == "DANY_REALE")
+    mostra_ombra = (conto_selezionato in ("DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_DEMO"))
     tab_goldfinger = None
+    tab_ombra = None
     tab_hyper = None
 
     if is_regista:
         if mostra_goldfinger:
             tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
             tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+        elif mostra_ombra:
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "👤 Ombra", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_ombra, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
         else:
             tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
             tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
@@ -2971,6 +2976,9 @@ else:
         if mostra_goldfinger:
             tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
             tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
+        elif mostra_ombra:
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "👤 Ombra", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_ombra, tab_report = tabs
         else:
             tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
             tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
@@ -5052,6 +5060,300 @@ else:
                 goldfinger_tab.renderizza_tab_goldfinger(conto=conto_selezionato)
             except Exception as e_gf:
                 st.error(f"Errore caricamento Goldfinger: {e_gf}")
+
+    if tab_ombra is not None:
+        with tab_ombra:
+            @st.fragment(run_every=15)
+            def renderizza_tab_ombra():
+                from macchinetta_trend.ombra_manager import (
+                    CONTI_OMBRA_ABILITATI,
+                    carica_ombra,
+                    crea_operazione_ombra,
+                    chiudi_ombra_su_storico,
+                    elimina_storico_ombra,
+                    calcola_pnl_eur_ombra,
+                    calcola_margine_ombra,
+                )
+
+                if conto_selezionato not in CONTI_OMBRA_ABILITATI:
+                    st.warning("La sezione Ombra è disponibile esclusivamente sui conti DEMO.")
+                    return
+
+                st.markdown("<h2 style='text-align: center; color: #C084FC;'>👤 Gestione Trend Ombra (Demo Isolata)</h2>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<p style='text-align: center; color: #9CA3AF; font-size: 0.88rem;'>"
+                    f"Conto attivo: <b>{conto_selezionato}</b> — Simulazione live Trend (KJ55 / TK21) senza interazioni IG. "
+                    f"P/L e Margine Ombra sono isolati e visibili solo in questa scheda.</p>",
+                    unsafe_allow_html=True,
+                )
+
+                stato_sys = leggi_stato_sistema(conto_selezionato) or {}
+                prezzi_live = stato_sys.get("prezzi_live", {})
+                ombra_data = carica_ombra(conto_selezionato)
+                attive = ombra_data.get("attive", {})
+                chiuse = ombra_data.get("chiuse", [])
+
+                # Calcolo KPI complessivi Ombra (solo interni alla scheda)
+                tot_margine_ombra = 0.0
+                tot_pnl_live_ombra = 0.0
+                dettagli_attive = {}
+
+                for oid, camp in attive.items():
+                    nome = camp.get("nome", "")
+                    live_px = prezzi_live.get(nome)
+                    ref_px = float(live_px) if live_px is not None else float(camp.get("entry_price", 0) or 0)
+                    direz = camp.get("direzione", "LONG")
+                    sz_core = float(camp.get("size", 0) or 0)
+                    entry_core = float(camp.get("entry_price", 0) or 0)
+
+                    pnl_core_eur = calcola_pnl_eur_ombra(
+                        nome, direz, entry_core, ref_px, sz_core,
+                        prezzi_live, CONFIG_STRUMENTI, get_eur_rate
+                    )
+
+                    pnl_inc_float = 0.0
+                    incr_rows = []
+                    for inc in camp.get("posizioni_incr", []):
+                        inc_entry = float(inc.get("entry", 0) or 0)
+                        inc_sz = float(inc.get("size", 0) or 0)
+                        inc_dir = inc.get("direction", direz)
+                        inc_pnl = calcola_pnl_eur_ombra(
+                            nome, inc_dir, inc_entry, ref_px, inc_sz,
+                            prezzi_live, CONFIG_STRUMENTI, get_eur_rate
+                        )
+                        pnl_inc_float += inc_pnl
+                        incr_rows.append({**inc, "pnl_eur": inc_pnl})
+
+                    pnl_inc_real = float(camp.get("pnl_realizzato_inc_eur", 0) or 0)
+                    pnl_tot_camp = round(pnl_core_eur + pnl_inc_float + pnl_inc_real, 2)
+                    marg_camp = calcola_margine_ombra(camp, CONFIG_STRUMENTI)
+
+                    tot_margine_ombra += marg_camp
+                    tot_pnl_live_ombra += pnl_tot_camp
+
+                    dettagli_attive[oid] = {
+                        "live_px": live_px,
+                        "ref_px": ref_px,
+                        "pnl_core_eur": round(pnl_core_eur, 2),
+                        "pnl_inc_float_eur": round(pnl_inc_float, 2),
+                        "pnl_inc_real_eur": round(pnl_inc_real, 2),
+                        "pnl_tot_eur": pnl_tot_camp,
+                        "margine_eur": round(marg_camp, 2),
+                        "incr_rows": incr_rows,
+                    }
+
+                tot_pnl_storico = round(sum(float(c.get("pnl_totale_eur", 0) or 0) for c in chiuse), 2)
+
+                k1, k2, k3, k4 = st.columns(4)
+                k1.metric("👤 Campagne Ombra Attive", f"{len(attive)}")
+                k2.metric("🏦 Margine Ombra Usato", f"{formatta_eur(tot_margine_ombra)} €")
+                k3.metric("💹 P/L Ombra Live Attive", f"{'+' if tot_pnl_live_ombra > 0 else ''}{formatta_eur(tot_pnl_live_ombra)} €")
+                k4.metric("📜 P/L Storico Ombra", f"{'+' if tot_pnl_storico > 0 else ''}{formatta_eur(tot_pnl_storico)} €")
+
+                st.markdown("---")
+
+                # Modulo inserimento nuova operazione Core Ombra
+                with st.expander("➕ Inserisci Nuova Posizione Core Ombra", expanded=(len(attive) == 0)):
+                    strumenti_disp = list(CONFIG_STRUMENTI.keys())
+                    tf_mappa = {"H1": "HOUR", "H4": "HOUR_4", "Daily": "DAY"}
+
+                    c_f1, c_f2, c_f3 = st.columns(3)
+                    with c_f1:
+                        sel_strum = st.selectbox("Strumento", strumenti_disp, key=f"om_strum_{conto_selezionato}")
+                    with c_f2:
+                        sel_tf_lbl = st.selectbox("Timeframe", ["H1", "H4", "Daily"], key=f"om_tf_{conto_selezionato}")
+                    with c_f3:
+                        sel_dir = st.selectbox("Direzione", ["LONG", "SHORT"], key=f"om_dir_{conto_selezionato}")
+
+                    c_f4, c_f5, c_f6 = st.columns(3)
+                    with c_f4:
+                        val_size = st.number_input("Size Core", min_value=0.1, max_value=50.0, value=4.0, step=0.5, format="%.2f", key=f"om_size_{conto_selezionato}")
+                    with c_f5:
+                        val_prezzo_str = st.text_input("Prezzo Ingresso Core", value="", placeholder="Es. 1.0850 oppure 2650.5", key=f"om_px_{conto_selezionato}")
+                    with c_f6:
+                        d_col1, d_col2 = st.columns([1.4, 1.0])
+                        with d_col1:
+                            val_data = st.date_input("Data Inizio", value=now_it().date(), format="DD/MM/YYYY", key=f"om_data_{conto_selezionato}")
+                        with d_col2:
+                            val_ora = st.text_input("Ora (rif.)", value="09:00", key=f"om_ora_{conto_selezionato}")
+
+                    c_f7, c_f8, c_f9 = st.columns([1, 1, 2])
+                    with c_f7:
+                        val_size_max = st.number_input("Size Max Trend", min_value=1.0, max_value=100.0, value=10.0, step=1.0, format="%.1f", key=f"om_smax_{conto_selezionato}")
+                    with c_f8:
+                        val_scala = st.number_input("Scala Incr.", min_value=1, max_value=10, value=2, step=1, key=f"om_scala_{conto_selezionato}")
+                    with c_f9:
+                        st.markdown("<div style='height: 26px;'></div>", unsafe_allow_html=True)
+                        btn_avvia_ombra = st.button(
+                            "👤 Avvia Operazione Ombra",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=(not is_operativo),
+                            key=f"om_btn_avvia_{conto_selezionato}",
+                        )
+
+                    if btn_avvia_ombra:
+                        px_clean = str(val_prezzo_str or "").replace(",", ".").strip()
+                        try:
+                            px_num = float(px_clean)
+                        except ValueError:
+                            px_num = 0.0
+
+                        if px_num <= 0:
+                            st.error("Inserisci un Prezzo Ingresso Core numerico valido (> 0).")
+                        else:
+                            data_rif = f"{val_data.strftime('%Y-%m-%d')} {str(val_ora or '').strip()}".strip()
+                            crea_operazione_ombra(
+                                conto=conto_selezionato,
+                                nome=sel_strum,
+                                timeframe=tf_mappa[sel_tf_lbl],
+                                direzione=sel_dir,
+                                size=float(val_size),
+                                entry_price=px_num,
+                                data_inizio_str=data_rif,
+                                size_max=float(val_size_max),
+                                scala=int(val_scala),
+                                min_body=10,
+                            )
+                            st.success(f"Operazione Ombra {sel_strum} ({sel_tf_lbl}) {sel_dir} @ {px_num} avviata su {conto_selezionato}.")
+                            st.rerun()
+
+                # Elenco Campagne Ombra Attive
+                if not attive:
+                    st.info("Nessuna operazione Ombra attiva al momento su questo conto Demo.")
+                else:
+                    st.markdown("### 👤 Posizioni Ombra Attive")
+                    for oid, camp in attive.items():
+                        nome = camp.get("nome", "")
+                        tf_val = camp.get("timeframe", "HOUR")
+                        tf_lbl = "H1" if tf_val == "HOUR" else ("H4" if tf_val == "HOUR_4" else "Daily")
+                        direz = camp.get("direzione", "LONG")
+                        dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
+                        entry_core = float(camp.get("entry_price", 0) or 0)
+                        sz_core = float(camp.get("size", 0) or 0)
+                        data_in = camp.get("data_inizio", "-")
+                        det = dettagli_attive[oid]
+                        live_px = det["live_px"]
+                        pnl_core = det["pnl_core_eur"]
+                        pnl_inc_fl = det["pnl_inc_float_eur"]
+                        pnl_inc_rl = det["pnl_inc_real_eur"]
+                        pnl_tot = det["pnl_tot_eur"]
+                        marg_c = det["margine_eur"]
+
+                        dir_color = "#22C55E" if direz == "LONG" else "#EF4444"
+                        tot_color = "#22C55E" if pnl_tot >= 0 else "#EF4444"
+                        live_str = f"{float(live_px):.{dec}f}" if live_px is not None else "N/D"
+                        tk_v = camp.get("current_tk")
+                        kj_v = camp.get("current_kj")
+                        tk_str = f"{float(tk_v):.{dec}f}" if tk_v is not None else "N/D"
+                        kj_str = f"{float(kj_v):.{dec}f}" if kj_v is not None else "N/D"
+
+                        with st.container(border=True):
+                            h_col1, h_col2 = st.columns([3.2, 1.3])
+                            with h_col1:
+                                st.markdown(
+                                    formatta_titolo_con_bandiere_orizzontale(
+                                        nome,
+                                        f"[{tf_lbl}] • <span style='color:{dir_color};'>{direz}</span> • Core {sz_core:g} • Rif. {data_in} • ID {oid}",
+                                    ),
+                                    unsafe_allow_html=True,
+                                )
+                            with h_col2:
+                                st.markdown(
+                                    f"<div style='text-align:right; font-size:1.25rem; font-weight:bold; color:{tot_color};'>"
+                                    f"Tot: {'+' if pnl_tot > 0 else ''}{formatta_eur(pnl_tot)} €"
+                                    f"</div>"
+                                    f"<div style='text-align:right; font-size:0.82rem; color:#9CA3AF;'>Margine Ombra: {formatta_eur(marg_c)} €</div>",
+                                    unsafe_allow_html=True,
+                                )
+
+                            m1, m2, m3, m4, m5 = st.columns(5)
+                            m1.metric("Entry Core", f"{entry_core:.{dec}f}")
+                            m2.metric("Prezzo Live", live_str)
+                            m3.metric("P/L Core", f"{'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} €")
+                            m4.metric("P/L Incr (Real + Float)", f"{'+' if (pnl_inc_rl + pnl_inc_fl) > 0 else ''}{formatta_eur(pnl_inc_rl + pnl_inc_fl)} €")
+                            m5.metric("TK21 / KJ55", f"{tk_str} / {kj_str}")
+
+                            sig_msgs = []
+                            if camp.get("signal_candle_active") and camp.get("signal_stop_price") is not None:
+                                sig_msgs.append(f"🔔 Candela Segnale KJ55 attiva (Stop Core: {float(camp['signal_stop_price']):.{dec}f})")
+                            if camp.get("signal_candle_tk_active") and camp.get("signal_stop_price_tk") is not None:
+                                sig_msgs.append(f"🔔 Candela Segnale TK21 attiva (Stop Incr: {float(camp['signal_stop_price_tk']):.{dec}f})")
+                            if sig_msgs:
+                                st.warning(" | ".join(sig_msgs))
+
+                            incr_rows = det["incr_rows"]
+                            if incr_rows:
+                                st.markdown(f"**Incrementi Ombra Aperti ({len(incr_rows)}):**")
+                                df_inc = pd.DataFrame([
+                                    {
+                                        "Ticket": r.get("ticket", ""),
+                                        "Dir": r.get("direction", direz),
+                                        "Size": r.get("size", 0),
+                                        "Entry": f"{float(r.get('entry', 0)):.{dec}f}",
+                                        "BE": "✅" if r.get("be_active") else "—",
+                                        "SL": f"{float(r['sl_price']):.{dec}f}" if r.get("sl_price") is not None else "—",
+                                        "P/L €": f"{'+' if r['pnl_eur'] > 0 else ''}{formatta_eur(r['pnl_eur'])} €",
+                                    }
+                                    for r in incr_rows
+                                ])
+                                st.dataframe(df_inc, use_container_width=True, hide_index=True)
+
+                            act_c1, act_c2 = st.columns([3.5, 1.2])
+                            with act_c1:
+                                with st.expander(f"📋 Log Eventi Ombra ({len(camp.get('storico', []))})", expanded=False):
+                                    for r_log in reversed(camp.get("storico", [])[-15:]):
+                                        st.text(r_log)
+                            with act_c2:
+                                if st.button(
+                                    "🛑 Chiudi Ombra Ora",
+                                    key=f"om_close_{conto_selezionato}_{oid}",
+                                    use_container_width=True,
+                                    disabled=(not is_operativo),
+                                ):
+                                    chiudi_ombra_su_storico(
+                                        conto=conto_selezionato,
+                                        oid=oid,
+                                        close_price=det["ref_px"],
+                                        motivo="Chiusura Manuale Ombra",
+                                        prezzi_live=prezzi_live,
+                                        config_strumenti=CONFIG_STRUMENTI,
+                                        get_eur_rate_fn=get_eur_rate,
+                                    )
+                                    st.success(f"Operazione Ombra {oid} spostata nello storico chiuso.")
+                                    st.rerun()
+
+                # Storico Ombra Chiuse
+                if chiuse:
+                    st.markdown("---")
+                    st.markdown(f"### 📜 Storico Operazioni Ombra Chiuse ({len(chiuse)})")
+                    righe_storico = []
+                    for c_old in chiuse:
+                        dec_o = CONFIG_STRUMENTI.get(c_old.get("nome", ""), {}).get("decimali", 2)
+                        tf_o = c_old.get("timeframe", "HOUR")
+                        tf_o_lbl = "H1" if tf_o == "HOUR" else ("H4" if tf_o == "HOUR_4" else "Daily")
+                        righe_storico.append({
+                            "ID": c_old.get("id", ""),
+                            "Strumento": c_old.get("nome", ""),
+                            "TF": tf_o_lbl,
+                            "Dir": c_old.get("direzione", ""),
+                            "Size": c_old.get("size", 0),
+                            "Data Inizio": c_old.get("data_inizio", ""),
+                            "Data Chiusura": c_old.get("data_chiusura", ""),
+                            "Entry": f"{float(c_old.get('entry_price', 0)):.{dec_o}f}",
+                            "Close": f"{float(c_old.get('close_price', 0)):.{dec_o}f}",
+                            "Motivo": c_old.get("motivo_chiusura", ""),
+                            "P/L Core €": f"{float(c_old.get('pnl_core_eur', 0)):+.2f}",
+                            "P/L Incr €": f"{float(c_old.get('pnl_inc_eur', 0)):+.2f}",
+                            "Totale €": f"{float(c_old.get('pnl_totale_eur', 0)):+.2f}",
+                        })
+                    st.dataframe(pd.DataFrame(righe_storico), use_container_width=True, hide_index=True)
+
+                    if st.button("🗑️ Svuota Storico Ombra", key=f"om_clear_hist_{conto_selezionato}", disabled=(not is_operativo)):
+                        elimina_storico_ombra(conto_selezionato)
+                        st.rerun()
+
+            renderizza_tab_ombra()
 
     if tab_posizioni is not None:
         with tab_posizioni:

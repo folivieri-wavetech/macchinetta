@@ -29,6 +29,11 @@ from dotenv import dotenv_values
 
 from macchinetta_trend.core_engine import CoreEngine, Candle
 from macchinetta_trend.position_manager import PositionManager, Position
+from macchinetta_trend.ombra_manager import (
+    carica_ombra,
+    salva_ombra,
+    chiudi_ombra_su_storico
+)
 from trend_deals_manager import (
     registra_deal_trend,
     rimuovi_deal_trend,
@@ -2241,6 +2246,290 @@ def is_weekend_active():
         return True
     return False
 
+OMBRA_ENGINES = {}
+
+def _ombra_pnl_eur(camp, raw_diff, prezzi_live):
+    nome = camp.get("nome", "")
+    c_cfg = CONFIG_STRUMENTI.get(nome, {})
+    mult = float(c_cfg.get("moltiplicatore", 1) or 1)
+    valore_punto = float(c_cfg.get("valore_punto", 1) or 1)
+    valuta_c = c_cfg.get("valuta", "EUR")
+    rate = float(get_eur_rate(valuta_c, prezzi_live) or 1.0)
+    return round((float(raw_diff or 0) / mult) * valore_punto * rate, 2)
+
+
+def _formatta_motivo_chiusura_ombra(r_reason: str) -> str:
+    r = str(r_reason or "")
+    if "live_stop_kj_break_min" in r:
+        return "Stop KJ55 (Break Min -5p)"
+    if "live_stop_kj_break_max" in r:
+        return "Stop KJ55 (Break Max +5p)"
+    if "live_stop_kj" in r:
+        return "Paracadute KJ55"
+    if "tp_kj_extension" in r:
+        return "TP Estensione KJ55"
+    return "Stop KJ55"
+
+
+def processa_eventi_ombra(oid, camp, engine, events, prezzi_live, dec, tf):
+    """Elabora gli eventi CoreEngine di una campagna Ombra senza alcuna chiamata IG."""
+    nome = camp.get("nome", "")
+    ora_str = now_it().strftime("%d/%m %H:%M:%S")
+    tf_label = format_tf_label(tf)
+    storico = camp.setdefault("storico", [])
+
+    core_closed_ev = None
+    core_pnl_eur = 0.0
+    core_close_px = None
+    rev_reason = ""
+
+    for ev in (events or []):
+        tipo = ev.get("type")
+        if tipo == "increment_opened":
+            dir_incr = ev.get("direction", camp.get("direzione", "LONG"))
+            pos = ev.get("position")
+            if pos is not None:
+                pos.ticket = f"{oid}_INC_{uuid.uuid4().hex[:6].upper()}"
+                msg = f"➕ Ombra Open Incr {dir_incr} ({pos.size:g}) @ {pos.entry_price:.{dec}f}"
+                storico.append(f"[{ora_str}] {msg}")
+                print_log(nome, f"[OMBRA {tf_label}] {msg}")
+        elif tipo == "increment_be_activated":
+            sl_p = ev.get("sl_price", 0)
+            sz_i = ev.get("size", "")
+            msg = f"🛡️ Ombra BE Incr ({sz_i}) -> SL {sl_p:.{dec}f}"
+            storico.append(f"[{ora_str}] {msg}")
+            print_log(nome, f"[OMBRA {tf_label}] {msg}")
+        elif tipo in ("tp_increment", "fifo_close", "increment_closed"):
+            pnl_eur = _ombra_pnl_eur(camp, ev.get("pnl", 0), prezzi_live)
+            camp["pnl_realizzato_inc_eur"] = round(float(camp.get("pnl_realizzato_inc_eur", 0) or 0) + pnl_eur, 2)
+            close_px = ev.get("price") or ev.get("exit_price") or prezzi_live.get(nome)
+            px_str = f" @ {float(close_px):.{dec}f}" if isinstance(close_px, (int, float)) else ""
+            sz_i = ev.get("size", "")
+            r_inc = ev.get("reason", "")
+            if tipo == "tp_increment":
+                tag = f"🎯 Ombra TP Incr (+{ev.get('tp_pips', 0)}p)"
+            elif r_inc == "bancomat":
+                tag = "💰 Ombra Bancomat"
+            elif tipo == "fifo_close":
+                tag = "➖ Ombra FIFO Incr"
+            elif r_inc == "be_increment":
+                tag = "🛡️ Ombra BE Incr"
+            elif r_inc == "trailing_increment":
+                tag = "🎯 Ombra Trail Incr"
+            else:
+                tag = "🛑 Ombra Close Incr"
+            msg = f"{tag} ({sz_i}){px_str} [{pnl_eur:+.2f} €]"
+            storico.append(f"[{ora_str}] {msg}")
+            print_log(nome, f"[OMBRA {tf_label}] {msg}")
+        elif tipo == "signal_candle_kj":
+            msg = f"🔔 Ombra Candela Segnale KJ55 -> Stop {float(ev.get('stop_price', 0)):.{dec}f}"
+            storico.append(f"[{ora_str}] {msg}")
+            print_log(nome, f"[OMBRA {tf_label}] {msg}")
+        elif tipo == "signal_candle_tk":
+            msg = f"🔔 Ombra Candela Segnale TK21 -> Stop {float(ev.get('stop_price', 0)):.{dec}f}"
+            storico.append(f"[{ora_str}] {msg}")
+            print_log(nome, f"[OMBRA {tf_label}] {msg}")
+        elif tipo == "core_closed":
+            core_closed_ev = ev
+            core_pnl_eur = _ombra_pnl_eur(camp, ev.get("pnl", 0), prezzi_live)
+            core_close_px = ev.get("price") or ev.get("exit_price") or prezzi_live.get(nome) or camp.get("entry_price")
+        elif tipo == "reversal":
+            rev_reason = ev.get("reason", rev_reason)
+
+    camp["posizioni_core"] = [engine.pm.core_position.to_dict()] if engine.pm.core_position else []
+    camp["posizioni_incr"] = [p.to_dict() for p in engine.pm.increments]
+    camp["current_tk"] = engine.current_tk
+    camp["current_kj"] = engine.current_kj
+    camp["trailing_sl_incr"] = engine.trailing_sl_incr
+    camp["trailing_sl_core"] = engine.trailing_sl_core
+    camp["signal_candle_active"] = bool(engine.signal_candle_active)
+    camp["signal_stop_price"] = engine.signal_stop_price
+    camp["signal_candle_tk_active"] = bool(engine.signal_candle_tk_active)
+    camp["signal_stop_price_tk"] = engine.signal_stop_price_tk
+    camp["storico"] = storico[-80:]
+
+    return (core_closed_ev is not None), core_close_px, rev_reason, core_pnl_eur
+
+
+def esegui_ciclo_ombra(prezzi_live, candele_appena_chiuse):
+    """Gestisce tutte le campagne Trend Ombra attive sui conti DEMO a zero chiamate IG."""
+    if "_REALE" in NOME_CONTO.upper():
+        return
+
+    ombra_data = carica_ombra(NOME_CONTO)
+    attive = ombra_data.get("attive", {})
+
+    for old_oid in list(OMBRA_ENGINES.keys()):
+        if old_oid not in attive:
+            OMBRA_ENGINES.pop(old_oid, None)
+
+    if not attive:
+        return
+
+    in_rollover = is_rollover_active()
+
+    for oid, camp in list(attive.items()):
+        nome = camp.get("nome", "")
+        if nome not in CONFIG_STRUMENTI:
+            continue
+
+        tf = camp.get("timeframe", "HOUR")
+        dec = CONFIG_STRUMENTI[nome]["decimali"]
+        pip_val = CONFIG_STRUMENTI[nome]["moltiplicatore"]
+        size_i = float(camp.get("size", 1.0) or 1.0)
+        size_max = float(camp.get("size_max", 10.0) or 10.0)
+        scala = int(camp.get("scala", 2) or 2)
+        min_body = int(camp.get("min_body", 10) or 10)
+        direzione = camp.get("direzione", "LONG")
+
+        if oid not in OMBRA_ENGINES:
+            cfg = {
+                "nome": nome,
+                "size_i": size_i,
+                "size_max": size_max,
+                "scala": scala,
+                "timeframe": tf,
+                "tk_periods": 21,
+                "kj_periods": 55,
+                "min_body": min_body,
+                "pip_value": pip_val,
+                "max_kj_distance": 30.0,
+                "max_entry_delay": 5,
+                "auto_restart": False,
+                "tp_kj_distance_h1": CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 100)
+            }
+            OMBRA_ENGINES[oid] = CoreEngine(cfg)
+        else:
+            OMBRA_ENGINES[oid].config.update({
+                "nome": nome,
+                "size_i": size_i,
+                "size_max": size_max,
+                "scala": scala,
+                "timeframe": tf,
+                "min_body": min_body,
+                "pip_value": pip_val,
+                "auto_restart": False,
+                "tp_kj_distance_h1": CONFIG_STRUMENTI[nome].get("tp_kj_distance_h1", 100)
+            })
+
+        engine = OMBRA_ENGINES[oid]
+
+        if not engine.is_running:
+            pos_core = camp.get("posizioni_core", [])
+            pos_incr = camp.get("posizioni_incr", [])
+            if not pos_core:
+                continue
+            engine.is_running = True
+            engine.current_direction = direzione
+            for c_d in pos_core:
+                p_c = engine.pm.open_core(c_d.get("entry", camp.get("entry_price", 0)), c_d.get("size", size_i), c_d.get("direction", direzione))
+                p_c.ticket = c_d.get("ticket", f"{oid}_CORE")
+                p_c.opened_at = c_d.get("opened_at", camp.get("created_ts", 0))
+            for i_d in pos_incr:
+                engine.pm.open_increment(
+                    i_d.get("entry", 0),
+                    i_d.get("size", 1),
+                    i_d.get("direction", direzione),
+                    ticket=i_d.get("ticket"),
+                    highest_price=i_d.get("highest_price"),
+                    lowest_price=i_d.get("lowest_price"),
+                    be_active=i_d.get("be_active", False),
+                    sl_price=i_d.get("sl_price")
+                )
+            engine.trailing_sl_incr = camp.get("trailing_sl_incr")
+            engine.trailing_sl_core = camp.get("trailing_sl_core")
+            engine.signal_candle_active = camp.get("signal_candle_active", False)
+            engine.signal_stop_price = camp.get("signal_stop_price")
+            engine.signal_candle_tk_active = camp.get("signal_candle_tk_active", False)
+            engine.signal_stop_price_tk = camp.get("signal_stop_price_tk")
+            engine.current_tk = camp.get("current_tk")
+            engine.current_kj = camp.get("current_kj")
+
+        changed = False
+        if not engine.candles:
+            c_loc = carica_candele_locali(nome, tf)
+            if c_loc:
+                c_objs = []
+                for rc in c_loc[-100:]:
+                    try:
+                        o_p = (float(rc["openPrice"]["bid"]) + float(rc["openPrice"]["ask"])) / 2.0
+                        h_p = (float(rc["highPrice"]["bid"]) + float(rc["highPrice"]["ask"])) / 2.0
+                        l_p = (float(rc["lowPrice"]["bid"]) + float(rc["lowPrice"]["ask"])) / 2.0
+                        cl_p = (float(rc["closePrice"]["bid"]) + float(rc["closePrice"]["ask"])) / 2.0
+                        c_objs.append(Candle(o_p, h_p, l_p, cl_p))
+                    except Exception:
+                        pass
+                if c_objs:
+                    engine.seed_history(c_objs)
+                    if engine.current_tk is None:
+                        engine.current_tk = engine._calculate_donchian(21)
+                    if engine.current_kj is None:
+                        engine.current_kj = engine._calculate_donchian(55)
+                    if camp.get("current_tk") != engine.current_tk or camp.get("current_kj") != engine.current_kj:
+                        camp["current_tk"] = engine.current_tk
+                        camp["current_kj"] = engine.current_kj
+                        changed = True
+
+        live_px = prezzi_live.get(nome)
+
+        # FASE 1: Controlli live intracandela (Paracadute KJ55 / TK21, Candela Segnale, TP/BE/Trail incrementi)
+        if live_px is not None and not in_rollover and engine.current_tk is not None and engine.current_kj is not None:
+            prev_inc_state = [(p.be_active, p.sl_price) for p in engine.pm.increments]
+            ev_live = engine.check_live_stops(float(live_px))
+            new_inc_state = [(p.be_active, p.sl_price) for p in engine.pm.increments]
+            if ev_live or new_inc_state != prev_inc_state:
+                closed_core, close_px, rev_reason, core_pnl_eur = processa_eventi_ombra(oid, camp, engine, ev_live, prezzi_live, dec, tf)
+                changed = True
+                if closed_core:
+                    motivo = _formatta_motivo_chiusura_ombra(rev_reason)
+                    chiudi_ombra_su_storico(
+                        NOME_CONTO, oid, close_px, motivo, prezzi_live,
+                        CONFIG_STRUMENTI, get_eur_rate,
+                        pnl_core_override=core_pnl_eur, updated_campagna=camp
+                    )
+                    print_log(nome, f"[OMBRA {format_tf_label(tf)}] 🛑 Chiusa Core ({motivo}) @ {float(close_px):.{dec}f} [{core_pnl_eur:+.2f} €]")
+                    OMBRA_ENGINES.pop(oid, None)
+                    continue
+
+        # FASE 2: Chiusura candela del Timeframe configurato
+        c_key = (nome, tf)
+        closed_c = candele_appena_chiuse.get(c_key) if candele_appena_chiuse else None
+        if closed_c and not in_rollover:
+            c_time = str(closed_c.get("snapshotTime", ""))
+            if c_time and c_time != camp.get("last_candle_time", ""):
+                try:
+                    o_p = (float(closed_c["openPrice"]["bid"]) + float(closed_c["openPrice"]["ask"])) / 2.0
+                    h_p = (float(closed_c["highPrice"]["bid"]) + float(closed_c["highPrice"]["ask"])) / 2.0
+                    l_p = (float(closed_c["lowPrice"]["bid"]) + float(closed_c["lowPrice"]["ask"])) / 2.0
+                    cl_p = (float(closed_c["closePrice"]["bid"]) + float(closed_c["closePrice"]["ask"])) / 2.0
+                    c_obj = Candle(o_p, h_p, l_p, cl_p)
+                    camp["last_candle_time"] = c_time
+                    next_open = float(live_px) if live_px is not None else cl_p
+                    ev_close = engine.on_candle_close(c_obj, next_open_price=next_open)
+                    closed_core, close_px, rev_reason, core_pnl_eur = processa_eventi_ombra(oid, camp, engine, ev_close, prezzi_live, dec, tf)
+                    changed = True
+                    if closed_core:
+                        motivo = _formatta_motivo_chiusura_ombra(rev_reason)
+                        chiudi_ombra_su_storico(
+                            NOME_CONTO, oid, close_px, motivo, prezzi_live,
+                            CONFIG_STRUMENTI, get_eur_rate,
+                            pnl_core_override=core_pnl_eur, updated_campagna=camp
+                        )
+                        print_log(nome, f"[OMBRA {format_tf_label(tf)}] 🛑 Chiusa Core ({motivo}) @ {float(close_px):.{dec}f} [{core_pnl_eur:+.2f} €]")
+                        OMBRA_ENGINES.pop(oid, None)
+                        continue
+                except Exception as e_om:
+                    print_log(nome, f"⚠️ Errore ciclo candela Ombra {oid}: {e_om}")
+
+        if changed:
+            fresh_data = carica_ombra(NOME_CONTO)
+            if oid in fresh_data.get("attive", {}):
+                fresh_data["attive"][oid] = camp
+                salva_ombra(NOME_CONTO, fresh_data)
+            else:
+                OMBRA_ENGINES.pop(oid, None)
+
+
 LAST_FETCH_BOUNDARY = {}
 
 def esegui_ciclo_trend():
@@ -2303,6 +2592,12 @@ def esegui_ciclo_trend():
         candele_appena_chiuse = aggiorna_candele_live_globale(prezzi_live)
     except Exception as e_cg:
         pass
+
+    # Gestione campagne Trend Ombra (solo conti DEMO, zero chiamate IG)
+    try:
+        esegui_ciclo_ombra(prezzi_live, candele_appena_chiuse)
+    except Exception as e_om_ciclo:
+        print_log("SISTEMA", f"⚠️ Errore esegui_ciclo_ombra: {e_om_ciclo}")
 
     headers = ottieni_headers_ig()
     if not headers:
