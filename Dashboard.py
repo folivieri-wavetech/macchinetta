@@ -5225,8 +5225,8 @@ else:
                     st.info("Nessuna operazione Ombra attiva al momento su questo conto Demo.")
                 else:
                     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-                    ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9 = st.columns(
-                        [1.7, 1.1, 1.1, 1.1, 1.1, 1.6, 1.3, 1.3, 1.2], vertical_alignment="center"
+                    ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8 = st.columns(
+                        [1.8, 1.2, 1.2, 1.2, 1.2, 1.7, 1.5, 1.2], vertical_alignment="center"
                     )
                     with ch1: st.markdown("<b style='color:#888; font-size:0.76rem;'>STRUMENTO / TF</b>", unsafe_allow_html=True)
                     with ch2: st.markdown("<b style='color:#888; font-size:0.76rem;'>DATA / ORA</b>", unsafe_allow_html=True)
@@ -5234,9 +5234,8 @@ else:
                     with ch4: st.markdown("<b style='color:#888; font-size:0.76rem;'>APERTURA</b>", unsafe_allow_html=True)
                     with ch5: st.markdown("<b style='color:#888; font-size:0.76rem;'>ULTIMO</b>", unsafe_allow_html=True)
                     with ch6: st.markdown("<b style='color:#888; font-size:0.76rem;'>KJ55 / TK21</b>", unsafe_allow_html=True)
-                    with ch7: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L CORE</b>", unsafe_allow_html=True)
-                    with ch8: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L TOTALE</b>", unsafe_allow_html=True)
-                    with ch9: st.markdown("<b style='color:#888; font-size:0.76rem; text-align:center;'>AZIONI</b>", unsafe_allow_html=True)
+                    with ch7: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L TOTALE</b>", unsafe_allow_html=True)
+                    with ch8: st.markdown("<b style='color:#888; font-size:0.76rem; text-align:center;'>AZIONI</b>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin-top:3px; margin-bottom:8px; border-top:1px solid rgba(255,255,255,0.12);'>", unsafe_allow_html=True)
 
                     for oid, camp in attive.items():
@@ -5259,9 +5258,15 @@ else:
                         det = dettagli_attive[oid]
                         live_px = det["live_px"]
                         pnl_core = det["pnl_core_eur"]
+                        pnl_inc_fl = det["pnl_inc_float_eur"]
+                        pnl_inc_rl = det["pnl_inc_real_eur"]
+                        pnl_inc_tot = round(pnl_inc_fl + pnl_inc_rl, 2)
                         pnl_tot = det["pnl_tot_eur"]
                         marg_c = det["margine_eur"]
                         incr_rows = det["incr_rows"]
+
+                        inc_sizes = [f"{float(r.get('size', 0)):g}" for r in incr_rows if float(r.get("size", 0) or 0) > 0]
+                        size_expr = "+".join([f"{sz_core:g}"] + inc_sizes)
 
                         tk_v = camp.get("current_tk")
                         kj_v = camp.get("current_kj")
@@ -5280,7 +5285,6 @@ else:
                         dir_col = "#4ade80" if direz == "LONG" else "#FA8072"
                         dir_tag = "🟢 LONG" if direz == "LONG" else "🔴 SHORT"
                         entry_col = "#4ade80" if direz == "LONG" else "#FA8072"
-                        core_col = "#4ade80" if pnl_core > 0 else ("#ff6b6b" if pnl_core < 0 else "#aaa")
                         tot_col = "#4ade80" if pnl_tot > 0 else ("#ff6b6b" if pnl_tot < 0 else "#aaa")
                         ora_lbl = f"Ore: {ora_riga2}" if ora_riga2 else "Ore: —"
 
@@ -5290,9 +5294,17 @@ else:
                         elif camp.get("signal_candle_tk_active") and camp.get("signal_stop_price_tk") is not None:
                             sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop TK: {float(camp['signal_stop_price_tk']):.{dec}f}</div>"
 
+                        sub_pnl_html = ""
+                        if incr_rows or abs(pnl_inc_tot) >= 0.01:
+                            sub_pnl_html = (
+                                f"<div style='font-size:0.72rem; color:#9CA3AF;'>"
+                                f"Core: {'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} € | "
+                                f"Incr: {'+' if pnl_inc_tot > 0 else ''}{formatta_eur(pnl_inc_tot)} €</div>"
+                            )
+
                         with st.container(border=True):
-                            rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8, rc9 = st.columns(
-                                [1.7, 1.1, 1.1, 1.1, 1.1, 1.6, 1.3, 1.3, 1.2], vertical_alignment="center"
+                            rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8 = st.columns(
+                                [1.8, 1.2, 1.2, 1.2, 1.2, 1.7, 1.5, 1.2], vertical_alignment="center"
                             )
                             with rc1:
                                 st.markdown(
@@ -5308,7 +5320,7 @@ else:
                             with rc3:
                                 st.markdown(
                                     f"<div style='color:{dir_col}; font-size:0.82rem; font-weight:bold;'>{dir_tag}</div>"
-                                    f"<div style='font-size:0.84rem; color:#eee; font-weight:600;'>Size = {sz_core:g}</div>",
+                                    f"<div style='font-size:0.84rem; color:#eee; font-weight:600;'>Size = {size_expr}</div>",
                                     unsafe_allow_html=True,
                                 )
                             with rc4:
@@ -5331,15 +5343,11 @@ else:
                                 )
                             with rc7:
                                 st.markdown(
-                                    f"<div style='font-size:0.98rem; font-weight:600; color:{core_col};'>{'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} €</div>",
+                                    f"<div style='font-size:1.05rem; font-weight:bold; color:{tot_col};'>{'+' if pnl_tot > 0 else ''}{formatta_eur(pnl_tot)} €</div>"
+                                    f"{sub_pnl_html}",
                                     unsafe_allow_html=True,
                                 )
                             with rc8:
-                                st.markdown(
-                                    f"<div style='font-size:1.05rem; font-weight:bold; color:{tot_col};'>{'+' if pnl_tot > 0 else ''}{formatta_eur(pnl_tot)} €</div>",
-                                    unsafe_allow_html=True,
-                                )
-                            with rc9:
                                 b_det, b_cls = st.columns(2)
                                 with b_det:
                                     with st.popover("📋", use_container_width=True):
