@@ -32,7 +32,8 @@ from macchinetta_trend.position_manager import PositionManager, Position
 from macchinetta_trend.ombra_manager import (
     carica_ombra,
     salva_ombra,
-    chiudi_ombra_su_storico
+    chiudi_ombra_su_storico,
+    calcola_tk_kj_locali_ombra
 )
 from trend_deals_manager import (
     registra_deal_trend,
@@ -2469,6 +2470,15 @@ def esegui_ciclo_ombra(prezzi_live, candele_appena_chiuse):
                         camp["current_tk"] = engine.current_tk
                         camp["current_kj"] = engine.current_kj
                         changed = True
+
+        if engine.current_tk is None or engine.current_kj is None:
+            tk_f, kj_f = calcola_tk_kj_locali_ombra(NOME_CONTO, nome, tf)
+            if tk_f is not None and kj_f is not None:
+                engine.current_tk = tk_f
+                engine.current_kj = kj_f
+                camp["current_tk"] = tk_f
+                camp["current_kj"] = kj_f
+                changed = True
 
         live_px = prezzi_live.get(nome)
 

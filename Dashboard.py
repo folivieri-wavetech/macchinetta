@@ -5068,11 +5068,13 @@ else:
                 from macchinetta_trend.ombra_manager import (
                     CONTI_OMBRA_ABILITATI,
                     carica_ombra,
+                    salva_ombra,
                     crea_operazione_ombra,
                     chiudi_ombra_su_storico,
                     elimina_storico_ombra,
                     calcola_pnl_eur_ombra,
                     calcola_margine_ombra,
+                    calcola_tk_kj_locali_ombra,
                 )
 
                 if conto_selezionato not in CONTI_OMBRA_ABILITATI:
@@ -5218,15 +5220,29 @@ else:
                             st.success(f"Operazione Ombra {sel_strum} ({sel_tf_lbl}) {sel_dir} @ {px_num} avviata su {conto_selezionato}.")
                             st.rerun()
 
-                # Elenco Campagne Ombra Attive
+                # Tabella riassuntiva compatta per righe e colonne delle Campagne Ombra Attive
                 if not attive:
                     st.info("Nessuna operazione Ombra attiva al momento su questo conto Demo.")
                 else:
-                    st.markdown("### 👤 Posizioni Ombra Attive")
+                    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+                    ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9 = st.columns(
+                        [1.8, 1.1, 1.1, 1.1, 1.6, 1.5, 1.2, 1.3, 1.2], vertical_alignment="center"
+                    )
+                    with ch1: st.markdown("<b style='color:#888; font-size:0.76rem;'>STRUMENTO / TF</b>", unsafe_allow_html=True)
+                    with ch2: st.markdown("<b style='color:#888; font-size:0.76rem;'>DIR / SIZE</b>", unsafe_allow_html=True)
+                    with ch3: st.markdown("<b style='color:#888; font-size:0.76rem;'>APERTURA</b>", unsafe_allow_html=True)
+                    with ch4: st.markdown("<b style='color:#888; font-size:0.76rem;'>ULTIMO</b>", unsafe_allow_html=True)
+                    with ch5: st.markdown("<b style='color:#888; font-size:0.76rem;'>TK21 / KJ55</b>", unsafe_allow_html=True)
+                    with ch6: st.markdown("<b style='color:#888; font-size:0.76rem;'>INCR. / MARG.</b>", unsafe_allow_html=True)
+                    with ch7: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L CORE</b>", unsafe_allow_html=True)
+                    with ch8: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L TOTALE</b>", unsafe_allow_html=True)
+                    with ch9: st.markdown("<b style='color:#888; font-size:0.76rem; text-align:center;'>AZIONI</b>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin-top:3px; margin-bottom:8px; border-top:1px solid rgba(255,255,255,0.12);'>", unsafe_allow_html=True)
+
                     for oid, camp in attive.items():
                         nome = camp.get("nome", "")
                         tf_val = camp.get("timeframe", "HOUR")
-                        tf_lbl = "H1" if tf_val == "HOUR" else ("H4" if tf_val == "HOUR_4" else "Daily")
+                        tf_lbl = "H1" if tf_val == "HOUR" else ("H4" if tf_val == "HOUR_4" else "D1")
                         direz = camp.get("direzione", "LONG")
                         dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                         entry_core = float(camp.get("entry_price", 0) or 0)
@@ -5237,91 +5253,120 @@ else:
                         pnl_core = det["pnl_core_eur"]
                         pnl_inc_fl = det["pnl_inc_float_eur"]
                         pnl_inc_rl = det["pnl_inc_real_eur"]
+                        pnl_inc_tot = round(pnl_inc_fl + pnl_inc_rl, 2)
                         pnl_tot = det["pnl_tot_eur"]
                         marg_c = det["margine_eur"]
+                        incr_rows = det["incr_rows"]
 
-                        dir_color = "#22C55E" if direz == "LONG" else "#EF4444"
-                        tot_color = "#22C55E" if pnl_tot >= 0 else "#EF4444"
-                        live_str = f"{float(live_px):.{dec}f}" if live_px is not None else "N/D"
                         tk_v = camp.get("current_tk")
                         kj_v = camp.get("current_kj")
+                        if tk_v is None or kj_v is None:
+                            tk_loc, kj_loc = calcola_tk_kj_locali_ombra(conto_selezionato, nome, tf_val)
+                            if tk_loc is not None and kj_loc is not None:
+                                tk_v, kj_v = tk_loc, kj_loc
+                                camp["current_tk"] = tk_v
+                                camp["current_kj"] = kj_v
+                                salva_ombra(conto_selezionato, ombra_data)
+
                         tk_str = f"{float(tk_v):.{dec}f}" if tk_v is not None else "N/D"
                         kj_str = f"{float(kj_v):.{dec}f}" if kj_v is not None else "N/D"
+                        live_str = f"{float(live_px):.{dec}f}" if live_px is not None else "N/D"
+
+                        dir_col = "#4ade80" if direz == "LONG" else "#ff6b6b"
+                        dir_tag = "🟢 LONG" if direz == "LONG" else "🔴 SHORT"
+                        core_col = "#4ade80" if pnl_core > 0 else ("#ff6b6b" if pnl_core < 0 else "#aaa")
+                        tot_col = "#4ade80" if pnl_tot > 0 else ("#ff6b6b" if pnl_tot < 0 else "#aaa")
+                        inc_col = "#4ade80" if pnl_inc_tot > 0 else ("#ff6b6b" if pnl_inc_tot < 0 else "#aaa")
+
+                        sig_badge = ""
+                        if camp.get("signal_candle_active") and camp.get("signal_stop_price") is not None:
+                            sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop KJ: {float(camp['signal_stop_price']):.{dec}f}</div>"
+                        elif camp.get("signal_candle_tk_active") and camp.get("signal_stop_price_tk") is not None:
+                            sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop TK: {float(camp['signal_stop_price_tk']):.{dec}f}</div>"
 
                         with st.container(border=True):
-                            h_col1, h_col2 = st.columns([3.2, 1.3])
-                            with h_col1:
+                            rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8, rc9 = st.columns(
+                                [1.8, 1.1, 1.1, 1.1, 1.6, 1.5, 1.2, 1.3, 1.2], vertical_alignment="center"
+                            )
+                            with rc1:
                                 st.markdown(
-                                    formatta_titolo_con_bandiere_orizzontale(
-                                        nome,
-                                        f"[{tf_lbl}] • <span style='color:{dir_color};'>{direz}</span> • Core {sz_core:g} • Rif. {data_in} • ID {oid}",
-                                    ),
+                                    f"<div style='font-size:0.95rem; font-weight:bold; color:#fff;'>{nome} <span style='color:#C084FC; font-size:0.80rem;'>[{tf_lbl}]</span></div>"
+                                    f"<div style='font-size:0.72rem; color:#888;'>Rif. {data_in}</div>",
                                     unsafe_allow_html=True,
                                 )
-                            with h_col2:
+                            with rc2:
                                 st.markdown(
-                                    f"<div style='text-align:right; font-size:1.25rem; font-weight:bold; color:{tot_color};'>"
-                                    f"Tot: {'+' if pnl_tot > 0 else ''}{formatta_eur(pnl_tot)} €"
-                                    f"</div>"
-                                    f"<div style='text-align:right; font-size:0.82rem; color:#9CA3AF;'>Margine Ombra: {formatta_eur(marg_c)} €</div>",
+                                    f"<div style='color:{dir_col}; font-size:0.82rem; font-weight:bold;'>{dir_tag}</div>"
+                                    f"<div style='font-size:0.85rem; color:#eee; font-weight:600;'>{sz_core:g} c</div>",
                                     unsafe_allow_html=True,
                                 )
-
-                            m1, m2, m3, m4, m5 = st.columns(5)
-                            m1.metric("Entry Core", f"{entry_core:.{dec}f}")
-                            m2.metric("Prezzo Live", live_str)
-                            m3.metric("P/L Core", f"{'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} €")
-                            m4.metric("P/L Incr (Real + Float)", f"{'+' if (pnl_inc_rl + pnl_inc_fl) > 0 else ''}{formatta_eur(pnl_inc_rl + pnl_inc_fl)} €")
-                            m5.metric("TK21 / KJ55", f"{tk_str} / {kj_str}")
-
-                            sig_msgs = []
-                            if camp.get("signal_candle_active") and camp.get("signal_stop_price") is not None:
-                                sig_msgs.append(f"🔔 Candela Segnale KJ55 attiva (Stop Core: {float(camp['signal_stop_price']):.{dec}f})")
-                            if camp.get("signal_candle_tk_active") and camp.get("signal_stop_price_tk") is not None:
-                                sig_msgs.append(f"🔔 Candela Segnale TK21 attiva (Stop Incr: {float(camp['signal_stop_price_tk']):.{dec}f})")
-                            if sig_msgs:
-                                st.warning(" | ".join(sig_msgs))
-
-                            incr_rows = det["incr_rows"]
-                            if incr_rows:
-                                st.markdown(f"**Incrementi Ombra Aperti ({len(incr_rows)}):**")
-                                df_inc = pd.DataFrame([
-                                    {
-                                        "Ticket": r.get("ticket", ""),
-                                        "Dir": r.get("direction", direz),
-                                        "Size": r.get("size", 0),
-                                        "Entry": f"{float(r.get('entry', 0)):.{dec}f}",
-                                        "BE": "✅" if r.get("be_active") else "—",
-                                        "SL": f"{float(r['sl_price']):.{dec}f}" if r.get("sl_price") is not None else "—",
-                                        "P/L €": f"{'+' if r['pnl_eur'] > 0 else ''}{formatta_eur(r['pnl_eur'])} €",
-                                    }
-                                    for r in incr_rows
-                                ])
-                                st.dataframe(df_inc, use_container_width=True, hide_index=True)
-
-                            act_c1, act_c2 = st.columns([3.5, 1.2])
-                            with act_c1:
-                                with st.expander(f"📋 Log Eventi Ombra ({len(camp.get('storico', []))})", expanded=False):
-                                    for r_log in reversed(camp.get("storico", [])[-15:]):
-                                        st.text(r_log)
-                            with act_c2:
-                                if st.button(
-                                    "🛑 Chiudi Ombra Ora",
-                                    key=f"om_close_{conto_selezionato}_{oid}",
-                                    use_container_width=True,
-                                    disabled=(not is_operativo),
-                                ):
-                                    chiudi_ombra_su_storico(
-                                        conto=conto_selezionato,
-                                        oid=oid,
-                                        close_price=det["ref_px"],
-                                        motivo="Chiusura Manuale Ombra",
-                                        prezzi_live=prezzi_live,
-                                        config_strumenti=CONFIG_STRUMENTI,
-                                        get_eur_rate_fn=get_eur_rate,
-                                    )
-                                    st.success(f"Operazione Ombra {oid} spostata nello storico chiuso.")
-                                    st.rerun()
+                            with rc3:
+                                st.markdown(
+                                    f"<div style='font-family:monospace; font-size:0.95rem; color:#fff;'>{entry_core:.{dec}f}</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc4:
+                                st.markdown(
+                                    f"<div style='font-family:monospace; font-size:0.98rem; color:#FFD700; font-weight:bold;'>{live_str}</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc5:
+                                st.markdown(
+                                    f"<div style='font-family:monospace; font-size:0.82rem; color:#ddd;'>TK: {tk_str}</div>"
+                                    f"<div style='font-family:monospace; font-size:0.82rem; color:#93C5FD;'>KJ: {kj_str}</div>"
+                                    f"{sig_badge}",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc6:
+                                st.markdown(
+                                    f"<div style='font-size:0.82rem; color:{inc_col}; font-weight:600;'>Incr ({len(incr_rows)}): {'+' if pnl_inc_tot > 0 else ''}{formatta_eur(pnl_inc_tot)} €</div>"
+                                    f"<div style='font-size:0.72rem; color:#888;'>Marg: {formatta_eur(marg_c)} €</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc7:
+                                st.markdown(
+                                    f"<div style='font-size:0.98rem; font-weight:600; color:{core_col};'>{'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} €</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc8:
+                                st.markdown(
+                                    f"<div style='font-size:1.05rem; font-weight:bold; color:{tot_col};'>{'+' if pnl_tot > 0 else ''}{formatta_eur(pnl_tot)} €</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc9:
+                                b_det, b_cls = st.columns(2)
+                                with b_det:
+                                    with st.popover("📋", use_container_width=True):
+                                        st.markdown(f"**{nome} [{tf_lbl}] • {oid}**")
+                                        if incr_rows:
+                                            st.markdown(f"**Incrementi Aperti ({len(incr_rows)}):**")
+                                            for r in incr_rows:
+                                                be_s = "BE ✅" if r.get("be_active") else ""
+                                                sl_s = f"SL {float(r['sl_price']):.{dec}f}" if r.get("sl_price") is not None else ""
+                                                st.caption(
+                                                    f"• {r.get('size', 0):g}c @ {float(r.get('entry', 0)):.{dec}f} | "
+                                                    f"{'+' if r['pnl_eur'] > 0 else ''}{formatta_eur(r['pnl_eur'])} € {be_s} {sl_s}"
+                                                )
+                                        st.markdown("**Ultimi Eventi:**")
+                                        for r_log in reversed(camp.get("storico", [])[-10:]):
+                                            st.text(r_log)
+                                with b_cls:
+                                    if is_operativo:
+                                        with st.popover("❌", use_container_width=True):
+                                            st.markdown(f"Chiudere Ombra **{nome}** ({sz_core:g}c)?")
+                                            if st.button("Conferma", key=f"om_close_{conto_selezionato}_{oid}", type="primary", use_container_width=True):
+                                                chiudi_ombra_su_storico(
+                                                    conto=conto_selezionato,
+                                                    oid=oid,
+                                                    close_price=det["ref_px"],
+                                                    motivo="Chiusura Manuale Ombra",
+                                                    prezzi_live=prezzi_live,
+                                                    config_strumenti=CONFIG_STRUMENTI,
+                                                    get_eur_rate_fn=get_eur_rate,
+                                                )
+                                                st.rerun()
+                                    else:
+                                        st.button("❌", key=f"om_dis_{conto_selezionato}_{oid}", disabled=True, use_container_width=True)
 
                 # Storico Ombra Chiuse
                 if chiuse:

@@ -24,11 +24,80 @@ CONTI_OMBRA_ABILITATI = ("DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_DEMO")
 
 def _resolve_ombra_path(conto: str = None) -> str:
     """Restituisce il percorso del file ombra_trend.json per il conto specificato."""
-    if conto and os.path.isdir(conto):
-        return os.path.join(conto, FILE_OMBRA)
     if conto:
+        cwd_base = os.path.basename(os.path.abspath(os.getcwd()))
+        if cwd_base.upper() == str(conto).strip().upper():
+            return FILE_OMBRA
         return os.path.join(conto, FILE_OMBRA)
     return FILE_OMBRA
+
+
+def calcola_tk_kj_locali_ombra(conto: str, nome: str, timeframe: str) -> tuple:
+    """
+    Recupera i valori correnti di TK21 e KJ55 dai file locali (radar_trend.json o candele_*.json)
+    a zero chiamate API IG. Ritorna (tk21, kj55).
+    """
+    tf_val = str(timeframe or "HOUR").upper()
+    tf_lbl = "H1" if tf_val == "HOUR" else ("H4" if tf_val == "HOUR_4" else "D1")
+    clean = str(nome or "").replace("/", "_").replace(" ", "_")
+
+    dirs_to_check = []
+    if conto:
+        cwd_base = os.path.basename(os.path.abspath(os.getcwd()))
+        if cwd_base.upper() == str(conto).strip().upper():
+            dirs_to_check.append(".")
+        dirs_to_check.extend([conto, os.path.join("..", conto), os.path.join("/data", conto)])
+    for alt in CONTI_OMBRA_ABILITATI:
+        dirs_to_check.extend([alt, os.path.join("..", alt), os.path.join("/data", alt)])
+    dirs_to_check.append(".")
+
+    seen = set()
+    ordered_dirs = []
+    for d in dirs_to_check:
+        if d not in seen:
+            seen.add(d)
+            ordered_dirs.append(d)
+
+    # 1. Prova prima da radar_trend.json (certificato dal motore)
+    for d in ordered_dirs:
+        r_path = os.path.join(d, "radar_trend.json") if d != "." else "radar_trend.json"
+        if os.path.exists(r_path):
+            try:
+                with open(r_path, "r", encoding="utf-8") as f:
+                    r_data = json.load(f).get("radar_trend", {})
+                tf_info = r_data.get(nome, {}).get("timeframes", {}).get(tf_lbl, {})
+                tk_v = tf_info.get("tk")
+                kj_v = tf_info.get("kj")
+                if tk_v is not None and kj_v is not None:
+                    return float(tk_v), float(kj_v)
+            except Exception:
+                pass
+
+    # 2. Fallback diretto dalle candele chiuse su disco
+    for d in ordered_dirs:
+        c_path = os.path.join(d, f"candele_{clean}_{tf_val}.json") if d != "." else f"candele_{clean}_{tf_val}.json"
+        if os.path.exists(c_path):
+            try:
+                with open(c_path, "r", encoding="utf-8") as f:
+                    c_list = json.load(f)
+                if isinstance(c_list, list) and len(c_list) >= 2:
+                    highs, lows = [], []
+                    for c in c_list[-55:]:
+                        h = (float(c["highPrice"]["bid"]) + float(c["highPrice"]["ask"])) / 2.0
+                        l = (float(c["lowPrice"]["bid"]) + float(c["lowPrice"]["ask"])) / 2.0
+                        if 0 < h < 1e8 and 0 < l < 1e8:
+                            highs.append(h)
+                            lows.append(l)
+                    if highs and lows:
+                        kj_v = (max(highs) + min(lows)) / 2.0
+                        h21 = highs[-21:] if len(highs) >= 21 else highs
+                        l21 = lows[-21:] if len(lows) >= 21 else lows
+                        tk_v = (max(h21) + min(l21)) / 2.0
+                        return float(tk_v), float(kj_v)
+            except Exception:
+                pass
+
+    return None, None
 
 
 def carica_ombra(conto: str = None) -> dict:
@@ -103,7 +172,7 @@ def calcola_pnl_eur_ombra(
         if entry_f <= 0 or curr_f <= 0 or sz_f <= 0:
             return 0.0
         raw_diff = (curr_f - entry_f) if str(direction).upper() == "LONG" else (entry_f - curr_f)
-        return round((raw_diff / mult) * valore_punto * rate, 2)
+        return round((raw_diff / mult) * sz_f * valore_punto * rate, 2)
     except Exception:
         return 0.0
 
@@ -143,6 +212,8 @@ def crea_operazione_ombra(
     scala_clean = int(max(1, int(scala)))
     entry_clean = float(entry_price)
 
+    tk_init, kj_init = calcola_tk_kj_locali_ombra(conto, nome, timeframe)
+
     campagna = {
         "id": oid,
         "nome": nome,
@@ -173,8 +244,8 @@ def crea_operazione_ombra(
         "signal_stop_price": None,
         "signal_candle_tk_active": False,
         "signal_stop_price_tk": None,
-        "current_tk": None,
-        "current_kj": None,
+        "current_tk": tk_init,
+        "current_kj": kj_init,
         "last_candle_time": "",
         "storico": [
             f"[{ora_str}] 👤 Avvio Ombra Core {dir_clean} ({sz_clean:g}) @ {entry_clean} (Rif. Data: {data_inizio_str})"
