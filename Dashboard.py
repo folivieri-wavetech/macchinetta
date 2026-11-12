@@ -5226,14 +5226,14 @@ else:
                 else:
                     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
                     ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9 = st.columns(
-                        [1.8, 1.1, 1.1, 1.1, 1.6, 1.5, 1.2, 1.3, 1.2], vertical_alignment="center"
+                        [1.7, 1.1, 1.1, 1.1, 1.1, 1.6, 1.3, 1.3, 1.2], vertical_alignment="center"
                     )
                     with ch1: st.markdown("<b style='color:#888; font-size:0.76rem;'>STRUMENTO / TF</b>", unsafe_allow_html=True)
-                    with ch2: st.markdown("<b style='color:#888; font-size:0.76rem;'>DIR / SIZE</b>", unsafe_allow_html=True)
-                    with ch3: st.markdown("<b style='color:#888; font-size:0.76rem;'>APERTURA</b>", unsafe_allow_html=True)
-                    with ch4: st.markdown("<b style='color:#888; font-size:0.76rem;'>ULTIMO</b>", unsafe_allow_html=True)
-                    with ch5: st.markdown("<b style='color:#888; font-size:0.76rem;'>TK21 / KJ55</b>", unsafe_allow_html=True)
-                    with ch6: st.markdown("<b style='color:#888; font-size:0.76rem;'>INCR. / MARG.</b>", unsafe_allow_html=True)
+                    with ch2: st.markdown("<b style='color:#888; font-size:0.76rem;'>DATA / ORA</b>", unsafe_allow_html=True)
+                    with ch3: st.markdown("<b style='color:#888; font-size:0.76rem;'>DIR / SIZE</b>", unsafe_allow_html=True)
+                    with ch4: st.markdown("<b style='color:#888; font-size:0.76rem;'>APERTURA</b>", unsafe_allow_html=True)
+                    with ch5: st.markdown("<b style='color:#888; font-size:0.76rem;'>ULTIMO</b>", unsafe_allow_html=True)
+                    with ch6: st.markdown("<b style='color:#888; font-size:0.76rem;'>KJ55 / TK21</b>", unsafe_allow_html=True)
                     with ch7: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L CORE</b>", unsafe_allow_html=True)
                     with ch8: st.markdown("<b style='color:#888; font-size:0.76rem;'>P/L TOTALE</b>", unsafe_allow_html=True)
                     with ch9: st.markdown("<b style='color:#888; font-size:0.76rem; text-align:center;'>AZIONI</b>", unsafe_allow_html=True)
@@ -5247,15 +5247,19 @@ else:
                         dec = CONFIG_STRUMENTI.get(nome, {}).get("decimali", 2)
                         entry_core = float(camp.get("entry_price", 0) or 0)
                         sz_core = float(camp.get("size", 0) or 0)
-                        data_in = camp.get("data_inizio", "-")
+                        data_in = str(camp.get("data_inizio", "-") or "-").strip()
+                        parti_dt = data_in.split()
+                        data_riga1 = parti_dt[0] if parti_dt else "-"
+                        if len(data_riga1) == 10 and data_riga1[4] == "-" and data_riga1[7] == "-":
+                            data_riga1 = f"{data_riga1[8:10]}/{data_riga1[5:7]}/{data_riga1[0:4]}"
+                        ora_riga2 = " ".join(parti_dt[1:]) if len(parti_dt) > 1 else ""
+                        if ora_riga2 and ":" not in ora_riga2 and ora_riga2.isdigit():
+                            ora_riga2 = f"{int(ora_riga2):02d}:00"
+
                         det = dettagli_attive[oid]
                         live_px = det["live_px"]
                         pnl_core = det["pnl_core_eur"]
-                        pnl_inc_fl = det["pnl_inc_float_eur"]
-                        pnl_inc_rl = det["pnl_inc_real_eur"]
-                        pnl_inc_tot = round(pnl_inc_fl + pnl_inc_rl, 2)
                         pnl_tot = det["pnl_tot_eur"]
-                        marg_c = det["margine_eur"]
                         incr_rows = det["incr_rows"]
 
                         tk_v = camp.get("current_tk")
@@ -5276,7 +5280,6 @@ else:
                         dir_tag = "🟢 LONG" if direz == "LONG" else "🔴 SHORT"
                         core_col = "#4ade80" if pnl_core > 0 else ("#ff6b6b" if pnl_core < 0 else "#aaa")
                         tot_col = "#4ade80" if pnl_tot > 0 else ("#ff6b6b" if pnl_tot < 0 else "#aaa")
-                        inc_col = "#4ade80" if pnl_inc_tot > 0 else ("#ff6b6b" if pnl_inc_tot < 0 else "#aaa")
 
                         sig_badge = ""
                         if camp.get("signal_candle_active") and camp.get("signal_stop_price") is not None:
@@ -5286,41 +5289,40 @@ else:
 
                         with st.container(border=True):
                             rc1, rc2, rc3, rc4, rc5, rc6, rc7, rc8, rc9 = st.columns(
-                                [1.8, 1.1, 1.1, 1.1, 1.6, 1.5, 1.2, 1.3, 1.2], vertical_alignment="center"
+                                [1.7, 1.1, 1.1, 1.1, 1.1, 1.6, 1.3, 1.3, 1.2], vertical_alignment="center"
                             )
                             with rc1:
                                 st.markdown(
-                                    f"<div style='font-size:0.95rem; font-weight:bold; color:#fff;'>{nome} <span style='color:#C084FC; font-size:0.80rem;'>[{tf_lbl}]</span></div>"
-                                    f"<div style='font-size:0.72rem; color:#888;'>Rif. {data_in}</div>",
+                                    f"<div style='font-size:0.95rem; font-weight:bold; color:#fff;'>{nome} <span style='color:#C084FC; font-size:0.80rem;'>[{tf_lbl}]</span></div>",
                                     unsafe_allow_html=True,
                                 )
                             with rc2:
+                                st.markdown(
+                                    f"<div style='font-size:0.84rem; color:#ddd; font-weight:600;'>{data_riga1}</div>"
+                                    f"<div style='font-size:0.78rem; color:#9CA3AF;'>{ora_riga2 or '—'}</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with rc3:
                                 st.markdown(
                                     f"<div style='color:{dir_col}; font-size:0.82rem; font-weight:bold;'>{dir_tag}</div>"
                                     f"<div style='font-size:0.85rem; color:#eee; font-weight:600;'>{sz_core:g} c</div>",
                                     unsafe_allow_html=True,
                                 )
-                            with rc3:
+                            with rc4:
                                 st.markdown(
                                     f"<div style='font-family:monospace; font-size:0.95rem; color:#fff;'>{entry_core:.{dec}f}</div>",
                                     unsafe_allow_html=True,
                                 )
-                            with rc4:
+                            with rc5:
                                 st.markdown(
                                     f"<div style='font-family:monospace; font-size:0.98rem; color:#FFD700; font-weight:bold;'>{live_str}</div>",
                                     unsafe_allow_html=True,
                                 )
-                            with rc5:
-                                st.markdown(
-                                    f"<div style='font-family:monospace; font-size:0.82rem; color:#ddd;'>TK: {tk_str}</div>"
-                                    f"<div style='font-family:monospace; font-size:0.82rem; color:#93C5FD;'>KJ: {kj_str}</div>"
-                                    f"{sig_badge}",
-                                    unsafe_allow_html=True,
-                                )
                             with rc6:
                                 st.markdown(
-                                    f"<div style='font-size:0.82rem; color:{inc_col}; font-weight:600;'>Incr ({len(incr_rows)}): {'+' if pnl_inc_tot > 0 else ''}{formatta_eur(pnl_inc_tot)} €</div>"
-                                    f"<div style='font-size:0.72rem; color:#888;'>Marg: {formatta_eur(marg_c)} €</div>",
+                                    f"<div style='font-family:monospace; font-size:0.84rem; color:#FFD700; font-weight:bold;'>KJ: {kj_str}</div>"
+                                    f"<div style='font-family:monospace; font-size:0.84rem; color:#00BFFF; font-weight:bold;'>TK: {tk_str}</div>"
+                                    f"{sig_badge}",
                                     unsafe_allow_html=True,
                                 )
                             with rc7:
