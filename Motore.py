@@ -2,6 +2,7 @@ import json
 import time
 import os
 import uuid
+import threading
 import requests
 import traceback
 import datetime
@@ -523,67 +524,81 @@ def salva_report_giornaliero(saldo, margine, drawdown):
             except Exception as e:
                 print_log("SISTEMA", f"⚠️ Errore salvataggio report giornaliero: {e}")
 
-def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None):
-    salva_report_giornaliero(saldo, margine, drawdown)
-    dati = {}
-    if os.path.exists("stato_sistema.json"):
-        try:
-            with open("stato_sistema.json", "r") as f:
-                dati = json.load(f)
-        except Exception:
-            dati = {}
-    dati.update({
-        "saldo": str(saldo),
-        "disponibile": str(disponibile),
-        "margine": str(margine),
-        "drawdown": str(drawdown),
-        "messaggio": messaggio,
-        "durata_sessione": calcola_durata_sessione(),
-        "ultimo_aggiornamento": now_it().strftime("%H:%M:%S"),
-        "prezzi_live": prezzi_live or {},
-        "distanze_minime": distanze_minime or {},
-        "prezzi_bid_ask": prezzi_bid_ask or {}
-    })
-    try:
-        tmp_st = f"stato_sistema.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
-        with open(tmp_st, "w", encoding="utf-8") as f:
-            json.dump(dati, f, indent=4)
-        os.replace(tmp_st, "stato_sistema.json")
-    except Exception:
-        pass
+_STATO_SISTEMA_LOCK = threading.Lock()
 
-def tocca_heartbeat_stato_sistema(prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None):
+def scrivi_stato_sistema(saldo, disponibile, margine, drawdown, messaggio, prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None, posizioni=None, ordini_pendenti=None):
+    salva_report_giornaliero(saldo, margine, drawdown)
+    with _STATO_SISTEMA_LOCK:
+        dati = {}
+        if os.path.exists("stato_sistema.json"):
+            try:
+                with open("stato_sistema.json", "r", encoding="utf-8") as f:
+                    dati = json.load(f)
+            except Exception:
+                dati = {}
+        dati.update({
+            "saldo": str(saldo),
+            "disponibile": str(disponibile),
+            "margine": str(margine),
+            "drawdown": str(drawdown),
+            "messaggio": messaggio,
+            "durata_sessione": calcola_durata_sessione(),
+            "ultimo_aggiornamento": now_it().strftime("%H:%M:%S"),
+            "prezzi_live": prezzi_live or dati.get("prezzi_live", {}),
+            "distanze_minime": distanze_minime or dati.get("distanze_minime", {}),
+            "prezzi_bid_ask": prezzi_bid_ask or dati.get("prezzi_bid_ask", {})
+        })
+        if posizioni is not None:
+            dati["posizioni"] = posizioni
+            dati["posizioni_ts"] = time.time()
+        if ordini_pendenti is not None:
+            dati["ordini_pendenti"] = ordini_pendenti
+        try:
+            tmp_st = f"stato_sistema.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
+            with open(tmp_st, "w", encoding="utf-8") as f:
+                json.dump(dati, f, indent=4)
+            os.replace(tmp_st, "stato_sistema.json")
+        except Exception:
+            pass
+
+def tocca_heartbeat_stato_sistema(prezzi_live=None, distanze_minime=None, prezzi_bid_ask=None, posizioni=None, ordini_pendenti=None):
     """
     Aggiorna regolarmente il battito cardiaco (mtime e ultimo_aggiornamento) in stato_sistema.json.
     Mantiene intatti tutti i dati contabili esistenti e aggiorna i prezzi live se forniti.
     Garantisce che la Dashboard veda il motore sempre '🟢 Connesso' anche in caso di micro-ritardo API di IG.
     """
-    dati = {}
-    if os.path.exists("stato_sistema.json"):
-        try:
-            with open("stato_sistema.json", "r", encoding="utf-8") as f:
-                dati = json.load(f)
-        except Exception:
-            dati = {}
-    
-    dati["ultimo_aggiornamento"] = now_it().strftime("%H:%M:%S")
-    dati["durata_sessione"] = calcola_durata_sessione()
-    if not dati.get("messaggio"):
-        dati["messaggio"] = "Mercati Chiusi (Weekend)" if is_weekend_active() else "Sistema Online"
-    if prezzi_live:
-        dati["prezzi_live"] = prezzi_live
-    if distanze_minime:
-        dati["distanze_minime"] = distanze_minime
-    if prezzi_bid_ask:
-        dati["prezzi_bid_ask"] = prezzi_bid_ask
+    with _STATO_SISTEMA_LOCK:
+        dati = {}
+        if os.path.exists("stato_sistema.json"):
+            try:
+                with open("stato_sistema.json", "r", encoding="utf-8") as f:
+                    dati = json.load(f)
+            except Exception:
+                dati = {}
         
-    try:
-        tmp_st = f"stato_sistema.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
-        with open(tmp_st, "w", encoding="utf-8") as f:
-            json.dump(dati, f, indent=4)
-        os.replace(tmp_st, "stato_sistema.json")
-    except Exception:
-        pass
+        dati["ultimo_aggiornamento"] = now_it().strftime("%H:%M:%S")
+        dati["durata_sessione"] = calcola_durata_sessione()
+        if not dati.get("messaggio"):
+            dati["messaggio"] = "Mercati Chiusi (Weekend)" if is_weekend_active() else "Sistema Online"
+        if prezzi_live:
+            dati["prezzi_live"] = prezzi_live
+        if distanze_minime:
+            dati["distanze_minime"] = distanze_minime
+        if prezzi_bid_ask:
+            dati["prezzi_bid_ask"] = prezzi_bid_ask
+        if posizioni is not None:
+            dati["posizioni"] = posizioni
+            dati["posizioni_ts"] = time.time()
+        if ordini_pendenti is not None:
+            dati["ordini_pendenti"] = ordini_pendenti
+            
+        try:
+            tmp_st = f"stato_sistema.json.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
+            with open(tmp_st, "w", encoding="utf-8") as f:
+                json.dump(dati, f, indent=4)
+            os.replace(tmp_st, "stato_sistema.json")
+        except Exception:
+            pass
 
 def chiamata_api_sicura(metodo, url, headers, payload=None, max_retries=4):
     headers_req = headers.copy()
@@ -597,8 +612,10 @@ def esegui_login_ig():
     try:
         r = ig_api_request('POST', f"{BASE_URL}/session", h, payload=p, timeout=10, logger_func=print_log)
         if r and r.status_code == 200:
-            with open(FILE_TOKEN, "w") as f:
+            tmp_tok = f"{FILE_TOKEN}.tmp.{os.getpid()}_{uuid.uuid4().hex[:8]}"
+            with open(tmp_tok, "w", encoding="utf-8") as f:
                 json.dump({"CST": r.headers.get('CST'), "X-SECURITY-TOKEN": r.headers.get('X-SECURITY-TOKEN')}, f)
+            os.replace(tmp_tok, FILE_TOKEN)
             return True
         else:
             msg = f"{r.status_code} - {r.text}" if r else "Nessuna risposta"
@@ -616,7 +633,7 @@ def ottieni_dati_mercati_batch(h):
     risultato = {}
     
     r = ig_api_request('GET', f"{BASE_URL}/markets?epics={epics_str}", h_batch, timeout=10, logger_func=print_log)
-    if not r or r.status_code != 200:
+    if r is not None and r.status_code in (400, 404):
         h_batch["Version"] = "2"
         r = ig_api_request('GET', f"{BASE_URL}/markets?epics={epics_str}", h_batch, timeout=10, logger_func=print_log)
     
@@ -656,7 +673,7 @@ def ottieni_dati_mercati_batch(h):
         
     return risultato
 
-def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=None):
+def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=None, posizioni=None, ordini_pendenti=None):
     try:
         h_conti = h.copy()
         h_conti["Version"] = "1"
@@ -671,12 +688,12 @@ def ottieni_e_scrivi_saldo(h, prezzi_live=None, dist_min=None, prezzi_bid_ask=No
             dd = il_mio_conto['balance'].get('profitLoss', 0)
             
             msg = "Mercati Chiusi (Weekend)" if is_weekend_active() else "Sistema Online"
-            scrivi_stato_sistema(bal, disp, marg, dd, msg, prezzi_live, dist_min, prezzi_bid_ask)
+            scrivi_stato_sistema(bal, disp, marg, dd, msg, prezzi_live, dist_min, prezzi_bid_ask, posizioni=posizioni, ordini_pendenti=ordini_pendenti)
         else:
             # Fallback heartbeat per garantire che la Dashboard veda sempre il motore connesso
-            tocca_heartbeat_stato_sistema(prezzi_live, dist_min, prezzi_bid_ask)
+            tocca_heartbeat_stato_sistema(prezzi_live, dist_min, prezzi_bid_ask, posizioni=posizioni, ordini_pendenti=ordini_pendenti)
     except Exception:
-        tocca_heartbeat_stato_sistema(prezzi_live, dist_min, prezzi_bid_ask)
+        tocca_heartbeat_stato_sistema(prezzi_live, dist_min, prezzi_bid_ask, posizioni=posizioni, ordini_pendenti=ordini_pendenti)
 
 def verifica_token_ig():
     if not os.path.exists(FILE_TOKEN):
@@ -1116,6 +1133,17 @@ def esegui_motore():
 
     try:
         print_log("SISTEMA", f"--- MOTORE AVVIATO PER CONTO: {NOME_CONTO} ---")
+
+        def _heartbeat_daemon_loop():
+            while True:
+                try:
+                    tocca_heartbeat_stato_sistema()
+                except Exception:
+                    pass
+                time.sleep(20)
+
+        th_hb = threading.Thread(target=_heartbeat_daemon_loop, daemon=True, name=f"Heartbeat_{NOME_CONTO}")
+        th_hb.start()
         
         if DEV_MODE:
             print_log("SISTEMA", "🔧 [DEV MODE ATTIVA] - Connessione IG bypassata. Modalità offline.")
@@ -1148,16 +1176,21 @@ def esegui_motore():
             h = {}
         
         ultimo_controllo_saldo = 0
+        ultimo_rinnovo_401 = 0
         prezzi_live = {}
         distanze_minime = {}
         prezzi_bid_ask = {}
+        posizioni_totali = []
+        ordini_totali = []
         if os.path.exists("stato_sistema.json"):
             try:
-                with open("stato_sistema.json", "r") as f_st:
+                with open("stato_sistema.json", "r", encoding="utf-8") as f_st:
                     d_st = json.load(f_st)
                     prezzi_live = d_st.get("prezzi_live", {})
                     distanze_minime = d_st.get("distanze_minime", {})
                     prezzi_bid_ask = d_st.get("prezzi_bid_ask", {})
+                    posizioni_totali = d_st.get("posizioni", [])
+                    ordini_totali = d_st.get("ordini_pendenti", [])
             except Exception:
                 pass
 
@@ -1185,6 +1218,19 @@ def esegui_motore():
                 print_log("SISTEMA", "🔄 RESTART VM ricevuto o token mancante: Rinnovo sessione IG in corso...")
                 richiede_rinnovo = True
             else:
+                try:
+                    with open(FILE_TOKEN, "r", encoding="utf-8") as f_tok:
+                        token_dati = json.load(f_tok)
+                    if token_dati.get("CST") and token_dati.get("X-SECURITY-TOKEN"):
+                        h = {
+                            "X-IG-API-KEY": config.get("IG_API_KEY"),
+                            "CST": token_dati.get("CST"),
+                            "X-SECURITY-TOKEN": token_dati.get("X-SECURITY-TOKEN"),
+                            "Version": "1",
+                            "Accept": "application/json"
+                        }
+                except Exception:
+                    pass
                 tempo_creazione = os.path.getmtime(FILE_TOKEN)
                 if (time.time() - tempo_creazione) > (70 * 3600):
                     print_log("SISTEMA", "⚠️ Sessione vicina alle 72h: Mi preparo al rinnovo automatico del Token IG.")
@@ -1202,7 +1248,7 @@ def esegui_motore():
                 
                 if rinnovo_riuscito:
                     if os.path.exists(FILE_TOKEN):
-                        with open(FILE_TOKEN, "r") as f:
+                        with open(FILE_TOKEN, "r", encoding="utf-8") as f:
                             token_dati = json.load(f)
                         h = {
                             "X-IG-API-KEY": config.get("IG_API_KEY"), 
@@ -1221,10 +1267,10 @@ def esegui_motore():
 
             if is_weekend_active():
                 if ora_attuale - ultimo_controllo_saldo >= 30:
-                    ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
+                    ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask, posizioni=posizioni_totali, ordini_pendenti=ordini_totali)
                     ultimo_controllo_saldo = ora_attuale
                 else:
-                    tocca_heartbeat_stato_sistema(prezzi_live, distanze_minime, prezzi_bid_ask)
+                    tocca_heartbeat_stato_sistema(prezzi_live, distanze_minime, prezzi_bid_ask, posizioni=posizioni_totali, ordini_pendenti=ordini_totali)
                 time.sleep(15)
                 continue
 
@@ -1241,31 +1287,62 @@ def esegui_motore():
                 distanze_minime[n] = v["min_dist"]
                 prezzi_bid_ask[n] = {"bid": v["bid"], "ask": v["ask"]}
             
-            if ora_attuale - ultimo_controllo_saldo >= 45:
-                ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask)
-                ultimo_controllo_saldo = ora_attuale
-            else:
-                tocca_heartbeat_stato_sistema(prezzi_live, distanze_minime, prezzi_bid_ask)
-
             resp_pos_global = chiamata_api_sicura('GET', f"{BASE_URL}/positions", h)
             if resp_pos_global and resp_pos_global.status_code == 200:
                 posizioni_totali = resp_pos_global.json().get('positions', [])
-            else:
-                posizioni_totali = []
-            
-            resp_ord_global = chiamata_api_sicura('GET', f"{BASE_URL}/workingorders", h)
-            if resp_ord_global and resp_ord_global.status_code == 200:
-                ordini_totali = resp_ord_global.json().get('workingOrders', [])
+            elif resp_pos_global is not None and resp_pos_global.status_code == 401 and (ora_attuale - ultimo_rinnovo_401) >= 300:
+                ultimo_rinnovo_401 = ora_attuale
+                if esegui_login_ig() and os.path.exists(FILE_TOKEN):
+                    try:
+                        with open(FILE_TOKEN, "r", encoding="utf-8") as f_t:
+                            td = json.load(f_t)
+                        h["CST"] = td.get("CST")
+                        h["X-SECURITY-TOKEN"] = td.get("X-SECURITY-TOKEN")
+                    except Exception:
+                        pass
+
+            dati_mem_range = {}
+            richiede_working_orders = False
+            if os.path.exists(FILE_MEMORIA):
+                try:
+                    with open(FILE_MEMORIA, "r", encoding="utf-8") as f:
+                        dati_mem_range = json.load(f)
+                    for _, prm in dati_mem_range.items():
+                        if prm.get("tipo_strategia", "RANGE") == "TREND":
+                            continue
+                        if (
+                            prm.get("attivo", False)
+                            or prm.get("comando_reset", False)
+                            or prm.get("comando_manuale", False)
+                            or prm.get("comando_restore")
+                            or prm.get("comando_riattiva_fase2", False)
+                            or prm.get("kill_switch", False)
+                            or prm.get("comando_weekend", False)
+                            or prm.get("comando_riprendi", False)
+                            or ("IN_ATTESA" not in prm.get("stato", "IN_ATTESA"))
+                        ):
+                            richiede_working_orders = True
+                            break
+                except Exception:
+                    dati_mem_range = {}
+
+            if richiede_working_orders:
+                resp_ord_global = chiamata_api_sicura('GET', f"{BASE_URL}/workingorders", h)
+                if resp_ord_global and resp_ord_global.status_code == 200:
+                    ordini_totali = resp_ord_global.json().get('workingOrders', [])
+                else:
+                    ordini_totali = []
             else:
                 ordini_totali = []
 
-            if os.path.exists(FILE_MEMORIA):
-                try:
-                    with open(FILE_MEMORIA, "r") as f: 
-                        dati = json.load(f)
-                except Exception:
-                    continue
-                            
+            if ora_attuale - ultimo_controllo_saldo >= 45:
+                ottieni_e_scrivi_saldo(h, prezzi_live, distanze_minime, prezzi_bid_ask, posizioni=posizioni_totali, ordini_pendenti=ordini_totali)
+                ultimo_controllo_saldo = ora_attuale
+            else:
+                tocca_heartbeat_stato_sistema(prezzi_live, distanze_minime, prezzi_bid_ask, posizioni=posizioni_totali, ordini_pendenti=ordini_totali)
+
+            if dati_mem_range:
+                dati = dati_mem_range
                 for nome, param in dati.items():
                     if param.get("tipo_strategia", "RANGE") == "TREND":
                         continue

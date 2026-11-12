@@ -2541,6 +2541,7 @@ def esegui_ciclo_ombra(prezzi_live, candele_appena_chiuse):
 
 
 LAST_FETCH_BOUNDARY = {}
+_LAST_TREND_POS_CACHE = {"ts": 0.0, "data": [], "valid": False}
 
 def esegui_ciclo_trend():
     # Lettura prezzi live locali e posizioni aperte reali (a 0 chiamate API a IG)
@@ -2549,7 +2550,12 @@ def esegui_ciclo_trend():
     has_pos_live_data = False
     if os.path.exists(STATO_SISTEMA):
         try:
-            with open(STATO_SISTEMA, "r") as f_st:
+            if (time.time() - os.path.getmtime(STATO_SISTEMA)) > 30:
+                try:
+                    os.utime(STATO_SISTEMA, None)
+                except Exception:
+                    pass
+            with open(STATO_SISTEMA, "r", encoding="utf-8") as f_st:
                 d_st = json.load(f_st)
                 prezzi_live = d_st.get("prezzi_live", {})
                 posizioni_live_ig = d_st.get("posizioni", [])
@@ -2614,14 +2620,22 @@ def esegui_ciclo_trend():
         print_log("SISTEMA", "Manca token IG, impossibile proseguire.")
         return
         
-    if not has_pos_live_data or not posizioni_live_ig:
-        try:
-            r_pos = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=8, logger_func=print_log)
-            if r_pos is not None and r_pos.status_code == 200:
-                posizioni_live_ig = r_pos.json().get('positions', [])
-                has_pos_live_data = True
-        except Exception:
-            pass
+    if not has_pos_live_data:
+        now_pos_ts = time.time()
+        if (now_pos_ts - _LAST_TREND_POS_CACHE["ts"]) >= 30.0:
+            try:
+                r_pos = ig_api_request("GET", f"{BASE_URL}/positions", headers=headers, timeout=8, logger_func=print_log)
+                if r_pos is not None and r_pos.status_code == 200:
+                    posizioni_live_ig = r_pos.json().get('positions', [])
+                    has_pos_live_data = True
+                    _LAST_TREND_POS_CACHE["ts"] = now_pos_ts
+                    _LAST_TREND_POS_CACHE["data"] = posizioni_live_ig
+                    _LAST_TREND_POS_CACHE["valid"] = True
+            except Exception:
+                pass
+        elif _LAST_TREND_POS_CACHE["valid"]:
+            posizioni_live_ig = _LAST_TREND_POS_CACHE["data"]
+            has_pos_live_data = True
 
     if has_pos_live_data and posizioni_live_ig:
         live_deal_ids = {str(p.get('position', {}).get('dealId')).strip() for p in posizioni_live_ig if p.get('position', {}).get('dealId')}

@@ -2960,28 +2960,27 @@ else:
     mostra_ombra = (conto_selezionato in ("DANY_DEMO", "BONGIOLO_DEMO", "FIORDOK_DEMO"))
     tab_goldfinger = None
     tab_ombra = None
-    tab_hyper = None
 
     if is_regista:
         if mostra_goldfinger:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_goldfinger, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
         elif mostra_ombra:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "👤 Ombra", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_ombra, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "👤 Ombra", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_ombra, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
         else:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📋 Pos. Week", "🛑 Recovery", "📊 Stat", "📄 Report", "💻 Log", "🔐 Regia"])
+            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_posizioni, tab_restore, tab_statistiche, tab_report, tab_console, tab_autorizzazioni = tabs
     else:
         if mostra_goldfinger:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "🏆 Goldfinger", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_goldfinger, tab_trend, tab_operativa, tab_report = tabs
         elif mostra_ombra:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "👤 Ombra", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_ombra, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "👤 Ombra", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_ombra, tab_report = tabs
         else:
-            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "⚡ Hyper", "📈 Trend", "🛡️ Range", "📄 Report"])
-            tab_portafoglio, tab_radar, tab_hyper, tab_trend, tab_operativa, tab_report = tabs
+            tabs = st.tabs(["💼 Pfoglio", "📡 Radar", "📈 Trend", "🛡️ Range", "📄 Report"])
+            tab_portafoglio, tab_radar, tab_trend, tab_operativa, tab_report = tabs
         tab_restore = tab_posizioni = tab_console = tab_autorizzazioni = tab_statistiche = None
 
 
@@ -3044,27 +3043,31 @@ else:
             st.markdown("<h1 style='color: #FFD700; text-align: center;'>💼 Portafoglio IG (Live)</h1>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;'>Visualizzazione speculare in sola lettura delle tue posizioni e ordini sui server IG.</p>", unsafe_allow_html=True)
             
-            h = get_ig_headers(conto_selezionato)
-            if not h:
-                st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
-                return
+            stato = leggi_stato_sistema(conto_selezionato)
+            prezzi_live = stato.get("prezzi_live", {})
+            if "posizioni" in stato:
+                pos_data = stato.get("posizioni", [])
+                ord_data = stato.get("ordini_pendenti", [])
+            else:
+                h = get_ig_headers(conto_selezionato)
+                if not h:
+                    st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
+                    return
 
-            base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto_selezionato.upper() else "https://demo-api.ig.com/gateway/deal"
-            
-            # Fetch dati
-            r_pos = requests.get(f"{base_url}/positions", headers=h)
-            pos_data = r_pos.json().get('positions', []) if r_pos.status_code == 200 else []
-            
-            r_ord = requests.get(f"{base_url}/workingorders", headers=h)
-            ord_data = r_ord.json().get('workingOrders', []) if r_ord.status_code == 200 else []
+                base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto_selezionato.upper() else "https://demo-api.ig.com/gateway/deal"
+                
+                # Fetch dati fallback
+                r_pos = requests.get(f"{base_url}/positions", headers=h, timeout=8)
+                pos_data = r_pos.json().get('positions', []) if r_pos.status_code == 200 else []
+                
+                r_ord = requests.get(f"{base_url}/workingorders", headers=h, timeout=8)
+                ord_data = r_ord.json().get('workingOrders', []) if r_ord.status_code == 200 else []
 
             # Salvataggio in sessione per validazioni incrociate
             st.session_state.live_pos_data = pos_data
             st.session_state.live_ord_data = ord_data
 
             epic_to_name = {v['epic']: k for k, v in CONFIG_STRUMENTI.items()}
-            stato = leggi_stato_sistema(conto_selezionato)
-            prezzi_live = stato.get("prezzi_live", {})
             memoria_attuale = carica_memoria(conto_selezionato)
             memoria_trend_attuale = carica_memoria_trend(conto_selezionato)
 
@@ -5045,14 +5048,6 @@ else:
                 renderizza_sintesi()
 
 
-    if tab_hyper is not None:
-        with tab_hyper:
-            try:
-                import hyper_tab
-                hyper_tab.render_hyper_tab(conto_selezionato=conto_selezionato)
-            except Exception as e_hyp:
-                st.error(f"Errore caricamento Hyper: {e_hyp}")
-
     if tab_goldfinger is not None:
         with tab_goldfinger:
             try:
@@ -5453,21 +5448,24 @@ else:
                 st.markdown("<h2 style='text-align: center; color: #00FFCC;'>📋 Gestione Posizioni Aperte</h2>", unsafe_allow_html=True)
                 st.markdown(f"<p style='text-align: center; color: #888; font-size: 0.9rem;'>Monitoraggio live e chiusura manuale a mercato delle posizioni aperte su IG per il conto <b>{conto_selezionato}</b>.</p>", unsafe_allow_html=True)
                 
-                h = get_ig_headers(conto_selezionato)
-                if not h:
-                    st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
-                    return
-
-                base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto_selezionato.upper() else "https://demo-api.ig.com/gateway/deal"
-                try:
-                    r_pos = requests.get(f"{base_url}/positions", headers=h, timeout=8)
-                    pos_data = r_pos.json().get('positions', []) if r_pos.status_code == 200 else []
-                except Exception as e:
-                    st.error(f"Errore recupero posizioni da IG: {e}")
-                    return
-
                 stato = leggi_stato_sistema(conto_selezionato)
                 prezzi_live = stato.get("prezzi_live", {})
+                if "posizioni" in stato:
+                    pos_data = stato.get("posizioni", [])
+                else:
+                    h = get_ig_headers(conto_selezionato)
+                    if not h:
+                        st.error("Connessione IG mancante. Avvia il Motore per generare il token.")
+                        return
+
+                    base_url = "https://api.ig.com/gateway/deal" if "_REALE" in conto_selezionato.upper() else "https://demo-api.ig.com/gateway/deal"
+                    try:
+                        r_pos = requests.get(f"{base_url}/positions", headers=h, timeout=8)
+                        pos_data = r_pos.json().get('positions', []) if r_pos.status_code == 200 else []
+                    except Exception as e:
+                        st.error(f"Errore recupero posizioni da IG: {e}")
+                        return
+
                 memoria_attuale = carica_memoria(conto_selezionato)
                 memoria_trend_attuale = carica_memoria_trend(conto_selezionato)
                 try:
