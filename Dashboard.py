@@ -5084,8 +5084,7 @@ else:
                 st.markdown("<h2 style='text-align: center; color: #C084FC;'>👤 Gestione Trend Ombra (Demo Isolata)</h2>", unsafe_allow_html=True)
                 st.markdown(
                     f"<p style='text-align: center; color: #9CA3AF; font-size: 0.88rem;'>"
-                    f"Conto attivo: <b>{conto_selezionato}</b> — Simulazione live Trend (KJ55 / TK21) senza interazioni IG. "
-                    f"P/L e Margine Ombra sono isolati e visibili solo in questa scheda.</p>",
+                    f"Conto attivo: <b>{conto_selezionato}</b> — Simulazione live Trend (KJ55 / TK21) senza interazioni IG.</p>",
                     unsafe_allow_html=True,
                 )
 
@@ -5146,11 +5145,42 @@ else:
 
                 tot_pnl_storico = round(sum(float(c.get("pnl_totale_eur", 0) or 0) for c in chiuse), 2)
 
+                col_kpi_live = "#00E676" if tot_pnl_live_ombra > 0 else ("#FA8072" if tot_pnl_live_ombra < 0 else "#9CA3AF")
+                col_kpi_hist = "#00E676" if tot_pnl_storico > 0 else ("#FA8072" if tot_pnl_storico < 0 else "#9CA3AF")
+
                 k1, k2, k3, k4 = st.columns(4)
-                k1.metric("👤 Campagne Ombra Attive", f"{len(attive)}")
-                k2.metric("🏦 Margine Ombra Usato", f"{formatta_eur(tot_margine_ombra)} €")
-                k3.metric("💹 P/L Ombra Live Attive", f"{'+' if tot_pnl_live_ombra > 0 else ''}{formatta_eur(tot_pnl_live_ombra)} €")
-                k4.metric("📜 P/L Storico Ombra", f"{'+' if tot_pnl_storico > 0 else ''}{formatta_eur(tot_pnl_storico)} €")
+                with k1:
+                    st.markdown(
+                        f"<div style='text-align:center;'>"
+                        f"<div style='font-size:0.85rem; color:#9CA3AF; margin-bottom:4px;'>👤 Campagne Ombra Attive</div>"
+                        f"<div style='font-size:1.75rem; font-weight:600; color:#fff;'>{len(attive)}</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                with k2:
+                    st.markdown(
+                        f"<div>"
+                        f"<div style='font-size:0.85rem; color:#9CA3AF; margin-bottom:4px;'>🏦 Margine Ombra Utilizzato</div>"
+                        f"<div style='font-size:1.75rem; font-weight:600; color:#FFD700;'>{formatta_eur(tot_margine_ombra)} €</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                with k3:
+                    st.markdown(
+                        f"<div>"
+                        f"<div style='font-size:0.85rem; color:#9CA3AF; margin-bottom:4px;'>💹 P/L Ombra Live</div>"
+                        f"<div style='font-size:1.75rem; font-weight:600; color:{col_kpi_live};'>{'+' if tot_pnl_live_ombra > 0 else ''}{formatta_eur(tot_pnl_live_ombra)} €</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                with k4:
+                    st.markdown(
+                        f"<div>"
+                        f"<div style='font-size:0.85rem; color:#9CA3AF; margin-bottom:4px;'>📜 P&L Storici Ombra</div>"
+                        f"<div style='font-size:1.75rem; font-weight:600; color:{col_kpi_hist};'>{'+' if tot_pnl_storico > 0 else ''}{formatta_eur(tot_pnl_storico)} €</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
 
                 st.markdown("---")
 
@@ -5296,10 +5326,12 @@ else:
 
                         sub_pnl_html = ""
                         if incr_rows or abs(pnl_inc_tot) >= 0.01:
+                            c_sub_col = "#00E676" if pnl_core > 0 else ("#FA8072" if pnl_core < 0 else "#9CA3AF")
+                            i_sub_col = "#00E676" if pnl_inc_tot > 0 else ("#FA8072" if pnl_inc_tot < 0 else "#9CA3AF")
                             sub_pnl_html = (
-                                f"<div style='font-size:0.72rem; color:#9CA3AF;'>"
-                                f"Core: {'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} € | "
-                                f"Incr: {'+' if pnl_inc_tot > 0 else ''}{formatta_eur(pnl_inc_tot)} €</div>"
+                                f"<div style='font-size:0.72rem; color:#9CA3AF; font-weight:normal;'>"
+                                f"Core: <span style='color:{c_sub_col}; font-weight:normal;'>{'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} €</span> | "
+                                f"Incr: <span style='color:{i_sub_col}; font-weight:normal;'>{'+' if pnl_inc_tot > 0 else ''}{formatta_eur(pnl_inc_tot)} €</span></div>"
                             )
 
                         with st.container(border=True):
@@ -5308,7 +5340,7 @@ else:
                             )
                             with rc1:
                                 st.markdown(
-                                    f"<div style='font-size:0.95rem; font-weight:bold; color:#fff;'>{nome} <span style='color:#C084FC; font-size:0.80rem;'>[{tf_lbl}]</span></div>",
+                                    f"<div style='font-size:0.95rem; font-weight:bold; color:#FFD700;'>{nome} <span style='color:#C084FC; font-size:0.80rem;'>[{tf_lbl}]</span></div>",
                                     unsafe_allow_html=True,
                                 )
                             with rc2:
@@ -5335,7 +5367,7 @@ else:
                                 )
                             with rc6:
                                 st.markdown(
-                                    f"<div style='font-family:monospace; font-size:0.78rem; color:#9CA3AF;'>MG: {formatta_eur(marg_c)} €</div>"
+                                    f"<div style='font-family:monospace; font-size:0.78rem; color:#00E676; text-decoration:underline; font-weight:normal;'>MG: {formatta_eur(marg_c)} €</div>"
                                     f"<div style='font-family:monospace; font-size:0.84rem; color:#FFD700; font-weight:bold;'>KJ: {kj_str}</div>"
                                     f"<div style='font-family:monospace; font-size:0.84rem; color:#00BFFF; font-weight:bold;'>TK: {tk_str}</div>"
                                     f"{sig_badge}",
