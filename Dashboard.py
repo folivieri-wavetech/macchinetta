@@ -5138,10 +5138,12 @@ else:
                         "incr_rows": incr_rows,
                     }
 
-                tot_pnl_storico = round(sum(float(c.get("pnl_totale_eur", 0) or 0) for c in chiuse), 2)
+                tot_pnl_storico_chiuse = sum(float(c.get("pnl_totale_eur", 0) or 0) for c in chiuse)
+                tot_pnl_inc_realizzate_attive = sum(float(det.get("pnl_inc_real_eur", 0) or 0) for det in dettagli_attive.values())
+                tot_pnl_cumulato = round(tot_pnl_storico_chiuse + tot_pnl_inc_realizzate_attive, 2)
 
                 col_kpi_live = "#00E676" if tot_pnl_live_ombra > 0 else ("#FA8072" if tot_pnl_live_ombra < 0 else "#9CA3AF")
-                col_kpi_hist = "#00E676" if tot_pnl_storico > 0 else ("#FA8072" if tot_pnl_storico < 0 else "#9CA3AF")
+                col_kpi_cumulato = "#00E676" if tot_pnl_cumulato > 0 else ("#FA8072" if tot_pnl_cumulato < 0 else "#9CA3AF")
 
                 k1, k2, k3, k4 = st.columns(4)
                 with k1:
@@ -5171,8 +5173,8 @@ else:
                 with k4:
                     st.markdown(
                         f"<div>"
-                        f"<div style='font-size:0.85rem; color:#9CA3AF; margin-bottom:4px;'>📜 P&L Storici Ombra</div>"
-                        f"<div style='font-size:1.75rem; font-weight:600; color:{col_kpi_hist};'>{'+' if tot_pnl_storico > 0 else ''}{formatta_eur(tot_pnl_storico)} €</div>"
+                        f"<div style='font-size:0.85rem; color:#9CA3AF; margin-bottom:4px;'>📜 P/L Cumulato</div>"
+                        f"<div style='font-size:1.75rem; font-weight:600; color:{col_kpi_cumulato};'>{'+' if tot_pnl_cumulato > 0 else ''}{formatta_eur(tot_pnl_cumulato)} €</div>"
                         f"</div>",
                         unsafe_allow_html=True,
                     )

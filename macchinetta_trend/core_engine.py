@@ -112,12 +112,12 @@ class CoreEngine:
         if any(c in nome for c in ["gold", "us 500", "us500", "sp500"]):
             be_pips = self.config.get("increment_be_pips", 40)
             be_offset = self.config.get("increment_be_offset", 2)
-            tp_pips = self.config.get("increment_tp_pips", 50)
+            tp_pips = self.config.get("increment_tp_pips", None) # Rimosso TP fisso: corsa libera con Trailing Stop
             trail_dist = self.config.get("increment_trail_pips", 15)
         else:
             be_pips = self.config.get("increment_be_pips", 25)
             be_offset = self.config.get("increment_be_offset", 1)
-            tp_pips = self.config.get("increment_tp_pips", 40)
+            tp_pips = self.config.get("increment_tp_pips", None) # Rimosso TP fisso: corsa libera con Trailing Stop
             trail_dist = self.config.get("increment_trail_pips", 12)
         return be_pips, be_offset, tp_pips, trail_dist
 
@@ -231,28 +231,29 @@ class CoreEngine:
 
             has_cleared_increments_long = any(e.get("type") in ("increments_cleared", "reversal") for e in events)
             if self.current_direction == "LONG" and not has_cleared_increments_long:
-                # Take Profit Incrementi Bancomat (+25p Forex / +50p Comm) valutato a fine candela
+                # Gestione Take Profit fisso disabilitata: l'incremento corre libero con Break-Even e Trailing Stop dinamico
                 be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
-                tp_threshold = tp_pips * pip_val
-                inc_to_close = [p for p in list(self.pm.increments) if (c_close - p.entry_price) >= (tp_threshold - 1e-7)]
-                for inc in inc_to_close:
-                    inc.close(exec_price)
-                    if inc in self.pm.increments:
-                        self.pm.increments.remove(inc)
-                    self.pm.closed_positions.append(inc)
-                    diff_p = (c_close - inc.entry_price) / pip_val
-                    gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
-                    events.append({
-                        "type": "tp_increment",
-                        "pnl": inc.pnl,
-                        "price": exec_price,
-                        "ticket": inc.ticket,
-                        "size": inc.size,
-                        "direction": "LONG",
-                        "tp_pips": gained_pips
-                    })
-                if inc_to_close:
-                    self.retracement_start_price = None
+                if tp_pips is not None:
+                    tp_threshold = tp_pips * pip_val
+                    inc_to_close = [p for p in list(self.pm.increments) if (c_close - p.entry_price) >= (tp_threshold - 1e-7)]
+                    for inc in inc_to_close:
+                        inc.close(exec_price)
+                        if inc in self.pm.increments:
+                            self.pm.increments.remove(inc)
+                        self.pm.closed_positions.append(inc)
+                        diff_p = (c_close - inc.entry_price) / pip_val
+                        gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                        events.append({
+                            "type": "tp_increment",
+                            "pnl": inc.pnl,
+                            "price": exec_price,
+                            "ticket": inc.ticket,
+                            "size": inc.size,
+                            "direction": "LONG",
+                            "tp_pips": gained_pips
+                        })
+                    if inc_to_close:
+                        self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
                 tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
@@ -347,28 +348,29 @@ class CoreEngine:
 
             has_cleared_increments_short = any(e.get("type") in ("increments_cleared", "reversal") for e in events)
             if self.current_direction == "SHORT" and not has_cleared_increments_short:
-                # Take Profit Incrementi Bancomat (+25p Forex / +50p Comm) valutato a fine candela
+                # Gestione Take Profit fisso disabilitata: l'incremento corre libero con Break-Even e Trailing Stop dinamico
                 be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
-                tp_threshold = tp_pips * pip_val
-                inc_to_close = [p for p in list(self.pm.increments) if (p.entry_price - c_close) >= (tp_threshold - 1e-7)]
-                for inc in inc_to_close:
-                    inc.close(exec_price)
-                    if inc in self.pm.increments:
-                        self.pm.increments.remove(inc)
-                    self.pm.closed_positions.append(inc)
-                    diff_p = (inc.entry_price - c_close) / pip_val
-                    gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
-                    events.append({
-                        "type": "tp_increment",
-                        "pnl": inc.pnl,
-                        "price": exec_price,
-                        "ticket": inc.ticket,
-                        "size": inc.size,
-                        "direction": "SHORT",
-                        "tp_pips": gained_pips
-                    })
-                if inc_to_close:
-                    self.retracement_start_price = None
+                if tp_pips is not None:
+                    tp_threshold = tp_pips * pip_val
+                    inc_to_close = [p for p in list(self.pm.increments) if (p.entry_price - c_close) >= (tp_threshold - 1e-7)]
+                    for inc in inc_to_close:
+                        inc.close(exec_price)
+                        if inc in self.pm.increments:
+                            self.pm.increments.remove(inc)
+                        self.pm.closed_positions.append(inc)
+                        diff_p = (inc.entry_price - c_close) / pip_val
+                        gained_pips = int(round(diff_p)) if round(diff_p, 1).is_integer() else round(diff_p, 1)
+                        events.append({
+                            "type": "tp_increment",
+                            "pnl": inc.pnl,
+                            "price": exec_price,
+                            "ticket": inc.ticket,
+                            "size": inc.size,
+                            "direction": "SHORT",
+                            "tp_pips": gained_pips
+                        })
+                    if inc_to_close:
+                        self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
                 tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
@@ -546,15 +548,15 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_min", "price": current_price})
                     self.retracement_start_price = None
 
-            # 5. Gestione a 3 Stadi Singolo Incremento (Break-Even, Trailing Stop e Take Profit Bancomat)
+            # 5. Gestione Singolo Incremento (Break-Even e Trailing Stop dinamico continuo, TP fisso rimosso)
             for inc in list(self.pm.increments):
                 gain = current_price - inc.entry_price
                 if not hasattr(inc, 'highest_price') or inc.highest_price is None:
                     inc.highest_price = inc.entry_price
                 inc.highest_price = max(inc.highest_price, current_price)
 
-                # A. Take Profit Bancomat Immediato al Target (+25p Forex / +50p Comm)
-                if gain >= (tp_threshold - 1e-7):
+                # A. Take Profit fisso opzionale (disattivato per consentire corsa libera col Trailing Stop)
+                if tp_threshold is not None and gain >= (tp_threshold - 1e-7):
                     inc.close(current_price)
                     if inc in self.pm.increments:
                         self.pm.increments.remove(inc)
@@ -573,7 +575,7 @@ class CoreEngine:
                     self.retracement_start_price = None
                     continue
 
-                # B. Attivazione Break-Even (+15p Forex / +30p Comm)
+                # B. Attivazione Break-Even (+25p Forex / +40p Comm)
                 if gain >= (be_threshold - 1e-7):
                     be_level = inc.entry_price + be_offset
                     if not getattr(inc, 'be_active', False):
@@ -673,15 +675,15 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk_break_max", "price": current_price})
                     self.retracement_start_price = None
 
-            # 5. Gestione a 3 Stadi Singolo Incremento (Break-Even, Trailing Stop e Take Profit Bancomat)
+            # 5. Gestione Singolo Incremento (Break-Even e Trailing Stop dinamico continuo, TP fisso rimosso)
             for inc in list(self.pm.increments):
                 gain = inc.entry_price - current_price
                 if not hasattr(inc, 'lowest_price') or inc.lowest_price is None:
                     inc.lowest_price = inc.entry_price
                 inc.lowest_price = min(inc.lowest_price, current_price)
 
-                # A. Take Profit Bancomat Immediato al Target (+25p Forex / +50p Comm)
-                if gain >= (tp_threshold - 1e-7):
+                # A. Take Profit fisso opzionale (disattivato per consentire corsa libera col Trailing Stop)
+                if tp_threshold is not None and gain >= (tp_threshold - 1e-7):
                     inc.close(current_price)
                     if inc in self.pm.increments:
                         self.pm.increments.remove(inc)
@@ -700,7 +702,7 @@ class CoreEngine:
                     self.retracement_start_price = None
                     continue
 
-                # B. Attivazione Break-Even (+15p Forex / +30p Comm)
+                # B. Attivazione Break-Even (+25p Forex / +40p Comm)
                 if gain >= (be_threshold - 1e-7):
                     be_level = inc.entry_price - be_offset
                     if not getattr(inc, 'be_active', False):
