@@ -346,6 +346,12 @@ def chiudi_ombra_su_storico(
     return salva_ombra(conto, data)
 
 
+def azzera_database_ombra(conto: str) -> bool:
+    """Azzera completamente l'intero database Ombra per il conto (sia attive che chiuse)."""
+    data = {"attive": {}, "chiuse": []}
+    return salva_ombra(conto, data)
+
+
 def elimina_storico_ombra(conto: str, oid: str = None) -> bool:
     """Elimina una singola voce o l'intero storico delle operazioni Ombra chiuse."""
     data = carica_ombra(conto)

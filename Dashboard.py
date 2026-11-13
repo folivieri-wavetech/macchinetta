@@ -5066,6 +5066,7 @@ else:
                     salva_ombra,
                     crea_operazione_ombra,
                     chiudi_ombra_su_storico,
+                    azzera_database_ombra,
                     elimina_storico_ombra,
                     calcola_pnl_eur_ombra,
                     calcola_margine_ombra,
@@ -5154,6 +5155,11 @@ else:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
+                    with st.popover("🗑️ Azzera Database", use_container_width=True):
+                        st.markdown("<div style='font-size:0.85rem; margin-bottom:8px;'>⚠️ Vuoi azzerare <b>tutto</b> il database Ombra (campagne attive, incrementi e storico)?</div>", unsafe_allow_html=True)
+                        if st.button("Conferma Reset Totale", key=f"btn_reset_all_ombra_{conto_selezionato}", type="primary", use_container_width=True):
+                            azzera_database_ombra(conto_selezionato)
+                            st.rerun()
                 with k2:
                     st.markdown(
                         f"<div>"
