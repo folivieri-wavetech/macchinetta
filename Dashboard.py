@@ -5122,7 +5122,7 @@ else:
                         incr_rows.append({**inc, "pnl_eur": inc_pnl})
 
                     pnl_inc_real = float(camp.get("pnl_realizzato_inc_eur", 0) or 0)
-                    pnl_tot_camp = round(pnl_core_eur + pnl_inc_float + pnl_inc_real, 2)
+                    pnl_tot_camp = round(pnl_core_eur + pnl_inc_float, 2)
                     marg_camp = calcola_margine_ombra(camp, CONFIG_STRUMENTI)
 
                     tot_margine_ombra += marg_camp
@@ -5328,13 +5328,13 @@ else:
                             sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop TK: {float(camp['signal_stop_price_tk']):.{dec}f}</div>"
 
                         sub_pnl_html = ""
-                        if incr_rows or abs(pnl_inc_tot) >= 0.01:
+                        if incr_rows:
                             c_sub_col = "#00E676" if pnl_core > 0 else ("#FA8072" if pnl_core < 0 else "#9CA3AF")
-                            i_sub_col = "#00E676" if pnl_inc_tot > 0 else ("#FA8072" if pnl_inc_tot < 0 else "#9CA3AF")
+                            i_sub_col = "#00E676" if pnl_inc_fl > 0 else ("#FA8072" if pnl_inc_fl < 0 else "#9CA3AF")
                             sub_pnl_html = (
                                 f"<div style='font-size:0.72rem; color:#9CA3AF; font-weight:normal;'>"
                                 f"Core: <span style='color:{c_sub_col}; font-weight:normal;'>{'+' if pnl_core > 0 else ''}{formatta_eur(pnl_core)} €</span> | "
-                                f"Incr: <span style='color:{i_sub_col}; font-weight:normal;'>{'+' if pnl_inc_tot > 0 else ''}{formatta_eur(pnl_inc_tot)} €</span></div>"
+                                f"Incr: <span style='color:{i_sub_col}; font-weight:normal;'>{'+' if pnl_inc_fl > 0 else ''}{formatta_eur(pnl_inc_fl)} €</span></div>"
                             )
 
                         with st.container(border=True):
