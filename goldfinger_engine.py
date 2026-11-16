@@ -285,8 +285,8 @@ class GoldfingerEngine:
 
     def apri_short_mercato(self, size, numero_scaglione=None):
         now_t = time.time()
-        if (now_t - self.ultimo_tentativo_ordine) < 3.0:
-            # Salvaguardia anti-flood: rispetta almeno 3 secondi tra ordini consecutivi
+        if (now_t - self.ultimo_tentativo_ordine) < 1.0:
+            # Salvaguardia anti-flood: rispetta almeno 1.0s tra ordini consecutivi
             return False, None, None
         self.ultimo_tentativo_ordine = now_t
 
@@ -303,39 +303,39 @@ class GoldfingerEngine:
         }
         lbl_sc = f" [Difesa {numero_scaglione}]" if numero_scaglione else ""
         try:
-            r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=payload, timeout=8)
+            r = requests.post(f"{BASE_URL}/positions/otc", headers=headers, json=payload, timeout=5)
             if r.status_code == 200:
                 deal_ref = r.json().get("dealReference")
-                print_log(f"📤 Ordine SHORT inviato a IG{lbl_sc} [dealRef: {deal_ref}]. Avvio verifica esecuzione (fino a 5 tentativi a intervalli di 5s)...")
+                print_log(f"📤 Ordine SHORT inviato a IG{lbl_sc} [dealRef: {deal_ref}]. Avvio verifica rapida (max 3 tentativi da 1s)...")
 
-                # Fino a 5 tentativi distanziati di 5 secondi ciascuno (tolleranza 25 secondi totali)
-                for tentativo in range(1, 6):
-                    time.sleep(5.0)
+                # Verifica rapida e reattiva: 3 tentativi a intervalli di 1.0 secondo (max 3s totali invece di 25s!)
+                for tentativo in range(1, 4):
+                    time.sleep(1.0)
                     try:
-                        r_conf = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=self.get_auth_headers("1"), timeout=8)
+                        r_conf = requests.get(f"{BASE_URL}/confirms/{deal_ref}", headers=self.get_auth_headers("1"), timeout=4)
                         if r_conf.status_code == 200:
                             c_data = r_conf.json()
                             deal_status = c_data.get("dealStatus")
                             if deal_status == "ACCEPTED":
                                 deal_id = c_data.get("dealId")
                                 level = float(c_data.get("level", 0.0))
-                                print_log(f"✅ Eseguito SHORT a mercato{lbl_sc} (confermato al tentativo {tentativo}/5): {size} contratti @ {level:.2f} [ID: {deal_id}]")
+                                print_log(f"✅ Eseguito SHORT a mercato{lbl_sc} (confermato al tentativo {tentativo}/3): {size} contratti @ {level:.2f} [ID: {deal_id}]")
                                 return True, deal_id, level
                             elif deal_status == "REJECTED":
                                 reason = c_data.get("reason", "UNKNOWN_REASON")
-                                print_log(f"🛑 [TENTATIVO {tentativo}/5] Ordine SHORT respinto da IG{lbl_sc}: {reason}")
+                                print_log(f"🛑 [TENTATIVO {tentativo}/3] Ordine SHORT respinto da IG{lbl_sc}: {reason}")
                                 break
                             else:
-                                print_log(f"⏳ [TENTATIVO {tentativo}/5] Deal {deal_ref} in elaborazione IG (stato: {deal_status}). Attesa 5s...")
+                                print_log(f"⏳ [TENTATIVO {tentativo}/3] Deal {deal_ref} in elaborazione IG (stato: {deal_status}). Attesa 1s...")
                         elif r_conf.status_code == 401:
                             print_log("🔄 Token IG non valido durante verifica conferma: ricarico credenziali...")
                             self.carica_token()
                         else:
-                            print_log(f"⚠️ [TENTATIVO {tentativo}/5] Risposta HTTP {r_conf.status_code} da IG su /confirms/{deal_ref}")
+                            print_log(f"⚠️ [TENTATIVO {tentativo}/3] Risposta HTTP {r_conf.status_code} da IG su /confirms/{deal_ref}")
                     except Exception as e_conf:
-                        print_log(f"⚠️ [TENTATIVO {tentativo}/5] Errore verifica conferma{lbl_sc}: {e_conf}")
+                        print_log(f"⚠️ [TENTATIVO {tentativo}/3] Errore verifica conferma{lbl_sc}: {e_conf}")
 
-                print_log(f"🛑 [ORDINE NON ESEGUITO] Difesa{lbl_sc} NON eseguita dopo 5 tentativi (25s) di verifica su IG [dealRef: {deal_ref}]. Arresto tentativi per sicurezza.")
+                print_log(f"🛑 [ORDINE NON ESEGUITO] Difesa{lbl_sc} NON confermata dopo 3 tentativi rapidi su IG [dealRef: {deal_ref}].")
             else:
                 print_log(f"⚠️ Errore invio ordine SHORT IG{lbl_sc}: HTTP {r.status_code} - {r.text}")
         except Exception as e:
@@ -679,11 +679,29 @@ class GoldfingerEngine:
 
         # 6. VERIFICA ENTRATE A SCAGLIONI IN DISCESA (RATCHET A GRADINI)
         passo = float(self.stato.get("passo_pip", 6.0))
+        delta_totale = int(self.stato.get("delta_totale", 15))
+
         for idx, sc in enumerate(scaglioni):
             if sc["stato"] == "IN_ATTESA":
                 if bid <= sc["prezzo_target"]:
-                    # Invia ordine SHORT a mercato con tolleranza (5 tentativi a intervalli di 5s)
-                    ok, deal_id, lvl = self.apri_short_mercato(sc["size"], numero_scaglione=sc.get("numero"))
+                    # BLINDATURA 1: TETTO ASSOLUTO SIZE SUL DELTA TOTALE
+                    contratti_in_essere = sum(
+                        int(s.get("size", 0)) for s in scaglioni
+                        if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO", "IN_VOLO")
+                    )
+                    size_da_aprire = int(sc.get("size", 3))
+                    if (contratti_in_essere + size_da_aprire) > delta_totale:
+                        print_log(f"🛑 BLOCCO DI SICUREZZA DELTA: contratti attivi ({contratti_in_essere}) + size ({size_da_aprire}) superano il Delta Max ({delta_totale}). Ordine Difesa {sc['numero']} bloccato.")
+                        sc["stato"] = "NON_ESEGUITO"
+                        self.salva_stato()
+                        break
+
+                    # BLINDATURA 2: LOCK IMMEDIATO STATO "IN_VOLO" (Zero duplicazioni ordini)
+                    sc["stato"] = "IN_VOLO"
+                    self.salva_stato()
+
+                    # Invia ordine SHORT a mercato con verifica rapida
+                    ok, deal_id, lvl = self.apri_short_mercato(size_da_aprire, numero_scaglione=sc.get("numero"))
                     if ok:
                         sc["stato"] = "APERTO"
                         sc["deal_id"] = deal_id
@@ -729,8 +747,21 @@ class GoldfingerEngine:
                         # CONTROLLO RECUPERO DIFESE ROSSE PRECEDENTI
                         scaglioni_rossi = [s for s in scaglioni if s.get("numero") < sc.get("numero") and s.get("stato") == "NON_ESEGUITO"]
                         for sc_r in scaglioni_rossi:
+                            # Verifica tetto Delta prima di qualsiasi recupero
+                            contratti_curr = sum(
+                                int(s.get("size", 0)) for s in scaglioni
+                                if s.get("stato") in ("APERTO", "PROTETTO_BE", "RECUPERATO", "IN_VOLO")
+                            )
+                            sz_rec = int(sc_r.get("size", 3))
+                            if (contratti_curr + sz_rec) > delta_totale:
+                                print_log(f"🛑 BLOCCO RECUPERO: contratti attivi ({contratti_curr}) + recupero ({sz_rec}) superano il Delta Max ({delta_totale}). Recupero annullato.")
+                                break
+
                             print_log(f"🔍 Rilevata Difesa {sc_r['numero']} NON ESEGUITA in precedenza (rosso). Tento il recupero a mercato al prezzo attuale ({bid:.2f})...")
-                            ok_rec, deal_id_rec, lvl_rec = self.apri_short_mercato(sc_r["size"], numero_scaglione=f"{sc_r['numero']} (RECUPERO)")
+                            sc_r["stato"] = "IN_VOLO"
+                            self.salva_stato()
+
+                            ok_rec, deal_id_rec, lvl_rec = self.apri_short_mercato(sz_rec, numero_scaglione=f"{sc_r['numero']} (RECUPERO)")
                             if ok_rec:
                                 sc_r["stato"] = "RECUPERATO"
                                 sc_r["deal_id"] = deal_id_rec
@@ -743,9 +774,11 @@ class GoldfingerEngine:
                                 invia_notifica("RECUPERO DIFESA", f"Difesa {sc_r['numero']} recuperata a mercato @ {lvl_rec:.2f}", "arrows_counterclockwise")
                                 self.salva_stato()
                             else:
+                                sc_r["stato"] = "NON_ESEGUITO"
                                 print_log(f"⚠️ Recupero Difesa {sc_r['numero']} fallito anche al prezzo attuale. Rimane NON ESEGUITA (rosso).")
+                                self.salva_stato()
                     else:
-                        # Non eseguito dopo i 5 tentativi: segna NON_ESEGUITO (pallino rosso) e fermati
+                        # Non eseguito: segna NON_ESEGUITO (pallino rosso) e sblocca lo stato per sicurezza
                         sc["stato"] = "NON_ESEGUITO"
                         print_log(f"🔴 Difesa {sc['numero']} marchiata NON_ESEGUITO. Il motore si ferma per questo livello per evitare duplicazioni.")
                         invia_notifica("DIFESA NON ESEGUITA", f"Difesa {sc['numero']} non eseguita su IG dopo 5 tentativi (25s).", "stop_sign")
@@ -975,7 +1008,9 @@ class GoldfingerEngine:
             try:
                 self.ciclo_operativo()
                 consecutive_errors = 0
-                time.sleep(1.5)
+                # Se ci sono difese in attesa, reattività rapida a 0.5s per intercettare il tick
+                has_waiting = any(s.get("stato") == "IN_ATTESA" for s in self.stato.get("scaglioni", []))
+                time.sleep(0.5 if (self.stato.get("attivo") and has_waiting) else 1.5)
             except KeyboardInterrupt:
                 print_log("🛑 Goldfinger Engine interrotto.")
                 break

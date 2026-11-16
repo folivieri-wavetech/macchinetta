@@ -125,10 +125,10 @@ class CoreEngine:
         """Restituisce (tolleranza_tk, max_dist_tk, min_dist_incr, min_candle_body) in pip/punti."""
         tf_val = str(self.config.get("timeframe", "HOUR")).upper()
         if "HOUR_4" in tf_val or "H4" in tf_val:
-            max_dist_tk = self.config.get("max_tk_dist_pips", 40)
+            max_dist_tk = self.config.get("max_tk_dist_pips", 50)
         else:
-            max_dist_tk = self.config.get("max_tk_dist_pips", 20)
-        tolleranza_tk = self.config.get("tolleranza_tk_pips", 5)
+            max_dist_tk = self.config.get("max_tk_dist_pips", 25)
+        tolleranza_tk = self.config.get("tolleranza_tk_pips", 10)
         min_dist_incr = self.config.get("min_dist_incr_pips", 10)
         min_body = self.config.get("min_body_pips", 1)
         return tolleranza_tk, max_dist_tk, min_dist_incr, min_body
@@ -205,9 +205,15 @@ class CoreEngine:
                 dist_kj_tk_pips = abs(tk - kj) / pip_val
                 proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
 
+                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
+                tolleranza_tk = tol_pips * pip_val
+                max_dist_tk = max_tk_dist_pips * pip_val
+                min_dist_incr = min_dist_pips * pip_val
+                min_body = min_body_pips * pip_val
+
                 if len(self.pm.increments) > 0:
-                    if proteggi_su_tk and c_close < (tk - 5 * pip_val - 1e-7):
-                        # Chiusura sotto Tenkan oltre tolleranza 5 pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Minimo - 5 pip
+                    if proteggi_su_tk and c_close < (tk - tolleranza_tk - 1e-7):
+                        # Chiusura sotto Tenkan oltre tolleranza pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Minimo - 5 pip
                         stop_livello_tk = closed_candle.low - (5 * pip_val)
                         if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                             self.signal_stop_price_tk = min(self.signal_stop_price_tk, stop_livello_tk)
@@ -256,11 +262,6 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
-                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
-                tolleranza_tk = tol_pips * pip_val
-                max_dist_tk = max_tk_dist_pips * pip_val
-                min_dist_incr = min_dist_pips * pip_val
-                min_body = min_body_pips * pip_val
 
                 if closed_candle.open > (tk - tolleranza_tk) and c_close >= (tk - tolleranza_tk - 1e-7) and (c_close - tk) <= (max_dist_tk + 1e-7):
                     # Candela rossa di almeno min_body pip
@@ -322,9 +323,15 @@ class CoreEngine:
                 dist_kj_tk_pips = abs(tk - kj) / pip_val
                 proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
 
+                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
+                tolleranza_tk = tol_pips * pip_val
+                max_dist_tk = max_tk_dist_pips * pip_val
+                min_dist_incr = min_dist_pips * pip_val
+                min_body = min_body_pips * pip_val
+
                 if len(self.pm.increments) > 0:
-                    if proteggi_su_tk and c_close > (tk + 5 * pip_val + 1e-7):
-                        # Chiusura sopra Tenkan oltre tolleranza 5 pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Massimo + 5 pip
+                    if proteggi_su_tk and c_close > (tk + tolleranza_tk + 1e-7):
+                        # Chiusura sopra Tenkan oltre tolleranza pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Massimo + 5 pip
                         stop_livello_tk = closed_candle.high + (5 * pip_val)
                         if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                             self.signal_stop_price_tk = max(self.signal_stop_price_tk, stop_livello_tk)
@@ -373,11 +380,6 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
-                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
-                tolleranza_tk = tol_pips * pip_val
-                max_dist_tk = max_tk_dist_pips * pip_val
-                min_dist_incr = min_dist_pips * pip_val
-                min_body = min_body_pips * pip_val
 
                 if closed_candle.open < (tk + tolleranza_tk) and c_close <= (tk + tolleranza_tk + 1e-7) and (tk - c_close) <= (max_dist_tk + 1e-7):
                     # Candela verde di almeno min_body pip
