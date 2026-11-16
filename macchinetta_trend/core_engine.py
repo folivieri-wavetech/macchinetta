@@ -482,7 +482,7 @@ class CoreEngine:
         be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
         be_threshold = be_pips * pip_val
         be_offset = be_offset_pips * pip_val
-        tp_threshold = tp_pips * pip_val
+        tp_threshold = (tp_pips * pip_val) if tp_pips is not None else None
         trail_dist = trail_dist_pips * pip_val
 
         tf_val = str(self.config.get("timeframe", "HOUR")).upper()
