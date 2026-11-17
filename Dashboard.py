@@ -5549,7 +5549,6 @@ else:
                         tf_o = c_old.get("timeframe", "HOUR")
                         tf_o_lbl = "H1" if tf_o == "HOUR" else ("H4" if tf_o == "HOUR_4" else "Daily")
                         righe_storico.append({
-                            "ID": c_old.get("id", ""),
                             "Strumento": c_old.get("nome", ""),
                             "TF": tf_o_lbl,
                             "Dir": c_old.get("direzione", ""),
