@@ -3281,13 +3281,31 @@ else:
                 color_style = f"color: {trend_color};" if is_trend else ""
                 u_style = f"border-bottom: 1px solid {trend_color}; text-decoration: none;" if is_trend else ""
 
+                stima_kj_master_html = ""
+                if is_trend and kj_val is not None and mult > 0:
+                    tot_pnl_kj_eur = 0.0
+                    for p_item in posizioni:
+                        sz_p = float(p_item['position']['size'])
+                        lvl_p = float(p_item['position']['level'])
+                        pts_kj_p = (float(kj_val) - lvl_p)/mult if dir == 'BUY' else (lvl_p - float(kj_val))/mult
+                        tot_pnl_kj_eur += (pts_kj_p * sz_p * valore_punto * rate)
+                    col_tot_kj = "#4ade80" if tot_pnl_kj_eur > 0 else ("#ff6b6b" if tot_pnl_kj_eur < 0 else "#aaa")
+                    sign_tot_kj = "+" if tot_pnl_kj_eur > 0 else ""
+                    stima_kj_master_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_tot_kj};'>{sign_tot_kj}{formatta_eur(tot_pnl_kj_eur)} €</b></div>"
+
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
                     td_mercato = f"<td rowspan='{r_span}' class='col-mercato' style='vertical-align: middle; border-right: 1px solid rgba(255,255,255,0.05);'><div style='display: flex; align-items: center;'><span class='ig-dot'></span>{formatta_mercato_con_bandiere(nome, color=trend_color)}</div></td>"
                 else:
                     td_mercato = ""
 
-                td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span></td>" if mostra_tipo else ""
+                if mostra_tipo:
+                    if len(posizioni) > 1:
+                        td_tipo_master = f"<td>{stima_kj_master_html}</td>" if is_trend else "<td></td>"
+                    else:
+                        td_tipo_master = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_master_str}</u></span>{stima_kj_master_html}</td>"
+                else:
+                    td_tipo_master = ""
                 
                 # Se è posizione singola (es. solo Core, senza incrementi), ricava la data/ora di apertura da visualizzare sotto il livello (senza sottolineatura)
                 data_master_str = ""
@@ -3426,7 +3444,15 @@ else:
                         is_last_subrow = (idx == len(posizioni_render) - 1)
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
-                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span></td>" if mostra_tipo else ""
+                        stima_kj_child_html = ""
+                        if is_trend and kj_val is not None and mult > 0:
+                            pts_kj_c = (float(kj_val) - lvl)/mult if dir == 'BUY' else (lvl - float(kj_val))/mult
+                            pnl_kj_c = pts_kj_c * sz * valore_punto * rate
+                            col_kj_c = "#4ade80" if pnl_kj_c > 0 else ("#ff6b6b" if pnl_kj_c < 0 else "#aaa")
+                            sign_kj_c = "+" if pnl_kj_c > 0 else ""
+                            stima_kj_child_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_kj_c};'>{sign_kj_c}{formatta_eur(pnl_kj_c)} €</b></div>"
+
+                        td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span>{stima_kj_child_html}</td>" if mostra_tipo else ""
                         html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span class='entry-date' style='font-size: 0.75rem; color: #888; text-decoration: none !important; display: inline-block;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
             
             totale_class = "pnl-pos" if totale_pnl_portafoglio >= 0 else "pnl-neg"
