@@ -599,7 +599,7 @@ class CoreEngine:
                     self.retracement_start_price = None
                     continue
 
-                # B. Attivazione Break-Even (+25p Forex / +40p Comm)
+                # B. Attivazione Break-Even (+25p Forex / +40p Comm) - Opzione A: no Trailing fisso 12p, uscita naturale su TK21
                 if gain >= (be_threshold - 1e-7):
                     be_level = inc.entry_price + be_offset
                     if not getattr(inc, 'be_active', False):
@@ -614,12 +614,6 @@ class CoreEngine:
                             "sl_price": be_level,
                             "be_pips": be_pips
                         })
-                    # Trailing Stop progressivo sopra Break-Even
-                    trail_level = inc.highest_price - trail_dist
-                    if getattr(inc, 'sl_price', None) is not None:
-                        inc.sl_price = max(inc.sl_price, trail_level)
-                    else:
-                        inc.sl_price = max(be_level, trail_level)
 
                 # C. Esecuzione Stop / Break-Even dell'incremento
                 if getattr(inc, 'sl_price', None) is not None and current_price <= (inc.sl_price + 1e-7):
@@ -726,7 +720,7 @@ class CoreEngine:
                     self.retracement_start_price = None
                     continue
 
-                # B. Attivazione Break-Even (+25p Forex / +40p Comm)
+                # B. Attivazione Break-Even (+25p Forex / +40p Comm) - Opzione A: no Trailing fisso 12p, uscita naturale su TK21
                 if gain >= (be_threshold - 1e-7):
                     be_level = inc.entry_price - be_offset
                     if not getattr(inc, 'be_active', False):
@@ -741,12 +735,6 @@ class CoreEngine:
                             "sl_price": be_level,
                             "be_pips": be_pips
                         })
-                    # Trailing Stop progressivo sopra Break-Even
-                    trail_level = inc.lowest_price + trail_dist
-                    if getattr(inc, 'sl_price', None) is not None:
-                        inc.sl_price = min(inc.sl_price, trail_level)
-                    else:
-                        inc.sl_price = min(be_level, trail_level)
 
                 # C. Esecuzione Stop / Break-Even dell'incremento
                 if getattr(inc, 'sl_price', None) is not None and current_price >= (inc.sl_price - 1e-7):

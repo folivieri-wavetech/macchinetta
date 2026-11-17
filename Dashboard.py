@@ -3432,20 +3432,23 @@ else:
                                 trailing_sl_incr = mem_strum.get("trailing_sl_incr")
                                 tk_val = mem_strum.get("current_tk")
                                 pip_val = c.get("moltiplicatore", 0.0001)
+                                tk_paracadute = (tk_val - (10 * pip_val)) if (tk_val is not None and dir == 'BUY') else ((tk_val + (10 * pip_val)) if tk_val is not None else None)
+                                candidati = []
+                                if tk_paracadute is not None:
+                                    candidati.append((tk_paracadute, "Paracadute TK (TK +- 10 pip)"))
                                 if inc_sl_mem is not None:
-                                    sl_display = inc_sl_mem
-                                    title_info = "Stop/BE Incremento salvato"
-                                elif signal_tk_active and signal_tk_stop is not None:
-                                    sl_display = signal_tk_stop
-                                    title_info = "Stop Candela Segnale TK (Min/Max +- 5 pip confermato)"
-                                elif trailing_sl_incr is not None:
-                                    sl_display = trailing_sl_incr
-                                    title_info = "Trailing SL Incremento"
-                                elif tk_val is not None:
-                                    sl_display = (tk_val - (10 * pip_val)) if dir == 'BUY' else (tk_val + (10 * pip_val))
-                                    title_info = "Paracadute TK (TK +- 10 pip)"
+                                    candidati.append((inc_sl_mem, "Break-Even Incremento (+1 pip)"))
+                                if signal_tk_active and signal_tk_stop is not None:
+                                    candidati.append((signal_tk_stop, "Stop Candela Segnale TK (Min/Max +- 5 pip)"))
+                                
+                                if candidati:
+                                    if dir == 'BUY':
+                                        sl_display, title_info = max(candidati, key=lambda x: x[0])
+                                    else:
+                                        sl_display, title_info = min(candidati, key=lambda x: x[0])
                                 else:
                                     sl_display = None
+                                    title_info = ""
                                 
                                 # Uniformazione al Trailing Stop Core se più protettivo
                                 trailing_sl_core = mem_strum.get("trailing_sl_core")
