@@ -83,7 +83,7 @@ def invia_notifica(titolo, messaggio, tags="trophy", cooldown_identico_sec=60, m
         # Fallback
         ora = now_it().strftime("%H:%M:%S")
         body = f"[{ora}] {messaggio}"
-        headers = {"Title": f"[GOLDFINGER] {titolo}".encode('utf-8'), "Tags": tags}
+        headers = {"Title": f"[GOLDFINGER] {titolo}".encode('utf-8'), "Tags": tags, "Priority": "high"}
         requests.post(f"https://ntfy.sh/{topic}", data=body.encode('utf-8'), headers=headers, timeout=5)
     except Exception:
         pass

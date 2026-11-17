@@ -3295,16 +3295,27 @@ else:
                 u_style = f"border-bottom: 1px solid {trend_color}; text-decoration: none;" if is_trend else ""
 
                 stima_kj_master_html = ""
-                if is_trend and kj_val is not None and mult > 0:
-                    tot_pnl_kj_eur = 0.0
-                    for p_item in posizioni:
-                        sz_p = float(p_item['position']['size'])
-                        lvl_p = float(p_item['position']['level'])
-                        pts_kj_p = (float(kj_val) - lvl_p)/mult if dir == 'BUY' else (lvl_p - float(kj_val))/mult
-                        tot_pnl_kj_eur += (pts_kj_p * sz_p * valore_punto * rate)
-                    col_tot_kj = "#4ade80" if tot_pnl_kj_eur > 0 else ("#ff6b6b" if tot_pnl_kj_eur < 0 else "#aaa")
-                    sign_tot_kj = "+" if tot_pnl_kj_eur > 0 else ""
-                    stima_kj_master_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_tot_kj};'>{sign_tot_kj}{tot_pnl_kj_eur:.0f} €</b></div>"
+                if is_trend and mult > 0:
+                    ref_core_m_val = tk_val if core_ref_m == "TK" else kj_val
+                    lbl_m = f"Stima {core_ref_m}:"
+                    col_lbl_m = "#00BFFF" if core_ref_m == "TK" else "#FFD700"
+
+                    if ref_core_m_val is not None:
+                        tot_pnl_est_eur = 0.0
+                        s_core = float(mem_corrente.get(nome, {}).get("size", 3))
+                        core_pos_list = [p for p in posizioni if abs(float(p['position']['size']) - s_core) < 0.001 or any(c.get("ticket") == p['position'].get("dealId") for c in mem_corrente.get(nome, {}).get("posizioni_core", []))]
+                        
+                        for p_item in posizioni:
+                            sz_p = float(p_item['position']['size'])
+                            lvl_p = float(p_item['position']['level'])
+                            is_inc = (len(posizioni) > 1 and p_item not in core_pos_list)
+                            target_px = (tk_val if (is_inc and tk_val is not None) else ref_core_m_val)
+                            pts_p = (float(target_px) - lvl_p)/mult if dir == 'BUY' else (lvl_p - float(target_px))/mult
+                            tot_pnl_est_eur += (pts_p * sz_p * valore_punto * rate)
+                            
+                        col_tot_est = "#4ade80" if tot_pnl_est_eur > 0 else ("#ff6b6b" if tot_pnl_est_eur < 0 else "#aaa")
+                        sign_tot_est = "+" if tot_pnl_est_eur > 0 else ""
+                        stima_kj_master_html = f"<div style='font-size: 0.75rem; margin-top: 2px;'><span style='color: {col_lbl_m};'>{lbl_m}</span> <b style='color: {col_tot_est};'>{sign_tot_est}{tot_pnl_est_eur:.0f} €</b></div>"
 
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
@@ -3473,12 +3484,22 @@ else:
                         subrow_style = "border-bottom: 2px solid rgba(255,255,255,0.3);" if (is_last_of_instrument and is_last_subrow) else ""
                         
                         stima_kj_child_html = ""
-                        if is_trend and kj_val is not None and mult > 0:
-                            pts_kj_c = (float(kj_val) - lvl)/mult if dir == 'BUY' else (lvl - float(kj_val))/mult
-                            pnl_kj_c = pts_kj_c * sz * valore_punto * rate
-                            col_kj_c = "#4ade80" if pnl_kj_c > 0 else ("#ff6b6b" if pnl_kj_c < 0 else "#aaa")
-                            sign_kj_c = "+" if pnl_kj_c > 0 else ""
-                            stima_kj_child_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_kj_c};'>{sign_kj_c}{pnl_kj_c:.0f} €</b></div>"
+                        if is_trend and mult > 0:
+                            if is_core_subrow:
+                                target_c_val = ref_core_val
+                                lbl_c = f"Stima {core_ref_line}:"
+                                col_lbl_c = "#00BFFF" if core_ref_line == "TK" else "#FFD700"
+                            else:
+                                target_c_val = tk_val
+                                lbl_c = "Stima TK:"
+                                col_lbl_c = "#00BFFF"
+
+                            if target_c_val is not None:
+                                pts_kj_c = (float(target_c_val) - lvl)/mult if dir == 'BUY' else (lvl - float(target_c_val))/mult
+                                pnl_kj_c = pts_kj_c * sz * valore_punto * rate
+                                col_kj_c = "#4ade80" if pnl_kj_c > 0 else ("#ff6b6b" if pnl_kj_c < 0 else "#aaa")
+                                sign_kj_c = "+" if pnl_kj_c > 0 else ""
+                                stima_kj_child_html = f"<div style='font-size: 0.75rem; margin-top: 2px;'><span style='color: {col_lbl_c};'>{lbl_c}</span> <b style='color: {col_kj_c};'>{sign_kj_c}{pnl_kj_c:.0f} €</b></div>"
 
                         td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span>{stima_kj_child_html}</td>" if mostra_tipo else ""
                         html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span class='entry-date' style='font-size: 0.75rem; color: #888; text-decoration: none !important; display: inline-block;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
@@ -5665,17 +5686,47 @@ else:
                     role_html = calcola_ruolo_posizione(nome, dir_pos, sz, param_inst, pos, {}, {}, pos_data)
                     role_clean = re.sub(r"<[^>]+>", "", role_html).strip()
 
-                    # Stima P/L su Kijun per posizioni TREND
+                    # Stima P/L su KJ / TK per posizioni TREND
                     pnl_kj_html = ""
-                    if is_deal_t_rec and param_inst:
+                    if is_deal_t_rec and param_inst and mult > 0:
                         kj_val_t = param_inst.get("current_kj")
-                        if kj_val_t is not None and mult > 0:
-                            kj_num = float(kj_val_t)
-                            pts_kj = (kj_num - lvl_open)/mult if dir_pos == 'BUY' else (lvl_open - kj_num)/mult
-                            pnl_kj_eur = pts_kj * sz * valore_punto * rate_eur
-                            col_kj = "#4ade80" if pnl_kj_eur > 0 else ("#ff6b6b" if pnl_kj_eur < 0 else "#aaa")
-                            sign_kj = "+" if pnl_kj_eur > 0 else ""
-                            pnl_kj_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ ({kj_num:.{dec}f}): <b style='color: {col_kj};'>{sign_kj}{pnl_kj_eur:.0f} €</b></div>"
+                        tk_val_t = param_inst.get("current_tk")
+                        if kj_val_t is None or tk_val_t is None:
+                            try:
+                                rt_d, _ = carica_radar_trend_dash(conto_selezionato)
+                                tf_cur = param_inst.get("timeframe", "HOUR")
+                                lbl_cur = "H4" if tf_cur == "HOUR_4" else ("D1" if tf_cur == "DAY" else "H1")
+                                if rt_d and nome in rt_d:
+                                    tf_d = rt_d[nome].get("timeframes", {}).get(lbl_cur, {})
+                                    if kj_val_t is None: kj_val_t = tf_d.get("kj")
+                                    if tk_val_t is None: tk_val_t = tf_d.get("tk")
+                            except Exception:
+                                pass
+
+                        is_incr_pos = ("Incremento" in role_clean)
+                        if is_incr_pos:
+                            ref_line_t = "TK"
+                            ref_val_t = tk_val_t
+                        else:
+                            core_ref_t = param_inst.get("core_ref_line")
+                            if not core_ref_t and kj_val_t is not None and tk_val_t is not None:
+                                tf_t = param_inst.get("timeframe", "HOUR")
+                                soglia_t = 70 if ("HOUR_4" in tf_t or "H4" in tf_t) else (100 if ("DAY" in tf_t or "D1" in tf_t) else 40)
+                                dist_t = abs(kj_val_t - tk_val_t) / mult
+                                core_ref_t = "TK" if dist_t > (soglia_t - 1e-7) else "KJ"
+                            else:
+                                core_ref_t = core_ref_t or "KJ"
+                            ref_line_t = core_ref_t
+                            ref_val_t = tk_val_t if core_ref_t == "TK" else kj_val_t
+
+                        if ref_val_t is not None:
+                            ref_num = float(ref_val_t)
+                            pts_ref = (ref_num - lvl_open)/mult if dir_pos == 'BUY' else (lvl_open - ref_num)/mult
+                            pnl_ref_eur = pts_ref * sz * valore_punto * rate_eur
+                            col_ref_pnl = "#4ade80" if pnl_ref_eur > 0 else ("#ff6b6b" if pnl_ref_eur < 0 else "#aaa")
+                            sign_ref_pnl = "+" if pnl_ref_eur > 0 else ""
+                            col_ref_lbl = "#00BFFF" if ref_line_t == "TK" else "#FFD700"
+                            pnl_kj_html = f"<div style='font-size: 0.75rem; margin-top: 2px;'><span style='color: {col_ref_lbl};'>Stima {ref_line_t} ({ref_num:.{dec}f}):</span> <b style='color: {col_ref_pnl};'>{sign_ref_pnl}{pnl_ref_eur:.0f} €</b></div>"
 
                     with st.container(border=True):
                         col1, col2, col3, col4, col5, col6, col7 = st.columns([1.8, 0.8, 1.2, 1.2, 2.2, 1.3, 1.1], vertical_alignment="center")

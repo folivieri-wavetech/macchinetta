@@ -173,6 +173,8 @@ def invia_notifica(topic: str, titolo: str, messaggio: str, tags: str = "informa
             "Title": titolo_completo.encode('utf-8'),
             "Tags": tags
         }
+        if prioritario:
+            headers["Priority"] = "high"
         res = requests.post(f"https://ntfy.sh/{topic}", data=body.encode('utf-8'), headers=headers, timeout=5)
 
         if res.status_code == 200:
