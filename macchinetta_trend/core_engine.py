@@ -42,10 +42,12 @@ class CoreEngine:
         self.current_kj = None
         self.trailing_sl_incr = None # Trailing SL a 20 pip da Close per tutti gli incrementi (dist TK >= 20 pip)
         self.trailing_sl_core = None # Trailing SL a 40 pip da Close per la Core (dist KJ >= 40 pip)
-        self.signal_candle_active = False # True se una candela ha chiuso oltre KJ senza prendere il paracadute
+        self.signal_candle_active = False # True se una candela ha chiuso oltre linea guida Core
         self.signal_stop_price = None     # Livello di stop confermato Core (Minimo - 5p per LONG, Massimo + 5p per SHORT)
         self.signal_candle_tk_active = False # True se una candela ha chiuso oltre TK senza prendere il paracadute TK
         self.signal_stop_price_tk = None     # Livello di stop confermato Incrementi (Minimo - 5p per LONG, Massimo + 5p per SHORT)
+        self.core_ref_line = "KJ"            # "KJ" (default) oppure "TK" se forbice > soglia
+        self.core_ref_value = None           # Valore del livello attivo
         
     def reset(self):
         """Resetta lo stato della macchinetta."""
@@ -60,6 +62,8 @@ class CoreEngine:
         self.signal_stop_price = None
         self.signal_candle_tk_active = False
         self.signal_stop_price_tk = None
+        self.core_ref_line = "KJ"
+        self.core_ref_value = None
         # NOTA: le candele (lo storico) NON vengono resettate perché servono agli indicatori!
 
     def seed_history(self, candles_list):
@@ -75,6 +79,8 @@ class CoreEngine:
         self.signal_stop_price = None
         self.signal_candle_tk_active = False
         self.signal_stop_price_tk = None
+        self.core_ref_line = "KJ"
+        self.core_ref_value = None
         pos = self.pm.open_core(current_price, self.config.get("size_i"), direction)
         print(f"START: Eseguita Core a Mercato {direction} a Prezzo={current_price}")
         return pos
@@ -133,15 +139,26 @@ class CoreEngine:
         min_body = self.config.get("min_body_pips", 1)
         return tolleranza_tk, max_dist_tk, min_dist_incr, min_body
 
-    def _get_max_kj_tk_threshold_pips(self):
-        """Restituisce la soglia di forbice Kijun-Tenkan in pip per Timeframe: H1=30, H4=40, D1=50."""
+    def _get_core_switch_threshold_pips(self):
+        """Restituisce la soglia di distanza KJ-TK in pip per attivare lo switch Core su TK: H1=40, H4=70, Daily=100."""
         tf_val = str(self.config.get("timeframe", "HOUR")).upper()
         if "HOUR_4" in tf_val or "H4" in tf_val:
-            return 40
+            return self.config.get("core_switch_h4_pips", 70)
         elif "DAY" in tf_val or "D1" in tf_val:
-            return 50
+            return self.config.get("core_switch_d1_pips", 100)
         else:
-            return 30 # Default H1 (HOUR)
+            return self.config.get("core_switch_h1_pips", 40)
+
+    def _get_core_reference(self):
+        """Calcola se la Core deve fare riferimento a TK21 (se distanza > soglia) o KJ55 naturale."""
+        if self.current_tk is None or self.current_kj is None:
+            return "KJ", self.current_kj
+        pip_val = self.config.get("pip_value") or 0.0001
+        dist_pips = abs(self.current_kj - self.current_tk) / pip_val
+        soglia = self._get_core_switch_threshold_pips()
+        if dist_pips > (soglia - 1e-7):
+            return "TK", self.current_tk
+        return "KJ", self.current_kj
 
     def on_candle_close(self, closed_candle, next_open_price=None):
         """
@@ -153,8 +170,8 @@ class CoreEngine:
             
         events = []
         
-        self.current_tk = self._calculate_donchian(self.config.get("tk_periods"))
-        self.current_kj = self._calculate_donchian(self.config.get("kj_periods"))
+        self.current_tk = self._calculate_donchian(self.config.get("tk_periods", 21))
+        self.current_kj = self._calculate_donchian(self.config.get("kj_periods", 55))
         
         if not self.is_running:
             return events
@@ -165,6 +182,18 @@ class CoreEngine:
         exec_price = next_open_price if next_open_price is not None else c_close
         tk = self.current_tk
         kj = self.current_kj
+
+        ref_line, ref_value = self._get_core_reference()
+        prev_ref = getattr(self, "core_ref_line", "KJ")
+        self.core_ref_line = ref_line
+        self.core_ref_value = ref_value
+        ref_core = ref_value if ref_value is not None else kj
+
+        # Se la linea di riferimento è cambiata (es. da TK è tornata sotto soglia a KJ), azzeriamo eventuale candela segnale
+        if prev_ref != ref_line:
+            self.signal_candle_active = False
+            self.signal_stop_price = None
+
         pip_val = self.config.get("pip_value") or 0.0001
         min_body = self.config.get("min_body", 5) or 5
         min_body_price = min_body * pip_val
@@ -177,9 +206,9 @@ class CoreEngine:
         
         if self.current_direction == "LONG":
             # --- USCITE E REVERSAL LONG ---
-            # Nessun Trailing SL sulla Core: la Core corre libera ed è protetta unicamente da Kijun e Candela Segnale
-            if c_close < kj:
-                # Chiusura sotto Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Minimo - 5 pip
+            # La Core corre libera ed è protetta dalla linea di riferimento attiva (KJ55 o TK21 se forbice > soglia)
+            if c_close < ref_core:
+                # Chiusura sotto linea guida Core: Candela Segnale! Imposta stop a Minimo - 5 pip
                 stop_livello = closed_candle.low - (5 * pip_val)
                 if self.signal_candle_active and self.signal_stop_price is not None:
                     self.signal_stop_price = min(self.signal_stop_price, stop_livello)
@@ -187,33 +216,23 @@ class CoreEngine:
                     self.signal_candle_active = True
                     self.signal_stop_price = stop_livello
                 events.append({
-                    "type": "signal_candle_kj",
+                    "type": f"signal_candle_{ref_line.lower()}",
                     "direction": "LONG",
                     "stop_price": self.signal_stop_price,
                     "candle_low": closed_candle.low,
-                    "kj": kj
+                    "ref_line": ref_line,
+                    "ref_value": ref_core
                 })
             else:
-                # c_close >= kj: prezzo rientrato sopra Kijun, eventuale Candela Segnale azzerata
+                # c_close >= ref_core: prezzo sopra linea guida, eventuale Candela Segnale azzerata
                 self.signal_candle_active = False
                 self.signal_stop_price = None
 
             if self.current_direction == "LONG":
-
-                # Gestione Stop Loss Incrementi: Candela Segnale TK (se forbice TK-KJ > soglia)
-                max_forbice_pips = self._get_max_kj_tk_threshold_pips()
-                dist_kj_tk_pips = abs(tk - kj) / pip_val
-                proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
-
-                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
-                tolleranza_tk = tol_pips * pip_val
-                max_dist_tk = max_tk_dist_pips * pip_val
-                min_dist_incr = min_dist_pips * pip_val
-                min_body = min_body_pips * pip_val
-
+                # Gestione Stop Loss Incrementi: Candela Segnale TK
                 if len(self.pm.increments) > 0:
-                    if proteggi_su_tk and c_close < (tk - tolleranza_tk - 1e-7):
-                        # Chiusura sotto Tenkan oltre tolleranza pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Minimo - 5 pip
+                    if c_close < tk:
+                        # Chiusura sotto Tenkan: Candela Segnale TK! Imposta stop a Minimo - 5 pip
                         stop_livello_tk = closed_candle.low - (5 * pip_val)
                         if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                             self.signal_stop_price_tk = min(self.signal_stop_price_tk, stop_livello_tk)
@@ -228,7 +247,7 @@ class CoreEngine:
                             "tk": tk
                         })
                     else:
-                        # c_close in zona TK o sopra, oppure forbice stretta (<= soglia, respiro verso KJ): eventuale Candela Segnale TK azzerata
+                        # c_close >= tk: prezzo rientrato sopra TK, eventuale Candela Segnale TK azzerata
                         self.signal_candle_tk_active = False
                         self.signal_stop_price_tk = None
                 else:
@@ -262,6 +281,11 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO LONG ---
+                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
+                tolleranza_tk = tol_pips * pip_val
+                max_dist_tk = max_tk_dist_pips * pip_val
+                min_dist_incr = min_dist_pips * pip_val
+                min_body = min_body_pips * pip_val
 
                 if closed_candle.open > (tk - tolleranza_tk) and c_close >= (tk - tolleranza_tk - 1e-7) and (c_close - tk) <= (max_dist_tk + 1e-7):
                     # Candela rossa di almeno min_body pip
@@ -295,9 +319,10 @@ class CoreEngine:
 
         elif self.current_direction == "SHORT":
             # --- USCITE E REVERSAL SHORT ---
-            # Nessun Trailing SL sulla Core: la Core corre libera ed è protetta unicamente da Kijun e Candela Segnale
-            if c_close > kj:
-                # Chiusura sopra Kijun: Candela Segnale! Non chiude subito all'Open, imposta stop confermato a Massimo + 5 pip
+            # La Core corre libera ed è protetta dalla linea di riferimento attiva (KJ55 o TK21 se forbice > soglia)
+            ref_core = ref_value if ref_value is not None else kj
+            if c_close > ref_core:
+                # Chiusura sopra linea guida Core: Candela Segnale! Imposta stop a Massimo + 5 pip
                 stop_livello = closed_candle.high + (5 * pip_val)
                 if self.signal_candle_active and self.signal_stop_price is not None:
                     self.signal_stop_price = max(self.signal_stop_price, stop_livello)
@@ -305,33 +330,23 @@ class CoreEngine:
                     self.signal_candle_active = True
                     self.signal_stop_price = stop_livello
                 events.append({
-                    "type": "signal_candle_kj",
+                    "type": f"signal_candle_{ref_line.lower()}",
                     "direction": "SHORT",
                     "stop_price": self.signal_stop_price,
                     "candle_high": closed_candle.high,
-                    "kj": kj
+                    "ref_line": ref_line,
+                    "ref_value": ref_core
                 })
             else:
-                # c_close <= kj: prezzo rientrato sotto Kijun, eventuale Candela Segnale azzerata
+                # c_close <= ref_core: prezzo rientrato sotto linea guida, eventuale Candela Segnale azzerata
                 self.signal_candle_active = False
                 self.signal_stop_price = None
 
             if self.current_direction == "SHORT":
-
-                # Gestione Stop Loss Incrementi: Candela Segnale TK (se forbice TK-KJ > soglia)
-                max_forbice_pips = self._get_max_kj_tk_threshold_pips()
-                dist_kj_tk_pips = abs(tk - kj) / pip_val
-                proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
-
-                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
-                tolleranza_tk = tol_pips * pip_val
-                max_dist_tk = max_tk_dist_pips * pip_val
-                min_dist_incr = min_dist_pips * pip_val
-                min_body = min_body_pips * pip_val
-
+                # Gestione Stop Loss Incrementi: Candela Segnale TK
                 if len(self.pm.increments) > 0:
-                    if proteggi_su_tk and c_close > (tk + tolleranza_tk + 1e-7):
-                        # Chiusura sopra Tenkan oltre tolleranza pip con forbice ampia (> soglia): Candela Segnale TK! Imposta stop a Massimo + 5 pip
+                    if c_close > tk:
+                        # Chiusura sopra Tenkan: Candela Segnale TK! Imposta stop a Massimo + 5 pip
                         stop_livello_tk = closed_candle.high + (5 * pip_val)
                         if self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                             self.signal_stop_price_tk = max(self.signal_stop_price_tk, stop_livello_tk)
@@ -346,7 +361,7 @@ class CoreEngine:
                             "tk": tk
                         })
                     else:
-                        # c_close in zona TK o sotto, oppure forbice stretta (<= soglia, respiro verso KJ): eventuale Candela Segnale TK azzerata
+                        # c_close in zona TK o sotto: eventuale Candela Segnale TK azzerata
                         self.signal_candle_tk_active = False
                         self.signal_stop_price_tk = None
                 else:
@@ -380,6 +395,11 @@ class CoreEngine:
                         self.retracement_start_price = None
 
                 # --- INGRESSI INCREMENTO SHORT ---
+                tol_pips, max_tk_dist_pips, min_dist_pips, min_body_pips = self._get_tk_increment_filters()
+                tolleranza_tk = tol_pips * pip_val
+                max_dist_tk = max_tk_dist_pips * pip_val
+                min_dist_incr = min_dist_pips * pip_val
+                min_body = min_body_pips * pip_val
 
                 if closed_candle.open < (tk + tolleranza_tk) and c_close <= (tk + tolleranza_tk + 1e-7) and (tk - c_close) <= (max_dist_tk + 1e-7):
                     # Candela verde di almeno min_body pip
@@ -474,9 +494,11 @@ class CoreEngine:
         tk = self.current_tk
         kj = self.current_kj
         pip_val = self.config.get("pip_value") or 0.0001
-        max_forbice_pips = self._get_max_kj_tk_threshold_pips()
-        dist_kj_tk_pips = abs(tk - kj) / pip_val
-        proteggi_su_tk = dist_kj_tk_pips > (max_forbice_pips - 1e-7)
+
+        ref_line, ref_value = self._get_core_reference()
+        self.core_ref_line = ref_line
+        self.core_ref_value = ref_value
+        ref_core = ref_value if ref_value is not None else kj
         
         # Soglie per gestione a 3 stadi singolo incremento
         be_pips, be_offset_pips, tp_pips, trail_dist_pips = self._get_increment_rules()
@@ -493,8 +515,8 @@ class CoreEngine:
         sl_incr_pips = self.config.get("sl_incr_paracadute_pips", 10)
 
         if self.current_direction == "LONG":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ - 10 pip
-            sl_core_base = kj - (sl_core_pips * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): ref_core - 10 pip
+            sl_core_base = ref_core - (sl_core_pips * pip_val)
             if current_price <= (sl_core_base + 1e-7):
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
@@ -505,7 +527,7 @@ class CoreEngine:
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
+                events.append({"type": "reversal", "reason": f"live_stop_{ref_line.lower()}", "new_direction": "FLAT", "price": current_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 return events
@@ -522,13 +544,13 @@ class CoreEngine:
                     events.extend(self.pm.close_all_increments(current_price))
                     ev = self.pm.close_core(current_price)
                     if ev: events.append(ev)
-                    events.append({"type": "reversal", "reason": "live_stop_kj_break_min", "new_direction": "FLAT", "price": current_price})
+                    events.append({"type": "reversal", "reason": f"live_stop_{ref_line.lower()}_break_min", "new_direction": "FLAT", "price": current_price})
                     self.current_direction = "FLAT"
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK - 10 pip solo se forbice ampia > soglia
-            if len(self.pm.increments) > 0 and proteggi_su_tk:
+            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK - 10 pip (SEMPRE ATTIVO)
+            if len(self.pm.increments) > 0:
                 sl_incr_base = tk - (sl_incr_pips * pip_val)
                 if current_price <= (sl_incr_base + 1e-7):
                     self.signal_candle_tk_active = False
@@ -539,8 +561,8 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk", "price": current_price})
                     self.retracement_start_price = None
 
-            # 4. Stop Conferma Candela Segnale TK (Minimo - 5 pip) - attivo solo se forbice ampia
-            if len(self.pm.increments) > 0 and proteggi_su_tk and self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
+            # 4. Stop Conferma Candela Segnale TK (Minimo - 5 pip) - SEMPRE ATTIVO
+            if len(self.pm.increments) > 0 and self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                 if current_price <= (self.signal_stop_price_tk + 1e-7):
                     self.signal_candle_tk_active = False
                     self.signal_stop_price_tk = None
@@ -620,8 +642,8 @@ class CoreEngine:
                     self.retracement_start_price = None
 
         elif self.current_direction == "SHORT":
-            # 1. Stop Loss Core Intracandela (Paracadute): KJ + 10 pip
-            sl_core_base = kj + (sl_core_pips * pip_val)
+            # 1. Stop Loss Core Intracandela (Paracadute): ref_core + 10 pip
+            sl_core_base = ref_core + (sl_core_pips * pip_val)
             if current_price >= (sl_core_base - 1e-7):
                 self.trailing_sl_core = None
                 self.trailing_sl_incr = None
@@ -632,7 +654,7 @@ class CoreEngine:
                 events.extend(self.pm.close_all_increments(current_price))
                 ev = self.pm.close_core(current_price)
                 if ev: events.append(ev)
-                events.append({"type": "reversal", "reason": "live_stop_kj", "new_direction": "FLAT", "price": current_price})
+                events.append({"type": "reversal", "reason": f"live_stop_{ref_line.lower()}", "new_direction": "FLAT", "price": current_price})
                 self.current_direction = "FLAT"
                 self.retracement_start_price = None
                 return events
@@ -649,13 +671,13 @@ class CoreEngine:
                     events.extend(self.pm.close_all_increments(current_price))
                     ev = self.pm.close_core(current_price)
                     if ev: events.append(ev)
-                    events.append({"type": "reversal", "reason": "live_stop_kj_break_max", "new_direction": "FLAT", "price": current_price})
+                    events.append({"type": "reversal", "reason": f"live_stop_{ref_line.lower()}_break_max", "new_direction": "FLAT", "price": current_price})
                     self.current_direction = "FLAT"
                     self.retracement_start_price = None
                     return events
 
-            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK + 10 pip solo se forbice ampia > soglia
-            if len(self.pm.increments) > 0 and proteggi_su_tk:
+            # 3. Stop Loss Incrementi Intracandela: Paracadute TK a TK + 10 pip (SEMPRE ATTIVO)
+            if len(self.pm.increments) > 0:
                 sl_incr_base = tk + (sl_incr_pips * pip_val)
                 if current_price >= (sl_incr_base - 1e-7):
                     self.signal_candle_tk_active = False
@@ -666,8 +688,8 @@ class CoreEngine:
                         events.append({"type": "increments_cleared", "reason": "live_stop_tk", "price": current_price})
                     self.retracement_start_price = None
 
-            # 4. Stop Conferma Candela Segnale TK (Massimo + 5 pip) - attivo solo se forbice ampia
-            if len(self.pm.increments) > 0 and proteggi_su_tk and self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
+            # 4. Stop Conferma Candela Segnale TK (Massimo + 5 pip) - SEMPRE ATTIVO
+            if len(self.pm.increments) > 0 and self.signal_candle_tk_active and self.signal_stop_price_tk is not None:
                 if current_price >= (self.signal_stop_price_tk - 1e-7):
                     self.signal_candle_tk_active = False
                     self.signal_stop_price_tk = None

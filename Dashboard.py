@@ -3227,8 +3227,21 @@ else:
                         except Exception:
                             pass
                     
-                    lbl_kj = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>KJ</span>"
-                    lbl_tk = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>TK</span>"
+                    core_ref_m = mem_corrente.get(nome, {}).get("core_ref_line")
+                    if not core_ref_m and kj_val is not None and tk_val is not None:
+                        tf_m = mem_corrente.get(nome, {}).get("timeframe", "HOUR")
+                        soglia_m = 70 if ("HOUR_4" in tf_m or "H4" in tf_m) else (100 if ("DAY" in tf_m or "D1" in tf_m) else 40)
+                        dist_m = abs(kj_val - tk_val) / mult
+                        core_ref_m = "TK" if dist_m > (soglia_m - 1e-7) else "KJ"
+                    else:
+                        core_ref_m = core_ref_m or "KJ"
+
+                    if core_ref_m == "TK":
+                        lbl_kj = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>KJ</span>"
+                        lbl_tk = "<br><span class='entry-date' style='font-size: 0.75rem; color: #00BFFF; font-weight: bold;'>TK (Guida Core)</span>"
+                    else:
+                        lbl_kj = "<br><span class='entry-date' style='font-size: 0.75rem; color: #FFD700; font-weight: bold;'>KJ (Guida Core)</span>"
+                        lbl_tk = "<br><span class='entry-date' style='font-size: 0.75rem; color: #888;'>TK</span>"
                     if kj_val is not None:
                         stop_str = f"<span style='color: #FFD700;' title='Kijun-sen (KJ)'>{formatta_numero(kj_val, dec)}</span>{lbl_kj}"
                     else:
@@ -3291,7 +3304,7 @@ else:
                         tot_pnl_kj_eur += (pts_kj_p * sz_p * valore_punto * rate)
                     col_tot_kj = "#4ade80" if tot_pnl_kj_eur > 0 else ("#ff6b6b" if tot_pnl_kj_eur < 0 else "#aaa")
                     sign_tot_kj = "+" if tot_pnl_kj_eur > 0 else ""
-                    stima_kj_master_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_tot_kj};'>{sign_tot_kj}{formatta_eur(tot_pnl_kj_eur)} €</b></div>"
+                    stima_kj_master_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_tot_kj};'>{sign_tot_kj}{tot_pnl_kj_eur:.0f} €</b></div>"
 
                 if is_first_of_instrument:
                     r_span = pos_row_counts.get(nome, 1)
@@ -3357,16 +3370,33 @@ else:
                                 signal_active = mem_corrente.get(nome, {}).get("signal_candle_active", False)
                                 signal_stop = mem_corrente.get(nome, {}).get("signal_stop_price")
                                 kj_val = mem_corrente.get(nome, {}).get("current_kj")
+                                tk_val = mem_corrente.get(nome, {}).get("current_tk")
                                 pip_val = c.get("moltiplicatore", 0.0001)
+
+                                tf_val = mem_corrente.get(nome, {}).get("timeframe", "HOUR")
+                                tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
+                                tf_str = tf_map.get(tf_val, tf_val)
+
+                                core_ref_line = mem_corrente.get(nome, {}).get("core_ref_line")
+                                if not core_ref_line and kj_val is not None and tk_val is not None:
+                                    soglia_core = 70 if ("HOUR_4" in tf_val or "H4" in tf_val) else (100 if ("DAY" in tf_val or "D1" in tf_val) else 40)
+                                    dist_core_p = abs(kj_val - tk_val) / pip_val
+                                    core_ref_line = "TK" if dist_core_p > (soglia_core - 1e-7) else "KJ"
+                                else:
+                                    core_ref_line = core_ref_line or "KJ"
+
+                                ref_core_val = tk_val if core_ref_line == "TK" else kj_val
+                                lbl_ref = "TK21" if core_ref_line == "TK" else "KJ55"
+
                                 if signal_active and signal_stop is not None:
                                     sl_core = signal_stop
-                                    title_core = "Stop Candela Segnale (Min/Max +- 5 pip confermato)"
+                                    title_core = f"Stop Candela Segnale {lbl_ref} (Min/Max +- 5 pip confermato)"
                                 elif trailing_sl_core is not None:
                                     sl_core = trailing_sl_core
-                                    title_core = "Trailing SL Core (+-20 pip da Close)"
-                                elif kj_val is not None:
-                                    sl_core = (kj_val - (20 * pip_val)) if dir == 'BUY' else (kj_val + (20 * pip_val))
-                                    title_core = "Paracadute KJ (KJ +- 20 pip)"
+                                    title_core = "Trailing SL Core"
+                                elif ref_core_val is not None:
+                                    sl_core = (ref_core_val - (10 * pip_val)) if dir == 'BUY' else (ref_core_val + (10 * pip_val))
+                                    title_core = f"Paracadute {lbl_ref} ({lbl_ref} +- 10 pip)"
                                 else:
                                     sl_core = None
                                 
@@ -3374,11 +3404,9 @@ else:
                                     s_str = f"<span style='color: #b0b0b0;' title='{title_core}'>{formatta_numero(sl_core, dec)}</span>"
                                 else:
                                     s_str = "-"
-                                tf_val = mem_corrente.get(nome, {}).get("timeframe", "HOUR")
-                                tf_map = {"MINUTE_5": "M5", "MINUTE_10": "M10", "HOUR": "H1", "HOUR_4": "H4", "DAY": "D"}
-                                tf_str = tf_map.get(tf_val, tf_val)
                                 dir_str = 'LONG' if dir == 'BUY' else 'SHORT'
-                                ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span></span>"
+                                badge_tk = " <span style='color: #00BFFF; font-size: 0.70rem; border: 1px solid #00BFFF; border-radius: 3px; padding: 0 3px;'>TK</span>" if core_ref_line == "TK" else ""
+                                ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Core ({dir_str}) <span style='color: #FFD700;'>[{tf_str}]</span>{badge_tk}</span>"
                             else:
                                 incr_idx = other_positions.index(p) + 1
                                 ruolo_child = f"<span style='color: #FF8C00; font-weight: bold;'>Incremento n. {incr_idx}</span>"
@@ -3403,8 +3431,8 @@ else:
                                     sl_display = trailing_sl_incr
                                     title_info = "Trailing SL Incremento"
                                 elif tk_val is not None:
-                                    sl_display = (tk_val - (15 * pip_val)) if dir == 'BUY' else (tk_val + (15 * pip_val))
-                                    title_info = "Paracadute TK (TK +- 15 pip)"
+                                    sl_display = (tk_val - (10 * pip_val)) if dir == 'BUY' else (tk_val + (10 * pip_val))
+                                    title_info = "Paracadute TK (TK +- 10 pip)"
                                 else:
                                     sl_display = None
                                 
@@ -3450,7 +3478,7 @@ else:
                             pnl_kj_c = pts_kj_c * sz * valore_punto * rate
                             col_kj_c = "#4ade80" if pnl_kj_c > 0 else ("#ff6b6b" if pnl_kj_c < 0 else "#aaa")
                             sign_kj_c = "+" if pnl_kj_c > 0 else ""
-                            stima_kj_child_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_kj_c};'>{sign_kj_c}{formatta_eur(pnl_kj_c)} €</b></div>"
+                            stima_kj_child_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ: <b style='color: {col_kj_c};'>{sign_kj_c}{pnl_kj_c:.0f} €</b></div>"
 
                         td_tipo_child = f"<td><span class='{size_class}' style='font-weight: normal; {color_style}'><u style='{u_style}'>{ruolo_child}</u></span>{stima_kj_child_html}</td>" if mostra_tipo else ""
                         html_pos += f"<tr class='ig-row ig-subrow' style='{subrow_style}'><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{sign}{sz:g}</u></td><td class='{size_class}' style='{color_style}'><u style='{u_style}'>{formatta_numero(lvl, dec)}</u><br><span class='entry-date' style='font-size: 0.75rem; color: #888; text-decoration: none !important; display: inline-block;'>{data_str}</span></td><td></td><td>{s_str}</td><td>{l_str}</td>{td_tipo_child}<td class='{pnl_c_class}'>{pnl_child_eur:.0f} €</td></tr>\n"
@@ -5389,11 +5417,13 @@ else:
                         tot_col = "#4ade80" if pnl_tot > 0 else ("#ff6b6b" if pnl_tot < 0 else "#aaa")
                         ora_lbl = f"Ore: {ora_riga2}" if ora_riga2 else "Ore: —"
 
+                        core_ref_o = camp.get("core_ref_line", "KJ")
+                        lbl_sig_core = "TK" if core_ref_o == "TK" else "KJ"
                         sig_badge = ""
                         if camp.get("signal_candle_active") and camp.get("signal_stop_price") is not None:
-                            sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop KJ: {float(camp['signal_stop_price']):.{dec}f}</div>"
+                            sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop {lbl_sig_core}: {float(camp['signal_stop_price']):.{dec}f}</div>"
                         elif camp.get("signal_candle_tk_active") and camp.get("signal_stop_price_tk") is not None:
-                            sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop TK: {float(camp['signal_stop_price_tk']):.{dec}f}</div>"
+                            sig_badge = f"<div style='font-size:0.70rem; color:#FBBF24;'>🔔 Stop TK Incr: {float(camp['signal_stop_price_tk']):.{dec}f}</div>"
 
                         sub_pnl_html = ""
                         if incr_rows:
@@ -5645,7 +5675,7 @@ else:
                             pnl_kj_eur = pts_kj * sz * valore_punto * rate_eur
                             col_kj = "#4ade80" if pnl_kj_eur > 0 else ("#ff6b6b" if pnl_kj_eur < 0 else "#aaa")
                             sign_kj = "+" if pnl_kj_eur > 0 else ""
-                            pnl_kj_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ ({kj_num:.{dec}f}): <b style='color: {col_kj};'>{sign_kj}{formatta_eur(pnl_kj_eur)} €</b></div>"
+                            pnl_kj_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ ({kj_num:.{dec}f}): <b style='color: {col_kj};'>{sign_kj}{pnl_kj_eur:.0f} €</b></div>"
 
                     with st.container(border=True):
                         col1, col2, col3, col4, col5, col6, col7 = st.columns([1.8, 0.8, 1.2, 1.2, 2.2, 1.3, 1.1], vertical_alignment="center")

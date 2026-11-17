@@ -1959,18 +1959,27 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
                     elif "trailing" in r_reason or "live_stop_trailing_core" in r_reason or "close_below_trailing_sl_core" in r_reason or "close_above_trailing_sl_core" in r_reason:
                         tag_motivo = "Trailing Core H1"
                         tag_title = "TRAILING CORE H1"
+                    elif "live_stop_tk_break_min" in r_reason:
+                        tag_motivo = "Stop TK21 (Break Min -5p)"
+                        tag_title = "STOP TK21 (BREAK MIN)"
+                    elif "live_stop_tk_break_max" in r_reason:
+                        tag_motivo = "Stop TK21 (Break Max +5p)"
+                        tag_title = "STOP TK21 (BREAK MAX)"
+                    elif "live_stop_tk" in r_reason:
+                        tag_motivo = "Paracadute TK21"
+                        tag_title = "PARACADUTE TK21"
                     elif "live_stop_kj_break_min" in r_reason:
-                        tag_motivo = "Stop KJ (Break Min -5p)"
-                        tag_title = "STOP KJ (BREAK MIN)"
+                        tag_motivo = "Stop KJ55 (Break Min -5p)"
+                        tag_title = "STOP KJ55 (BREAK MIN)"
                     elif "live_stop_kj_break_max" in r_reason:
-                        tag_motivo = "Stop KJ (Break Max +5p)"
-                        tag_title = "STOP KJ (BREAK MAX)"
+                        tag_motivo = "Stop KJ55 (Break Max +5p)"
+                        tag_title = "STOP KJ55 (BREAK MAX)"
                     elif "live_stop" in r_reason:
-                        tag_motivo = "Paracadute KJ"
-                        tag_title = "PARACADUTE KJ"
+                        tag_motivo = "Paracadute KJ55"
+                        tag_title = "PARACADUTE KJ55"
                     else:
-                        tag_motivo = "Stop KJ"
-                        tag_title = "STOP KJ"
+                        tag_motivo = "Stop Trend"
+                        tag_title = "STOP TREND"
                     core_close_summary = f"🛑 {tag_motivo} ({sz}){pnl_str}"
                     msg = f"🛑 {tag_motivo}: Close Core ({sz}){px_str}{pnl_str} ➡️ FLAT"
                     if not has_auto_start:
@@ -2188,7 +2197,9 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             "signal_candle_active": getattr(engine, "signal_candle_active", False),
             "signal_stop_price": getattr(engine, "signal_stop_price", None),
             "signal_candle_tk_active": getattr(engine, "signal_candle_tk_active", False),
-            "signal_stop_price_tk": getattr(engine, "signal_stop_price_tk", None)
+            "signal_stop_price_tk": getattr(engine, "signal_stop_price_tk", None),
+            "core_ref_line": getattr(engine, "core_ref_line", "KJ"),
+            "core_ref_value": getattr(engine, "core_ref_value", None)
         }
 
         if ha_fatto_eventi:
@@ -2200,7 +2211,8 @@ def processa_eventi_engine(nome, engine, events, epic, valuta, size_i, headers, 
             "posizioni_core": [], "posizioni_incr": [], 
             "trailing_sl_incr": None, "trailing_sl_core": None,
             "signal_candle_active": False, "signal_stop_price": None,
-            "signal_candle_tk_active": False, "signal_stop_price_tk": None
+            "signal_candle_tk_active": False, "signal_stop_price_tk": None,
+            "core_ref_line": "KJ", "core_ref_value": None
         }
         if ha_fatto_eventi:
             if len(storico) > 30: storico = storico[-30:]
@@ -2261,6 +2273,12 @@ def _ombra_pnl_eur(camp, raw_diff, prezzi_live):
 
 def _formatta_motivo_chiusura_ombra(r_reason: str) -> str:
     r = str(r_reason or "")
+    if "live_stop_tk_break_min" in r:
+        return "Stop TK21 (Break Min -5p)"
+    if "live_stop_tk_break_max" in r:
+        return "Stop TK21 (Break Max +5p)"
+    if "live_stop_tk" in r:
+        return "Paracadute TK21"
     if "live_stop_kj_break_min" in r:
         return "Stop KJ55 (Break Min -5p)"
     if "live_stop_kj_break_max" in r:
@@ -2269,7 +2287,7 @@ def _formatta_motivo_chiusura_ombra(r_reason: str) -> str:
         return "Paracadute KJ55"
     if "tp_kj_extension" in r:
         return "TP Estensione KJ55"
-    return "Stop KJ55"
+    return "Stop Core"
 
 
 def processa_eventi_ombra(oid, camp, engine, events, prezzi_live, dec, tf):
@@ -2322,8 +2340,9 @@ def processa_eventi_ombra(oid, camp, engine, events, prezzi_live, dec, tf):
             msg = f"{tag} ({sz_i}){px_str} [{pnl_eur:+.2f} €]"
             storico.append(f"[{ora_str}] {msg}")
             print_log(nome, f"[OMBRA {tf_label}] {msg}")
-        elif tipo == "signal_candle_kj":
-            msg = f"🔔 Ombra Candela Segnale KJ55 -> Stop {float(ev.get('stop_price', 0)):.{dec}f}"
+        elif tipo in ("signal_candle_kj", "signal_candle_core"):
+            ref_n = "TK21" if ev.get("ref_line") == "TK" else "KJ55"
+            msg = f"🔔 Ombra Candela Segnale {ref_n} -> Stop {float(ev.get('stop_price', 0)):.{dec}f}"
             storico.append(f"[{ora_str}] {msg}")
             print_log(nome, f"[OMBRA {tf_label}] {msg}")
         elif tipo == "signal_candle_tk":
@@ -2347,6 +2366,8 @@ def processa_eventi_ombra(oid, camp, engine, events, prezzi_live, dec, tf):
     camp["signal_stop_price"] = engine.signal_stop_price
     camp["signal_candle_tk_active"] = bool(engine.signal_candle_tk_active)
     camp["signal_stop_price_tk"] = engine.signal_stop_price_tk
+    camp["core_ref_line"] = getattr(engine, "core_ref_line", "KJ")
+    camp["core_ref_value"] = getattr(engine, "core_ref_value", None)
     camp["storico"] = storico[-80:]
 
     return (core_closed_ev is not None), core_close_px, rev_reason, core_pnl_eur
@@ -2445,6 +2466,8 @@ def esegui_ciclo_ombra(prezzi_live, candele_appena_chiuse):
             engine.signal_stop_price_tk = camp.get("signal_stop_price_tk")
             engine.current_tk = camp.get("current_tk")
             engine.current_kj = camp.get("current_kj")
+            engine.core_ref_line = camp.get("core_ref_line", "KJ")
+            engine.core_ref_value = camp.get("core_ref_value")
 
         changed = False
         if not engine.candles:
@@ -2860,6 +2883,8 @@ def esegui_ciclo_trend():
                 engine.signal_stop_price_tk = dati.get("signal_stop_price_tk")
                 engine.current_tk = dati.get("current_tk")
                 engine.current_kj = dati.get("current_kj")
+                engine.core_ref_line = dati.get("core_ref_line", "KJ")
+                engine.core_ref_value = dati.get("core_ref_value")
 
                 
                 # Inizializzazione rapida al boot dall'ultima candela locale se i trailing non sono ancora in memoria
