@@ -4054,11 +4054,53 @@ else:
                                                     scrivi_log(f"[{nome}] 🛑 STOP MANUALE: Chiusa posizione {label_tipo}{px_str} [PnL: {sign_p}{pnl_it:.0f} €]", conto=conto_selezionato)
                                                 except Exception:
                                                     pass
+
+                                                # Notifica Push NTFY chiusura Trend
+                                                try:
+                                                    env_p_t = os.path.join(conto_selezionato, ".env")
+                                                    if not os.path.exists(env_p_t): env_p_t = ".env"
+                                                    cfg_env_t = dotenv_values(env_p_t)
+                                                    topic_t = cfg_env_t.get("NTFY_TOPIC")
+                                                    if topic_t:
+                                                        tf_lbl_t = format_tf_label(dati_salvati.get("timeframe", "H1"))
+                                                        body_ntfy_t = f"[{nome}] STOP MANUALE {label_tipo}({sz_int}c){px_str} [PnL: {sign_p}{pnl_it:.0f} €] ➡️ FLAT"
+                                                        from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+                                                        invia_notifica_centralizzata(
+                                                            topic=topic_t,
+                                                            titolo=f"🛑 STOP MANUALE TREND: {nome} {tf_lbl_t}",
+                                                            messaggio=body_ntfy_t,
+                                                            tags="octagonal_sign",
+                                                            prioritario=True,
+                                                            prefisso_conto=conto_selezionato
+                                                        )
+                                                except Exception:
+                                                    pass
                                         else:
                                             msg_stop = f"[{ora_str}] 🛑 STOP: Spento e chiuso su IG ({msg_ig})"
                                             storico.append(msg_stop)
                                             try:
                                                 scrivi_log(f"[{nome}] 🛑 STOP MANUALE: Spento e chiuso su IG ({msg_ig})", conto=conto_selezionato)
+                                            except Exception:
+                                                pass
+
+                                            # Notifica Push NTFY stop generico
+                                            try:
+                                                env_p_t = os.path.join(conto_selezionato, ".env")
+                                                if not os.path.exists(env_p_t): env_p_t = ".env"
+                                                cfg_env_t = dotenv_values(env_p_t)
+                                                topic_t = cfg_env_t.get("NTFY_TOPIC")
+                                                if topic_t:
+                                                    tf_lbl_t = format_tf_label(dati_salvati.get("timeframe", "H1"))
+                                                    body_ntfy_t = f"[{nome}] STOP MANUALE: Spento e chiuso su IG ({msg_ig}) ➡️ FLAT"
+                                                    from Sistema.notifiche_manager import invia_notifica as invia_notifica_centralizzata
+                                                    invia_notifica_centralizzata(
+                                                        topic=topic_t,
+                                                        titolo=f"🛑 STOP MANUALE TREND: {nome} {tf_lbl_t}",
+                                                        messaggio=body_ntfy_t,
+                                                        tags="octagonal_sign",
+                                                        prioritario=True,
+                                                        prefisso_conto=conto_selezionato
+                                                    )
                                             except Exception:
                                                 pass
                                         memoria_attuale[nome] = {
@@ -5567,6 +5609,18 @@ else:
                     role_html = calcola_ruolo_posizione(nome, dir_pos, sz, param_inst, pos, {}, {}, pos_data)
                     role_clean = re.sub(r"<[^>]+>", "", role_html).strip()
 
+                    # Stima P/L su Kijun per posizioni TREND
+                    pnl_kj_html = ""
+                    if is_deal_t_rec and param_inst:
+                        kj_val_t = param_inst.get("current_kj")
+                        if kj_val_t is not None and mult > 0:
+                            kj_num = float(kj_val_t)
+                            pts_kj = (kj_num - lvl_open)/mult if dir_pos == 'BUY' else (lvl_open - kj_num)/mult
+                            pnl_kj_eur = pts_kj * sz * valore_punto * rate_eur
+                            col_kj = "#4ade80" if pnl_kj_eur > 0 else ("#ff6b6b" if pnl_kj_eur < 0 else "#aaa")
+                            sign_kj = "+" if pnl_kj_eur > 0 else ""
+                            pnl_kj_html = f"<div style='font-size: 0.75rem; color: #aaa; margin-top: 2px;'>Stima KJ ({kj_num:.{dec}f}): <b style='color: {col_kj};'>{sign_kj}{formatta_eur(pnl_kj_eur)} €</b></div>"
+
                     with st.container(border=True):
                         col1, col2, col3, col4, col5, col6, col7 = st.columns([1.8, 0.8, 1.2, 1.2, 2.2, 1.3, 1.1], vertical_alignment="center")
                         with col1:
@@ -5582,7 +5636,7 @@ else:
                             px_str = f"{px_live:.{dec}f}" if px_live else "-"
                             st.markdown(f"<div style='font-family: monospace; font-size: 1.05rem; color: #FFD700; font-weight: bold;'>{px_str}</div>", unsafe_allow_html=True)
                         with col5:
-                            st.markdown(f"<div style='font-size: 0.92rem; line-height: 1.3;'>{role_html}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='font-size: 0.92rem; line-height: 1.3;'>{role_html}{pnl_kj_html}</div>", unsafe_allow_html=True)
                         with col6:
                             pnl_col = "#4ade80" if pnl_eur > 0 else ("#ff6b6b" if pnl_eur < 0 else "#aaa")
                             sign_e = "+" if pnl_eur > 0 else ""
