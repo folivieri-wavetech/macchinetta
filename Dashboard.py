@@ -2312,7 +2312,7 @@ def renderizza_schermata_radar(conto_selezionato=None):
                 st.rerun()
 
         gruppi_tabelle = [
-            ("💱 Cross Forex", ["AUD/NZD", "CAD/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY"], "#38bdf8"),
+            ("💱 Cross Forex", ["AUD/NZD", "CAD/JPY", "CHF/JPY", "EUR/JPY", "GBP/JPY", "GBP/USD", "USD/CAD", "USD/CHF", "USD/JPY"], "#38bdf8"),
             ("🪙 Commodities & Indici (Spot Gold, US 500)", ["Spot Gold", "US 500 Cash"], "#f59e0b")
         ]
         tf_map_code = {"H1": "HOUR", "H4": "HOUR_4", "D1": "DAY"}
